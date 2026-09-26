@@ -1,10 +1,27 @@
-# TEKITO
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/header-dark.png">
+    <img src="docs/images/header-light.png" alt="TEKITO, a simple input method" width="600">
+  </picture>
+</p>
 
-Windows のキーボードで英語を楽に打つための入力方式です。Space を押すと打ち間違いを直し、打とうとした単語を候補に出し、打ったとおりでよいときは何もしません。IME（TSF のテキストサービス）として動くので、普通の Windows アプリでそのまま使えます。処理はすべて PC の中で完結します。
+<p align="center">
+  Windows のキーボードで、英語を楽に打つための入力方式。<br>
+  打ち間違いは Space で直り、打ちたかった単語はすぐそこに。打ったとおりでいいときは何もしません。
+</p>
 
-[English](README.md)
+<p align="center">
+  <a href="README.md">English</a> ·
+  <a href="#インストール">インストール</a> ·
+  <a href="#ビルド">ビルド</a> ·
+  <a href="https://capitata.dev">capitata.dev</a>
+</p>
 
-![TEKITO の候補リスト。ライトとダークのグラス、シンプル表示](docs/images/candidate-list.png)
+<p align="center">
+  <img src="docs/images/typing-demo.png" alt="「thnaks for teh reveiw.」と打つと、単語ごとに候補リストが出て、Space で打ち間違いが直り、「thanks for the review.」になる様子" width="640">
+</p>
+
+TEKITO は IME（TSF のテキストサービス）なので、普通の Windows アプリでそのまま使えます。処理はすべて PC の中で完結します。
 
 > TEKITO はプレビュー版です。動作を確認しているのはメモ帳のみです。ほかのアプリの状況は[互換性メモ](docs/compatibility.md)にあります。
 
@@ -20,12 +37,36 @@ Windows のキーボードで英語を楽に打つための入力方式です。
 | Backspace | 補正の直後なら、打ったとおりに戻します。 |
 | Esc | 打ったとおりにします。 |
 | Enter | 候補を選んでいるときはその候補で確定します。それ以外は普通の改行です。 |
-| Alt+` | Auto と Direct を切り替えます。Direct では押したキーがそのまま入ります。 |
 
-次の文字を打った時点で単語は確定するので、あとから取り消す操作はありません。知っている単語、名前、コードらしい文字列、URL やアドレス、パスワード・数字・メール用の欄には手を出しません。ターミナルと、設定で追加したアプリでは完全にオフになります。
+次の文字を打った時点で単語は確定するので、あとから取り消す操作はありません。知っている単語、「brb」のようなチャットの略語、自分で大文字にして打った語、コードらしい文字列、URL やアドレス、パスワード・数字・メール用の欄には手を出しません。
+
+![TEKITO の候補リスト。ライトとダークのグラス、シンプル表示](docs/images/candidate-list.png)
+
+## Auto と Direct
+
+TEKITO には 2 つのモードがあります。タスクバーのボタンが今のモードを表していて、クリックするか Alt+` で切り替えられます。
+
+<table>
+  <tr>
+    <td width="72" align="center"><img src="docs/images/mode-auto.png" width="48" alt=""></td>
+    <td><b>Auto</b><br>スペルを直し、打ちながら単語を提案します。</td>
+    <td><img src="docs/images/taskbar-auto.png" width="216" alt="Auto のときのタスクバー"></td>
+  </tr>
+  <tr>
+    <td align="center">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="docs/images/mode-direct-dark.png">
+        <img src="docs/images/mode-direct-light.png" width="48" alt="">
+      </picture>
+    </td>
+    <td><b>Direct</b><br>押したキーがそのまま入ります。</td>
+    <td><img src="docs/images/taskbar-direct.png" width="216" alt="Direct のときのタスクバー"></td>
+  </tr>
+</table>
+
+ターミナル、管理者として実行中のアプリ、設定で追加したアプリでは、常に Direct になります。
 
 ![TEKITO の設定画面](docs/images/settings.png)
-
 ## プライバシー
 
 TEKITO の処理はすべて PC の中で行います。入力した内容をどこにも送らず、アカウントもテレメトリもなく、入力中にネットワークを使いません。選んだ候補から学習した内容は `%LOCALAPPDATA%\TEKITO` に保存され、設定画面から消せます。詳しくは[プライバシーについて](PRIVACY.md)を参照してください。
@@ -80,3 +121,12 @@ cmake --build --preset windows-x64-debug
 ソースコードは [Functional Source License 1.1](LICENSE.md)（FSL-1.1-ALv2）で公開しています。競合する商用製品に使うこと以外なら、使う・改変する・共有するのは自由です。各リリースは公開から 2 年後に Apache 2.0 になります。配布するインストーラーには [TEKITO 使用許諾契約](installer/TEKITO_LICENSE.md)が、言語データにはそれぞれの出典のライセンスが適用されます。詳しくは[ライセンスについて](LICENSING.md)と[サードパーティー通知](THIRD_PARTY_NOTICES.md)を参照してください。
 
 TEKITO は [Capitata](https://capitata.dev) が開発しています。
+
+<p align="center">
+  <a href="https://capitata.dev">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="docs/images/capitata-dark.png">
+      <img src="docs/images/capitata-light.png" alt="Capitata" width="160">
+    </picture>
+  </a>
+</p>

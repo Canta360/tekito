@@ -4,10 +4,11 @@
 // blur, the shadow window and the rounded corners exactly as a user would
 // see them.
 //
-//   tekito_candidate_window_preview.exe <out.bmp> [stripes|doc|dusk] [short|long] [glide] [click]
+//   tekito_candidate_window_preview.exe <out.bmp> [stripes|doc|paper|dusk] [short|long] [glide] [click]
 //
 // `stripes` puts saturated color bands behind the glass to show the blur;
-// `doc` is a plain page of text, the common case; `dusk` is a dark gradient
+// `doc` is a plain page of text, the common case; `paper` is a soft light
+// background for product shots; `dusk` is a dark gradient
 // wallpaper. `long` shows more
 // candidates than fit on a page, which brings up the page indicator.
 // `glide` moves the selection two rows down and captures mid-animation.
@@ -30,6 +31,7 @@ namespace {
 constexpr int kCaptureMargin = 40;
 bool g_documentBackdrop = false;
 bool g_duskBackdrop = false;
+bool g_paperBackdrop = false;
 
 // Dark slate-to-teal gradient, a calm dark wallpaper.
 void PaintDusk(HDC dc, const RECT& client) {
@@ -38,6 +40,19 @@ void PaintDusk(HDC dc, const RECT& client) {
         const double f = static_cast<double>(y) / static_cast<double>(height > 1 ? height - 1 : 1);
         const auto mix = [f](int a, int b) { return static_cast<BYTE>(a + (b - a) * f); };
         HBRUSH brush = CreateSolidBrush(RGB(mix(22, 92), mix(34, 118), mix(42, 126)));
+        RECT line{client.left, y, client.right, y + 1};
+        FillRect(dc, &line, brush);
+        DeleteObject(brush);
+    }
+}
+
+// Soft light gray-blue, top to bottom.
+void PaintPaper(HDC dc, const RECT& client) {
+    const int height = client.bottom - client.top;
+    for (int y = 0; y < height; ++y) {
+        const double f = static_cast<double>(y) / static_cast<double>(height > 1 ? height - 1 : 1);
+        const auto mix = [f](int a, int b) { return static_cast<BYTE>(a + (b - a) * f); };
+        HBRUSH brush = CreateSolidBrush(RGB(mix(244, 226), mix(246, 232), mix(250, 241)));
         RECT line{client.left, y, client.right, y + 1};
         FillRect(dc, &line, brush);
         DeleteObject(brush);
@@ -109,6 +124,8 @@ LRESULT CALLBACK BackdropProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lPa
         GetClientRect(hwnd, &client);
         if (g_duskBackdrop) {
             PaintDusk(dc, client);
+        } else if (g_paperBackdrop) {
+            PaintPaper(dc, client);
         } else if (g_documentBackdrop) {
             PaintDocument(dc, client);
         } else {
@@ -220,6 +237,7 @@ int wmain(int argc, wchar_t** argv) {
     for (int i = 2; i < argc; ++i) {
         if (wcscmp(argv[i], L"doc") == 0) g_documentBackdrop = true;
         if (wcscmp(argv[i], L"dusk") == 0) g_duskBackdrop = true;
+        if (wcscmp(argv[i], L"paper") == 0) g_paperBackdrop = true;
         if (wcscmp(argv[i], L"long") == 0) longList = true;
         if (wcscmp(argv[i], L"glide") == 0) glide = true;
         if (wcscmp(argv[i], L"click") == 0) click = true;
