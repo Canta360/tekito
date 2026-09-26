@@ -10,7 +10,7 @@ See `third_party/sqlite/README.md` and the notices in the amalgamation source.
 
 ## Microsoft WebView2
 
-The Settings application uses the Microsoft WebView2 SDK. Its redistribution
+The Settings window uses the Microsoft WebView2 SDK. Its redistribution
 notice and license files are included under `third_party/webview2/`.
 The runtime itself is a Windows prerequisite and is not bundled by the
 TEKITO package.
@@ -53,10 +53,12 @@ path).
 This file is a release inventory, not a replacement for the original license
 texts.
 
-## TEKITO Data Packs
+## Language data
 
-Data Packs are distributed independently from the TEKITO source and binaries.
-The exact source, version, checksum, license, and attribution for each shipped
-pack are recorded in `data/<pack-id>/manifest.json` and
-`data/<pack-id>/NOTICE`. Those per-pack notices are the authoritative release
-notices for Data Pack redistribution.
+The data packs in `data/` (and in the installer) come from SCOWL, Wikipedia,
+the Leipzig Corpora Collection, WordNet, GeoNames, Wiktionary, the CMU
+Pronouncing Dictionary and Unicode CLDR, plus data written for TEKITO. Each
+pack's `NOTICE` and `manifest.json` give its source, version and license, and
+carry the attribution that license asks for; they are the authoritative
+notices for the data. [docs/data-packs.md](docs/data-packs.md) lists them
+together.

@@ -1,56 +1,53 @@
-# TEKITO Privacy Notice
+# Privacy
 
-Version: 0.1.0 prerelease
+TEKITO works entirely on your PC. It does not send what you type, your
+dictionary or what it has learned anywhere. It has no account, no telemetry
+and no update check, and nothing in the input path uses the network.
 
-## Design summary
+## What TEKITO keeps, and where
 
-TEKITO input processing, candidate generation, ranking, and dictionary lookup
-are designed to run locally from installed Data Packs. The application does
-not intentionally send typed text, input history, User Dictionary entries, or
-User Learning data to a TEKITO server. TEKITO has no account or telemetry
-service in this package.
+| Location | What is in it |
+| --- | --- |
+| `%LOCALAPPDATA%\TEKITO\user.db` | Your settings, your dictionary, and what TEKITO has learned from your choices |
+| `%LOCALAPPDATA%\TEKITO\data` | The language data packs |
+| `%LOCALAPPDATA%\TEKITO\settings-webview` | The Settings window's browser cache |
+| `%TEMP%\TekitoTsf.log` | A diagnostic log, written only by trace builds or when `TEKITO_TSF_TRACE=1` is set |
 
-The WebView2-based Settings UI is local content. The installer does not
-download TEKITO data during normal installation. If WebView2 Runtime is
-missing, the installer can open the official Microsoft download page only
-after the user chooses that action.
+What TEKITO learns is a count of which suggestions you pick or turn down for
+a word. It does not store sentences or a history of what you typed. The
+diagnostic log and **Copy diagnostics** in Settings record events, timings
+and error codes, never text.
 
-## Local data locations
+The database is not encrypted; treat it like any other private file in your
+profile.
 
-The following locations may contain user or machine-specific data:
+## Your controls
 
-| Location | Contents | User-provided data possible |
-| --- | --- | --- |
-| `%LOCALAPPDATA%\TEKITO\data` | Installed Data Packs | No, unless the user adds a pack |
-| `%LOCALAPPDATA%\TEKITO\user.db` | User Dictionary, User Learning, and settings | Yes |
-| `%LOCALAPPDATA%\TEKITO\settings-webview` | WebView2 profile, cache, and local UI state | May contain settings/UI state |
-| `%TEMP%\TekitoTsf.log` | Optional diagnostic trace | Designed to exclude typed text and input history |
+- **Settings → Dictionary → Learn from my choices** turns learning on or off,
+  and **Forget** clears what TEKITO has learned.
+- **Settings → General → Apps where TEKITO stays off** makes TEKITO pass
+  every key through in the apps you list. It also stays off in terminals,
+  apps running as administrator, and password, PIN, email, URL and number
+  fields.
+- Uninstalling keeps your dictionary, learning and settings. Run
+  `uninstall.ps1 -RemoveUserData` from the installer package to remove them
+  too.
 
-The current diagnostic design excludes typed input and input history from
-diagnostics, but users should still treat local logs and the SQLite database
-as private files. TEKITO does not claim that the SQLite database is encrypted.
+## Other software
 
-## User controls and removal
+Windows, the Microsoft Edge WebView2 Runtime that draws the Settings window,
+and the apps you type in have their own privacy terms. If the WebView2
+Runtime is missing, the setup program offers to open Microsoft's download
+page; it never downloads anything on its own.
 
-Normal uninstall preserves User Dictionary, User Learning, and Settings. The
-explicit `uninstall.ps1 -RemoveUserData` path removes the local TEKITO User Data
-and installed Data Packs. Users should back up any User Dictionary they want to
-keep before using that option.
+---
 
-Windows, Microsoft Edge WebView2, the browser used to obtain a prerequisite,
-and any host application may have separate diagnostic, privacy, and retention
-behavior. Those services are outside TEKITO's control and are governed by
-their own notices.
+## プライバシー（日本語）
 
-## Japanese summary
+TEKITO の処理はすべて PC の中で行われます。入力した内容、ユーザー辞書、学習した内容をどこにも送りません。アカウント、テレメトリ、更新確認はなく、入力の処理経路でネットワークを使うこともありません。
 
-TEKITOの入力処理・候補生成・辞書検索はローカルData Packを使って動作し、
-TEKITOのサーバーへ入力文字列、入力履歴、User Dictionary、学習データを
-意図的に送信しません。このパッケージにはアカウント機能やテレメトリ機能は
-ありません。
-
-User Dictionary・学習・設定は `%LOCALAPPDATA%\TEKITO\user.db`、WebView2の
-ローカル状態は `settings-webview`、診断ログは通常 `%TEMP%` に保存されます。
-通常のアンインストールではUser Dataを保持し、完全削除は
-`uninstall.ps1 -RemoveUserData`を明示的に実行した場合だけ行います。
-SQLiteの暗号化は現状保証していません。
+- 設定・ユーザー辞書・学習内容は `%LOCALAPPDATA%\TEKITO\user.db` に保存されます。学習しているのは「どの単語でどの候補を選んだか」の回数だけで、文章や入力履歴は保存しません。
+- 診断ログ（`%TEMP%\TekitoTsf.log`、トレース用ビルドか `TEKITO_TSF_TRACE=1` のときだけ作られます）と設定画面の「Copy diagnostics」には、イベント・時間・エラーコードだけが含まれ、入力した文字は含まれません。
+- 学習は設定画面の「Dictionary → Learn from my choices」でオン/オフでき、「Forget」で消せます。「General → Apps where TEKITO stays off」に追加したアプリでは完全にオフになります。
+- アンインストールしても辞書・学習・設定は残ります。消す場合はインストーラーのパッケージにある `uninstall.ps1 -RemoveUserData` を実行してください。
+- データベースは暗号化していません。ほかの個人ファイルと同じように扱ってください。

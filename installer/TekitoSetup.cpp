@@ -843,7 +843,7 @@ void Paint(Wizard& wizard) {
     case Screen::Welcome:
         DrawLogo(wizard, kMargin, 42.0f, 60.0f);
         DrawWordmark(wizard, kMargin + 78.0f, 58.0f);
-        DrawText(wizard, L"Easy English typing for Windows", wizard.title.Get(),
+        DrawText(wizard, L"English typing help for Windows", wizard.title.Get(),
                  D2D1::RectF(kMargin, 128.0f, kWidth - kMargin, 164.0f), p.ink);
         DrawText(wizard,
                  L"TEKITO fixes typos and suggests words as you type. Everything runs on this PC, and nothing you "
@@ -964,8 +964,8 @@ void Paint(Wizard& wizard) {
         }
         DrawText(wizard, L"TEKITO is installed", wizard.headingCentered.Get(), D2D1::RectF(0.0f, 196.0f, kWidth, 228.0f), p.ink);
         DrawText(wizard,
-                 L"To start typing with it, choose TEKITO from the input menu on the taskbar, or press "
-                 L"Windows + Space.",
+                 L"Restart the apps you want to type in, then choose TEKITO from the input menu on the "
+                 L"taskbar or press Win+Space.",
                  wizard.bodyCentered.Get(), D2D1::RectF(90.0f, 238.0f, kWidth - 90.0f, 290.0f), p.ink2);
         break;
     }

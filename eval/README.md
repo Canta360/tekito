@@ -3,9 +3,10 @@
 Measures the real `CandidateEngine` / `AutoApplyPolicy` against two corpora
 already in `data/`:
 
-- `data/qwerty-typo-catalog` (about 23,600 synthetic QWERTY slips of the 5,000
-  most common words, plus the words typed correctly, each assigned to a
-  `test` / `validation` / `train` split; built by
+- `data/qwerty-typo-catalog` (about 23,800 rows: synthetic QWERTY slips of
+  the 5,000 most common words, the same words typed correctly, and the chat
+  abbreviations from the slang pack, which must stay as typed; each row is
+  assigned to a `test` / `validation` / `train` split; built by
   `scripts/build-expression-packs.py`).
 - `data/wikipedia-common-misspellings` (4,499 real human misspelling ->
   correction pairs, CC-BY-SA-4.0, no context; treated as an eval-only `test`

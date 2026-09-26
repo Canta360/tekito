@@ -71,10 +71,11 @@ click it, or press Alt+`, to switch.
   </tr>
 </table>
 
-Terminals, apps running as administrator, and any apps you list in Settings
-always get Direct.
+TEKITO stays off in terminals, in apps running as administrator, and in any
+apps you list in Settings.
 
 ![TEKITO Settings](docs/images/settings.png)
+
 ## Privacy
 
 Everything TEKITO does happens on your computer. It does not send your
@@ -85,9 +86,13 @@ network while you type. What it learns from your choices stays in
 
 ## Install
 
-Download the installer from the releases page and run it. It needs the
-Microsoft Edge WebView2 Runtime, which Windows 11 already has. After
-installing, sign out and back in, then pick TEKITO with Win+Space.
+Download `TEKITO-0.1.0-full-installer.exe` from [Releases](https://github.com/Canta360/tekito/releases/latest) and
+run it. It needs the Microsoft Edge WebView2 Runtime, which Windows 11
+already has. After installing, restart the apps you want to type in (or sign
+out and back in), then pick TEKITO with Win+Space.
+
+The installer is not code-signed yet, so Windows SmartScreen may ask you to
+confirm before it runs.
 
 ## Build
 

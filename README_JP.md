@@ -64,16 +64,19 @@ TEKITO には 2 つのモードがあります。タスクバーのボタンが�
   </tr>
 </table>
 
-ターミナル、管理者として実行中のアプリ、設定で追加したアプリでは、常に Direct になります。
+ターミナル、管理者として実行中のアプリ、設定で追加したアプリでは、TEKITO はオフになります。
 
 ![TEKITO の設定画面](docs/images/settings.png)
+
 ## プライバシー
 
 TEKITO の処理はすべて PC の中で行います。入力した内容をどこにも送らず、アカウントもテレメトリもなく、入力中にネットワークを使いません。選んだ候補から学習した内容は `%LOCALAPPDATA%\TEKITO` に保存され、設定画面から消せます。詳しくは[プライバシーについて](PRIVACY.md)を参照してください。
 
 ## インストール
 
-Releases からインストーラーをダウンロードして実行します。Microsoft Edge WebView2 Runtime が必要ですが、Windows 11 には最初から入っています。インストール後にサインアウトしてサインインし直し、Win+Space で TEKITO を選んでください。
+[Releases](https://github.com/Canta360/tekito/releases/latest) から `TEKITO-0.1.0-full-installer.exe` をダウンロードして実行します。Microsoft Edge WebView2 Runtime が必要ですが、Windows 11 には最初から入っています。インストール後は使いたいアプリを再起動するか、サインアウトしてサインインし直してから、Win+Space で TEKITO を選んでください。
+
+インストーラーはまだコード署名をしていないため、Windows SmartScreen が実行の確認を求めることがあります。
 
 ## ビルド
 
