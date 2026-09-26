@@ -15,9 +15,9 @@ untouched and shows nothing.
 | Teams, Slack, Discord | Not tested yet |
 | WPF, WinForms, WinUI 3, UWP fields | Not tested yet |
 | Start menu search, Settings app | Not supported yet (needs immersive-mode support) |
-| Windows Terminal, PowerShell, Command Prompt | Always off |
-| Apps running as administrator | Always off |
-| Apps listed in Settings | Always off |
+| Windows Terminal, PowerShell, Command Prompt | Stays off |
+| Apps running as administrator | Stays off |
+| Apps listed in Settings | Stays off |
 
 ## What to check in an app
 

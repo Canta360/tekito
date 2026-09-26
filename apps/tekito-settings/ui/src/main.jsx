@@ -291,7 +291,7 @@ function ExcludedApps({ settings, runAction }) {
         <Button type="submit" disabled={!name.trim()}>Add</Button>
       </form>
       {settings.builtInExcludedApps.length > 0 && (
-        <p className="fine-print">Always off in terminals: {settings.builtInExcludedApps.join(", ")}.</p>
+        <p className="fine-print">Also off in terminals: {settings.builtInExcludedApps.join(", ")}.</p>
       )}
     </Glass>
   );
@@ -445,7 +445,7 @@ function AboutPage({ runtime, packs, runAction }) {
         <img className="about-icon" src="./assets/tekito.ico" alt="" />
         <div>
           <img className="wordmark large" src="./assets/tekito-wordmark-dark.svg" alt="TEKITO" />
-          <p>Easy English typing for Windows.</p>
+          <p>English typing help for Windows keyboards.</p>
         </div>
         <span className="version"><small>Version</small><b>0.1.0</b></span>
       </Glass>
