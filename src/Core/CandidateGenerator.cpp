@@ -159,6 +159,20 @@ void AddOriginal(std::vector<Candidate>& output, std::unordered_set<std::wstring
               sourceFlags, std::move(dictionaryEntryId), socialRange);
 }
 
+// Marks the typed text as intended: protected, and first in the list.
+void ProtectOriginal(std::vector<Candidate>& output, std::unordered_set<std::wstring>& seen,
+                     std::wstring_view raw) {
+    auto original = std::find_if(output.begin(), output.end(),
+                                 [](const Candidate& candidate) { return candidate.isOriginal; });
+    if (original == output.end()) {
+        AddOriginal(output, seen, raw);
+        original = output.end() - 1;
+    }
+    original->isProtected = true;
+    original->policyFlags |= CandidatePolicyProtect;
+    std::rotate(output.begin(), original, original + 1);
+}
+
 void FinalizeCandidates(std::vector<Candidate>& candidates, std::wstring_view rawText) {
     for (std::size_t index = 0; index < candidates.size(); ++index) {
         candidates[index].id = static_cast<std::uint32_t>(index + 1);
@@ -519,7 +533,23 @@ std::vector<Candidate> CandidateGenerator::Generate(std::wstring_view rawText,
         const bool explicitSocial = rawText.size() > 1 && rawText.front() == L':';
         const auto socialQuery = explicitSocial ? rawText.substr(1) : rawText;
         const bool casualInput = explicitSocial || !exact;
+        std::vector<std::wstring> curatedMeanings;
+        std::size_t meaningIndex = 1;  // right after the typed word, or after its emoji
         const auto emitSupplementary = [&](const auto& entry, std::wstring_view queryText) {
+            // TEKITO's own slang and expression lists are curated: a spelling
+            // listed there ("brb", "omw") is meant, so it stays first and is
+            // never auto-corrected, whether or not its suggestions are shown.
+            // Larger external lists (Wiktionary, place names) also contain
+            // common typos and only add suggestions.
+            constexpr auto kCuratedSources =
+                CandidateSourceTekitoOwnedSlang | CandidateSourceSocialExpression;
+            if (entry.originalFirst && (entry.sourceFlags & kCuratedSources) != 0 &&
+                (policyEngine_.RawFlags(entry) & CandidatePolicyProtect) != 0) {
+                ProtectOriginal(output, seen, rawText);
+                if (entry.candidateLabel != SemanticLabel::Emoji) {
+                    curatedMeanings.emplace_back(entry.candidate);
+                }
+            }
             const bool social = entry.socialRange != SocialRangeUnspecified;
             const bool phonetic = (entry.sourceFlags & CandidateSourceJapanesePhonetic) != 0;
             const bool emoji = entry.candidateLabel == SemanticLabel::Emoji ||
@@ -614,7 +644,21 @@ std::vector<Candidate> CandidateGenerator::Generate(std::wstring_view rawText,
                 output.insert(output.begin() + static_cast<std::ptrdiff_t>(insertion),
                               std::make_move_iterator(promotedEmoji.rbegin()),
                               std::make_move_iterator(promotedEmoji.rend()));
+                meaningIndex = insertion + promotedEmoji.size();
             }
+        }
+
+        // What a curated abbreviation stands for ("brb" -> "be right back")
+        // comes right after it and its emoji, ahead of spelling look-alikes.
+        const auto meaningSlot =
+            output.begin() + static_cast<std::ptrdiff_t>(std::min(meaningIndex, output.size()));
+        for (auto meaning = curatedMeanings.rbegin(); meaning != curatedMeanings.rend(); ++meaning) {
+            const auto found = std::find_if(meaningSlot, output.end(),
+                                            [&](const Candidate& candidate) {
+                                                return !candidate.isOriginal &&
+                                                       candidate.text == *meaning;
+                                            });
+            if (found != output.end()) std::rotate(meaningSlot, found, found + 1);
         }
     }
 

@@ -965,6 +965,45 @@ void TestInstalledDataPacks() {
     Require(phoneticFound, "Japanese phonetic provider serves suggestion-only candidates");
 }
 
+void TestChatAbbreviationsStayAsTyped() {
+    // Spellings in TEKITO's own slang list are meant, even when they are one
+    // edit away from a common word (brb/bob, omw/bmw, thx/the).
+    const auto engine = tekito::CreateDefaultConversionEngine();
+    for (const int range : {0, 1}) {
+        for (const auto* raw : {L"brb", L"cya", L"omw", L"thx", L"ngl", L"tbh", L"smh",
+                                L"pls", L"ttyl", L"yall", L"gonna", L"idk"}) {
+            tekito::ConversionRequest request;
+            request.rawText = raw;
+            request.options.socialExpressionRange = range;
+            const auto candidates = engine->Convert(request).candidates;
+            tekito::InputStateMachine state;
+            state.BeginOrUpdate(raw, candidates);
+            if (state.OnSpace().text != std::wstring(raw) + L" ") {
+                std::wcerr << L"[chat abbreviation] " << raw << L" range " << range << L"\n";
+            }
+            Require(!candidates.empty() && candidates.front().text == raw &&
+                        candidates.front().isProtected,
+                    "a listed chat abbreviation is kept as typed");
+        }
+    }
+
+    const auto brb = engine->Convert({L"brb"}).candidates;
+    const auto meaning = std::find_if(brb.begin(), brb.end(), [](const auto& candidate) {
+        return candidate.text == L"be right back";
+    });
+    const auto lookAlike = std::find_if(brb.begin(), brb.end(), [](const auto& candidate) {
+        return candidate.text == L"bob";
+    });
+    Require(meaning != brb.end() && (lookAlike == brb.end() || meaning < lookAlike),
+            "an abbreviation's meaning is offered ahead of spelling look-alikes");
+
+    // Wiktionary lists "teh" too, but only TEKITO's own lists protect a word.
+    tekito::InputStateMachine typo;
+    typo.BeginOrUpdate(L"teh", engine->Convert({L"teh"}).candidates);
+    Require(typo.OnSpace().text == L"the ",
+            "a common typo that an external slang list contains is still corrected");
+}
+
 void TestTypoModelBoundary() {
     const tekito::TypoModel model;
     const auto repeated = model.Compare(L"meeet", L"meet");
@@ -1918,6 +1957,7 @@ int main() {
     TestExternalLexiconProvider();
     TestWikipediaCommonMisspellingsProvider();
     TestInstalledDataPacks();
+    TestChatAbbreviationsStayAsTyped();
     TestTypoModelBoundary();
     TestTargetTextCandidateDiagnostics();
     TestDictionaryServiceBoundary();
