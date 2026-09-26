@@ -1,0 +1,4 @@
+#include "tekito_resource.h"
+
+IDI_TEKITO ICON "icons/Tekito.ico"
+IDR_LICENSE_TEXT RCDATA "../installer/TEKITO_LICENSE.md"

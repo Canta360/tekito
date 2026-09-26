@@ -1,0 +1,350 @@
+->	→	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+<-	←	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+<=>	⇔	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+=>	⇒	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+afaik	as far as I know	social	en-US	common	kind=text_expansion;policy=suggest_only;raw_pinned=true;auto_apply=false
+agree	👍	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+agree	💯	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+angry	(╬ಠ益ಠ)	social	en-US	familiar	kind=kaomoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+angry	(｀へ´)	social	en-US	familiar	kind=kaomoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+angry	😠	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+angry	😡	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+annoyed	-_-	social	en-US	familiar	kind=emoticon;policy=suggest_only;raw_pinned=true;auto_apply=false
+annoyed	😒	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+apology	m(_ _)m	social	en-US	familiar	kind=kaomoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+apology	🙇	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+approximately	≈	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+arrow	←	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+arrow	↑	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+arrow	→	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+arrow	↓	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+arrow	↕	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+arrow	↖	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+arrow	↗	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+arrow	↘	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+arrow	↙	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+arrow	⇄	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+arrows	↕	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+arrows	⇄	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+asap	as soon as possible	social	en-US	common	kind=text_expansion;policy=suggest_only;raw_pinned=true;auto_apply=false
+awesome	🙌	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+awesome	🤩	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+awkward	^^;	social	en-US	familiar	kind=emoticon;policy=suggest_only;raw_pinned=true;auto_apply=false
+awkward	😬	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+back	↩	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+bear	ʕ•ᴥ•ʔ	social	en-US	familiar	kind=kaomoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+because	∵	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+bored	🥱	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+brb	be right back	social	en-US	common	kind=text_expansion;policy=suggest_only;raw_pinned=true;auto_apply=false
+btw	by the way	social	en-US	common	kind=text_expansion;policy=suggest_only;raw_pinned=true;auto_apply=false
+bullet	•	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+bullet	▪	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+bullet	◦	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+bye	(・ω・)ﾉ	social	en-US	familiar	kind=kaomoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+bye	👋	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+cat	ฅ^•ﻌ•^ฅ	social	en-US	familiar	kind=kaomoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+celebrate	🍾	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+celebrate	🎉	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+check	☑	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+check	✓	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+check	✔	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+cheers	🍻	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+cheers	🥂	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+clap	👏	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+confused	(・・?)	social	en-US	familiar	kind=kaomoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+confused	o_O	social	en-US	familiar	kind=emoticon;policy=suggest_only;raw_pinned=true;auto_apply=false
+confused	😕	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+congrats	🎉	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+congrats	👏	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+cool	(⌐■_■)	social	en-US	familiar	kind=kaomoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+cool	😎	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+copyright	©	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+cringe	😬	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+cross	✗	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+cross	✘	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+cry	(╥﹏╥)	social	en-US	familiar	kind=kaomoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+cry	:'(	social	en-US	familiar	kind=emoticon;policy=suggest_only;raw_pinned=true;auto_apply=false
+cry	T_T	social	en-US	familiar	kind=emoticon;policy=suggest_only;raw_pinned=true;auto_apply=false
+cry	😢	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+cry	😭	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+cute	🥰	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+cute	🥺	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+dance	┌(・o・)┐	social	en-US	familiar	kind=kaomoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+dance	♪┏(・o･)┛♪	social	en-US	familiar	kind=kaomoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+dance	💃	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+dead	💀	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+deal	🤝	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+dealwithit	(⌐■_■)	social	en-US	familiar	kind=kaomoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+degree	°	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+disagree	👎	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+divide	÷	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+done	✅	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+dot	・	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+downarrow	↓	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+downarrow	⇓	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+dunno	🤷	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+ellipsis	…	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+excited	٩(◕‿◕)۶	social	en-US	familiar	kind=kaomoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+excited	🤩	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+eyes	👀	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+facepalm	(－‸ლ)	social	en-US	familiar	kind=kaomoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+facepalm	🤦	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+facts	💯	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+fingerscrossed	🤞	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+fire	🔥	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+fliptable	(╯°□°）╯︵ ┻━┻	social	en-US	familiar	kind=kaomoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+forward	↪	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+fr	for real	social	en-US	common	kind=text_expansion;policy=suggest_only;raw_pinned=true;auto_apply=false
+fyi	for your information	social	en-US	common	kind=text_expansion;policy=suggest_only;raw_pinned=true;auto_apply=false
+goat	🐐	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+goodbye	👋	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+goodjob	👍	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+goodjob	👏	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+goodluck	🤞	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+goodvibes	✨	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+great	👍	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+great	🙌	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+greaterequal	≥	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+grin	:D	social	en-US	familiar	kind=emoticon;policy=suggest_only;raw_pinned=true;auto_apply=false
+grin	😁	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+haha	(≧▽≦)	social	en-US	familiar	kind=kaomoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+haha	:D	social	en-US	familiar	kind=emoticon;policy=suggest_only;raw_pinned=true;auto_apply=false
+haha	😂	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+haha	😄	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+happy	(^_^)	social	en-US	familiar	kind=kaomoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+happy	(＾▽＾)	social	en-US	familiar	kind=kaomoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+happy	:)	social	en-US	familiar	kind=emoticon;policy=suggest_only;raw_pinned=true;auto_apply=false
+happy	😄	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+happy	😊	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+hbu	how about you	social	en-US	common	kind=text_expansion;policy=suggest_only;raw_pinned=true;auto_apply=false
+heart	<3	social	en-US	familiar	kind=emoticon;policy=suggest_only;raw_pinned=true;auto_apply=false
+heart	♡	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+heart	❤	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+heart	❤️	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+hehe	^^	social	en-US	familiar	kind=emoticon;policy=suggest_only;raw_pinned=true;auto_apply=false
+hehe	😁	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+hello	(＾▽＾)ﾉ	social	en-US	familiar	kind=kaomoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+hello	👋	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+hey	👋	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+hi	(・ω・)ﾉ	social	en-US	familiar	kind=kaomoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+hi	👋	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+hmm	🤔	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+hug	(っ´▽`)っ	social	en-US	familiar	kind=kaomoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+hug	🤗	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+hype	🔥	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+hype	🙌	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+idea	💡	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+idk	I don't know	social	en-US	common	kind=text_expansion;policy=suggest_only;raw_pinned=true;auto_apply=false
+idk	¯\_(ツ)_/¯	social	en-US	familiar	kind=kaomoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+idk	🤷	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+ily	I love you	social	en-US	common	kind=text_expansion;policy=suggest_only;raw_pinned=true;auto_apply=false
+ily	❤️	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+ily	🥰	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+imho	in my humble opinion	social	en-US	common	kind=text_expansion;policy=suggest_only;raw_pinned=true;auto_apply=false
+imo	in my opinion	social	en-US	common	kind=text_expansion;policy=suggest_only;raw_pinned=true;auto_apply=false
+infinity	∞	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+irl	in real life	social	en-US	common	kind=text_expansion;policy=suggest_only;raw_pinned=true;auto_apply=false
+jk	:P	social	en-US	familiar	kind=emoticon;policy=suggest_only;raw_pinned=true;auto_apply=false
+jk	just kidding	social	en-US	common	kind=text_expansion;policy=suggest_only;raw_pinned=true;auto_apply=false
+jk	😜	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+joy	ヽ(＾Д＾)ﾉ	social	en-US	familiar	kind=kaomoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+joy	😂	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+kiss	:*	social	en-US	familiar	kind=emoticon;policy=suggest_only;raw_pinned=true;auto_apply=false
+kiss	😘	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+leftarrow	←	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+leftarrow	⇐	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+leftarrow	⟵	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+leftrightarrow	↔	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+leftrightarrow	⇔	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+lenny	( ͡° ͜ʖ ͡°)	social	en-US	familiar	kind=kaomoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+lessequal	≤	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+lit	🔥	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+lmao	XD	social	en-US	familiar	kind=emoticon;policy=suggest_only;raw_pinned=true;auto_apply=false
+lmao	😂	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+lmao	🤣	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+lmk	let me know	social	en-US	common	kind=text_expansion;policy=suggest_only;raw_pinned=true;auto_apply=false
+lol	( ´艸｀)	social	en-US	familiar	kind=kaomoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+lol	(≧▽≦)	social	en-US	familiar	kind=kaomoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+lol	XD	social	en-US	familiar	kind=emoticon;policy=suggest_only;raw_pinned=true;auto_apply=false
+lol	😂	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+lol	🤣	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+look	👀	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+love	(｡♥‿♥｡)	social	en-US	familiar	kind=kaomoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+love	<3	social	en-US	familiar	kind=emoticon;policy=suggest_only;raw_pinned=true;auto_apply=false
+love	❤️	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+love	😍	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+mad	(｀へ´)	social	en-US	familiar	kind=kaomoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+mad	😠	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+magic	✨	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+magic	🪄	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+meh	-_-	social	en-US	familiar	kind=emoticon;policy=suggest_only;raw_pinned=true;auto_apply=false
+meh	😐	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+multiply	×	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+muscle	💪	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+music	♪	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+music	♫	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+music	♬	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+mybad	my bad	social	en-US	common	kind=text_expansion;policy=suggest_only;raw_pinned=true;auto_apply=false
+mybad	😅	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+nah	🙅	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+nervous	😬	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+ngl	not gonna lie	social	en-US	common	kind=text_expansion;policy=suggest_only;raw_pinned=true;auto_apply=false
+nice	👌	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+nice	👍	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+no	👎	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+no	🙅	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+nope	❌	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+nope	🙅	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+northeast	↗	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+northwest	↖	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+note	♪	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+notequal	≠	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+np	no problem	social	en-US	common	kind=text_expansion;policy=suggest_only;raw_pinned=true;auto_apply=false
+nvm	never mind	social	en-US	common	kind=text_expansion;policy=suggest_only;raw_pinned=true;auto_apply=false
+ok	👌	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+ok	👍	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+okay	👌	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+okay	👍	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+omg	:O	social	en-US	familiar	kind=emoticon;policy=suggest_only;raw_pinned=true;auto_apply=false
+omg	😮	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+omg	😱	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+omw	on my way	social	en-US	common	kind=text_expansion;policy=suggest_only;raw_pinned=true;auto_apply=false
+oops	😅	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+oops	🙈	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+paragraph	¶	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+party	🎉	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+party	🥳	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+please	(人 •͈ᴗ•͈)	social	en-US	familiar	kind=kaomoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+please	🙏	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+plusminus	±	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+point	👉	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+pray	🙏	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+rage	😡	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+reference	※	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+registered	®	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+return	↵	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+rightarrow	→	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+rightarrow	⇒	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+rightarrow	⟶	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+rn	right now	social	en-US	common	kind=text_expansion;policy=suggest_only;raw_pinned=true;auto_apply=false
+rofl	XD	social	en-US	familiar	kind=emoticon;policy=suggest_only;raw_pinned=true;auto_apply=false
+rofl	🤣	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+sad	(;_;)	social	en-US	familiar	kind=kaomoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+sad	(´；ω；`)	social	en-US	familiar	kind=kaomoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+sad	:(	social	en-US	familiar	kind=emoticon;policy=suggest_only;raw_pinned=true;auto_apply=false
+sad	😞	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+sad	😢	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+same	💯	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+same	🙌	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+scared	😨	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+section	§	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+seeya	👋	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+shock	(⊙_⊙)	social	en-US	familiar	kind=kaomoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+shock	😱	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+shocked	😱	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+shrug	¯\_(ツ)_/¯	social	en-US	familiar	kind=kaomoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+shrug	🤷	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+shy	(⁄ ⁄•⁄ω⁄•⁄ ⁄)	social	en-US	familiar	kind=kaomoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+shy	☺️	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+sick	🤒	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+sideeye	👀	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+sideeye	🤨	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+skull	💀	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+slay	💅	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+slay	🔥	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+sleep	💤	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+sleep	😴	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+sleepy	(－_－) zzZ	social	en-US	familiar	kind=kaomoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+sleepy	😴	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+smh	shaking my head	social	en-US	common	kind=text_expansion;policy=suggest_only;raw_pinned=true;auto_apply=false
+smh	😒	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+smh	🤦	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+smile	(^‿^)	social	en-US	familiar	kind=kaomoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+smile	:-)	social	en-US	familiar	kind=emoticon;policy=suggest_only;raw_pinned=true;auto_apply=false
+smile	😊	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+smile	🙂	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+sob	😭	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+sorry	m(_ _)m	social	en-US	familiar	kind=kaomoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+sorry	😔	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+sorry	🙇	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+southeast	↘	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+southwest	↙	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+sparkle	✨	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+sparkles	✨	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+star	★	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+star	☆	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+star	✦	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+star	✧	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+strong	💪	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+sure	👍	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+sure	🤝	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+surprised	(⊙_⊙)	social	en-US	familiar	kind=kaomoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+surprised	(ﾟдﾟ)	social	en-US	familiar	kind=kaomoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+surprised	😮	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+sus	🤨	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+suspicious	🤨	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+tableflip	(╯°□°）╯︵ ┻━┻	social	en-US	familiar	kind=kaomoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+tbh	to be honest	social	en-US	common	kind=text_expansion;policy=suggest_only;raw_pinned=true;auto_apply=false
+tears	😭	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+thanks	(人´∀`)	social	en-US	familiar	kind=kaomoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+thanks	😊	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+thanks	🙏	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+thankyou	🙏	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+therefore	∴	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+think	(¬_¬)	social	en-US	familiar	kind=kaomoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+think	🤔	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+thinking	🤔	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+this	☝️	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+this	👆	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+thx	thanks	social	en-US	common	kind=text_expansion;policy=suggest_only;raw_pinned=true;auto_apply=false
+thx	🙏	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+tick	✓	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+tired	(￣ρ￣)..zzZZ	social	en-US	familiar	kind=kaomoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+tired	😩	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+tired	😴	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+trademark	™	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+true	💯	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+ttyl	talk to you later	social	en-US	common	kind=text_expansion;policy=suggest_only;raw_pinned=true;auto_apply=false
+ty	thank you	social	en-US	common	kind=text_expansion;policy=suggest_only;raw_pinned=true;auto_apply=false
+ty	🙏	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+tysm	thank you so much	social	en-US	common	kind=text_expansion;policy=suggest_only;raw_pinned=true;auto_apply=false
+tysm	🙏	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+unflip	┬─┬ ノ( ゜-゜ノ)	social	en-US	familiar	kind=kaomoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+unhappy	:-(	social	en-US	familiar	kind=emoticon;policy=suggest_only;raw_pinned=true;auto_apply=false
+unhappy	😞	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+uparrow	↑	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+uparrow	⇑	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+updownarrow	↕	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+updownarrow	⇅	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+upset	😞	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+upset	😤	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+vibes	✨	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+watching	👀	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+wave	(＾▽＾)ﾉ	social	en-US	familiar	kind=kaomoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+wave	👋	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+wbu	what about you	social	en-US	common	kind=text_expansion;policy=suggest_only;raw_pinned=true;auto_apply=false
+wdym	what do you mean	social	en-US	common	kind=text_expansion;policy=suggest_only;raw_pinned=true;auto_apply=false
+wellplayed	👏	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+whatever	¯\_(ツ)_/¯	social	en-US	familiar	kind=kaomoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+whatever	🙄	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+whoa	😲	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+wink	(^_−)☆	social	en-US	familiar	kind=kaomoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+wink	;)	social	en-US	familiar	kind=emoticon;policy=suggest_only;raw_pinned=true;auto_apply=false
+wink	😉	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+winner	🏆	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+woah	😲	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+woohoo	＼(^o^)／	social	en-US	familiar	kind=kaomoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+woohoo	🎉	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+wow	:O	social	en-US	familiar	kind=emoticon;policy=suggest_only;raw_pinned=true;auto_apply=false
+wow	😮	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+wow	🤩	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+xmark	✕	social	en-US	broad	kind=symbol;policy=suggest_only;raw_pinned=true;auto_apply=false
+yay	＼(^o^)／	social	en-US	familiar	kind=kaomoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+yay	🎉	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+yay	🥳	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+yep	👍	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+yes	✅	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+yes	👍	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+yikes	😬	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+yup	👍	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false
+zzz	💤	emoji	en-US	broad	kind=emoji;policy=suggest_only;raw_pinned=true;auto_apply=false

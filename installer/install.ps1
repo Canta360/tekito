@@ -1,0 +1,160 @@
+# Installs TEKITO from an extracted package for the current user:
+#   %LOCALAPPDATA%\Programs\TEKITO   TEKITO.exe, Tekito.Tsf.dll, settings-ui
+#   %LOCALAPPDATA%\TEKITO\data       Data Packs
+# registers the input method, adds it to the English keyboard list and makes
+# a Start menu shortcut to Settings. Needs an administrator PowerShell unless
+# -SkipRegistration is given. The user's dictionary, learning and settings in
+# %LOCALAPPDATA%\TEKITO are never touched.
+[CmdletBinding()]
+param(
+    [string]$SourceRoot = $PSScriptRoot,
+    [string]$InstallRoot = (Join-Path $env:LOCALAPPDATA "Programs\TEKITO"),
+    [bool]$StartMenuShortcut = $true,
+    [switch]$SkipDataPacks,
+    [switch]$SkipRegistration,
+    [switch]$SkipPrerequisiteCheck
+)
+
+$ErrorActionPreference = "Stop"
+Set-StrictMode -Version Latest
+
+$tip = "0409:{6F67E5C8-A873-4B69-8EC3-26DF00F642F1}{8D99240A-5C9C-4ED8-8DE4-85F21DF23763}"
+$regsvr32 = Join-Path $env:WINDIR "System32\regsvr32.exe"
+$startMenu = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\TEKITO"
+
+function Invoke-Regsvr32([string[]]$Arguments) {
+    $process = Start-Process $regsvr32 -ArgumentList $Arguments -WindowStyle Hidden -Wait -PassThru
+    return $process.ExitCode
+}
+
+function Remove-InputMethodTip {
+    $languages = Get-WinUserLanguageList
+    $changed = $false
+    foreach ($language in $languages) {
+        if ($language.InputMethodTips -contains $tip) {
+            [void]$language.InputMethodTips.Remove($tip)
+            $changed = $true
+        }
+    }
+    if ($changed) { Set-WinUserLanguageList $languages -Force }
+}
+
+$SourceRoot = (Resolve-Path $SourceRoot).Path
+$packageManifestPath = Join-Path $SourceRoot "package-manifest.json"
+$packageManifest = if (Test-Path -LiteralPath $packageManifestPath) {
+    Get-Content -LiteralPath $packageManifestPath -Raw | ConvertFrom-Json
+} else { $null }
+if (-not $SkipPrerequisiteCheck) { & (Join-Path $SourceRoot "check-prerequisites.ps1") }
+
+$sourceFiles = @("TEKITO.exe", "Tekito.Tsf.dll", "settings-ui\index.html") | ForEach-Object { Join-Path $SourceRoot $_ }
+foreach ($file in $sourceFiles) {
+    if (-not (Test-Path -LiteralPath $file -PathType Leaf)) { throw "The package is incomplete: $file is missing." }
+}
+
+$installRoot = [IO.Path]::GetFullPath($InstallRoot).TrimEnd('\')
+$userRoot = [IO.Path]::GetFullPath($env:USERPROFILE).TrimEnd('\') + '\'
+if (-not $installRoot.StartsWith($userRoot, [StringComparison]::OrdinalIgnoreCase)) {
+    throw "InstallRoot must be a folder inside your user profile."
+}
+$hadExistingInstall = Test-Path -LiteralPath (Join-Path $installRoot "install-manifest.json") -PathType Leaf
+if ((Test-Path -LiteralPath $installRoot) -and -not $hadExistingInstall -and
+    @(Get-ChildItem -LiteralPath $installRoot -Force).Count -gt 0) {
+    throw "InstallRoot must be empty or an existing TEKITO installation."
+}
+
+$principal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
+if (-not $SkipRegistration -and -not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+    throw "Run this from an administrator PowerShell, or pass -SkipRegistration for a copy that is not registered."
+}
+
+# Stage the new files first so a failure leaves the old installation alone.
+$stagingRoot = Join-Path ([IO.Path]::GetTempPath()) ("tekito-install-" + [guid]::NewGuid().ToString("N"))
+New-Item -ItemType Directory -Path $stagingRoot -Force | Out-Null
+$installedDll = Join-Path $installRoot "Tekito.Tsf.dll"
+$installedApp = Join-Path $installRoot "TEKITO.exe"
+$addedInputTip = $false
+$registeredNewDll = $false
+try {
+    Copy-Item -LiteralPath (Join-Path $SourceRoot "TEKITO.exe") $stagingRoot
+    Copy-Item -LiteralPath (Join-Path $SourceRoot "Tekito.Tsf.dll") $stagingRoot
+    Copy-Item -LiteralPath (Join-Path $SourceRoot "settings-ui") $stagingRoot -Recurse
+
+    Get-Process -Name TEKITO -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+    if (-not $SkipRegistration) {
+        # Older versions kept the DLL in a subfolder; unregister wherever it is.
+        foreach ($oldDll in @(Get-ChildItem -LiteralPath $installRoot -Filter "Tekito.Tsf*.dll" -File -Recurse -ErrorAction SilentlyContinue)) {
+            $code = Invoke-Regsvr32 @('/u', '/s', $oldDll.FullName)
+            if ($code -ne 0) { Write-Warning "Unregistering the previous version returned $code." }
+        }
+    }
+    if (Test-Path -LiteralPath $installRoot) { Remove-Item -LiteralPath $installRoot -Recurse -Force }
+    New-Item -ItemType Directory -Path (Split-Path $installRoot -Parent) -Force | Out-Null
+    Move-Item -LiteralPath $stagingRoot -Destination $installRoot
+    $stagingRoot = $null
+
+    if (-not $SkipDataPacks) {
+        & (Join-Path $SourceRoot "scripts\install-data-packs.ps1") `
+            -SourceRoot (Join-Path $SourceRoot "data") `
+            -DestinationRoot (Join-Path $env:LOCALAPPDATA "TEKITO\data")
+    }
+
+    if (-not $SkipRegistration) {
+        $code = Invoke-Regsvr32 @('/s', $installedDll)
+        if ($code -ne 0) { throw "Registering the input method failed (regsvr32 returned $code)." }
+        $registeredNewDll = $true
+
+        $languages = Get-WinUserLanguageList
+        $english = $languages | Where-Object { $_.LanguageTag -eq "en-US" } | Select-Object -First 1
+        if (-not $english) {
+            $english = (New-WinUserLanguageList en-US)[0]
+            $languages.Add($english)
+        }
+        if ($english.InputMethodTips -notcontains $tip) {
+            $english.InputMethodTips.Add($tip)
+            Set-WinUserLanguageList $languages -Force
+            $addedInputTip = $true
+        }
+    }
+
+    $shortcutPath = Join-Path $startMenu "TEKITO Settings.lnk"
+    if ($StartMenuShortcut) {
+        New-Item -ItemType Directory -Path $startMenu -Force | Out-Null
+        $shortcut = (New-Object -ComObject WScript.Shell).CreateShortcut($shortcutPath)
+        $shortcut.TargetPath = $installedApp
+        $shortcut.Arguments = "--settings"
+        $shortcut.WorkingDirectory = $installRoot
+        $shortcut.IconLocation = "$installedApp,0"
+        $shortcut.Save()
+    } else {
+        Remove-Item -LiteralPath $shortcutPath -Force -ErrorAction SilentlyContinue
+    }
+
+    [ordered]@{
+        product = "TEKITO"
+        version = if ($packageManifest) { [string]$packageManifest.version } else { "0.1.0" }
+        installed_at = [DateTime]::UtcNow.ToString("o")
+        install_root = $installRoot
+        tsf_dll = $installedDll
+        data_root = Join-Path $env:LOCALAPPDATA "TEKITO\data"
+        start_menu_shortcut = $StartMenuShortcut
+    } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $installRoot "install-manifest.json") -Encoding UTF8
+
+    Write-Host "TEKITO is installed in $installRoot."
+    Write-Host "Sign out and back in, or restart your apps, then pick TEKITO with Win+Space."
+}
+catch {
+    # Undo a first-time install that did not finish.
+    if (-not $hadExistingInstall -and (Test-Path -LiteralPath $installRoot) -and
+        -not (Test-Path -LiteralPath (Join-Path $installRoot "install-manifest.json"))) {
+        if ($addedInputTip) { Remove-InputMethodTip }
+        if ($registeredNewDll) { [void](Invoke-Regsvr32 @('/u', '/s', $installedDll)) }
+        Remove-Item -LiteralPath $startMenu -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $installRoot -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    throw
+}
+finally {
+    if ($stagingRoot -and (Test-Path -LiteralPath $stagingRoot)) {
+        Remove-Item -LiteralPath $stagingRoot -Recurse -Force
+    }
+}

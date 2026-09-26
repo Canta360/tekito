@@ -1,0 +1,17 @@
+#include <windows.h>
+
+#define IDI_ICON1 101
+IDI_ICON1 ICON "..\\assets\\icons\\Tekito.ico"
+#define IDI_AUTO 102
+IDI_AUTO ICON "..\\assets\\icons\\A.ico"
+#define IDI_DIRECT 103
+IDI_DIRECT ICON "..\\assets\\icons\\d.ico"
+#define IDR_LICENSE_TEXT 401
+IDR_LICENSE_TEXT RCDATA "TEKITO_LICENSE.md"
+#define IDR_FONT_MPLUS1 301
+IDR_FONT_MPLUS1 RCDATA "..\\assets\\fonts\\MPLUS1-wght.ttf"
+#define IDR_WORDMARK 501
+IDR_WORDMARK RCDATA "..\\apps\\tekito-settings\\ui\\public\\assets\\tekito-wordmark-dark.svg"
+#ifndef TEKITO_SETUP_PREVIEW
+CREATEPROCESS_MANIFEST_RESOURCE_ID RT_MANIFEST "TekitoSetup.manifest"
+#endif

@@ -1,0 +1,19 @@
+{
+  "pack_id": "wikipedia-common-misspellings",
+  "display_name": "Wikipedia Common Misspellings",
+  "schema_version": 1,
+  "version": "1199637275",
+  "language": "en-US",
+  "type": "misspelling-correction",
+  "file": "misspellings.tsv",
+  "index_file": "misspellings.tsv.idx",
+  "entry_count": 4499,
+  "sha256": {
+    "file": "23C3220705DFCBD6BFB255E6C0D4983FFB730D38EF98FDFFA559C87E13BFD28F",
+    "index": "4C845ADC4970040E5653D24C6446C193D8D651A9DDC34A18AFF9EB6E2AA93E83"
+  },
+  "license": "CC-BY-SA-4.0",
+  "source": "https://en.wikipedia.org/wiki/Wikipedia:Lists_of_common_misspellings/For_machines",
+  "notice_file": "NOTICE",
+  "source_version": "oldid-1199637275"
+}

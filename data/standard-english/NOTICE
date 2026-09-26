@@ -1,0 +1,32 @@
+TEKITO Standard English Data Pack
+
+This pack is a normalized and indexed derivative of the ESDB/SCOWL
+American-English size 60 generated wordlist, release 2026.02.25.
+
+Source:
+https://github.com/en-wl/wordlist-diff/blob/master/en_US.txt
+https://wordlist.aspell.net/dicts/
+
+SCOWL copyright notice and permission terms:
+
+Copyright 2000-2026 by Kevin Atkinson
+
+Permission to use, copy, modify, distribute, and sell any part of SCOWLv2,
+or word lists created from it, is hereby granted without fee, provided that
+the above copyright notice appears in all copies and that both the above
+copyright notice and this notice appear in supporting documentation. Kevin
+Atkinson makes no representations about the suitability of this database for
+any purpose. It is provided "as is" without express or implied warranty.
+
+SCOWL is derived from many sources, most of which are in the Public Domain.
+The source distribution also documents the included source credits and terms.
+This NOTICE must remain with redistributed copies and derivatives.
+
+Supplemental validated correction targets were derived from Wikipedia's common-misspellings list, revision 1199637275, and included only when corroborated by TEKITO's local frequency, pronunciation, or WordNet data.
+Source: https://en.wikipedia.org/wiki/Wikipedia:Lists_of_common_misspellings/For_machines
+License: https://creativecommons.org/licenses/by-sa/4.0/
+
+Audited supplemental standard additions were individually checked against the local English Wiktionary dump dated 2026-08-05. The technical term 'cellpadding' is also listed by the WHATWG HTML Standard.
+Source: https://en.wiktionary.org/
+Source: https://html.spec.whatwg.org/multipage/obsolete.html#non-conforming-features
+License: https://creativecommons.org/licenses/by-sa/4.0/ (Wiktionary-derived review)

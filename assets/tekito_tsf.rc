@@ -1,0 +1,6 @@
+#include "tekito_resource.h"
+
+IDI_TEKITO ICON "icons/Tekito.ico"
+IDI_AUTO ICON "icons/A.ico"
+IDI_DIRECT ICON "icons/d.ico"
+IDR_FONT_MPLUS1 RCDATA "fonts/MPLUS1-wght.ttf"

@@ -1,0 +1,19 @@
+{
+  "pack_id": "pronunciation",
+  "display_name": "Pronunciation Data",
+  "schema_version": 1,
+  "version": "cmudict-2025-10-24",
+  "language": "en-US",
+  "type": "pronunciation",
+  "file": "pronunciations.tsv",
+  "index_file": "pronunciations.tsv.idx",
+  "entry_count": 125112,
+  "sha256": {
+    "file": "4489066ECA9757C0665C749691E6B0A55842806024B1EB6DCE76DCED413B71CC",
+    "index": "34282FC077E5964BBA4D50C023BA489AB53B2B4238423B58B6A955CBAA43DE32"
+  },
+  "license": "CMUdict",
+  "source": "https://github.com/cmusphinx/cmudict",
+  "notice_file": "NOTICE",
+  "source_version": "master-2025-10-24"
+}

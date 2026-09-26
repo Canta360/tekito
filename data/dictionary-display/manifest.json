@@ -1,0 +1,19 @@
+{
+  "pack_id": "dictionary-display",
+  "display_name": "Extended Dictionary",
+  "schema_version": 1,
+  "version": "wordnet-3.0",
+  "language": "en-US",
+  "type": "dictionary-display",
+  "file": "entries.tsv",
+  "index_file": "entries.tsv.idx",
+  "entry_count": 146289,
+  "sha256": {
+    "file": "00D5B48C3794D26FB26FCC570FBDBF019275D576F3957BF5011CCFB228F9B539",
+    "index": "ED678C96540E3C2C77F2C3BE0EA2860B98C34AD9B42B5D799254602C0EBD363B"
+  },
+  "license": "WordNet-3.0",
+  "source": "https://wordnet.princeton.edu/download/current-version",
+  "notice_file": "NOTICE",
+  "source_version": "3.0"
+}

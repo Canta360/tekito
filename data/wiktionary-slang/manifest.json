@@ -1,0 +1,19 @@
+{
+  "pack_id": "wiktionary-slang",
+  "display_name": "Extended Slang and Abbreviations",
+  "schema_version": 1,
+  "version": "enwiktionary-2026-08-05",
+  "language": "en-US",
+  "type": "slang-abbreviation",
+  "file": "entries.tsv",
+  "index_file": "entries.tsv.idx",
+  "entry_count": 52127,
+  "sha256": {
+    "file": "EDEF4D8D6E2075430A2D1776E1646510B39AA29E33696BD0CC1DE8DFBD404C51",
+    "index": "28E6335302CB1F24CD9D2BD480CFBF464187A659BC8380AD95502248CEB45D71"
+  },
+  "license": "CC-BY-SA-4.0",
+  "source": "https://kaikki.org/dictionary/rawdata.html",
+  "notice_file": "NOTICE",
+  "source_version": "dump-2026-08-05"
+}

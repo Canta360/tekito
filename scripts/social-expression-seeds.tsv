@@ -1,0 +1,380 @@
+# Chat words and the expressions TEKITO offers for them. Written for TEKITO
+# and covered by LICENSE.md. build-expression-packs.py turns this into the
+# social-expression Data Pack.
+#
+# trigger	expression	kind (emoji, emoticon, kaomoji, symbol, text_expansion)
+#
+# Every row is only ever a suggestion; TEKITO never replaces a word with one.
+# How far down the list a kind appears is set by the Casual expressions
+# setting: text_expansion from Common, emoticon and kaomoji from Familiar,
+# symbol from Broad. Emoji follow the emoji rules instead.
+
+# Laughing
+lol	😂	emoji
+lol	🤣	emoji
+lol	XD	emoticon
+lol	( ´艸｀)	kaomoji
+lol	(≧▽≦)	kaomoji
+lmao	🤣	emoji
+lmao	😂	emoji
+lmao	XD	emoticon
+rofl	🤣	emoji
+rofl	XD	emoticon
+haha	😄	emoji
+haha	😂	emoji
+haha	:D	emoticon
+haha	(≧▽≦)	kaomoji
+hehe	😁	emoji
+hehe	^^	emoticon
+grin	😁	emoji
+grin	:D	emoticon
+
+# Happy, excited
+happy	😊	emoji
+happy	😄	emoji
+happy	:)	emoticon
+happy	(^_^)	kaomoji
+happy	(＾▽＾)	kaomoji
+smile	🙂	emoji
+smile	😊	emoji
+smile	:-)	emoticon
+smile	(^‿^)	kaomoji
+joy	😂	emoji
+joy	ヽ(＾Д＾)ﾉ	kaomoji
+yay	🎉	emoji
+yay	🥳	emoji
+yay	＼(^o^)／	kaomoji
+woohoo	🎉	emoji
+woohoo	＼(^o^)／	kaomoji
+excited	🤩	emoji
+excited	٩(◕‿◕)۶	kaomoji
+party	🥳	emoji
+party	🎉	emoji
+celebrate	🎉	emoji
+celebrate	🍾	emoji
+congrats	🎉	emoji
+congrats	👏	emoji
+cheers	🥂	emoji
+cheers	🍻	emoji
+hype	🔥	emoji
+hype	🙌	emoji
+lit	🔥	emoji
+fire	🔥	emoji
+slay	💅	emoji
+slay	🔥	emoji
+goat	🐐	emoji
+vibes	✨	emoji
+goodvibes	✨	emoji
+sparkle	✨	emoji
+sparkles	✨	emoji
+magic	✨	emoji
+magic	🪄	emoji
+cool	😎	emoji
+cool	(⌐■_■)	kaomoji
+dealwithit	(⌐■_■)	kaomoji
+
+# Love, thanks, greetings
+love	❤️	emoji
+love	😍	emoji
+love	<3	emoticon
+love	(｡♥‿♥｡)	kaomoji
+heart	❤️	emoji
+heart	<3	emoticon
+ily	❤️	emoji
+ily	🥰	emoji
+ily	I love you	text_expansion
+hug	🤗	emoji
+hug	(っ´▽`)っ	kaomoji
+kiss	😘	emoji
+kiss	:*	emoticon
+cute	🥺	emoji
+cute	🥰	emoji
+shy	☺️	emoji
+shy	(⁄ ⁄•⁄ω⁄•⁄ ⁄)	kaomoji
+thanks	🙏	emoji
+thanks	😊	emoji
+thanks	(人´∀`)	kaomoji
+thankyou	🙏	emoji
+thx	🙏	emoji
+thx	thanks	text_expansion
+ty	🙏	emoji
+ty	thank you	text_expansion
+tysm	🙏	emoji
+tysm	thank you so much	text_expansion
+please	🙏	emoji
+please	(人 •͈ᴗ•͈)	kaomoji
+pray	🙏	emoji
+hi	👋	emoji
+hi	(・ω・)ﾉ	kaomoji
+hello	👋	emoji
+hello	(＾▽＾)ﾉ	kaomoji
+hey	👋	emoji
+bye	👋	emoji
+bye	(・ω・)ﾉ	kaomoji
+goodbye	👋	emoji
+seeya	👋	emoji
+wave	👋	emoji
+wave	(＾▽＾)ﾉ	kaomoji
+clap	👏	emoji
+wink	😉	emoji
+wink	;)	emoticon
+wink	(^_−)☆	kaomoji
+jk	😜	emoji
+jk	:P	emoticon
+jk	just kidding	text_expansion
+
+# Agreeing, answering
+ok	👌	emoji
+ok	👍	emoji
+okay	👌	emoji
+okay	👍	emoji
+yes	👍	emoji
+yes	✅	emoji
+yep	👍	emoji
+yup	👍	emoji
+sure	👍	emoji
+sure	🤝	emoji
+agree	👍	emoji
+agree	💯	emoji
+deal	🤝	emoji
+no	👎	emoji
+no	🙅	emoji
+nope	🙅	emoji
+nope	❌	emoji
+nah	🙅	emoji
+disagree	👎	emoji
+nice	👍	emoji
+nice	👌	emoji
+great	👍	emoji
+great	🙌	emoji
+awesome	🤩	emoji
+awesome	🙌	emoji
+goodjob	👏	emoji
+goodjob	👍	emoji
+wellplayed	👏	emoji
+same	🙌	emoji
+same	💯	emoji
+facts	💯	emoji
+true	💯	emoji
+done	✅	emoji
+winner	🏆	emoji
+goodluck	🤞	emoji
+fingerscrossed	🤞	emoji
+strong	💪	emoji
+muscle	💪	emoji
+idea	💡	emoji
+point	👉	emoji
+this	☝️	emoji
+this	👆	emoji
+
+# Sad, sorry, tired
+sad	😢	emoji
+sad	😞	emoji
+sad	:(	emoticon
+sad	(;_;)	kaomoji
+sad	(´；ω；`)	kaomoji
+unhappy	😞	emoji
+unhappy	:-(	emoticon
+cry	😭	emoji
+cry	😢	emoji
+cry	:'(	emoticon
+cry	T_T	emoticon
+cry	(╥﹏╥)	kaomoji
+sob	😭	emoji
+tears	😭	emoji
+sorry	🙇	emoji
+sorry	😔	emoji
+sorry	m(_ _)m	kaomoji
+apology	🙇	emoji
+apology	m(_ _)m	kaomoji
+oops	😅	emoji
+oops	🙈	emoji
+mybad	😅	emoji
+mybad	my bad	text_expansion
+tired	😩	emoji
+tired	😴	emoji
+tired	(￣ρ￣)..zzZZ	kaomoji
+sleepy	😴	emoji
+sleepy	(－_－) zzZ	kaomoji
+sleep	😴	emoji
+sleep	💤	emoji
+zzz	💤	emoji
+bored	🥱	emoji
+sick	🤒	emoji
+
+# Angry, annoyed
+angry	😠	emoji
+angry	😡	emoji
+angry	(╬ಠ益ಠ)	kaomoji
+angry	(｀へ´)	kaomoji
+mad	😠	emoji
+mad	(｀へ´)	kaomoji
+rage	😡	emoji
+upset	😞	emoji
+upset	😤	emoji
+annoyed	😒	emoji
+annoyed	-_-	emoticon
+meh	😐	emoji
+meh	-_-	emoticon
+facepalm	🤦	emoji
+facepalm	(－‸ლ)	kaomoji
+smh	🤦	emoji
+smh	😒	emoji
+smh	shaking my head	text_expansion
+tableflip	(╯°□°）╯︵ ┻━┻	kaomoji
+fliptable	(╯°□°）╯︵ ┻━┻	kaomoji
+unflip	┬─┬ ノ( ゜-゜ノ)	kaomoji
+
+# Surprised, unsure
+omg	😱	emoji
+omg	😮	emoji
+omg	:O	emoticon
+wow	😮	emoji
+wow	🤩	emoji
+wow	:O	emoticon
+whoa	😲	emoji
+woah	😲	emoji
+shock	😱	emoji
+shock	(⊙_⊙)	kaomoji
+shocked	😱	emoji
+surprised	😮	emoji
+surprised	(ﾟдﾟ)	kaomoji
+surprised	(⊙_⊙)	kaomoji
+scared	😨	emoji
+nervous	😬	emoji
+awkward	😬	emoji
+awkward	^^;	emoticon
+yikes	😬	emoji
+cringe	😬	emoji
+think	🤔	emoji
+think	(¬_¬)	kaomoji
+thinking	🤔	emoji
+hmm	🤔	emoji
+confused	😕	emoji
+confused	o_O	emoticon
+confused	(・・?)	kaomoji
+shrug	🤷	emoji
+shrug	¯\_(ツ)_/¯	kaomoji
+idk	🤷	emoji
+idk	¯\_(ツ)_/¯	kaomoji
+idk	I don't know	text_expansion
+dunno	🤷	emoji
+whatever	🙄	emoji
+whatever	¯\_(ツ)_/¯	kaomoji
+eyes	👀	emoji
+look	👀	emoji
+watching	👀	emoji
+sus	🤨	emoji
+suspicious	🤨	emoji
+sideeye	🤨	emoji
+sideeye	👀	emoji
+skull	💀	emoji
+dead	💀	emoji
+lenny	( ͡° ͜ʖ ͡°)	kaomoji
+
+# Fun
+dance	💃	emoji
+dance	┌(・o・)┐	kaomoji
+dance	♪┏(・o･)┛♪	kaomoji
+bear	ʕ•ᴥ•ʔ	kaomoji
+cat	ฅ^•ﻌ•^ฅ	kaomoji
+music	♪	symbol
+
+# Short forms
+brb	be right back	text_expansion
+ttyl	talk to you later	text_expansion
+omw	on my way	text_expansion
+imo	in my opinion	text_expansion
+imho	in my humble opinion	text_expansion
+tbh	to be honest	text_expansion
+btw	by the way	text_expansion
+fyi	for your information	text_expansion
+np	no problem	text_expansion
+nvm	never mind	text_expansion
+irl	in real life	text_expansion
+afaik	as far as I know	text_expansion
+asap	as soon as possible	text_expansion
+lmk	let me know	text_expansion
+wdym	what do you mean	text_expansion
+fr	for real	text_expansion
+ngl	not gonna lie	text_expansion
+rn	right now	text_expansion
+hbu	how about you	text_expansion
+wbu	what about you	text_expansion
+
+# Symbols
+->	→	symbol
+<-	←	symbol
+=>	⇒	symbol
+<=>	⇔	symbol
+arrow	→	symbol
+arrow	←	symbol
+arrow	↑	symbol
+arrow	↓	symbol
+arrow	↗	symbol
+arrow	↘	symbol
+arrow	↙	symbol
+arrow	↖	symbol
+arrow	↕	symbol
+arrow	⇄	symbol
+arrows	↕	symbol
+arrows	⇄	symbol
+rightarrow	→	symbol
+rightarrow	⇒	symbol
+rightarrow	⟶	symbol
+leftarrow	←	symbol
+leftarrow	⇐	symbol
+leftarrow	⟵	symbol
+uparrow	↑	symbol
+uparrow	⇑	symbol
+downarrow	↓	symbol
+downarrow	⇓	symbol
+updownarrow	↕	symbol
+updownarrow	⇅	symbol
+leftrightarrow	↔	symbol
+leftrightarrow	⇔	symbol
+northeast	↗	symbol
+northwest	↖	symbol
+southeast	↘	symbol
+southwest	↙	symbol
+back	↩	symbol
+forward	↪	symbol
+return	↵	symbol
+therefore	∴	symbol
+because	∵	symbol
+approximately	≈	symbol
+notequal	≠	symbol
+lessequal	≤	symbol
+greaterequal	≥	symbol
+infinity	∞	symbol
+degree	°	symbol
+plusminus	±	symbol
+multiply	×	symbol
+divide	÷	symbol
+bullet	•	symbol
+bullet	◦	symbol
+bullet	▪	symbol
+dot	・	symbol
+ellipsis	…	symbol
+copyright	©	symbol
+registered	®	symbol
+trademark	™	symbol
+section	§	symbol
+paragraph	¶	symbol
+reference	※	symbol
+star	★	symbol
+star	☆	symbol
+star	✦	symbol
+star	✧	symbol
+heart	♡	symbol
+heart	❤	symbol
+check	✓	symbol
+check	✔	symbol
+check	☑	symbol
+tick	✓	symbol
+cross	✗	symbol
+cross	✘	symbol
+xmark	✕	symbol
+music	♫	symbol
+music	♬	symbol
+note	♪	symbol

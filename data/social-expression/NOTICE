@@ -1,0 +1,7 @@
+Emoji, emoticons, kaomoji, symbols and short forms for chat words.
+
+The mapping from words to expressions was written for TEKITO and is covered
+by the TEKITO source license (LICENSE.md in the TEKITO repository). The
+emoji and symbols themselves are Unicode characters.
+
+Every entry is a suggestion only; TEKITO never replaces a word with one.

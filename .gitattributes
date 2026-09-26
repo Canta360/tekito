@@ -1,0 +1,11 @@
+# Source files are normalized to LF in the repository.
+* text=auto
+
+# Data Packs are checksummed and indexed by byte offset: never convert them.
+data/** -text
+
+*.lib binary
+*.ico binary
+*.ttf binary
+*.png binary
+*.gz binary
