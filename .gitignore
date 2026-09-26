@@ -24,5 +24,4 @@ third_party/webview2/tools/
 third_party/webview2/build/
 
 # Built locally by scripts/prepare-full-data-packs.ps1; too large for Git
-data/proper-nouns/
 data/phrase/

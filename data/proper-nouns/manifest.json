@@ -1,0 +1,19 @@
+{
+  "pack_id": "proper-nouns",
+  "display_name": "Place Names",
+  "schema_version": 1,
+  "version": "2026-08-12-major",
+  "language": "en-US",
+  "type": "proper-noun-gazetteer",
+  "file": "entries.tsv",
+  "index_file": "entries.tsv.idx",
+  "entry_count": 70741,
+  "sha256": {
+    "file": "656D01404AEFC6A7F52C188D8D64C266A912FF997933BEB561E80DE4E2928708",
+    "index": "C5027E5B5AB354FCF17C4106453F23EE08BC368A5A49FC3F695C000BC6F80CFE"
+  },
+  "license": "CC-BY-4.0",
+  "source": "https://download.geonames.org/export/dump/allCountries.zip",
+  "notice_file": "NOTICE",
+  "source_version": "2026-08-12"
+}

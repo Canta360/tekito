@@ -68,10 +68,10 @@ cmake --build --preset windows-x64-debug
 an administrator PowerShell with `scripts\register-debug.ps1`
 and remove it again with `unregister-debug.ps1`.
 
-The language data lives in `data/`. The two largest packs (place names and
-phrase statistics) are too big for the repository;
-`scripts\prepare-full-data-packs.ps1` downloads the public
-sources and rebuilds them. See [Data Packs](docs/data-packs.md).
+The language data lives in `data/`. One pack, phrase statistics, is too
+big for the repository; `scripts\prepare-full-data-packs.ps1` downloads the
+public sources and rebuilds it. TEKITO and its tests work without it. See
+[Data Packs](docs/data-packs.md).
 
 To make an installer, build the `windows-x64-release` preset and run
 `installer\package-release.ps1`.

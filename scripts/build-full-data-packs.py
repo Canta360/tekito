@@ -483,6 +483,36 @@ def build_cldr() -> dict:
                        license_text, "CLDR 48.2 + Emoji 17.0.0")
 
 
+# Places worth recognizing as names while typing. Everything else in the
+# GeoNames dump (post offices, hotels, streams, farms, ...) only adds noise
+# and hundreds of megabytes.
+GEONAMES_REGION_CODES = {"PCLI", "PCLD", "PCLF", "PCLS", "PCLIX", "PCL", "TERR", "ADM1", "CONT", "OCN", "SEA"}
+GEONAMES_MIN_CITY_POPULATION = 15000
+GEONAMES_ALTERNATE_NAME_CODES = {"PCLI", "PCLD", "PCLF", "PCLS", "PCLIX", "PCL", "TERR", "CONT", "OCN", "SEA"}
+GEONAMES_ALTERNATE_NAME_POPULATION = 1000000
+
+
+def geonames_names(fields: list[str]) -> list[str]:
+    """The names to index for one GeoNames row, or none if it is not kept."""
+    feature_class, feature_code = fields[6], fields[7]
+    population = int(fields[14] or 0)
+    region = feature_code in GEONAMES_REGION_CODES
+    city = feature_class == "P" and population >= GEONAMES_MIN_CITY_POPULATION
+    if not region and not city:
+        return []
+    names = [fields[1], fields[2]]
+    if feature_code in GEONAMES_ALTERNATE_NAME_CODES or population >= GEONAMES_ALTERNATE_NAME_POPULATION:
+        # Other names of countries and big cities, such as "Munich". Most
+        # alternates are other languages' forms ("Kanagawa prefektura"); keep
+        # only title-case names of up to three words, and no codes like "NRT".
+        for name in fields[3].split(","):
+            words = name.split()
+            if (1 <= len(words) <= 3 and all(word[:1].isupper() for word in words)
+                    and not name.isupper()):
+                names.append(name)
+    return names
+
+
 def build_geonames() -> dict:
     archive = require(CACHE / "geonames-allCountries.zip")
     database = CACHE / "proper-nouns-build.sqlite3"
@@ -499,7 +529,7 @@ def build_geonames() -> dict:
                 if len(fields) < 15:
                     continue
                 population = int(fields[14] or 0)
-                for name in (fields[1], fields[2], *fields[3].split(",")):
+                for name in geonames_names(fields):
                     name = clean(name)
                     if ASCII_TERM.fullmatch(name):
                         batch.append((name.lower(), name, population))
@@ -519,10 +549,11 @@ def build_geonames() -> dict:
             output.write(f"{key}\t{display}\tproper\ten-US\tGeoNames place name\n")
     db.close(); database.unlink(missing_ok=True)
     notice = require(CACHE / "geonames-readme.txt").read_text(encoding="utf-8", errors="replace")
-    return finish_pack("proper-nouns", "Extended Proper Nouns", "2026-08-12",
+    return finish_pack("proper-nouns", "Place Names", "2026-08-12-major",
                        "proper-noun-gazetteer", "entries.tsv", "TEKITO_SLANG_INDEX_V1", 1,
                        "CC-BY-4.0", "https://download.geonames.org/export/dump/allCountries.zip",
-                       "Place names derived from GeoNames allCountries dump.\n\n" + notice,
+                       "Names of countries, their first-level regions, cities of 15,000 people or\n"
+                       "more, continents, oceans and seas, from the GeoNames allCountries dump.\n\n" + notice,
                        "2026-08-12")
 
 
