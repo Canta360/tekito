@@ -40,9 +40,3 @@ Each data pack keeps the license of its source. Several are CC BY 4.0 or
 CC BY-SA 4.0 and require attribution; the CC BY-SA packs must stay under
 CC BY-SA when shared. `data/<pack>/NOTICE` is the authoritative statement for
 each pack. Packs marked `TEKITO-OWNED` are covered by `LICENSE.md`.
-
-## Before a public release
-
-- Have `installer/TEKITO_LICENSE.md` reviewed by a lawyer; it was written
-  without one.
-- Sign the installer and the binaries.

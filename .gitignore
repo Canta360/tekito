@@ -23,8 +23,5 @@ eval/generated/
 third_party/webview2/tools/
 third_party/webview2/build/
 
-# Not published
-CLAUDE.md
-.claude/
 # Built locally by scripts/prepare-full-data-packs.ps1; too large for Git
 data/phrase/
