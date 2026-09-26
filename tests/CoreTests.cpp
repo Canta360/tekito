@@ -40,9 +40,9 @@ void Require(bool condition, const char* message) {
     }
 }
 
-// proper-nouns and phrase are too large for the repository and are built
-// locally (see docs/data-packs.md). Tests that need them are skipped
-// when they are not installed; every other pack is required.
+// The phrase pack is too large for the repository and is built locally
+// (see docs/data-packs.md). Tests that need it are skipped when it is not
+// installed; every other pack is required.
 bool OptionalPackInstalled(const wchar_t* packId) {
     const bool installed = std::filesystem::exists(
         tekito::ExternalLexiconProvider::DataPackRoot() / packId / L"manifest.json");
@@ -53,7 +53,7 @@ bool OptionalPackInstalled(const wchar_t* packId) {
 }
 
 bool IsOptionalPack(std::wstring_view packId) {
-    return packId == L"proper-nouns" || packId == L"phrase";
+    return packId == L"phrase";
 }
 
 bool HasFlag(std::uint32_t value, std::uint32_t flag) {
@@ -1195,7 +1195,7 @@ void TestLocalDataPackProviders() {
     Require(wiktionary.IsLoaded() && foundAbbreviation,
             "Wiktionary slang pack is queried through its independent local provider");
 
-    if (OptionalPackInstalled(L"proper-nouns")) {
+    {
         const tekito::ExternalSlangProvider proper(
             dataRoot / L"proper-nouns" / L"entries.tsv",
             tekito::CandidateSourceProperNoun);

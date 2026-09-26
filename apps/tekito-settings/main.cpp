@@ -67,7 +67,7 @@ constexpr DataPackInfo kDataPacks[] = {
     {L"frequency", L"Frequency"},
     {L"phrase", L"Phrase / N-gram"},
     {L"dictionary-display", L"Dictionary Display"},
-    {L"proper-nouns", L"Proper Nouns"},
+    {L"proper-nouns", L"Place Names"},
     {L"slang", L"Slang"},
     {L"wiktionary-slang", L"Extended Slang"},
     {L"pronunciation", L"Pronunciation"},

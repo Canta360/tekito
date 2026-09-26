@@ -50,7 +50,7 @@ cmake --build --preset windows-x64-debug
 
 `verify.ps1` はビルド、テスト、[開発のルール](#開発のルール)の確認をまとめて行います。自分のビルドを試すときは、管理者 PowerShell で `scripts\register-debug.ps1` を実行して登録し、`unregister-debug.ps1` で外します。
 
-言語データは `data/` にあります。いちばん大きい 2 つ（地名とフレーズ統計）はリポジトリに入れられないため、`scripts\prepare-full-data-packs.ps1` で公開元からダウンロードして作り直します。詳しくは [Data Packs](docs/data-packs.md) を参照してください。
+言語データは `data/` にあります。フレーズ統計のパックだけはリポジトリに入れられない大きさなので、`scripts\prepare-full-data-packs.ps1` で公開元からダウンロードして作り直します。なくても TEKITO とテストは動きます。詳しくは [Data Packs](docs/data-packs.md) を参照してください。
 
 インストーラーを作るときは `windows-x64-release` プリセットでビルドし、`installer\package-release.ps1` を実行します。
 
