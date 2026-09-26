@@ -27,6 +27,23 @@ function Invoke-Regsvr32([string[]]$Arguments) {
     return $process.ExitCode
 }
 
+# Apps that take text input keep the input method DLL loaded, so it cannot
+# be deleted while they run. It can be renamed, though: move such files out
+# of the way and let the next install or uninstall remove them.
+function Remove-InstalledFiles([string]$Root) {
+    if (-not (Test-Path -LiteralPath $Root)) { return }
+    foreach ($file in @(Get-ChildItem -LiteralPath $Root -File -Recurse -Force)) {
+        try {
+            Remove-Item -LiteralPath $file.FullName -Force -ErrorAction Stop
+        } catch {
+            Rename-Item -LiteralPath $file.FullName ("{0}.old-{1}" -f $file.Name, [guid]::NewGuid().ToString("N"))
+        }
+    }
+    Get-ChildItem -LiteralPath $Root -Directory -Recurse -Force | Sort-Object { $_.FullName.Length } -Descending |
+        Where-Object { @(Get-ChildItem -LiteralPath $_.FullName -Force).Count -eq 0 } |
+        ForEach-Object { Remove-Item -LiteralPath $_.FullName -Force -ErrorAction SilentlyContinue }
+}
+
 function Remove-InputMethodTip {
     $languages = Get-WinUserLanguageList
     $changed = $false
@@ -87,10 +104,9 @@ try {
             if ($code -ne 0) { Write-Warning "Unregistering the previous version returned $code." }
         }
     }
-    if (Test-Path -LiteralPath $installRoot) { Remove-Item -LiteralPath $installRoot -Recurse -Force }
-    New-Item -ItemType Directory -Path (Split-Path $installRoot -Parent) -Force | Out-Null
-    Move-Item -LiteralPath $stagingRoot -Destination $installRoot
-    $stagingRoot = $null
+    Remove-InstalledFiles $installRoot
+    New-Item -ItemType Directory -Path $installRoot -Force | Out-Null
+    Copy-Item -Path (Join-Path $stagingRoot "*") -Destination $installRoot -Recurse -Force
 
     if (-not $SkipDataPacks) {
         & (Join-Path $SourceRoot "scripts\install-data-packs.ps1") `

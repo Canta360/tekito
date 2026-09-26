@@ -1,13 +1,28 @@
-# TEKITO
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/header-dark.png">
+    <img src="docs/images/header-light.png" alt="TEKITO, a simple input method" width="600">
+  </picture>
+</p>
 
-English typing help for Windows keyboards. TEKITO fixes typos when you press
-Space, offers the word you were going for, and gets out of the way when you
-meant what you typed. It is an input method (a TSF text service), so it works
-in ordinary Windows apps without plugins, and it runs entirely on your PC.
+<p align="center">
+  English typing help for Windows keyboards.<br>
+  Typos fixed on Space, the word you meant one key away, and nothing touched when you meant what you typed.
+</p>
 
-[日本語](README_JP.md)
+<p align="center">
+  <a href="README_JP.md">日本語</a> ·
+  <a href="#install">Install</a> ·
+  <a href="#build">Build</a> ·
+  <a href="https://capitata.dev">capitata.dev</a>
+</p>
 
-![The TEKITO candidate list: glass in light and dark, and the simple style](docs/images/candidate-list.png)
+<p align="center">
+  <img src="docs/images/typing-demo.png" alt="Typing “thnaks for teh reveiw.” in a plain page: the candidate list appears under each word, Space fixes the typos, and the line ends up as “thanks for the review.”" width="640">
+</p>
+
+TEKITO is an input method (a TSF text service), so it works in ordinary
+Windows apps without plugins, and everything runs on your PC.
 
 > TEKITO is a preview. It has been tested in Notepad; other apps are listed in
 > [the compatibility notes](docs/compatibility.md).
@@ -25,15 +40,41 @@ choices appears under it.
 | Backspace | Right after a correction, puts back what you typed. |
 | Esc | Keeps what you typed. |
 | Enter | Picks the highlighted choice when you are in the list; otherwise ends the line as usual. |
-| Alt+` | Switches between Auto and Direct. Direct types exactly the keys you press. |
 
 Typing the next letter settles the word, so there is nothing to undo later.
-TEKITO leaves alone words it recognizes, names, anything that looks like
-code, URLs and addresses, and fields marked as passwords, numbers or email.
-Terminals, and any apps you add in Settings, get no help at all.
+TEKITO leaves alone words it recognizes, chat abbreviations like “brb”,
+anything you capitalize yourself, anything that looks like code, URLs and
+addresses, and fields marked as passwords, numbers or email.
+
+![The TEKITO candidate list: glass in light and dark, and the simple style](docs/images/candidate-list.png)
+
+## Auto and Direct
+
+TEKITO has two modes. The button in the taskbar shows which one is on;
+click it, or press Alt+`, to switch.
+
+<table>
+  <tr>
+    <td width="72" align="center"><img src="docs/images/mode-auto.png" width="48" alt=""></td>
+    <td><b>Auto</b><br>Corrects spelling and suggests words as you type.</td>
+    <td><img src="docs/images/taskbar-auto.png" width="216" alt="The taskbar with TEKITO in Auto"></td>
+  </tr>
+  <tr>
+    <td align="center">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="docs/images/mode-direct-dark.png">
+        <img src="docs/images/mode-direct-light.png" width="48" alt="">
+      </picture>
+    </td>
+    <td><b>Direct</b><br>Types exactly the keys you press.</td>
+    <td><img src="docs/images/taskbar-direct.png" width="216" alt="The taskbar with TEKITO in Direct"></td>
+  </tr>
+</table>
+
+Terminals, apps running as administrator, and any apps you list in Settings
+always get Direct.
 
 ![TEKITO Settings](docs/images/settings.png)
-
 ## Privacy
 
 Everything TEKITO does happens on your computer. It does not send your
@@ -112,3 +153,12 @@ and each data pack keeps the license of its source. The details are in
 [third-party notices](THIRD_PARTY_NOTICES.md).
 
 TEKITO is made by [Capitata](https://capitata.dev).
+
+<p align="center">
+  <a href="https://capitata.dev">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="docs/images/capitata-dark.png">
+      <img src="docs/images/capitata-light.png" alt="Capitata" width="160">
+    </picture>
+  </a>
+</p>

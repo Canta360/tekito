@@ -11,6 +11,23 @@ param(
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
+# Apps that take text input keep the input method DLL loaded, so it cannot
+# be deleted while they run. It can be renamed, though: move such files out
+# of the way and let the next install or uninstall remove them.
+function Remove-InstalledFiles([string]$Root) {
+    if (-not (Test-Path -LiteralPath $Root)) { return }
+    foreach ($file in @(Get-ChildItem -LiteralPath $Root -File -Recurse -Force)) {
+        try {
+            Remove-Item -LiteralPath $file.FullName -Force -ErrorAction Stop
+        } catch {
+            Rename-Item -LiteralPath $file.FullName ("{0}.old-{1}" -f $file.Name, [guid]::NewGuid().ToString("N"))
+        }
+    }
+    Get-ChildItem -LiteralPath $Root -Directory -Recurse -Force | Sort-Object { $_.FullName.Length } -Descending |
+        Where-Object { @(Get-ChildItem -LiteralPath $_.FullName -Force).Count -eq 0 } |
+        ForEach-Object { Remove-Item -LiteralPath $_.FullName -Force -ErrorAction SilentlyContinue }
+}
+
 $installRoot = [IO.Path]::GetFullPath($InstallRoot).TrimEnd('\')
 $userRoot = [IO.Path]::GetFullPath($env:USERPROFILE).TrimEnd('\') + '\'
 if (-not $installRoot.StartsWith($userRoot, [StringComparison]::OrdinalIgnoreCase)) {
@@ -50,7 +67,13 @@ if (-not $SkipRegistration) {
 
 $startMenu = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\TEKITO"
 if (Test-Path -LiteralPath $startMenu) { Remove-Item -LiteralPath $startMenu -Recurse -Force }
-if (Test-Path -LiteralPath $installRoot) { Remove-Item -LiteralPath $installRoot -Recurse -Force }
+Remove-InstalledFiles $installRoot
+if (Test-Path -LiteralPath $installRoot) {
+    Remove-Item -LiteralPath $installRoot -Recurse -Force -ErrorAction SilentlyContinue
+    if (Test-Path -LiteralPath $installRoot) {
+        Write-Host "Some files are still in use and were renamed; sign out and back in, then delete $installRoot."
+    }
+}
 if ($RemoveUserData) {
     $userDataRoot = Join-Path $env:LOCALAPPDATA "TEKITO"
     if (Test-Path -LiteralPath $userDataRoot) { Remove-Item -LiteralPath $userDataRoot -Recurse -Force }
