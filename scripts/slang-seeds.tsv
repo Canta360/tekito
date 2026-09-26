@@ -1,0 +1,197 @@
+# Chat abbreviations and informal spellings that people type on purpose.
+# Written for TEKITO and covered by LICENSE.md. build-expression-packs.py
+# turns this into the slang Data Pack.
+#
+# spelling	meaning	label (abbreviation, colloquial, slang)
+#
+# TEKITO never corrects a spelling listed here; the meaning is offered as a
+# suggestion. Where the meaning is the spelling itself, TEKITO only keeps the
+# word as typed and suggests nothing.
+
+abt	about	colloquial
+afaik	as far as I know	abbreviation
+afk	away from keyboard	abbreviation
+asap	as soon as possible	abbreviation
+atm	at the moment	abbreviation
+bae	bae	slang
+bc	because	abbreviation
+bday	birthday	colloquial
+betcha	bet you	colloquial
+bf	boyfriend	abbreviation
+bff	best friends forever	abbreviation
+bout	about	colloquial
+brb	be right back	abbreviation
+bruh	bro	slang
+btw	by the way	abbreviation
+bby	baby	colloquial
+c'mon	come on	colloquial
+congrats	congratulations	colloquial
+convo	conversation	colloquial
+cooked	exhausted	slang
+cuz	because	colloquial
+cya	see you	abbreviation
+def	definitely	colloquial
+defo	definitely	colloquial
+delulu	delusional	slang
+dm	direct message	abbreviation
+dms	direct messages	abbreviation
+dontcha	don't you	colloquial
+dunno	don't know	colloquial
+eod	end of day	abbreviation
+eta	estimated time of arrival	abbreviation
+fab	fabulous	colloquial
+fam	family	slang
+fav	favorite	colloquial
+fave	favorite	colloquial
+finna	going to	slang
+fomo	fear of missing out	abbreviation
+fr	for real	abbreviation
+fs	for sure	abbreviation
+ftw	for the win	abbreviation
+fwiw	for what it's worth	abbreviation
+fyi	for your information	abbreviation
+gf	girlfriend	abbreviation
+gg	good game	abbreviation
+gimme	give me	colloquial
+gl	good luck	abbreviation
+gm	good morning	abbreviation
+gn	good night	abbreviation
+gonna	going to	colloquial
+gorg	gorgeous	colloquial
+gotcha	got you	colloquial
+gotta	got to	colloquial
+grats	congratulations	colloquial
+hafta	have to	colloquial
+hbd	happy birthday	abbreviation
+hbu	how about you	abbreviation
+highkey	openly	slang
+hmu	hit me up	abbreviation
+icymi	in case you missed it	abbreviation
+idc	I don't care	abbreviation
+idek	I don't even know	abbreviation
+idk	I don't know	abbreviation
+idts	I don't think so	abbreviation
+ig	I guess	abbreviation
+iirc	if I remember correctly	abbreviation
+ik	I know	abbreviation
+ikr	I know, right	abbreviation
+ily	I love you	abbreviation
+imho	in my humble opinion	abbreviation
+imo	in my opinion	abbreviation
+imy	I miss you	abbreviation
+irl	in real life	abbreviation
+istg	I swear to God	abbreviation
+iykyk	if you know, you know	abbreviation
+jic	just in case	abbreviation
+jk	just kidding	abbreviation
+k	okay	colloquial
+kinda	kind of	colloquial
+kk	okay	colloquial
+lemme	let me	colloquial
+lil	little	colloquial
+lmao	lmao	abbreviation
+lmk	let me know	abbreviation
+lol	laughing out loud	abbreviation
+lotta	lot of	colloquial
+lowkey	quietly	slang
+luv	love	colloquial
+lysm	love you so much	abbreviation
+mfw	my face when	abbreviation
+mid	average	slang
+msg	message	abbreviation
+nah	no	colloquial
+naw	no	colloquial
+nbd	no big deal	abbreviation
+ngl	not gonna lie	abbreviation
+nite	night	colloquial
+nm	not much	abbreviation
+nocap	no lie	slang
+np	no problem	abbreviation
+nsfw	not safe for work	abbreviation
+nvm	never mind	abbreviation
+nw	no worries	abbreviation
+obv	obviously	colloquial
+obvi	obviously	colloquial
+obvs	obviously	colloquial
+ofc	of course	abbreviation
+okie	okay	colloquial
+omg	oh my god	abbreviation
+omw	on my way	abbreviation
+ong	on God	abbreviation
+ootd	outfit of the day	abbreviation
+outta	out of	colloquial
+perf	perfect	colloquial
+pic	picture	colloquial
+pics	pictures	colloquial
+pls	please	abbreviation
+plz	please	abbreviation
+pov	point of view	abbreviation
+ppl	people	abbreviation
+prob	probably	colloquial
+probs	probably	colloquial
+prolly	probably	colloquial
+rizz	charisma	slang
+rly	really	abbreviation
+rn	right now	abbreviation
+rofl	rolling on the floor laughing	abbreviation
+ridic	ridiculous	colloquial
+sesh	session	colloquial
+smh	shaking my head	abbreviation
+smth	something	abbreviation
+sorta	sort of	colloquial
+sry	sorry	abbreviation
+srsly	seriously	abbreviation
+sth	something	abbreviation
+stfu	stfu	abbreviation
+sup	what's up	colloquial
+sus	suspicious	slang
+tbd	to be determined	abbreviation
+tbf	to be fair	abbreviation
+tbh	to be honest	abbreviation
+tfw	that feeling when	abbreviation
+thanx	thanks	colloquial
+thnx	thanks	colloquial
+tho	though	colloquial
+thru	through	colloquial
+thx	thanks	abbreviation
+tia	thanks in advance	abbreviation
+til	today I learned	abbreviation
+tks	thanks	abbreviation
+tldr	too long; didn't read	abbreviation
+tmi	too much information	abbreviation
+tmr	tomorrow	abbreviation
+tmrw	tomorrow	abbreviation
+tn	tonight	abbreviation
+tonite	tonight	colloquial
+totes	totally	colloquial
+tryna	trying to	colloquial
+ttyl	talk to you later	abbreviation
+ttys	talk to you soon	abbreviation
+txt	text	abbreviation
+ty	thank you	abbreviation
+tysm	thank you so much	abbreviation
+tyvm	thank you very much	abbreviation
+u	you	abbreviation
+ur	your	abbreviation
+vid	video	colloquial
+vids	videos	colloquial
+wanna	want to	colloquial
+wassup	what's up	colloquial
+wbu	what about you	abbreviation
+wdym	what do you mean	abbreviation
+wfh	work from home	abbreviation
+whatcha	what are you	colloquial
+whatevs	whatever	colloquial
+wtf	wtf	abbreviation
+wya	where are you	abbreviation
+wyd	what are you doing	abbreviation
+wym	what do you mean	abbreviation
+xoxo	hugs and kisses	abbreviation
+y'all	y'all	colloquial
+y'know	you know	colloquial
+ya	you	colloquial
+yall	y'all	colloquial
+yea	yeah	colloquial
+yeet	yeet	slang
+yolo	you only live once	abbreviation
+yw	you're welcome	abbreviation
