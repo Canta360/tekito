@@ -1,0 +1,19 @@
+{
+  "pack_id": "emoji",
+  "display_name": "Emoji Data",
+  "schema_version": 1,
+  "version": "48.2+emoji-17.0.0",
+  "language": "en-US",
+  "type": "emoji-annotations",
+  "file": "entries.tsv",
+  "index_file": "entries.tsv.idx",
+  "entry_count": 30549,
+  "sha256": {
+    "file": "4751CD5BF29E29BB5E3DFBD8F86423F8E037823AE432577395CB80C7FEE309E6",
+    "index": "93270DDED6A80E6A8756F8853F4439E6FF814BD2B3B15A0F16357FFBB53FA7E9"
+  },
+  "license": "Unicode-3.0",
+  "source": "https://unicode.org/Public/cldr/48.2/cldr-common-48.2.zip; https://www.unicode.org/Public/17.0.0/emoji/emoji-test.txt",
+  "notice_file": "NOTICE",
+  "source_version": "CLDR 48.2 + Emoji 17.0.0"
+}

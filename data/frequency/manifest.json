@@ -1,0 +1,19 @@
+{
+  "pack_id": "frequency",
+  "display_name": "Word Frequency",
+  "schema_version": 1,
+  "version": "eng-news-2025-1M",
+  "language": "en-US",
+  "type": "ranking-frequency-priors",
+  "file": "word-scores.tsv",
+  "index_file": "word-scores.tsv.idx",
+  "entry_count": 312579,
+  "sha256": {
+    "file": "503360C77873ACD0842072DEB2741A0A90291A1C749974C1501264153231785D",
+    "index": "D7537A35CC0570742500471A4598DD740098733498D2B6856F3B05C4F10F5345"
+  },
+  "license": "CC-BY-4.0",
+  "source": "https://downloads.wortschatz-leipzig.de/corpora/eng_news_2025_1M.tar.gz",
+  "notice_file": "NOTICE",
+  "source_version": "2025-1M"
+}

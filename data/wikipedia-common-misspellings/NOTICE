@@ -1,0 +1,4 @@
+Derived from Wikipedia:Lists of common misspellings/For machines, revision 1199637275. Copyright belongs to the page contributors. This derived pack is distributed under CC BY-SA 4.0. Source history: https://en.wikipedia.org/w/index.php?title=Wikipedia:Lists_of_common_misspellings/For_machines&oldid=1199637275
+License: https://creativecommons.org/licenses/by-sa/4.0/
+The source page states that this machine-readable list can be out of date; treat it as a supplemental correction source, not a complete English lexicon.
+TEKITO normalized arrows to TSV, split alternatives, removed non-word records, lowercased lookup keys, corrected six audited source typos, removed one space-dependent target and one semantic replacement, deduplicated case variants, sorted, and indexed the result.

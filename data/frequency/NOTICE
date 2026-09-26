@@ -1,0 +1,5 @@
+Word-frequency data derived from the Leipzig Corpora Collection English News 2025 1,000,000 sentence download. The downloadable corpus is provided under CC BY.
+Attribution: © 2026 Universität Leipzig / Sächsische Akademie der Wissenschaften / InfAI.
+Source: https://wortschatz.uni-leipzig.de/en/download/eng
+Terms: https://www.wortschatz.uni-leipzig.de/en/usage
+TEKITO lowercased ASCII word tokens, aggregated counts, normalized scores, sorted records, and generated a sparse local index.
