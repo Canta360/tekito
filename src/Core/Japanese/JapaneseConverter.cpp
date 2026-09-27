@@ -279,7 +279,7 @@ std::vector<Phrase> JapaneseConverter::Convert(std::wstring_view reading,
 
 std::vector<Prediction> JapaneseConverter::Predict(std::wstring_view reading, std::size_t limit) const {
     // Going through more keys than this would take too long per keystroke.
-    constexpr std::uint32_t kMaxKeys = 3000;
+    constexpr std::uint32_t kMaxKeys = 2000;
     std::vector<Prediction> predictions;
     if (reading.empty() || limit == 0) return predictions;
     const ReadingCodes codes = dictionary_.Encode(reading);
@@ -292,17 +292,21 @@ std::vector<Prediction> JapaneseConverter::Predict(std::wstring_view reading, st
         DictionaryWord word;
     };
     std::vector<Found> found;
+    found.reserve(end - first);
     for (std::uint32_t record = first; record < end; ++record) {
-        bool taken = false;
         dictionary_.ForEachWord(record, [&](const DictionaryWord& word) {
             // The cheapest word of each longer reading, never a spelling
             // correction.
-            if (taken || word.spellingCorrection) return;
-            taken = true;
+            if (word.spellingCorrection) return true;
             found.push_back({word.cost, record, word});
+            return false;
         });
     }
-    std::sort(found.begin(), found.end(), [](const Found& a, const Found& b) { return a.cost < b.cost; });
+    const auto cheaper = [](const Found& a, const Found& b) { return a.cost < b.cost; };
+    // Only the first few are needed; some may be dropped below.
+    const std::size_t sorted = std::min(found.size(), limit * 4);
+    std::partial_sort(found.begin(), found.begin() + static_cast<std::ptrdiff_t>(sorted), found.end(), cheaper);
+    found.resize(sorted);
     for (const auto& item : found) {
         std::wstring key = dictionary_.KeyText(item.record);
         if (key.size() <= reading.size()) continue;
