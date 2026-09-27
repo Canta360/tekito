@@ -86,7 +86,7 @@ export function installMockHost() {
         state.dictionary = state.dictionary.filter((entry) => entry.id !== message.id);
       }
       if (type === "license.get") {
-        const data = JSON.stringify({ requestId, ok: true, error: "", state, text: "# TEKITO License Agreement\n\nVersion 0.1.0 (preview)\n\n## In short\n\n- You may install TEKITO on the computers you use.\n- What you type is yours.\n\n## 1. What you may do\n\nWe give you a personal license to use TEKITO." });
+        const data = JSON.stringify({ requestId, ok: true, error: "", state, text: "# TEKITO License Agreement\n\nVersion 0.1 (preview)\n\n## In short\n\n- You may install TEKITO on the computers you use.\n- What you type is yours.\n\n## 1. What you may do\n\nWe give you a personal license to use TEKITO." });
         window.setTimeout(() => listeners.forEach((listener) => listener({ data })), 60);
         return;
       }
