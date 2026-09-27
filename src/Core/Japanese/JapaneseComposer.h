@@ -185,15 +185,6 @@ private:
     void UpdatePredictions();
     // English candidates for the whole text, when the keys look like a word.
     void AddEnglish(const std::wstring& reading, bool romajiCorrected);
-    // The kana `keys` make, and whether every key became kana.
-    [[nodiscard]] std::wstring ReadingOf(std::wstring_view keys, bool& complete) const;
-    // A mistyped key that left letters the table cannot read ("arigatpu"):
-    // the one-edit spelling nearby that reads as the most likely Japanese.
-    struct RomajiCorrection {
-        std::wstring reading;
-        std::vector<Phrase> phrases;
-    };
-    [[nodiscard]] std::optional<RomajiCorrection> CorrectRomaji() const;
 
     const RomajiTable* table_{nullptr};
     const JapaneseConverter* converter_{nullptr};

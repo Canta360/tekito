@@ -85,13 +85,13 @@ const JapaneseData* ProcessJapaneseData() {
             return std::unique_ptr<JapaneseData>{};
         }
         loaded->converter = std::make_unique<japanese::JapaneseConverter>(loaded->dictionary, loaded->matrix);
-        const auto* table = ProcessRomajiTable();
-        if (table && loaded->english.Open(root / L"japanese-english-words")) {
+        // Mixed conversion also corrects slips in the keys, so it runs
+        // without the English words too.
+        if (const auto* table = ProcessRomajiTable()) {
+            if (!loaded->english.Open(root / L"japanese-english-words")) Trace(L"Japanese English words unavailable");
             loaded->mixed = std::make_unique<japanese::MixedConverter>(loaded->dictionary, loaded->matrix,
                                                                       *loaded->converter, *table,
                                                                       loaded->english);
-        } else {
-            Trace(L"Japanese mixed conversion unavailable");
         }
         return loaded;
     }();

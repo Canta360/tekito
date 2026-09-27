@@ -20,11 +20,17 @@ sentences with a common English noun typed among the romaji
 ("kyouha" + "meeting" + "gaarimasu"):
 
   source <TAB> id <TAB> keys <TAB> expected [<TAB> expected ...]
+
+And eval/generated/japanese_eval_typo_keys.tsv: the same sentences with one
+slip in the keys (a neighboring key, a key dropped, an extra neighboring
+key, or two keys swapped), chosen deterministically; the expected text is
+what was meant.
 """
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import urllib.request
 from pathlib import Path
@@ -33,6 +39,8 @@ ROOT = Path(__file__).resolve().parents[1]
 CACHE = ROOT / ".cache" / "tekito-data"
 OUTPUT = ROOT / "eval" / "generated" / "japanese_eval.tsv"
 KEYS_OUTPUT = ROOT / "eval" / "generated" / "japanese_eval_keys.tsv"
+TYPO_OUTPUT = ROOT / "eval" / "generated" / "japanese_eval_typo_keys.tsv"
+QWERTY_ROWS = ["qwertyuiop", "asdfghjkl", "zxcvbnm"]
 DATA = ROOT / "data"
 
 # Japanese around the English word: keys before, their text, keys after,
@@ -173,6 +181,41 @@ def reads_as_romaji(word: str, keys: set[str]) -> bool:
     return True
 
 
+def qwerty_neighbors(key: str) -> str:
+    """The same neighbors as TypoModel's AreQwertyNeighbors."""
+    for row, letters in enumerate(QWERTY_ROWS):
+        column = letters.find(key)
+        if column < 0:
+            continue
+        near = [letters[c] for c in (column - 1, column + 1) if 0 <= c < len(letters)]
+        for other in (row - 1, row + 1):
+            if 0 <= other < len(QWERTY_ROWS):
+                near += [QWERTY_ROWS[other][c] for c in (column - 1, column, column + 1)
+                         if 0 <= c < len(QWERTY_ROWS[other])]
+        return "".join(near)
+    return ""
+
+
+def typo(keys: str, seed: str) -> tuple[str, str] | None:
+    """One slip in the keys, the same every run."""
+    digest = hashlib.sha1(seed.encode("utf-8")).digest()
+    letters = [i for i, c in enumerate(keys) if c.isalpha()]
+    if len(letters) < 6:
+        return None
+    at = letters[digest[0] % len(letters)]
+    kind = ("neighbor", "neighbor", "dropped", "extra", "swapped")[digest[1] % 5]
+    near = qwerty_neighbors(keys[at])
+    if kind == "neighbor" and near:
+        return kind, keys[:at] + near[digest[2] % len(near)] + keys[at + 1:]
+    if kind == "dropped":
+        return kind, keys[:at] + keys[at + 1:]
+    if kind == "extra" and near:
+        return kind, keys[:at + 1] + near[digest[2] % len(near)] + keys[at + 1:]
+    if kind == "swapped" and at + 1 < len(keys) and keys[at] != keys[at + 1] and keys[at + 1].isalpha():
+        return kind, keys[:at] + keys[at + 1] + keys[at] + keys[at + 2:]
+    return None
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--output", type=Path, default=OUTPUT)
@@ -189,18 +232,27 @@ def main() -> None:
 
     keys_for = romaji_table()
     keyed = 0
-    with KEYS_OUTPUT.open("w", encoding="utf-8", newline="\n") as out:
+    typos = 0
+    with KEYS_OUTPUT.open("w", encoding="utf-8", newline="\n") as out, \
+            TYPO_OUTPUT.open("w", encoding="utf-8", newline="\n") as typo_out:
         for rows in (mozc_rows(), ajimee_rows()):
             for source, row_id, _, reading, expected in rows:
                 keys = romanize(clean(reading), keys_for)
                 if keys:
                     out.write("\t".join([source, row_id, keys] + [clean(e) for e in expected]) + "\n")
                     keyed += 1
+                    slip = typo(keys, f"{source}:{row_id}")
+                    if slip:
+                        kind, slipped = slip
+                        typo_out.write("\t".join([f"typo-{kind}", f"{source}-{row_id}", slipped] +
+                                                  [clean(e) for e in expected]) + "\n")
+                        typos += 1
         for word in english_nouns(60, keys_for):
             for number, (before, before_text, after, after_text) in enumerate(MIXED_TEMPLATES):
                 out.write(f"mixed\t{word}-{number}\t{before}{word}{after}\t{before_text}{word}{after_text}\n")
                 keyed += 1
     print(f"wrote {keyed} rows to {KEYS_OUTPUT}")
+    print(f"wrote {typos} rows to {TYPO_OUTPUT}")
 
 
 if __name__ == "__main__":

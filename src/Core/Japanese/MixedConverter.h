@@ -30,28 +30,36 @@ private:
     std::vector<std::uint32_t> lines_;  // offsets of the rows, in word order
 };
 
-// What the keys typed become when Japanese and English are mixed.
+// What the keys typed become when Japanese and English are mixed, or when
+// a slip in the keys was corrected.
 struct MixedConversion {
-    // The text the phrases index: kana for the Japanese runs, the English
-    // words as typed.
+    // The text the phrases index: kana for the Japanese runs (as corrected),
+    // the English words as typed.
     std::wstring reading;
     std::vector<Phrase> phrases;
+    bool english{false};
+    bool corrected{false};
 };
 
 // Converts the keys as typed, not the kana they made while typing: Japanese
-// words (the keys read as romaji from any position) and English words (the
-// keys as they are) go into one lattice over the key positions, and the most
-// likely mix of the two wins ("kyouhameetinggaaru" -> 今日は meeting がある).
-// English words join the Japanese around them as nouns.
+// words (the keys read as romaji from any position), English words (the
+// keys as they are) and Japanese words one slip away from the keys (a
+// neighboring key, a key dropped or added, two keys swapped) go into one
+// lattice over the key positions, and the likeliest reading of the whole
+// wins ("kyouhameetinggaaru" -> 今日は meeting がある; "arigayou" ->
+// ありがとう). English words join the Japanese around them as nouns.
 class MixedConverter final {
 public:
     // In the connection matrix's units. An English word costs
     // englishBase - englishPerScore * score + languageSwitch, so a reading
-    // that is good Japanese stays Japanese; tuned with tekito_ja_eval.
+    // that is good Japanese stays Japanese; a word read through a slip costs
+    // `typo` more than the word. Tuned with tekito_ja_eval; typo 0 turns
+    // the correction off.
     struct Costs {
         std::int64_t englishBase{10000};
         std::int64_t englishPerScore{1000};
         std::int64_t languageSwitch{2500};
+        std::int64_t typo{6000};
     };
 
     MixedConverter(const JapaneseDictionary& dictionary, const ConnectionMatrix& matrix,
@@ -60,9 +68,10 @@ public:
         : dictionary_(dictionary), matrix_(matrix), converter_(converter), table_(table), english_(english),
           costs_(costs) {}
 
-    // The conversion when the likeliest reading has an English word in it;
-    // nothing when it is all Japanese (the usual conversion handles that) or
-    // when keys stay unreadable either way.
+    // The conversion when the likeliest reading has an English word or a
+    // corrected slip in it; nothing when it is the keys as Japanese (the
+    // usual conversion handles that) or when keys stay unreadable. The
+    // English words may be missing (no English then).
     [[nodiscard]] std::optional<MixedConversion> Convert(std::wstring_view keys) const;
 
 private:
