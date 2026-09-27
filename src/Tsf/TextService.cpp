@@ -1,9 +1,9 @@
 #include "Tsf/TextService.h"
 
 #include "Tsf/ComPtr.h"
+#include "Tsf/Compartments.h"
 #include "Tsf/Diagnostics.h"
 #include "Tsf/Globals.h"
-#include "Tsf/JapaneseSpike.h"
 #include "Tsf/TekitoGuids.h"
 #include "UserData/UiLanguage.h"
 
@@ -302,13 +302,11 @@ bool ToggleKeyFor(int key, TF_PRESERVEDKEY& preserved) {
 }
 
 ComPtr<ITfCompartment> OpenCloseCompartment(ITfThreadMgr* threadManager) {
-    ComPtr<ITfCompartmentMgr> manager;
-    ComPtr<ITfCompartment> compartment;
-    if (threadManager &&
-        SUCCEEDED(threadManager->QueryInterface(IID_PPV_ARGS(manager.Put())))) {
-        (void)manager->GetCompartment(GUID_COMPARTMENT_KEYBOARD_OPENCLOSE, compartment.Put());
-    }
-    return compartment;
+    return ThreadCompartment(threadManager, GUID_COMPARTMENT_KEYBOARD_OPENCLOSE);
+}
+
+ComPtr<ITfCompartment> ConversionCompartment(ITfThreadMgr* threadManager) {
+    return ThreadCompartment(threadManager, GUID_COMPARTMENT_KEYBOARD_INPUTMODE_CONVERSION);
 }
 
 HRESULT AdviseSink(IUnknown* source, REFIID riid, IUnknown* sink, DWORD& cookie) {
@@ -486,6 +484,8 @@ HRESULT TextService::QueryInterface(REFIID riid, void** object) {
         *object = static_cast<ITfTextLayoutSink*>(this);
     } else if (riid == IID_ITfCompartmentEventSink) {
         *object = static_cast<ITfCompartmentEventSink*>(this);
+    } else if (riid == IID_ITfInputProcessorProfileActivationSink) {
+        *object = static_cast<ITfInputProcessorProfileActivationSink*>(this);
     } else {
         return E_NOINTERFACE;
     }
@@ -551,8 +551,15 @@ HRESULT TextService::ActivateEx(ITfThreadMgr* threadManager, TfClientId clientId
     const auto startupMode = userSettings_.restoreLastInputMode
                                  ? userSettings_.lastInputMode
                                  : userSettings_.defaultInputMode;
-    runtimeMode_ = std::make_unique<userdata::RuntimeModeState>(startupMode);
-    state_.SetInputMode(runtimeMode_->Mode());
+    const auto japaneseStartupMode = userSettings_.restoreLastInputMode
+                                         ? userSettings_.lastJapaneseProfileMode
+                                         : InputMode::Japanese;
+    runtimeMode_ = std::make_unique<userdata::RuntimeModeState>(
+        startupMode, userdata::kRuntimeStateName, japaneseStartupMode);
+    UpdateActiveProfile();
+    activationSettling_ = japaneseProfile_;
+    mode_ = SharedMode();
+    state_.SetInputMode(mode_ == InputMode::Convert ? InputMode::Convert : InputMode::Direct);
     runtimeModeGeneration_ = runtimeMode_->ModeGeneration();
     runtimeSettingsGeneration_ = runtimeMode_->SettingsGeneration();
     runtimeDictionaryGeneration_ = runtimeMode_->DictionaryGeneration();
@@ -582,29 +589,25 @@ HRESULT TextService::ActivateEx(ITfThreadMgr* threadManager, TfClientId clientId
 
     UpdateToggleKey(userSettings_.toggleKey);
     AdviseThreadManagerSinks();
-    SyncOpenCloseCompartment();
+    SyncModeCompartments();
 
     RegisterLangBarItem();
     candidateWindow_.Initialize(g_moduleInstance, [this](std::size_t index) {
         OnCandidateSelected(index);
     });
-#if defined(TEKITO_JA_SPIKE)
-    spikeWatcher_.Start(threadManager_);
-#endif
     Trace(L"ActivateEx ready");
     return S_OK;
 }
 
 HRESULT TextService::Deactivate() {
     Trace(L"Deactivate");
-#if defined(TEKITO_JA_SPIKE)
-    spikeWatcher_.Stop();
-#endif
     if (settingsLoaded_) SyncRuntimeState();
     if (settingsLoaded_) {
         userdata::UserSettings latestSettings = userSettings_;
         if (settingsRepository_) (void)settingsRepository_->LoadSettings(latestSettings);
         latestSettings.lastInputMode = runtimeMode_ ? runtimeMode_->Mode() : state_.Mode();
+        if (runtimeMode_) latestSettings.lastJapaneseProfileMode = runtimeMode_->JapaneseMode();
+        latestSettings.japaneseProfileEnglishMode = userSettings_.japaneseProfileEnglishMode;
         userSettings_ = latestSettings;
         if (!settingsRepository_ || !settingsRepository_->SaveSettings(latestSettings)) {
             Trace(L"Deactivate UserSettings save failed");
@@ -621,6 +624,7 @@ HRESULT TextService::Deactivate() {
     candidateWindow_.Hide();
     state_.Reset();
     rawText_.clear();
+    japanese_.Clear();
     UnregisterLangBarItem();
     UnadviseContextSinks();
     UnadviseThreadManagerSinks();
@@ -700,8 +704,7 @@ void TextService::SyncRuntimeState() {
 
     const auto modeGeneration = runtimeMode_->ModeGeneration();
     if (modeGeneration != runtimeModeGeneration_) {
-        const auto mode = runtimeMode_->Mode();
-        SetInputMode(mode);
+        SetInputMode(SharedMode());
         runtimeModeGeneration_ = modeGeneration;
     }
 }
@@ -727,11 +730,15 @@ void TextService::ApplySettings() {
         FinishCompositionLater();
     }
     if (threadManager_) UpdateToggleKey(userSettings_.toggleKey);
+    japanese_.SetPunctuationStyle(
+        static_cast<japanese::PunctuationStyle>(std::clamp(userSettings_.japanesePunctuation, 0, 3)));
 }
 
 // Keys that end the word and still reach the application: anything that is
 // not part of a word, and Enter unless it picks a candidate from the list.
 bool TextService::LetsKeyThrough(const KeyInput& input) const noexcept {
+    // In Japanese, Enter only commits the text, as in Microsoft IME.
+    if (mode_ == InputMode::Japanese) return input.type == KeyInput::Type::EndComposition;
     return input.type == KeyInput::Type::EndComposition ||
            (input.type == KeyInput::Type::Enter && !state_.IsCandidateNavigationActive());
 }
@@ -741,17 +748,31 @@ bool TextService::ProcessPassesThrough() const noexcept {
 }
 
 void TextService::SetInputMode(InputMode mode) {
-    const bool finishWord = mode == InputMode::Direct && state_.IsActive();
-    state_.SetInputMode(mode);
-    userSettings_.lastInputMode = mode;
+    // Only the Japanese profile has a Japanese mode.
+    if (!japaneseProfile_ && mode == InputMode::Japanese) mode = InputMode::Convert;
+    const bool finishWord = (mode != InputMode::Convert && state_.IsActive()) ||
+                            (mode != InputMode::Japanese && japanese_.IsComposing());
+    mode_ = mode;
+    state_.SetInputMode(mode == InputMode::Convert ? InputMode::Convert : InputMode::Direct);
+    if (japaneseProfile_) {
+        userSettings_.lastJapaneseProfileMode = mode;
+        if (mode != InputMode::Japanese) userSettings_.japaneseProfileEnglishMode = mode;
+    } else {
+        userSettings_.lastInputMode = mode;
+    }
     if (finishWord) FinishCompositionLater();
-    SyncOpenCloseCompartment();
+    SyncModeCompartments();
     if (modeLangBarItem_) modeLangBarItem_->NotifyUpdate();
 }
 
 void TextService::ChangeInputMode(InputMode mode) {
+    activationSettling_ = false;
     if (runtimeMode_) {
-        runtimeMode_->SetMode(mode);
+        if (japaneseProfile_) {
+            runtimeMode_->SetJapaneseMode(mode);
+        } else {
+            runtimeMode_->SetMode(mode == InputMode::Direct ? InputMode::Direct : InputMode::Convert);
+        }
         runtimeModeGeneration_ = runtimeMode_->ModeGeneration();
     }
     SetInputMode(mode);
@@ -764,10 +785,12 @@ void TextService::FinishCompositionLater() {
     if (!compositionContext_) {
         state_.Reset();
         rawText_.clear();
+        japanese_.Clear();
         return;
     }
     KeyInput input{};
-    input.type = KeyInput::Type::EndComposition;
+    input.type = japanese_.IsComposing() ? KeyInput::Type::JapaneseCommit
+                                         : KeyInput::Type::EndComposition;
     auto* session = new (std::nothrow) KeyEditSession(this, compositionContext_, input);
     HRESULT sessionResult = E_FAIL;
     const HRESULT hr = session ? compositionContext_->RequestEditSession(
@@ -779,6 +802,7 @@ void TextService::FinishCompositionLater() {
         TraceHr(L"FinishCompositionLater RequestEditSession failed", hr);
         state_.Reset();
         rawText_.clear();
+        japanese_.Clear();
     }
 }
 
@@ -806,27 +830,6 @@ void TextService::UpdateToggleKey(int key) {
     }
 }
 
-// Mirrors the mode in the keyboard open/close compartment, which is how
-// Windows and applications see whether an input method is on.
-void TextService::SyncOpenCloseCompartment() {
-    auto compartment = OpenCloseCompartment(threadManager_);
-    if (!compartment) return;
-    const LONG open = state_.Mode() == InputMode::Convert ? 1 : 0;
-    VARIANT current;
-    VariantInit(&current);
-    const bool upToDate = SUCCEEDED(compartment->GetValue(&current)) && current.vt == VT_I4 &&
-                          current.lVal == open;
-    VariantClear(&current);
-    if (upToDate) return;
-    VARIANT value;
-    VariantInit(&value);
-    value.vt = VT_I4;
-    value.lVal = open;
-    updatingOpenClose_ = true;
-    (void)compartment->SetValue(clientId_, &value);
-    updatingOpenClose_ = false;
-}
-
 void TextService::AdviseThreadManagerSinks() {
     if (!threadManager_) return;
     if (threadManagerSinkCookie_ == TF_INVALID_COOKIE) {
@@ -839,6 +842,17 @@ void TextService::AdviseThreadManagerSinks() {
                              static_cast<ITfCompartmentEventSink*>(this), openCloseSinkCookie_);
         }
     }
+    if (conversionSinkCookie_ == TF_INVALID_COOKIE) {
+        if (auto compartment = ConversionCompartment(threadManager_)) {
+            (void)AdviseSink(compartment.Get(), IID_ITfCompartmentEventSink,
+                             static_cast<ITfCompartmentEventSink*>(this), conversionSinkCookie_);
+        }
+    }
+    if (profileSinkCookie_ == TF_INVALID_COOKIE) {
+        (void)AdviseSink(threadManager_, IID_ITfInputProcessorProfileActivationSink,
+                         static_cast<ITfInputProcessorProfileActivationSink*>(this),
+                         profileSinkCookie_);
+    }
 
     ComPtr<ITfDocumentMgr> focus;
     ComPtr<ITfContext> top;
@@ -850,8 +864,11 @@ void TextService::AdviseThreadManagerSinks() {
 
 void TextService::UnadviseThreadManagerSinks() {
     UnadviseSink(threadManager_, threadManagerSinkCookie_);
+    UnadviseSink(threadManager_, profileSinkCookie_);
     auto compartment = OpenCloseCompartment(threadManager_);
     UnadviseSink(compartment.Get(), openCloseSinkCookie_);
+    auto conversion = ConversionCompartment(threadManager_);
+    UnadviseSink(conversion.Get(), conversionSinkCookie_);
 }
 
 void TextService::AdviseContextSinks(ITfContext* context) {
@@ -900,8 +917,10 @@ void TextService::RegisterLangBarItem() {
 
     auto* item = new (std::nothrow) ModeLangBarItem(
         g_moduleInstance,
-        [this]() { return runtimeMode_ ? runtimeMode_->Mode() : state_.Mode(); },
+        [this]() { return mode_; },
         [this](InputMode mode) { ChangeInputMode(mode); },
+        [this]() { return ToggledMode(); },
+        [this]() { return japaneseProfile_; },
         [this]() { OpenSettings(); },
         [this]() { return userdata::UseJapaneseUi(userSettings_.uiLanguage); });
     if (!item) return;
@@ -936,13 +955,15 @@ HRESULT TextService::OnSetFocus(BOOL foreground) {
 }
 
 HRESULT TextService::OnTestKeyDown(ITfContext* context, WPARAM wParam, LPARAM lParam, BOOL* eaten) {
-#if defined(TEKITO_JA_SPIKE)
-    spike::TraceKey(L"TestKeyDown", wParam, lParam);
-#endif
     if (!eaten) return E_INVALIDARG;
     SyncRuntimeState();
     if (IsReadOnly(context)) {
         *eaten = FALSE;
+        return S_OK;
+    }
+    ModeKey modeKey;
+    if (TranslateModeKey(wParam, modeKey)) {
+        *eaten = TRUE;
         return S_OK;
     }
     KeyInput input{};
@@ -962,15 +983,19 @@ HRESULT TextService::OnTestKeyDown(ITfContext* context, WPARAM wParam, LPARAM lP
 }
 
 HRESULT TextService::OnKeyDown(ITfContext* context, WPARAM wParam, LPARAM lParam, BOOL* eaten) {
-#if defined(TEKITO_JA_SPIKE)
-    spike::TraceKey(L"KeyDown", wParam, lParam);
-#endif
     ScopedTraceDuration duration(L"Perf OnKeyDown");
     Trace(L"OnKeyDown");
     if (!context || !eaten) return E_INVALIDARG;
     SyncRuntimeState();
+    activationSettling_ = false;
     if (IsReadOnly(context)) {
         *eaten = FALSE;
+        return S_OK;
+    }
+    ModeKey modeKey;
+    if (TranslateModeKey(wParam, modeKey)) {
+        ApplyModeKey(context, modeKey);
+        *eaten = TRUE;
         return S_OK;
     }
     KeyInput input{};
@@ -998,16 +1023,14 @@ HRESULT TextService::OnKeyUp(ITfContext*, WPARAM, LPARAM, BOOL* eaten) {
     return S_OK;
 }
 
-HRESULT TextService::OnPreservedKey(ITfContext*, REFGUID guid, BOOL* eaten) {
+HRESULT TextService::OnPreservedKey(ITfContext* context, REFGUID guid, BOOL* eaten) {
     if (!eaten) return E_INVALIDARG;
     *eaten = FALSE;
-#if defined(TEKITO_JA_SPIKE)
-    Trace(guid == GUID_TekitoToggleKey ? L"Spike PreservedKey toggle" : L"Spike PreservedKey other");
-#endif
     if (guid != GUID_TekitoToggleKey) return S_OK;
     SyncRuntimeState();
-    ChangeInputMode(state_.Mode() == InputMode::Convert ? InputMode::Direct
-                                                        : InputMode::Convert);
+    ModeKey key;
+    key.mode = ToggledMode();
+    ApplyModeKey(context, key);
     *eaten = TRUE;
     return S_OK;
 }
@@ -1022,9 +1045,6 @@ HRESULT TextService::OnPopContext(ITfContext* context) {
 }
 
 HRESULT TextService::OnSetFocus(ITfDocumentMgr* focus, ITfDocumentMgr*) {
-#if defined(TEKITO_JA_SPIKE)
-    if (focus) spike::TraceProfile(L"SetFocus");
-#endif
     ComPtr<ITfContext> top;
     if (focus && SUCCEEDED(focus->GetTop(top.Put())) && top) {
         AdviseContextSinks(top.Get());
@@ -1093,28 +1113,6 @@ HRESULT TextService::OnLayoutChange(ITfContext* context, TfLayoutCode code, ITfC
     return S_OK;
 }
 
-HRESULT TextService::OnChange(REFGUID compartment) {
-#if defined(TEKITO_JA_SPIKE)
-    spike::TraceCompartment(threadManager_, compartment);
-    // Windows closes a ja-JP profile when it activates. The probe only
-    // records that; following it would switch every TEKITO client, English
-    // included, to Direct through the shared mode.
-    if (spike::JapaneseProfileActive()) return S_OK;
-#endif
-    if (compartment != GUID_COMPARTMENT_KEYBOARD_OPENCLOSE || updatingOpenClose_) return S_OK;
-    auto openClose = OpenCloseCompartment(threadManager_);
-    if (!openClose) return S_OK;
-    VARIANT value;
-    VariantInit(&value);
-    const bool read = SUCCEEDED(openClose->GetValue(&value)) && value.vt == VT_I4;
-    const LONG open = read ? value.lVal : 0;
-    VariantClear(&value);
-    if (!read) return S_OK;
-    const auto mode = open != 0 ? InputMode::Convert : InputMode::Direct;
-    if (mode != state_.Mode()) ChangeInputMode(mode);
-    return S_OK;
-}
-
 HRESULT TextService::OnCompositionTerminated(TfEditCookie, ITfComposition* composition) {
     Trace(L"OnCompositionTerminated");
     if (composition_ == composition) {
@@ -1128,6 +1126,7 @@ HRESULT TextService::OnCompositionTerminated(TfEditCookie, ITfComposition* compo
     candidateWindow_.Hide();
     state_.Reset();
     rawText_.clear();
+    japanese_.Clear();
     return S_OK;
 }
 
@@ -1181,6 +1180,7 @@ HRESULT TextService::Reset() {
 
 bool TextService::TranslateKey(WPARAM wParam, LPARAM, KeyInput& input) {
     if (ProcessPassesThrough() || FocusIsClassicPasswordEdit()) return false;
+    if (mode_ == InputMode::Japanese) return TranslateJapaneseKey(wParam, input);
     if (state_.Mode() == InputMode::Direct) return false;
     if (!EnsureEngine()) return false;  // language data still loading
 
@@ -1313,6 +1313,17 @@ HRESULT TextService::HandleKeyInEditSession(ITfContext* context, TfEditCookie ed
                                   state_.PageStart(), state_.VisibleCount());
         }
         return S_OK;
+    }
+    // Japanese typing, and committing it after the mode or focus changed.
+    if (mode_ == InputMode::Japanese || input.type == KeyInput::Type::JapaneseCommit ||
+        japanese_.IsComposing()) {
+        if (input.type != KeyInput::Type::JapaneseCommit &&
+            (ContextHasPassThroughInputScope(context, editCookie) || FocusIsClassicPasswordEdit() ||
+             ProcessPassesThrough())) {
+            const HRESULT hr = CommitJapanese(context, editCookie);
+            return SUCCEEDED(hr) ? S_FALSE : hr;
+        }
+        return HandleJapaneseKey(context, editCookie, input);
     }
     if (state_.Mode() == InputMode::Direct) {
         candidateWindow_.Hide();

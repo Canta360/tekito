@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Core/InputStateMachine.h"
+#include "Core/Japanese/JapaneseComposer.h"
 
 #include <msctf.h>
 #include <windows.h>
@@ -28,8 +29,17 @@ struct KeyInput {
         // Not a key: move the candidate list to follow the composition
         // after the host's layout changed (scrolling, resizing).
         Reposition,
+        // Japanese mode: Space or Henkan, Muhenkan, F6-F10.
+        JapaneseConvert,
+        JapaneseCycleKana,
+        JapaneseTransliterate,
+        // Not a key: commit the Japanese text (the mode or focus changed).
+        JapaneseCommit,
+        // Types `character` outside a composition (a full-width space).
+        InsertCharacter,
     } type;
     wchar_t character{0};
+    japanese::KanaForm kanaForm{japanese::KanaForm::Hiragana};
     std::size_t candidateIndex{0};
     PunctuationRole punctuationRole{PunctuationRole::ClauseSeparator};
 };

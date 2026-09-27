@@ -28,6 +28,7 @@ const initialSettings = {
   socialPersonalization: 1,
   candidateWindowStyle: 0,
   toggleKey: 1,
+  keyboardType: 0,
   periodOnEnter: false,
   uiLanguage: 0,
   excludedApps: [],
@@ -235,6 +236,8 @@ function GeneralPage({ mode, settings, changeMode, setSetting, runAction }) {
   // UserSettings::toggleKey and UserSettings::uiLanguage.
   const toggleKeys = [[1, "Alt+`"], [2, "Ctrl+Space"], [3, "Ctrl+Shift+Space"], [0, t.switchKey.none]];
   const languages = [[0, t.language.system], [1, "English"], [2, "日本語"]];
+  // UserSettings::keyboardType.
+  const keyboards = [[0, t.keyboard.detect], [1, t.keyboard.japanese], [2, t.keyboard.us]];
   return (
     <>
       <div className="tile-grid mode-grid">
@@ -249,6 +252,9 @@ function GeneralPage({ mode, settings, changeMode, setSetting, runAction }) {
         </Row>
         <Row title={t.switchKey.title} description={t.switchKey.description}>
           <Segmented label={t.switchKey.title} value={settings.toggleKey} options={toggleKeys} onChange={(value) => setSetting("toggleKey", value)} />
+        </Row>
+        <Row title={t.keyboard.title} description={t.keyboard.description}>
+          <Segmented label={t.keyboard.title} value={settings.keyboardType} options={keyboards} onChange={(value) => setSetting("keyboardType", value)} />
         </Row>
         <Row title={t.language.title} description={t.language.description}>
           <Segmented label={t.language.title} value={settings.uiLanguage} options={languages} onChange={(value) => setSetting("uiLanguage", value)} />

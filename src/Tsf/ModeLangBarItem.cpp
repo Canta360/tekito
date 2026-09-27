@@ -14,19 +14,81 @@ namespace {
 constexpr UINT kMenuAuto = 1;
 constexpr UINT kMenuDirect = 2;
 constexpr UINT kMenuSettings = 3;
+constexpr UINT kMenuJapanese = 4;
+
+// A stand-in for the Japanese mode icon until the designed one arrives: a
+// white あ on a dark rounded square, readable on light and dark taskbars.
+HICON CreateJapaneseModeIcon(int size) {
+    BITMAPINFO info{};
+    info.bmiHeader.biSize = sizeof(info.bmiHeader);
+    info.bmiHeader.biWidth = size;
+    info.bmiHeader.biHeight = -size;  // top-down
+    info.bmiHeader.biPlanes = 1;
+    info.bmiHeader.biBitCount = 32;
+    info.bmiHeader.biCompression = BI_RGB;
+
+    HDC screen = GetDC(nullptr);
+    HDC dc = CreateCompatibleDC(screen);
+    void* bits = nullptr;
+    HBITMAP color = CreateDIBSection(dc, &info, DIB_RGB_COLORS, &bits, nullptr, 0);
+    HBITMAP mask = CreateBitmap(size, size, 1, 1, nullptr);
+    HICON icon = nullptr;
+    if (dc && color && mask && bits) {
+        auto* pixels = static_cast<DWORD*>(bits);
+        const float radius = size / 4.0f;
+        const auto inside = [&](int x, int y) {
+            const float cx = x + 0.5f, cy = y + 0.5f;
+            const float dx = cx < radius ? radius - cx : cx > size - radius ? cx - (size - radius) : 0;
+            const float dy = cy < radius ? radius - cy : cy > size - radius ? cy - (size - radius) : 0;
+            return dx * dx + dy * dy <= radius * radius;
+        };
+        for (int y = 0; y < size; ++y) {
+            for (int x = 0; x < size; ++x) pixels[y * size + x] = inside(x, y) ? 0xFF303030 : 0;
+        }
+        const HGDIOBJ oldBitmap = SelectObject(dc, color);
+        HFONT font = CreateFontW(-(size * 7 / 8), 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,
+                                 SHIFTJIS_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+                                 CLEARTYPE_QUALITY, DEFAULT_PITCH, L"Yu Gothic UI");
+        const HGDIOBJ oldFont = font ? SelectObject(dc, font) : nullptr;
+        SetBkMode(dc, TRANSPARENT);
+        SetTextColor(dc, RGB(255, 255, 255));
+        RECT rect{0, 0, size, size};
+        DrawTextW(dc, L"あ", 1, &rect, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+        GdiFlush();
+        // GDI clears the alpha of what it draws; the square is opaque.
+        for (int y = 0; y < size; ++y) {
+            for (int x = 0; x < size; ++x) {
+                if (inside(x, y)) pixels[y * size + x] |= 0xFF000000;
+            }
+        }
+        if (oldFont) SelectObject(dc, oldFont);
+        if (font) DeleteObject(font);
+        SelectObject(dc, oldBitmap);
+        ICONINFO iconInfo{TRUE, 0, 0, mask, color};
+        icon = CreateIconIndirect(&iconInfo);
+    }
+    if (mask) DeleteObject(mask);
+    if (color) DeleteObject(color);
+    if (dc) DeleteDC(dc);
+    if (screen) ReleaseDC(nullptr, screen);
+    return icon;
+}
 
 }  // namespace
 
 ModeLangBarItem::ModeLangBarItem(HINSTANCE instance, ModeGetter getMode, ModeSetter setMode,
-                                 SettingsLauncher launchSettings, LanguageQuery japanese)
+                                 ModeGetter toggledMode, Query japaneseProfile,
+                                 SettingsLauncher launchSettings, Query japaneseUi)
     : instance_(instance),
       getMode_(std::move(getMode)),
       setMode_(std::move(setMode)),
+      toggledMode_(std::move(toggledMode)),
+      japaneseProfile_(std::move(japaneseProfile)),
       launchSettings_(std::move(launchSettings)),
-      japanese_(std::move(japanese)) {}
+      japaneseUi_(std::move(japaneseUi)) {}
 
 const wchar_t* ModeLangBarItem::Text(const wchar_t* english, const wchar_t* japanese) const {
-    return japanese_ && japanese_() ? japanese : english;
+    return japaneseUi_ && japaneseUi_() ? japanese : english;
 }
 
 ModeLangBarItem::~ModeLangBarItem() {
@@ -80,7 +142,9 @@ HRESULT ModeLangBarItem::Show(BOOL) { return E_NOTIMPL; }
 
 HRESULT ModeLangBarItem::GetTooltipString(BSTR* tooltip) {
     if (!tooltip) return E_INVALIDARG;
-    *tooltip = SysAllocString(Mode() == InputMode::Direct
+    const auto mode = Mode();
+    *tooltip = SysAllocString(mode == InputMode::Japanese ? Text(L"TEKITO Japanese", L"TEKITO 日本語")
+                              : mode == InputMode::Direct
                                   ? Text(L"TEKITO Direct mode", L"TEKITO Direct モード")
                                   : Text(L"TEKITO Auto mode", L"TEKITO Auto モード"));
     return *tooltip ? S_OK : E_OUTOFMEMORY;
@@ -91,9 +155,9 @@ HRESULT ModeLangBarItem::OnClick(TfLBIClick click, POINT point, const RECT*) {
         ShowContextMenu(point);
         return S_OK;
     }
-    if (click != TF_LBI_CLK_LEFT || !setMode_) return S_OK;
+    if (click != TF_LBI_CLK_LEFT || !setMode_ || !toggledMode_) return S_OK;
     Trace(L"ModeLangBarItem OnClick");
-    setMode_(Mode() == InputMode::Direct ? InputMode::Convert : InputMode::Direct);
+    setMode_(toggledMode_());
     NotifyUpdate();
     return S_OK;
 }
@@ -105,6 +169,9 @@ void ModeLangBarItem::ShowContextMenu(POINT point) {
     const auto flags = [this](InputMode mode) {
         return MF_STRING | (Mode() == mode ? MF_CHECKED : 0);
     };
+    if (JapaneseProfile()) {
+        AppendMenuW(menu, flags(InputMode::Japanese), kMenuJapanese, Text(L"Japanese", L"日本語"));
+    }
     AppendMenuW(menu, flags(InputMode::Convert), kMenuAuto, L"Auto");
     AppendMenuW(menu, flags(InputMode::Direct), kMenuDirect, L"Direct");
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
@@ -125,11 +192,17 @@ HRESULT ModeLangBarItem::InitMenu(ITfMenu* menu) {
         return menu->AddMenuItem(id, flags, nullptr, nullptr, label,
                                  label ? static_cast<ULONG>(wcslen(label)) : 0, nullptr);
     };
-    HRESULT hr = addItem(kMenuAuto,
-                         mode == InputMode::Convert ? TF_LBMENUF_RADIOCHECKED : 0, L"Auto");
+    const auto checked = [mode](InputMode item) {
+        return mode == item ? static_cast<DWORD>(TF_LBMENUF_RADIOCHECKED) : 0;
+    };
+    HRESULT hr = S_OK;
+    if (JapaneseProfile()) {
+        hr = addItem(kMenuJapanese, checked(InputMode::Japanese), Text(L"Japanese", L"日本語"));
+        if (FAILED(hr)) return hr;
+    }
+    hr = addItem(kMenuAuto, checked(InputMode::Convert), L"Auto");
     if (FAILED(hr)) return hr;
-    hr = addItem(kMenuDirect,
-                 mode == InputMode::Direct ? TF_LBMENUF_RADIOCHECKED : 0, L"Direct");
+    hr = addItem(kMenuDirect, checked(InputMode::Direct), L"Direct");
     if (FAILED(hr)) return hr;
     hr = addItem(0, TF_LBMENUF_SEPARATOR, nullptr);
     if (FAILED(hr)) return hr;
@@ -137,23 +210,34 @@ HRESULT ModeLangBarItem::InitMenu(ITfMenu* menu) {
 }
 
 HRESULT ModeLangBarItem::OnMenuSelect(UINT id) {
-    if (id == kMenuAuto && setMode_) {
-        setMode_(InputMode::Convert);
-        NotifyUpdate();
-    } else if (id == kMenuDirect && setMode_) {
-        setMode_(InputMode::Direct);
-        NotifyUpdate();
-    } else if (id == kMenuSettings && launchSettings_) {
-        launchSettings_();
+    if (id == kMenuSettings) {
+        if (launchSettings_) launchSettings_();
+        return S_OK;
     }
+    if (!setMode_) return S_OK;
+    if (id == kMenuAuto) {
+        setMode_(InputMode::Convert);
+    } else if (id == kMenuDirect) {
+        setMode_(InputMode::Direct);
+    } else if (id == kMenuJapanese && JapaneseProfile()) {
+        setMode_(InputMode::Japanese);
+    } else {
+        return S_OK;
+    }
+    NotifyUpdate();
     return S_OK;
 }
 
 HRESULT ModeLangBarItem::GetIcon(HICON* icon) {
     if (!icon) return E_INVALIDARG;
-    const int resourceId = Mode() == InputMode::Direct ? IDI_DIRECT : IDI_AUTO;
-    *icon = static_cast<HICON>(LoadImageW(instance_, MAKEINTRESOURCEW(resourceId), IMAGE_ICON,
-                                          16, 16, LR_DEFAULTCOLOR));
+    const auto mode = Mode();
+    if (mode == InputMode::Japanese) {
+        *icon = CreateJapaneseModeIcon(GetSystemMetrics(SM_CXSMICON));
+    } else {
+        const int resourceId = mode == InputMode::Direct ? IDI_DIRECT : IDI_AUTO;
+        *icon = static_cast<HICON>(LoadImageW(instance_, MAKEINTRESOURCEW(resourceId), IMAGE_ICON,
+                                              16, 16, LR_DEFAULTCOLOR));
+    }
     Trace(*icon ? L"ModeLangBarItem GetIcon succeeded" : L"ModeLangBarItem GetIcon failed");
     return *icon ? S_OK : E_FAIL;
 }
@@ -161,7 +245,10 @@ HRESULT ModeLangBarItem::GetIcon(HICON* icon) {
 HRESULT ModeLangBarItem::GetText(BSTR* text) {
     if (!text) return E_INVALIDARG;
     Trace(L"ModeLangBarItem GetText");
-    *text = SysAllocString(Mode() == InputMode::Direct ? L"D" : L"A");
+    const auto mode = Mode();
+    *text = SysAllocString(mode == InputMode::Japanese ? L"あ"
+                           : mode == InputMode::Direct ? L"D"
+                                                       : L"A");
     return *text ? S_OK : E_OUTOFMEMORY;
 }
 
@@ -190,6 +277,10 @@ void ModeLangBarItem::NotifyUpdate() {
 
 InputMode ModeLangBarItem::Mode() const {
     return getMode_ ? getMode_() : InputMode::Convert;
+}
+
+bool ModeLangBarItem::JapaneseProfile() const {
+    return japaneseProfile_ && japaneseProfile_();
 }
 
 }  // namespace tekito::tsf

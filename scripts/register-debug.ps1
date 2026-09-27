@@ -54,11 +54,24 @@ if (-not $english) {
     $english = (New-WinUserLanguageList en-US)[0]
     $languages.Add($english)
 }
+$changed = $false
 if ($english.InputMethodTips -notcontains $tip) {
     $english.InputMethodTips.Add($tip)
-    Set-WinUserLanguageList $languages -Force
-    Write-Host "Added TEKITO to the English (United States) keyboards."
+    $changed = $true
+    Write-Host "Added TEKITO English to the English (United States) keyboards."
 }
+# The Japanese profile goes to the Japanese keyboards, if Japanese is one of
+# the user's languages; TEKITO does not add the language itself.
+$japaneseTip = "0411:{6F67E5C8-A873-4B69-8EC3-26DF00F642F1}{2876747C-FA52-4CCC-B308-F406190F8CDE}"
+$japanese = $languages | Where-Object { $_.LanguageTag -eq "ja" -or $_.LanguageTag -eq "ja-JP" } | Select-Object -First 1
+if ($japanese -and $japanese.InputMethodTips -notcontains $japaneseTip) {
+    $japanese.InputMethodTips.Add($japaneseTip)
+    $changed = $true
+    Write-Host "Added TEKITO to the Japanese keyboards."
+} elseif (-not $japanese) {
+    Write-Host "Japanese is not among your languages; add it in Settings to try TEKITO's Japanese profile."
+}
+if ($changed) { Set-WinUserLanguageList $languages -Force }
 
 Write-Host "Registered. Sign out and back in, or restart the apps you want to try it in."
 Write-Host "Settings: & '$appPath' --settings"

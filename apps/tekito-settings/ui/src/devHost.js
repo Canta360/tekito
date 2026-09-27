@@ -23,6 +23,7 @@ function initialState() {
       socialPersonalization: 1,
       candidateWindowStyle: 0,
       toggleKey: 1,
+      keyboardType: 0,
       periodOnEnter: false,
       uiLanguage: 0,
       excludedApps: ["Code.exe"],
