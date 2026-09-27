@@ -155,6 +155,10 @@ private:
     // what it is.
     HRESULT ReplaceJapaneseComposition(ITfContext* context, TfEditCookie editCookie);
     void ShowJapaneseCandidates(ITfContext* context, TfEditCookie editCookie);
+    // What the candidate means, for the pane beside the list; empty when
+    // meanings are off or unknown.
+    CandidateDetail MeaningFor(std::wstring_view text, std::wstring_view reading = {}) const;
+    CandidateDetail SelectedEnglishMeaning() const;
     RECT JapaneseCandidateAnchor(ITfContext* context, TfEditCookie editCookie) const;
     HRESULT CommitJapanese(ITfContext* context, TfEditCookie editCookie);
     // The mode shared for the active profile.

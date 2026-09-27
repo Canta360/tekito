@@ -5,6 +5,7 @@
 #include "Core/Japanese/JapaneseLearning.h"
 #include "Core/Japanese/MixedConverter.h"
 #include "Core/Japanese/KanaText.h"
+#include "Core/Japanese/Meanings.h"
 #include "Core/Japanese/RomajiTable.h"
 
 #include <algorithm>
@@ -610,6 +611,32 @@ void TestComposerLearning(const RomajiTable& table, const MiniPack& pack) {
     RequireText(composer.Segments().front().text, first, "without learning the order is the converter's");
 }
 
+void TestMeanings() {
+    tekito::japanese::MeaningDictionary meanings;
+    Require(meanings.Open(std::filesystem::path(TEKITO_TEST_DATA_DIR) / L"meanings-mini"), "the meaning packs open");
+    const auto first = [&](std::wstring_view text, std::wstring_view reading) {
+        const auto meaning = meanings.Lookup(text, reading);
+        return meaning ? meaning->headword + L":" + meaning->senses.front() : std::wstring(L"-");
+    };
+    RequireText(first(L"私", L"わたし"), L"私:自分自身のことを指す一人称。", "the reading picks the row");
+    RequireText(first(L"私", L""), L"私:一人称。", "without a reading, the row that names none");
+    RequireText(first(L"私の", L"わたしの"), L"私:自分自身のことを指す一人称。", "particles come off");
+    RequireText(first(L"会った", L"あった"), L"会う:人と同じ場所で時間を共有する。",
+                "an inflected verb finds its dictionary form, not the single kanji");
+    RequireText(first(L"食べました", L"たべました"), L"食べる:口から嚙んで飲み込む。", "longer inflections too");
+    RequireText(first(L"行った", L"いった"), L"行く:ある場所へ移動する。", "the reading tells 行く from 行う");
+    RequireText(first(L"機械", L"きかい"), L"機械:仕事をする装置。", "WordNet fills in for Wiktionary");
+    RequireText(first(L"はし", L"はし"), L"はし:川に渡した構築物。", "kana words are found as they are");
+    RequireText(first(L"はしった", L"はしった"), L"-", "but kana is never cut into another word");
+    const auto english = meanings.Lookup(L"Meeting");
+    Require(english && english->senses.size() == 2 && english->senses[1] == L"the act of coming together",
+            "English meanings are split into senses");
+    Require(!meanings.Lookup(L"xyzzy") && !meanings.Lookup(L"犬"), "unknown words have no meaning");
+
+    tekito::japanese::MeaningDictionary missing;
+    Require(!missing.Open(L"Z:/no-such-folder") && !missing.Lookup(L"私"), "missing packs just mean no meanings");
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -632,6 +659,7 @@ int main(int argc, char** argv) {
     TestRomajiCorrection(*table, *pack);
     TestPrediction(*table, *pack);
     TestMixedConversion(*table, *pack);
+    TestMeanings();
     if (argc > 1 && std::string_view(argv[1]) == "--dump") DumpConversions(*pack);
     std::cout << "All TEKITO Japanese tests passed.\n";
     return 0;

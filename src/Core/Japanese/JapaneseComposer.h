@@ -124,6 +124,8 @@ public:
     // the second Space, or an arrow key).
     [[nodiscard]] const std::vector<PhraseCandidate>* FocusedCandidates() const noexcept;
     [[nodiscard]] std::size_t FocusedSelection() const noexcept;
+    // The reading the focused phrase was converted from.
+    [[nodiscard]] std::wstring FocusedReading() const;
     [[nodiscard]] bool IsCandidateListOpen() const noexcept { return listOpen_ && IsConverted(); }
 
     // Predictions for what is typed (empty once converted), and which one

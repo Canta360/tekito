@@ -2,10 +2,13 @@
 # .cache\tekito-data and builds the japanese-core pack from it
 # (scripts\build-japanese-packs.py). The pack is too large for the
 # repository; TEKITO types Japanese without it, but cannot convert to kanji.
+# Then builds the meaning packs the candidate list shows beside a word
+# (scripts\build-japanese-meaning-packs.py), unless -SkipMeanings.
 param(
     [string]$Commit = "b9c3fcbd6d76b19649ef572324fa9da2559bc18e",
     [string]$Output,
-    [switch]$ForceDownload
+    [switch]$ForceDownload,
+    [switch]$SkipMeanings
 )
 
 $ErrorActionPreference = "Stop"
@@ -31,3 +34,8 @@ foreach ($file in $files) {
 python (Join-Path $PSScriptRoot "build-japanese-packs.py") --mozc $mozc --commit $Commit --out $Output
 if ($LASTEXITCODE -ne 0) { throw "build-japanese-packs.py failed with exit code $LASTEXITCODE" }
 Write-Host "Built $Output"
+
+if (-not $SkipMeanings) {
+    python (Join-Path $PSScriptRoot "build-japanese-meaning-packs.py")
+    if ($LASTEXITCODE -ne 0) { throw "build-japanese-meaning-packs.py failed with exit code $LASTEXITCODE" }
+}

@@ -80,6 +80,11 @@ constexpr int kIndicatorWidth = 3;
 constexpr int kIndicatorInset = 14;
 constexpr int kMinWidth = 200;
 constexpr int kMaxWidth = 440;
+// The meaning pane beside the list: a fixed width, as tall as the list or
+// its text (up to kDetailMaxHeight, dropping later senses to fit).
+constexpr int kDetailWidth = 250;
+constexpr int kDetailPadding = 14;
+constexpr int kDetailMaxHeight = 300;
 constexpr int kCaretGap = 6;
 constexpr int kSelectionPad = 8;
 constexpr int kGlowDepth = 9;
@@ -91,6 +96,8 @@ constexpr int kLightSpread = 22;
 constexpr float kFontCandidate = 15.0f;
 constexpr float kFontNumber = 12.5f;
 constexpr float kFontTag = 9.5f;
+constexpr float kFontDetail = 12.5f;
+constexpr float kFontDetailHead = 15.0f;
 
 // Floating shadow: a tight contact shadow for edge definition plus a soft
 // ambient one for lift. It lives in a separate click-through window so the
@@ -307,6 +314,8 @@ struct Frame {
     std::size_t totalCount{0};
     std::uint64_t generation{0};
     int style{0};  // CandidateWindow::Style
+    std::wstring detailHead;
+    std::vector<std::wstring> detailSenses;
 };
 
 }  // namespace
@@ -496,6 +505,7 @@ struct TextFormats {
     winrt::com_ptr<IDWriteTextFormat> textSelected;
     winrt::com_ptr<IDWriteTextFormat> number;
     winrt::com_ptr<IDWriteTextFormat> tag;
+    winrt::com_ptr<IDWriteTextFormat> detail;
 };
 
 struct Layout {
@@ -515,6 +525,11 @@ struct Layout {
     float tagHeight{0.0f};
     float tagTracking{0.0f};
     float rowRight{0.0f};
+    // The list part; the rest of the width is the meaning pane.
+    float listWidth{0.0f};
+    float listHeight{0.0f};
+    D2D1_RECT_F detail{};
+    winrt::com_ptr<IDWriteTextLayout> detailText;
     bool indicator{false};
     float indicatorWidth{0.0f};
     float indicatorInset{0.0f};
@@ -883,10 +898,10 @@ void DrawRows(ID2D1RenderTarget* target, IDWriteFactory* factory, const TextForm
 void DrawIndicator(ID2D1RenderTarget* target, const Layout& layout, const Frame& frame,
                    const Style& style) {
     if (!layout.indicator || frame.totalCount <= frame.rows.size()) return;
-    const float center = (layout.rowRight + static_cast<float>(layout.width)) / 2.0f;
+    const float center = (layout.rowRight + layout.listWidth) / 2.0f;
     const float half = layout.indicatorWidth / 2.0f;
     const float top = layout.indicatorInset;
-    const float bottom = static_cast<float>(layout.height) - layout.indicatorInset;
+    const float bottom = layout.listHeight - layout.indicatorInset;
     const float length = bottom - top;
     if (length <= 0.0f) return;
 
@@ -904,6 +919,20 @@ void DrawIndicator(ID2D1RenderTarget* target, const Layout& layout, const Frame&
     target->FillRoundedRectangle(
         Rounded(D2D1::RectF(center - half, thumbTop, center + half, thumbTop + thumbLength), half),
         thumb.get());
+}
+
+// The meaning pane: a hairline between it and the list, then the headword
+// and its senses.
+void DrawDetail(ID2D1RenderTarget* target, const Layout& layout, const Style& style) {
+    if (!layout.detailText) return;
+    auto line = SolidBrush(target, style.palette.tagFill);
+    const float x = std::round(layout.listWidth) + 0.5f;
+    target->DrawLine(D2D1::Point2F(x, layout.padding * 2.0f),
+                     D2D1::Point2F(x, static_cast<float>(layout.height) - layout.padding * 2.0f), line.get(),
+                     std::max(1.0f, layout.scale));
+    auto text = SolidBrush(target, style.palette.text);
+    target->DrawTextLayout(D2D1::Point2F(layout.detail.left, layout.detail.top), layout.detailText.get(),
+                           text.get(), D2D1_DRAW_TEXT_OPTIONS_ENABLE_COLOR_FONT | D2D1_DRAW_TEXT_OPTIONS_CLIP);
 }
 
 // Signed distance from (x, y) to a rounded rectangle; negative inside.
@@ -1296,7 +1325,52 @@ private:
         l.height = static_cast<int>(
             std::lround(2.0f * l.padding + count * l.rowHeight + (count - 1.0f) * (l.rowPitch - l.rowHeight)));
         l.rowRight = static_cast<float>(l.width) - l.padding - static_cast<float>(gutter);
+        l.listWidth = static_cast<float>(l.width);
+        l.listHeight = static_cast<float>(l.height);
+        AddDetail(l, frame);
         return l;
+    }
+
+    // Widens the layout by the meaning pane when the frame has a meaning.
+    void AddDetail(Layout& l, const Frame& frame) const {
+        if (frame.detailSenses.empty() || !formats_.detail || !dwrite_) return;
+        const float pad = static_cast<float>(ScaleForWindow(panel_, kDetailPadding));
+        const float inner = static_cast<float>(ScaleForWindow(panel_, kDetailWidth)) - 2.0f * pad;
+        const float maxText = static_cast<float>(ScaleForWindow(panel_, kDetailMaxHeight)) - 2.0f * pad;
+        static constexpr wchar_t kMarks[] = L"\u2460\u2461\u2462\u2463\u2464\u2465\u2466\u2467\u2468";  // circled 1 to 9
+        winrt::com_ptr<IDWriteTextLayout> text;
+        float textHeight = 0.0f;
+        // Later senses give way until the text fits.
+        for (std::size_t count = frame.detailSenses.size(); count > 0; --count) {
+            std::wstring content = frame.detailHead;
+            for (std::size_t i = 0; i < count; ++i) {
+                content += L'\n';
+                if (frame.detailSenses.size() > 1 && i < 9) {
+                    content += kMarks[i];
+                    content += L' ';
+                }
+                content += frame.detailSenses[i];
+            }
+            text = nullptr;
+            if (FAILED(dwrite_->CreateTextLayout(content.c_str(), static_cast<UINT32>(content.size()),
+                                                 formats_.detail.get(), inner, maxText, text.put()))) {
+                return;
+            }
+            const DWRITE_TEXT_RANGE head{0, static_cast<UINT32>(frame.detailHead.size())};
+            text->SetFontWeight(DWRITE_FONT_WEIGHT_SEMI_BOLD, head);
+            text->SetFontSize(kFontDetailHead * l.scale, head);
+            DWRITE_TEXT_METRICS metrics{};
+            text->GetMetrics(&metrics);
+            textHeight = metrics.height;
+            if (textHeight <= maxText) break;
+        }
+        if (!text) return;
+        const int width = ScaleForWindow(panel_, kDetailWidth);
+        l.width += width;
+        l.height = std::max(l.height, static_cast<int>(std::ceil(std::min(textHeight, maxText) + 2.0f * pad)));
+        l.detail = D2D1::RectF(l.listWidth + pad, pad, static_cast<float>(l.width) - pad,
+                               static_cast<float>(l.height) - pad);
+        l.detailText = std::move(text);
     }
 
     void EnsureTextFormats() {
@@ -1314,6 +1388,12 @@ private:
                                        DWRITE_TEXT_ALIGNMENT_TRAILING, false);
         formats_.tag = CreateFormat(f, brand, kFontTag * scale, DWRITE_FONT_WEIGHT_BOLD,
                                     DWRITE_TEXT_ALIGNMENT_LEADING, false);
+        formats_.detail = CreateFormat(f, brand, kFontDetail * scale, DWRITE_FONT_WEIGHT_NORMAL,
+                                       DWRITE_TEXT_ALIGNMENT_LEADING, false);
+        if (formats_.detail) {
+            formats_.detail->SetWordWrapping(DWRITE_WORD_WRAPPING_WRAP);
+            formats_.detail->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_NEAR);
+        }
     }
 
     // --- windows -----------------------------------------------------------
@@ -1651,6 +1731,7 @@ private:
         hr = PaintSurface(content_, layout_.width, layout_.height, [&](ID2D1RenderTarget* dc) {
             DrawRows(dc, dwrite_.get(), formats_, layout_, frame_, style_, Ink::Normal, kNoRow, kNoRow);
             DrawIndicator(dc, layout_, frame_, style_);
+            DrawDetail(dc, layout_, style_);
         });
         if (FAILED(hr)) return hr;
 
@@ -1820,6 +1901,7 @@ private:
                          kNoRow);
             }
             DrawIndicator(target, layout_, frame_, style_);
+            DrawDetail(target, layout_, style_);
             if (target->EndDraw() == D2DERR_RECREATE_TARGET) hwndTarget_ = nullptr;
         }
         EndPaint(panel_, &ps);
@@ -1984,7 +2066,8 @@ void CandidateWindow::Show(const RECT& caretRect,
                            const std::vector<Candidate>& candidates,
                            std::size_t selectedIndex,
                            std::size_t pageStart,
-                           std::size_t visibleCount) {
+                           std::size_t visibleCount,
+                           const CandidateDetail& detail) {
     if (!channel_) {
         return;
     }
@@ -2027,6 +2110,10 @@ void CandidateWindow::Show(const RECT& caretRect,
     }
     if (selectedIndex_ >= pageStart_ && selectedIndex_ - pageStart_ < visibleCount_) {
         frame.selectedRow = selectedIndex_ - pageStart_;
+    }
+    if (!detail.senses.empty()) {
+        frame.detailHead = detail.headword;
+        frame.detailSenses = detail.senses;
     }
 
     {

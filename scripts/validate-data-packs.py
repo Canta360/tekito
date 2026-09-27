@@ -153,7 +153,50 @@ def validate_index(pack_id: str, data_path: Path, index_path: Path,
             previous_offset, previous_key = offset, key
 
 
+def validate_sorted_tsv(pack: Path, manifest: dict) -> list[str]:
+    """Meaning packs (scripts/build-japanese-meaning-packs.py): one TSV,
+    surface, reading, senses..., searched in place, so the rows must be in
+    bytewise order of the surface (code point order is the same)."""
+    pack_id = pack.name
+    errors: list[str] = []
+    for field in ("pack_id", "version", "language", "type", "license", "file",
+                  "notice_file", "entry_count", "sha256"):
+        if field not in manifest:
+            errors.append(f"{pack_id}: manifest missing {field}")
+    if errors:
+        return errors
+    try:
+        data_path = relative_to_pack(pack, manifest["file"])
+        notice_path = relative_to_pack(pack, manifest["notice_file"])
+    except ValueError as error:
+        return [f"{pack_id}: {error}"]
+    for path in (data_path, notice_path):
+        if not path.is_file():
+            errors.append(f"{pack_id}: missing {path.name}")
+    if errors:
+        return errors
+    if digest(data_path) != manifest["sha256"].get("file"):
+        errors.append(f"{pack_id}: data checksum mismatch")
+    count = 0
+    previous = None
+    for number, line in text_lines(data_path):
+        count += 1
+        fields = line.split("\t")
+        if len(fields) < 3 or not fields[0] or not all(fields[2:]):
+            errors.append(f"{pack_id}:{number}: expected a surface, a reading and senses")
+            continue
+        key = (fields[0], fields[1])
+        if previous is not None and key <= previous:
+            errors.append(f"{pack_id}:{number}: rows are not sorted and unique")
+        previous = key
+    if count != manifest["entry_count"]:
+        errors.append(f"{pack_id}: manifest count {manifest['entry_count']} != {count}")
+    return errors
+
+
 def validate_pack(pack: Path, manifest: dict) -> list[str]:
+    if manifest.get("format") == "sorted-tsv-v1":
+        return validate_sorted_tsv(pack, manifest)
     errors: list[str] = []
     pack_id = pack.name
     for field in ("pack_id", "version", "language", "type", "license", "file",
