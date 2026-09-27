@@ -147,6 +147,13 @@ void TraceKey(const wchar_t* stage, WPARAM wParam, LPARAM lParam) noexcept {
     Trace(line);
 }
 
+bool JapaneseProfileActive() noexcept {
+    LANGID langid{};
+    GUID profile{};
+    ActiveProfile(langid, profile);
+    return langid == MAKELANGID(LANG_JAPANESE, SUBLANG_JAPANESE_JAPAN);
+}
+
 void TraceProfile(const wchar_t* stage) noexcept {
     LANGID langid{};
     GUID profile{};

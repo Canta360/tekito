@@ -1096,6 +1096,10 @@ HRESULT TextService::OnLayoutChange(ITfContext* context, TfLayoutCode code, ITfC
 HRESULT TextService::OnChange(REFGUID compartment) {
 #if defined(TEKITO_JA_SPIKE)
     spike::TraceCompartment(threadManager_, compartment);
+    // Windows closes a ja-JP profile when it activates. The probe only
+    // records that; following it would switch every TEKITO client, English
+    // included, to Direct through the shared mode.
+    if (spike::JapaneseProfileActive()) return S_OK;
 #endif
     if (compartment != GUID_COMPARTMENT_KEYBOARD_OPENCLOSE || updatingOpenClose_) return S_OK;
     auto openClose = OpenCloseCompartment(threadManager_);
