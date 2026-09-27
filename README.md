@@ -90,7 +90,7 @@ network while you type. What it learns from your choices stays in
 
 ## Install
 
-Download `TEKITO-0.1.0-full-installer.exe` from [Releases](https://github.com/Canta360/tekito/releases/latest) and
+Download `TEKITO-0.1.1-full-installer.exe` from [Releases](https://github.com/Canta360/tekito/releases/latest) and
 run it. It needs the Microsoft Edge WebView2 Runtime, which Windows 11
 already has. After installing, restart the apps you want to type in (or sign
 out and back in), then pick TEKITO with Win+Space.

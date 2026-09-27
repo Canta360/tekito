@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(TEKITO VERSION 0.1.0 LANGUAGES C CXX)
+project(TEKITO VERSION 0.1.1 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -116,6 +116,7 @@ add_executable(TEKITO WIN32
 target_include_directories(TEKITO PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} src third_party/webview2/include)
 target_compile_definitions(TEKITO PRIVATE ${TEKITO_WINDOWS_DEFINES})
 target_compile_options(TEKITO PRIVATE /utf-8)
+target_compile_definitions(TEKITO PRIVATE TEKITO_VERSION_STRING="${PROJECT_VERSION}")
 target_link_libraries(TEKITO PRIVATE
     tekito_userdata tekito_dictionary
     user32 gdi32 comctl32 comdlg32 shell32 advapi32

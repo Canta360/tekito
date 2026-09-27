@@ -1,6 +1,6 @@
 # TEKITO License Agreement
 
-Version 0.1.0 (preview) · Effective September 26, 2026
+Version 0.1 (preview) · Effective September 26, 2026
 
 This agreement is between you and Capitata (capitata.dev), which makes and distributes TEKITO. It covers TEKITO for Windows: the input method, TEKITO Settings, the setup program, the language data that comes with them, their documentation, and updates we provide for this version. By installing or using TEKITO you accept this agreement. If you do not accept it, do not install or use TEKITO.
 

@@ -76,7 +76,7 @@ TEKITO の処理はすべて PC の中で行います。入力した内容をど
 
 ## インストール
 
-[Releases](https://github.com/Canta360/tekito/releases/latest) から `TEKITO-0.1.0-full-installer.exe` をダウンロードして実行します。Microsoft Edge WebView2 Runtime が必要ですが、Windows 11 には最初から入っています。インストール後は使いたいアプリを再起動するか、サインアウトしてサインインし直してから、Win+Space で TEKITO を選んでください。
+[Releases](https://github.com/Canta360/tekito/releases/latest) から `TEKITO-0.1.1-full-installer.exe` をダウンロードして実行します。Microsoft Edge WebView2 Runtime が必要ですが、Windows 11 には最初から入っています。インストール後は使いたいアプリを再起動するか、サインアウトしてサインインし直してから、Win+Space で TEKITO を選んでください。
 
 インストーラーはまだコード署名をしていないため、Windows SmartScreen が実行の確認を求めることがあります。
 

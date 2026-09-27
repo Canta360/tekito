@@ -45,6 +45,11 @@
 namespace {
 
 constexpr wchar_t kClassName[] = L"TekitoSettingsWindow";
+
+// From project(VERSION) in CMakeLists.txt.
+#define TEKITO_WIDEN_(text) L##text
+#define TEKITO_WIDEN(text) TEKITO_WIDEN_(text)
+constexpr wchar_t kVersion[] = TEKITO_WIDEN(TEKITO_VERSION_STRING);
 constexpr int kRetryWebView = 200;
 // How often the host checks the shared runtime state for changes made
 // outside this window (mode switched from the Language Bar, the IME saving
@@ -711,7 +716,7 @@ private:
         const auto registeredDll = RegisteredTsfDll();
         const auto tsf = !registeredDll.empty() && std::filesystem::exists(registeredDll) ? L"Loaded" : L"Unavailable";
         const auto packs = DataPacksJson();
-        std::wstring json = L"{\"settings\":{\"restoreLastInputMode\":";
+        std::wstring json = L"{\"version\":\"" + std::wstring(kVersion) + L"\",\"settings\":{\"restoreLastInputMode\":";
         json += settings_.restoreLastInputMode ? L"true" : L"false";
         json += L",\"correctionEnabled\":";
         json += settings_.correctionEnabled ? L"true" : L"false";
@@ -1071,7 +1076,7 @@ private:
         const auto root = tekito::ExternalLexiconProvider::DataPackRoot();
         const auto registeredDll = RegisteredTsfDll();
         const bool registered = !registeredDll.empty() && std::filesystem::exists(registeredDll);
-        std::wstring text = L"TEKITO\r\nVersion 0.1.0\r\n\r\n";
+        std::wstring text = L"TEKITO\r\nVersion " + std::wstring(kVersion) + L"\r\n\r\n";
         text += L"Input method: " + std::wstring(registered ? L"Registered" : L"Not registered");
         text += L"\r\nLearning: " + std::wstring(settings_.learningEnabled ? L"On" : L"Off") + L" (" +
                 std::to_wstring(learning_.Entries().size() + learning_.PreferenceCount()) +

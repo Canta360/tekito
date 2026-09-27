@@ -15,8 +15,11 @@ param(
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
-$version = "0.1.0"
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+# The version comes from project(TEKITO VERSION x.y.z) in CMakeLists.txt.
+$version = [regex]::Match((Get-Content (Join-Path $repoRoot "CMakeLists.txt") -Raw),
+    'project\(TEKITO VERSION ([0-9.]+)').Groups[1].Value
+if (-not $version) { throw "The version was not found in CMakeLists.txt." }
 if (-not $OutputRoot) { $OutputRoot = Join-Path $repoRoot "artifacts\TEKITO-$version-full" }
 if (-not $ArchivePath) { $ArchivePath = Join-Path $repoRoot "artifacts\TEKITO-$version-full.zip" }
 if (-not $BuildRoot) { $BuildRoot = Join-Path $repoRoot "out\build\windows-x64-release" }

@@ -67,6 +67,7 @@ function App() {
   const [learning, setLearning] = useState({ enabled: true, count: 0 });
   const [dictionary, setDictionary] = useState([]);
   const [packs, setPacks] = useState([]);
+  const [version, setVersion] = useState("");
   const [appearance, setAppearance] = useState({ accent: "#0078d4", systemLanguage: navigator.language.startsWith("ja") ? "ja" : "en" });
   const [modal, setModal] = useState(null);
   const [confirm, setConfirm] = useState(null);
@@ -82,6 +83,7 @@ function App() {
     setLearning((value) => ({ ...value, ...(state.learning || {}) }));
     setDictionary(state.dictionary || []);
     setPacks(state.packs || []);
+    if (state.version) setVersion(state.version);
     if (state.appearance) setAppearance((value) => ({ ...value, ...state.appearance }));
   }, []);
 
@@ -207,7 +209,7 @@ function App() {
               {page === "general" && <GeneralPage mode={mode} settings={settings} changeMode={changeMode} setSetting={setSetting} runAction={runAction} />}
               {page === "typing" && <TypingPage settings={settings} setSetting={setSetting} />}
               {page === "dictionary" && <DictionaryPage learning={learning} settings={settings} setSetting={setSetting} dictionary={dictionary} setModal={setModal} setConfirm={setConfirm} runAction={runAction} />}
-              {page === "about" && <AboutPage runtime={runtime} packs={packs} runAction={runAction} />}
+              {page === "about" && <AboutPage version={version} runtime={runtime} packs={packs} runAction={runAction} />}
             </div>
           )}
         </main>
@@ -437,7 +439,7 @@ function DictionaryPage({ learning, settings, setSetting, dictionary, setModal, 
   );
 }
 
-function AboutPage({ runtime, packs, runAction }) {
+function AboutPage({ version, runtime, packs, runAction }) {
   const t = useText();
   const [license, setLicense] = useState(null);
   const openLicense = async () => {
@@ -454,7 +456,7 @@ function AboutPage({ runtime, packs, runAction }) {
           <img className="wordmark large" src="./assets/tekito-wordmark-dark.svg" alt="TEKITO" />
           <p>{t.about.tagline}</p>
         </div>
-        <span className="version"><small>{t.about.version}</small><b>0.1.0</b></span>
+        <span className="version"><small>{t.about.version}</small><b>{version}</b></span>
       </Glass>
 
       <Glass className="card">
