@@ -35,6 +35,22 @@ struct UserSettings {
     int toggleKey{1};
     // Enter adds a period to a line that ends without punctuation.
     bool periodOnEnter{false};
+    // The physical keyboard: 0 = as Windows reports it, 1 = Japanese (JIS,
+    // 106/109 keys), 2 = US (101/102 keys). Decides the switch keys and the
+    // layout the English profile uses. See KeyboardLayout.h.
+    int keyboardType{0};
+    // The ja-JP profile's mode (Japanese, Convert or Direct), and which of
+    // Convert and Direct its switch key goes to from Japanese.
+    InputMode lastJapaneseProfileMode{InputMode::Japanese};
+    InputMode japaneseProfileEnglishMode{InputMode::Convert};
+    // Space outside a composition in Japanese mode: 0 = full-width in
+    // Japanese and half-width otherwise, 1 = always half-width, 2 = always
+    // full-width. Shift+Space writes the other one.
+    int japaneseSpaceWidth{0};
+    // The marks for the comma and period keys in Japanese: 0 = touten and
+    // kuten, 1 = full-width comma and period, 2 = comma and kuten,
+    // 3 = touten and period (see japanese::PunctuationStyle).
+    int japanesePunctuation{0};
     // Language of TEKITO's own windows: 0 = the Windows display language,
     // 1 = English, 2 = Japanese. See UiLanguage.h.
     int uiLanguage{0};

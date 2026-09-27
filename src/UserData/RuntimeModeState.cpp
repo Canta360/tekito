@@ -17,7 +17,14 @@ struct SharedRuntimeState {
     volatile LONG settingsGeneration;
     volatile LONG dictionaryGeneration;
     volatile LONG learningGeneration;
+    volatile LONG japaneseMode;
 };
+
+InputMode JapaneseModeFrom(LONG value) noexcept {
+    return value == static_cast<LONG>(InputMode::Direct)    ? InputMode::Direct
+           : value == static_cast<LONG>(InputMode::Convert) ? InputMode::Convert
+                                                            : InputMode::Japanese;
+}
 
 }  // namespace
 
@@ -26,9 +33,11 @@ struct RuntimeModeState::Impl {
     SharedRuntimeState* state{};
 };
 
-RuntimeModeState::RuntimeModeState(InputMode fallbackMode,
-                                   const wchar_t* mappingName) noexcept
-    : fallbackMode_(fallbackMode), impl_(new (std::nothrow) Impl) {
+RuntimeModeState::RuntimeModeState(InputMode fallbackMode, const wchar_t* mappingName,
+                                   InputMode japaneseFallbackMode) noexcept
+    : impl_(new (std::nothrow) Impl),
+      fallbackMode_(fallbackMode == InputMode::Direct ? InputMode::Direct : InputMode::Convert),
+      japaneseFallbackMode_(japaneseFallbackMode) {
     if (!impl_ || !mappingName || !*mappingName) return;
     impl_->mapping = CreateFileMappingW(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, 0,
                                         sizeof(SharedRuntimeState), mappingName);
@@ -39,7 +48,8 @@ RuntimeModeState::RuntimeModeState(InputMode fallbackMode,
     if (!impl_->state) return;
 
     if (InterlockedCompareExchange(&impl_->state->magic, kInitializing, 0) == 0) {
-        InterlockedExchange(&impl_->state->mode, static_cast<LONG>(fallbackMode));
+        InterlockedExchange(&impl_->state->mode, static_cast<LONG>(fallbackMode_));
+        InterlockedExchange(&impl_->state->japaneseMode, static_cast<LONG>(japaneseFallbackMode_));
         InterlockedExchange(&impl_->state->modeGeneration, 1);
         InterlockedExchange(&impl_->state->settingsGeneration, 1);
         InterlockedExchange(&impl_->state->dictionaryGeneration, 1);
@@ -70,6 +80,11 @@ InputMode RuntimeModeState::Mode() const noexcept {
                : InputMode::Convert;
 }
 
+InputMode RuntimeModeState::JapaneseMode() const noexcept {
+    if (!IsAvailable()) return japaneseFallbackMode_;
+    return JapaneseModeFrom(InterlockedCompareExchange(&impl_->state->japaneseMode, 0, 0));
+}
+
 std::uint32_t RuntimeModeState::ModeGeneration() const noexcept {
     return IsAvailable() ? static_cast<std::uint32_t>(
                                InterlockedCompareExchange(&impl_->state->modeGeneration, 0, 0))
@@ -98,6 +113,17 @@ void RuntimeModeState::SetMode(InputMode mode) noexcept {
     if (!IsAvailable()) return;
     const LONG value = static_cast<LONG>(mode);
     if (InterlockedExchange(&impl_->state->mode, value) != value) {
+        InterlockedIncrement(&impl_->state->modeGeneration);
+    }
+}
+
+void RuntimeModeState::SetJapaneseMode(InputMode mode) noexcept {
+    if (!IsAvailable()) {
+        japaneseFallbackMode_ = mode;
+        return;
+    }
+    const LONG value = static_cast<LONG>(mode);
+    if (InterlockedExchange(&impl_->state->japaneseMode, value) != value) {
         InterlockedIncrement(&impl_->state->modeGeneration);
     }
 }
