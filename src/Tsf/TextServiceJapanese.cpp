@@ -718,6 +718,12 @@ RECT TextService::JapaneseCandidateAnchor(ITfContext* context, TfEditCookie edit
 
 void TextService::ShowJapaneseCandidates(ITfContext* context, TfEditCookie editCookie) {
     const auto& predictions = japanese_.Predictions();
+    if (TraceEnabled()) {
+        wchar_t line[96]{};
+        swprintf_s(line, L"Japanese list converted=%d open=%d predictions=%zu", japanese_.IsConverted() ? 1 : 0,
+                   japanese_.IsCandidateListOpen() ? 1 : 0, predictions.size());
+        Trace(line);
+    }
     if (!japanese_.IsConverted() && !predictions.empty() && userSettings_.candidateWindowEnabled) {
         std::vector<Candidate> rows;
         for (std::size_t i = 0; i < predictions.size(); ++i) {

@@ -8,6 +8,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <type_traits>
 
 namespace tekito::japanese {
 
@@ -51,7 +52,8 @@ public:
     [[nodiscard]] std::pair<std::uint32_t, std::uint32_t> PrefixRange(ReadingCodesView codes) const;
     // A record's key as text.
     [[nodiscard]] std::wstring KeyText(std::uint32_t record) const;
-    // The words of a record, cheapest first; word(const DictionaryWord&).
+    // The words of a record, cheapest first; word(const DictionaryWord&)
+    // returns nothing, or false to stop.
     template <typename Visit>
     void ForEachWord(std::uint32_t record, Visit&& word) const;
     [[nodiscard]] std::wstring Surface(const DictionaryWord& word, std::wstring_view reading) const;
@@ -148,7 +150,11 @@ void JapaneseDictionary::ForEachWord(std::uint32_t record, Visit&& word) const {
                    entry.surface != DictionaryWord::Surface::Katakana) {
             return;
         }
-        word(static_cast<const DictionaryWord&>(entry));
+        if constexpr (std::is_same_v<decltype(word(static_cast<const DictionaryWord&>(entry))), bool>) {
+            if (!word(static_cast<const DictionaryWord&>(entry))) return;
+        } else {
+            word(static_cast<const DictionaryWord&>(entry));
+        }
     }
 }
 

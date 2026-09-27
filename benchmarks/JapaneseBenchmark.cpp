@@ -168,6 +168,16 @@ int wmain(int argc, wchar_t** argv) {
         }
     }
     Print("convert_full", Summarize(full));
+    // Prediction after each key, from the second character.
+    std::vector<double> predictions;
+    for (const auto& row : rows) {
+        for (std::size_t k = 2; k <= row.input.size(); ++k) {
+            const auto start = Clock::now();
+            g_sink = g_sink + converter.Predict(std::wstring_view(row.input).substr(0, k), 5).size();
+            predictions.push_back(Microseconds(Clock::now() - start));
+        }
+    }
+    Print("predict_every_prefix", Summarize(predictions));
     Print("convert_every_prefix", Summarize(perPrefix));
     for (std::size_t target : {40u, 100u}) {
         std::vector<double> samples;

@@ -1360,7 +1360,8 @@ HRESULT TextService::HandleKeyInEditSessionCore(ITfContext* context, TfEditCooki
     if (!context) return E_INVALIDARG;
     if (input.type == KeyInput::Type::Reposition) {
         if (!composition_ || !candidateWindow_.IsShown()) return S_OK;
-        if (japanese_.IsConverted()) {
+        // Japanese conversion candidates and predictions follow the text too.
+        if (japanese_.IsComposing()) {
             ShowJapaneseCandidates(context, editCookie);
             return S_OK;
         }
