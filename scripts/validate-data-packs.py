@@ -181,6 +181,15 @@ def validate_pack(pack: Path, manifest: dict) -> list[str]:
         errors.append(f"{pack_id}: index checksum mismatch")
     if not isinstance(manifest["entry_count"], int) or manifest["entry_count"] <= 0:
         errors.append(f"{pack_id}: entry_count must be a positive integer")
+    if manifest.get("format") == "ja-dict-v1+ja-matrix-v1":
+        # Binary, memory-mapped files (scripts/build-japanese-packs.py); the
+        # reader checks every offset, so here the files only need to be what
+        # the manifest says.
+        if data_path.read_bytes()[:4] != b"TKJD":
+            errors.append(f"{pack_id}: dictionary.bin is not a ja-dict file")
+        if index_path.read_bytes()[:4] != b"TKJM":
+            errors.append(f"{pack_id}: connection.bin is not a ja-matrix file")
+        return errors
 
     expected_fields = EXPECTED_FIELDS.get(pack_id)
     count = 0
