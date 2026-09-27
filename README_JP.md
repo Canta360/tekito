@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/images/typing-demo.png" alt="「thnaks for teh reveiw.」と打つと、単語ごとに候補リストが出て、Space で打ち間違いが直り、「thanks for the review.」になる様子" width="640">
+  <img src="docs/images/typing-demo-ja.png" alt="「thnaks for teh reveiw.」と打つと、単語ごとに候補リストが出て、Space で打ち間違いが直り、「thanks for the review.」になる様子" width="640">
 </p>
 
 TEKITO は IME（TSF のテキストサービス）なので、普通の Windows アプリでそのまま使えます。処理はすべて PC の中で完結します。
@@ -40,7 +40,7 @@ TEKITO は IME（TSF のテキストサービス）なので、普通の Windows
 
 次の文字を打った時点で単語は確定するので、あとから取り消す操作はありません。知っている単語、「brb」のようなチャットの略語、自分で大文字にして打った語、コードらしい文字列、URL やアドレス、パスワード・数字・メール用の欄には手を出しません。
 
-![TEKITO の候補リスト。ライトとダークのグラス、シンプル表示](docs/images/candidate-list.png)
+![TEKITO の候補リスト。ライトとダークのグラス、シンプル表示](docs/images/candidate-list-ja.png)
 
 ## Auto と Direct
 
@@ -66,7 +66,7 @@ TEKITO には 2 つのモードがあります。タスクバーのボタンが�
 
 ターミナル、管理者として実行中のアプリ、設定で追加したアプリでは、TEKITO はオフになります。
 
-![TEKITO の設定画面](docs/images/settings.png)
+![TEKITO の設定画面](docs/images/settings-ja.png)
 
 設定画面、インストーラー、TEKITO のメッセージは日本語と英語に対応しています。通常は Windows の表示言語に合わせて表示され、**設定 → 一般 → 表示言語** で切り替えられます。
 
