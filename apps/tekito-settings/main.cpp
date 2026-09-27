@@ -739,6 +739,12 @@ private:
         json += L",\"keyboardType\":" + std::to_wstring(settings_.keyboardType);
         json += L",\"periodOnEnter\":";
         json += settings_.periodOnEnter ? L"true" : L"false";
+        json += L",\"japaneseSpaceWidth\":" + std::to_wstring(settings_.japaneseSpaceWidth);
+        json += L",\"japanesePunctuation\":" + std::to_wstring(settings_.japanesePunctuation);
+        json += L",\"japanesePredictionEnabled\":";
+        json += settings_.japanesePredictionEnabled ? L"true" : L"false";
+        json += L",\"japaneseDropSpaceBeforeKana\":";
+        json += settings_.japaneseDropSpaceBeforeKana ? L"true" : L"false";
         json += L",\"uiLanguage\":" + std::to_wstring(settings_.uiLanguage);
         json += L",\"excludedApps\":" + NameListJson(settings_.excludedApps);
         json += L",\"builtInExcludedApps\":" +
@@ -874,6 +880,14 @@ private:
                 settings_.candidateWindowStyle = std::clamp(integerValue, 0, 1);
             }
             else if (key == L"periodOnEnter") settings_.periodOnEnter = value;
+            else if (key == L"japaneseSpaceWidth") {
+                settings_.japaneseSpaceWidth = std::clamp(integerValue, 0, 2);
+            }
+            else if (key == L"japanesePunctuation") {
+                settings_.japanesePunctuation = std::clamp(integerValue, 0, 3);
+            }
+            else if (key == L"japanesePredictionEnabled") settings_.japanesePredictionEnabled = value;
+            else if (key == L"japaneseDropSpaceBeforeKana") settings_.japaneseDropSpaceBeforeKana = value;
             else if (key == L"uiLanguage") settings_.uiLanguage = std::clamp(integerValue, 0, 2);
             else if (key == L"toggleKey") {
                 settings_.toggleKey = std::clamp(integerValue, 0, 3);
@@ -932,6 +946,15 @@ private:
                 Reply(requestId, false, Text(L"Learning data could not be reset.", L"学習データを消去できませんでした。"));
             } else {
                 learning_.Reset();
+                runtime_->NotifyLearningChanged();
+                Reply(requestId, true);
+            }
+        } else if (type == L"japaneseLearning.clear") {
+            // Only what was learned from Japanese conversion; English
+            // learning has its own button.
+            if (!repository_ || !repository_->ResetJapaneseLearning()) {
+                Reply(requestId, false, Text(L"Learning data could not be reset.", L"学習データを消去できませんでした。"));
+            } else {
                 runtime_->NotifyLearningChanged();
                 Reply(requestId, true);
             }
