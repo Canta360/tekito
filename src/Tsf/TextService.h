@@ -6,6 +6,7 @@
 #include "Tsf/CandidateWindow.h"
 #include "Tsf/ComPtr.h"
 #include "Tsf/EditSession.h"
+#include "Tsf/JapaneseSpike.h"
 #include "Tsf/ModeLangBarItem.h"
 #include "UserData/UserDataRepository.h"
 #include "UserData/RuntimeModeState.h"
@@ -161,6 +162,9 @@ private:
     CandidateWindow candidateWindow_;
     ComPtr<ITfLangBarItemMgr> langBarItemMgr_;
     ComPtr<ModeLangBarItem> modeLangBarItem_;
+#if defined(TEKITO_JA_SPIKE)
+    spike::Watcher spikeWatcher_;
+#endif
 };
 
 }  // namespace tekito::tsf
