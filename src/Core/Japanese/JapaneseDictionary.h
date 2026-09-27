@@ -46,6 +46,11 @@ public:
     template <typename Found>
     void CommonPrefixSearch(ReadingCodesView codes, Found&& found) const;
     [[nodiscard]] std::optional<std::uint32_t> Find(ReadingCodesView codes) const;
+    // The records whose key starts with `codes`, in key order, as a range
+    // [first, end); empty if there are none.
+    [[nodiscard]] std::pair<std::uint32_t, std::uint32_t> PrefixRange(ReadingCodesView codes) const;
+    // A record's key as text.
+    [[nodiscard]] std::wstring KeyText(std::uint32_t record) const;
     // The words of a record, cheapest first; word(const DictionaryWord&).
     template <typename Visit>
     void ForEachWord(std::uint32_t record, Visit&& word) const;
@@ -67,6 +72,8 @@ private:
     std::uint32_t keyCount_{0};
     std::uint16_t unknownId_{0};
     const std::uint8_t* reverse_{nullptr};
+    const std::uint8_t* chars_{nullptr};
+    std::uint32_t charCount_{0};
     const std::uint8_t* index_{nullptr};
     const std::uint8_t* records_{nullptr};
     std::uint32_t recordsSize_{0};

@@ -36,6 +36,10 @@ public:
     // first; the rest keep their order.
     void Reorder(std::wstring_view reading, std::vector<PhraseCandidate>& candidates) const;
     [[nodiscard]] double Preference(std::wstring_view reading, std::wstring_view surface) const;
+    // What the user chose for readings that start with `prefix` and are
+    // longer, most preferred first.
+    [[nodiscard]] std::vector<JapaneseLearningEntry> StartingWith(std::wstring_view prefix,
+                                                                  std::size_t limit) const;
 
     // For loading; false if the entry is malformed.
     bool Add(JapaneseLearningEntry entry);

@@ -351,6 +351,28 @@ bool TextService::TranslateJapaneseKey(WPARAM wParam, KeyInput& input) {
             }
         }
     }
+    if (composing && !japanese_.IsConverted() && !japanese_.Predictions().empty()) {
+        const bool chosen = japanese_.ChosenPrediction().has_value();
+        switch (wParam) {
+        case VK_TAB:
+            input.type = KeyDown(VK_SHIFT) ? KeyInput::Type::JapanesePreviousPrediction
+                                           : KeyInput::Type::JapaneseNextPrediction;
+            return true;
+        case VK_DOWN:
+            input.type = KeyInput::Type::JapaneseNextPrediction;
+            return true;
+        case VK_UP:
+            if (!chosen) break;
+            input.type = KeyInput::Type::JapanesePreviousPrediction;
+            return true;
+        case VK_ESCAPE:
+            if (!chosen) break;
+            input.type = KeyInput::Type::JapaneseClearPrediction;
+            return true;
+        default:
+            break;
+        }
+    }
     if (composing && !japanese_.IsConverted()) {
         // Before conversion the arrows edit the typed text, as in Microsoft IME.
         switch (wParam) {
@@ -478,8 +500,24 @@ HRESULT TextService::HandleJapaneseKey(ITfContext* context, TfEditCookie editCoo
         japanese_.ResizeFocus(input.delta);
         return ShowJapanesePreedit(context, editCookie);
     case KeyInput::Type::JapaneseSelectCandidate:
-    case KeyInput::Type::CandidateSelection:
         japanese_.SelectCandidate(input.candidateIndex);
+        return ShowJapanesePreedit(context, editCookie);
+    case KeyInput::Type::CandidateSelection:
+        if (!japanese_.IsConverted()) {
+            // A click on a prediction commits it.
+            japanese_.ChoosePrediction(input.candidateIndex);
+            return CommitJapanese(context, editCookie);
+        }
+        japanese_.SelectCandidate(input.candidateIndex);
+        return ShowJapanesePreedit(context, editCookie);
+    case KeyInput::Type::JapaneseNextPrediction:
+        japanese_.NextPrediction();
+        return ShowJapanesePreedit(context, editCookie);
+    case KeyInput::Type::JapanesePreviousPrediction:
+        japanese_.PreviousPrediction();
+        return ShowJapanesePreedit(context, editCookie);
+    case KeyInput::Type::JapaneseClearPrediction:
+        japanese_.ClearPredictionChoice();
         return ShowJapanesePreedit(context, editCookie);
     case KeyInput::Type::JapaneseMoveCaret:
         japanese_.MoveCaret(input.delta);
@@ -594,6 +632,23 @@ RECT TextService::JapaneseCandidateAnchor(ITfContext* context, TfEditCookie edit
 }
 
 void TextService::ShowJapaneseCandidates(ITfContext* context, TfEditCookie editCookie) {
+    const auto& predictions = japanese_.Predictions();
+    if (!japanese_.IsConverted() && !predictions.empty() && userSettings_.candidateWindowEnabled) {
+        std::vector<Candidate> rows;
+        for (std::size_t i = 0; i < predictions.size(); ++i) {
+            Candidate row;
+            row.text = predictions[i].text;
+            row.id = static_cast<std::uint32_t>(i + 1);
+            rows.push_back(std::move(row));
+        }
+        const auto chosen = japanese_.ChosenPrediction();
+        const RECT anchor = GetCandidateAnchor(context, editCookie);
+        candidateAnchor_ = anchor;
+        candidateWindow_.SetStyle(userSettings_.candidateWindowStyle);
+        candidateWindow_.SetJapanese(userdata::UseJapaneseUi(userSettings_.uiLanguage));
+        candidateWindow_.Show(anchor, rows, chosen ? *chosen : CandidateWindow::kNoSelection, 0, rows.size());
+        return;
+    }
     const auto* candidates = japanese_.FocusedCandidates();
     if (!userSettings_.candidateWindowEnabled || !japanese_.IsCandidateListOpen() || !candidates ||
         candidates->empty()) {

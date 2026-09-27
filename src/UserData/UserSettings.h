@@ -51,6 +51,8 @@ struct UserSettings {
     // kuten, 1 = full-width comma and period, 2 = comma and kuten,
     // 3 = touten and period (see japanese::PunctuationStyle).
     int japanesePunctuation{0};
+    // Words that start with what is typed, offered while typing Japanese.
+    bool japanesePredictionEnabled{true};
     // Language of TEKITO's own windows: 0 = the Windows display language,
     // 1 = English, 2 = Japanese. See UiLanguage.h.
     int uiLanguage{0};

@@ -74,6 +74,26 @@ void JapaneseLearningStore::Reorder(std::wstring_view reading, std::vector<Phras
     candidates = std::move(reordered);
 }
 
+std::vector<JapaneseLearningEntry> JapaneseLearningStore::StartingWith(std::wstring_view prefix,
+                                                                       std::size_t limit) const {
+    std::vector<JapaneseLearningEntry> found;
+    if (prefix.empty()) return found;
+    for (auto it = entries_.lower_bound(prefix); it != entries_.end() && it->first.starts_with(prefix); ++it) {
+        const auto& entry = it->second;
+        if (entry.reading.size() > prefix.size() && entry.selections - 0.5 * entry.rejections > 0) {
+            found.push_back(entry);
+        }
+    }
+    std::sort(found.begin(), found.end(), [](const JapaneseLearningEntry& a, const JapaneseLearningEntry& b) {
+        const double pa = a.selections - 0.5 * a.rejections;
+        const double pb = b.selections - 0.5 * b.rejections;
+        if (pa != pb) return pa > pb;
+        return a.lastUsed > b.lastUsed;
+    });
+    if (found.size() > limit) found.resize(limit);
+    return found;
+}
+
 bool JapaneseLearningStore::Add(JapaneseLearningEntry entry) {
     if (entry.reading.empty() || entry.surface.empty() || !std::isfinite(entry.selections) ||
         !std::isfinite(entry.rejections) || entry.selections < 0 || entry.rejections < 0) {

@@ -1999,7 +1999,8 @@ void CandidateWindow::Show(const RECT& caretRect,
     }
 
     candidates_ = candidates;
-    selectedIndex_ = std::min(selectedIndex, candidates_.size() - 1);
+    selectedIndex_ = selectedIndex == kNoSelection ? kNoSelection
+                                                   : std::min(selectedIndex, candidates_.size() - 1);
     pageStart_ = std::min(pageStart, candidates_.size() - 1);
     visibleCount_ = std::min(visibleCount, candidates_.size() - pageStart_);
     if (visibleCount_ == 0) {

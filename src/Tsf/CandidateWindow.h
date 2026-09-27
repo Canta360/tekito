@@ -29,6 +29,9 @@ public:
     CandidateWindow& operator=(const CandidateWindow&) = delete;
 
     bool Initialize(HINSTANCE instance, std::function<void(std::size_t)> onSelection);
+    // selectedIndex kNoSelection highlights nothing (predictions before the
+    // user steps into them).
+    static constexpr std::size_t kNoSelection = static_cast<std::size_t>(-1);
     void Show(const RECT& caretRect,
               const std::vector<Candidate>& candidates,
               std::size_t selectedIndex,

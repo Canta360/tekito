@@ -277,4 +277,43 @@ std::vector<Phrase> JapaneseConverter::Convert(std::wstring_view reading,
     return phrases;
 }
 
+std::vector<Prediction> JapaneseConverter::Predict(std::wstring_view reading, std::size_t limit) const {
+    // Going through more keys than this would take too long per keystroke.
+    constexpr std::uint32_t kMaxKeys = 3000;
+    std::vector<Prediction> predictions;
+    if (reading.empty() || limit == 0) return predictions;
+    const ReadingCodes codes = dictionary_.Encode(reading);
+    const auto [first, end] = dictionary_.PrefixRange(codes);
+    if (first >= end || end - first > kMaxKeys) return predictions;
+
+    struct Found {
+        std::int64_t cost;
+        std::uint32_t record;
+        DictionaryWord word;
+    };
+    std::vector<Found> found;
+    for (std::uint32_t record = first; record < end; ++record) {
+        bool taken = false;
+        dictionary_.ForEachWord(record, [&](const DictionaryWord& word) {
+            // The cheapest word of each longer reading, never a spelling
+            // correction.
+            if (taken || word.spellingCorrection) return;
+            taken = true;
+            found.push_back({word.cost, record, word});
+        });
+    }
+    std::sort(found.begin(), found.end(), [](const Found& a, const Found& b) { return a.cost < b.cost; });
+    for (const auto& item : found) {
+        std::wstring key = dictionary_.KeyText(item.record);
+        if (key.size() <= reading.size()) continue;
+        std::wstring text = dictionary_.Surface(item.word, key);
+        const bool seen = std::any_of(predictions.begin(), predictions.end(),
+                                      [&](const Prediction& p) { return p.text == text; });
+        if (seen) continue;
+        predictions.push_back({std::move(key), std::move(text), item.cost});
+        if (predictions.size() >= limit) break;
+    }
+    return predictions;
+}
+
 }  // namespace tekito::japanese
