@@ -1858,7 +1858,19 @@ void TestSqliteUserSettingsRepository() {
     source.toggleKey = 3;
     source.periodOnEnter = true;
     source.uiLanguage = 2;
+    source.keyboardType = 1;
+    source.lastJapaneseProfileMode = tekito::InputMode::Convert;
+    source.japaneseProfileEnglishMode = tekito::InputMode::Direct;
+    source.japaneseSpaceWidth = 2;
+    source.japanesePunctuation = 3;
     source.excludedApps = {L"Code.exe", L"code.exe", L"game.exe"};
+    {
+        const tekito::userdata::UserSettings defaults;
+        Require(defaults.lastJapaneseProfileMode == tekito::InputMode::Japanese &&
+                    defaults.japaneseProfileEnglishMode == tekito::InputMode::Convert &&
+                    defaults.keyboardType == 0,
+                "the Japanese profile starts in Japanese, with Auto as its English mode");
+    }
     {
         tekito::userdata::SqliteUserDictionaryRepository repository(path);
         Require(repository.Open(), "settings repository opens its database");
@@ -1884,6 +1896,11 @@ void TestSqliteUserSettingsRepository() {
     Require(loaded.candidateWindowStyle == 1 && loaded.toggleKey == 3 && loaded.periodOnEnter &&
                 loaded.uiLanguage == 2,
             "settings repository restores the candidate style and toggle key");
+    Require(loaded.keyboardType == 1 &&
+                loaded.lastJapaneseProfileMode == tekito::InputMode::Convert &&
+                loaded.japaneseProfileEnglishMode == tekito::InputMode::Direct &&
+                loaded.japaneseSpaceWidth == 2 && loaded.japanesePunctuation == 3,
+            "settings repository restores the keyboard and Japanese settings");
     Require(loaded.excludedApps.size() == 2 && loaded.excludedApps[0] == L"Code.exe" &&
                 loaded.excludedApps[1] == L"game.exe",
             "settings repository keeps excluded apps once each, ignoring case");
@@ -1909,16 +1926,24 @@ void TestSqliteUserSettingsRepository() {
 }
 
 void TestRuntimeModeState() {
-    constexpr wchar_t mappingName[] = L"Local\\TEKITO.RuntimeState.CoreTests.V2";
+    constexpr wchar_t mappingName[] = L"Local\\TEKITO.RuntimeState.CoreTests.V3";
     tekito::userdata::RuntimeModeState first(tekito::InputMode::Convert, mappingName);
     tekito::userdata::RuntimeModeState second(tekito::InputMode::Convert, mappingName);
     Require(first.IsAvailable() && second.IsAvailable(),
             "runtime mode state opens a shared local mapping");
+    Require(second.JapaneseMode() == tekito::InputMode::Japanese,
+            "the Japanese profile starts in Japanese");
     const auto modeGeneration = second.ModeGeneration();
     first.SetMode(tekito::InputMode::Direct);
     Require(second.Mode() == tekito::InputMode::Direct &&
                 second.ModeGeneration() > modeGeneration,
             "runtime mode changes are immediately visible across clients");
+    const auto japaneseGeneration = second.ModeGeneration();
+    first.SetJapaneseMode(tekito::InputMode::Convert);
+    Require(second.JapaneseMode() == tekito::InputMode::Convert &&
+                second.Mode() == tekito::InputMode::Direct &&
+                second.ModeGeneration() > japaneseGeneration,
+            "the Japanese profile's mode is shared on its own");
     const auto settingsGeneration = second.SettingsGeneration();
     first.NotifySettingsChanged();
     Require(second.SettingsGeneration() > settingsGeneration,

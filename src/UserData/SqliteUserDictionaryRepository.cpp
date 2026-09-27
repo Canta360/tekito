@@ -235,6 +235,21 @@ bool SqliteUserDictionaryRepository::LoadSettings(UserSettings& settings) const 
             loaded.periodOnEnter = value != 0;
         } else if (std::strcmp(key, "ui_language") == 0) {
             loaded.uiLanguage = std::clamp(value, 0, 2);
+        } else if (std::strcmp(key, "keyboard_type") == 0) {
+            loaded.keyboardType = std::clamp(value, 0, 2);
+        } else if (std::strcmp(key, "last_japanese_profile_mode") == 0) {
+            loaded.lastJapaneseProfileMode =
+                value == static_cast<int>(InputMode::Direct)    ? InputMode::Direct
+                : value == static_cast<int>(InputMode::Convert) ? InputMode::Convert
+                                                                : InputMode::Japanese;
+        } else if (std::strcmp(key, "japanese_profile_english_mode") == 0) {
+            loaded.japaneseProfileEnglishMode = value == static_cast<int>(InputMode::Direct)
+                                                    ? InputMode::Direct
+                                                    : InputMode::Convert;
+        } else if (std::strcmp(key, "japanese_space_width") == 0) {
+            loaded.japaneseSpaceWidth = std::clamp(value, 0, 2);
+        } else if (std::strcmp(key, "japanese_punctuation") == 0) {
+            loaded.japanesePunctuation = std::clamp(value, 0, 3);
         }
     }
     success = success && stepResult == SQLITE_DONE;
@@ -301,6 +316,14 @@ bool SqliteUserDictionaryRepository::SaveSettings(const UserSettings& settings) 
     saveValue("toggle_key", std::clamp(settings.toggleKey, 0, 3));
     saveValue("period_on_enter", settings.periodOnEnter ? 1 : 0);
     saveValue("ui_language", std::clamp(settings.uiLanguage, 0, 2));
+    saveValue("keyboard_type", std::clamp(settings.keyboardType, 0, 2));
+    saveValue("last_japanese_profile_mode", static_cast<int>(settings.lastJapaneseProfileMode));
+    saveValue("japanese_profile_english_mode",
+              settings.japaneseProfileEnglishMode == InputMode::Direct
+                  ? static_cast<int>(InputMode::Direct)
+                  : static_cast<int>(InputMode::Convert));
+    saveValue("japanese_space_width", std::clamp(settings.japaneseSpaceWidth, 0, 2));
+    saveValue("japanese_punctuation", std::clamp(settings.japanesePunctuation, 0, 3));
     if (statement) sqlite3_finalize(statement);
     statement = nullptr;
 
