@@ -6,6 +6,7 @@
 #include "Tsf/CandidateWindow.h"
 #include "Tsf/ComPtr.h"
 #include "Tsf/EditSession.h"
+#include "Tsf/TekitoGuids.h"
 #include "Tsf/ModeLangBarItem.h"
 #include "UserData/UserDataRepository.h"
 #include "UserData/RuntimeModeState.h"
@@ -99,8 +100,8 @@ private:
     HRESULT EnsureComposition(ITfContext* context, TfEditCookie editCookie);
     HRESULT ReplaceComposition(ITfContext* context, TfEditCookie editCookie,
                                const std::wstring& text);
-    HRESULT ApplyDisplayAttribute(ITfContext* context, TfEditCookie editCookie,
-                                  ITfRange* range);
+    HRESULT ApplyDisplayAttribute(ITfContext* context, TfEditCookie editCookie, ITfRange* range,
+                                  REFGUID attribute = GUID_TekitoDisplayAttribute);
     HRESULT EndComposition(TfEditCookie editCookie);
     HRESULT InsertAtSelection(ITfContext* context, TfEditCookie editCookie,
                               const std::wstring& text);
@@ -139,6 +140,11 @@ private:
     bool TranslateJapaneseKey(WPARAM wParam, KeyInput& input);
     HRESULT HandleJapaneseKey(ITfContext* context, TfEditCookie editCookie, const KeyInput& input);
     HRESULT ShowJapanesePreedit(ITfContext* context, TfEditCookie editCookie);
+    // The composition text as the composer's segments, each underlined by
+    // what it is.
+    HRESULT ReplaceJapaneseComposition(ITfContext* context, TfEditCookie editCookie);
+    void ShowJapaneseCandidates(ITfContext* context, TfEditCookie editCookie);
+    RECT JapaneseCandidateAnchor(ITfContext* context, TfEditCookie editCookie) const;
     HRESULT CommitJapanese(ITfContext* context, TfEditCookie editCookie);
     // The mode shared for the active profile.
     InputMode SharedMode() const noexcept;
@@ -175,7 +181,9 @@ private:
     std::uint32_t runtimeSettingsGeneration_{0};
     std::uint32_t runtimeDictionaryGeneration_{0};
     std::uint32_t runtimeLearningGeneration_{0};
-    TfGuidAtom displayAttributeAtom_{TF_INVALID_GUIDATOM};
+    // Atoms of the English underline and the three Japanese ones.
+    TfGuidAtom displayAttributeAtoms_[4]{TF_INVALID_GUIDATOM, TF_INVALID_GUIDATOM,
+                                         TF_INVALID_GUIDATOM, TF_INVALID_GUIDATOM};
     bool processIsElevated_{false};
     bool processPrefersPassThrough_{false};
     bool processExcludedByUser_{false};

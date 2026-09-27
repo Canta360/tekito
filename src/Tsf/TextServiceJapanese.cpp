@@ -4,11 +4,16 @@
 #include "Tsf/TextService.h"
 
 #include "Core/ExternalLexiconProvider.h"
+#include "Core/Japanese/JapaneseConverter.h"
+#include "Core/Japanese/JapaneseDictionary.h"
 #include "Core/Japanese/RomajiTable.h"
 #include "Tsf/Compartments.h"
+#include "Tsf/DisplayAttributes.h"
 #include "Tsf/Diagnostics.h"
 #include "Tsf/TekitoGuids.h"
+#include "UserData/UiLanguage.h"
 
+#include <algorithm>
 #include <iterator>
 #include <memory>
 
@@ -55,6 +60,32 @@ const japanese::RomajiTable* ProcessRomajiTable() {
     return table.get();
 }
 
+// The japanese-core pack, mapped once per process (mapping it takes well
+// under a millisecond; the pages are shared with every other process).
+// Without it Japanese still types kana, and Space switches kana.
+const japanese::JapaneseConverter* ProcessJapaneseConverter() {
+    struct Data {
+        japanese::JapaneseDictionary dictionary;
+        japanese::ConnectionMatrix matrix;
+        std::unique_ptr<japanese::JapaneseConverter> converter;
+    };
+    static const std::unique_ptr<Data> data = [] {
+        auto loaded = std::make_unique<Data>();
+        const auto root = ExternalLexiconProvider::DataPackRoot() / L"japanese-core";
+        if (!loaded->dictionary.Open(root / L"dictionary.bin") ||
+            !loaded->matrix.Open(root / L"connection.bin")) {
+            Trace(L"Japanese dictionary unavailable");
+            return std::unique_ptr<Data>{};
+        }
+        loaded->converter = std::make_unique<japanese::JapaneseConverter>(loaded->dictionary, loaded->matrix);
+        return loaded;
+    }();
+    return data ? data->converter.get() : nullptr;
+}
+
+// Candidates per page of the list, numbered 1 to 9 as in Microsoft IME.
+constexpr std::size_t kCandidatePage = 9;
+
 }  // namespace
 
 InputMode TextService::SharedMode() const noexcept {
@@ -85,7 +116,10 @@ void TextService::UpdateActiveProfile() {
                    LANG_JAPANESE;
     }
     japaneseProfile_ = japanese;
-    if (japanese) japanese_.SetTable(ProcessRomajiTable());
+    if (japanese) {
+        japanese_.SetTable(ProcessRomajiTable());
+        japanese_.SetConverter(ProcessJapaneseConverter());
+    }
 }
 
 void TextService::SetJapaneseProfile(bool japanese) {
@@ -94,7 +128,10 @@ void TextService::SetJapaneseProfile(bool japanese) {
     if (japanese_.IsComposing() || state_.IsActive()) FinishCompositionLater();
     japaneseProfile_ = japanese;
     activationSettling_ = japanese;
-    if (japanese) japanese_.SetTable(ProcessRomajiTable());
+    if (japanese) {
+        japanese_.SetTable(ProcessRomajiTable());
+        japanese_.SetConverter(ProcessJapaneseConverter());
+    }
     SetInputMode(SharedMode());
 }
 
@@ -258,6 +295,39 @@ bool TextService::TranslateJapaneseKey(WPARAM wParam, KeyInput& input) {
         input.type = KeyInput::Type::EndComposition;
         return true;
     }
+    if (japanese_.IsConverted()) {
+        const bool shift = KeyDown(VK_SHIFT);
+        switch (wParam) {
+        case VK_SPACE:
+            input.type = shift ? KeyInput::Type::JapanesePreviousCandidate : KeyInput::Type::JapaneseConvert;
+            return true;
+        case VK_DOWN:
+            input.type = KeyInput::Type::JapaneseNextCandidate;
+            return true;
+        case VK_UP:
+            input.type = KeyInput::Type::JapanesePreviousCandidate;
+            return true;
+        case VK_LEFT:
+        case VK_RIGHT:
+            input.type = shift ? KeyInput::Type::JapaneseResize : KeyInput::Type::JapaneseMoveFocus;
+            input.delta = wParam == VK_LEFT ? -1 : 1;
+            return true;
+        default:
+            break;
+        }
+        // With the list open, 1-9 choose from the page shown.
+        const bool digit = (wParam >= '1' && wParam <= '9') || (wParam >= VK_NUMPAD1 && wParam <= VK_NUMPAD9);
+        if (digit && japanese_.IsCandidateListOpen() && !shift) {
+            const std::size_t number = wParam >= VK_NUMPAD1 ? wParam - VK_NUMPAD1 : wParam - '1';
+            const std::size_t page = japanese_.FocusedSelection() / kCandidatePage * kCandidatePage;
+            const auto* candidates = japanese_.FocusedCandidates();
+            if (candidates && page + number < candidates->size()) {
+                input.type = KeyInput::Type::JapaneseSelectCandidate;
+                input.candidateIndex = page + number;
+                return true;
+            }
+        }
+    }
     switch (wParam) {
     case VK_SPACE:
     case VK_CONVERT:
@@ -355,6 +425,22 @@ HRESULT TextService::HandleJapaneseKey(ITfContext* context, TfEditCookie editCoo
     case KeyInput::Type::JapaneseTransliterate:
         japanese_.Transliterate(input.kanaForm);
         return ShowJapanesePreedit(context, editCookie);
+    case KeyInput::Type::JapaneseNextCandidate:
+        japanese_.NextCandidate();
+        return ShowJapanesePreedit(context, editCookie);
+    case KeyInput::Type::JapanesePreviousCandidate:
+        japanese_.PreviousCandidate();
+        return ShowJapanesePreedit(context, editCookie);
+    case KeyInput::Type::JapaneseMoveFocus:
+        japanese_.MoveFocus(input.delta);
+        return ShowJapanesePreedit(context, editCookie);
+    case KeyInput::Type::JapaneseResize:
+        japanese_.ResizeFocus(input.delta);
+        return ShowJapanesePreedit(context, editCookie);
+    case KeyInput::Type::JapaneseSelectCandidate:
+    case KeyInput::Type::CandidateSelection:
+        japanese_.SelectCandidate(input.candidateIndex);
+        return ShowJapanesePreedit(context, editCookie);
     case KeyInput::Type::Enter:
     case KeyInput::Type::JapaneseCommit:
     case KeyInput::Type::EndComposition: {
@@ -374,18 +460,113 @@ HRESULT TextService::HandleJapaneseKey(ITfContext* context, TfEditCookie editCoo
 
 HRESULT TextService::ShowJapanesePreedit(ITfContext* context, TfEditCookie editCookie) {
     if (!japanese_.IsComposing()) {
+        candidateWindow_.Hide();
         if (composition_) {
             const HRESULT hr = ReplaceComposition(context, editCookie, std::wstring{});
             if (FAILED(hr)) return hr;
         }
         return EndComposition(editCookie);
     }
-    const HRESULT hr = EnsureComposition(context, editCookie);
+    HRESULT hr = EnsureComposition(context, editCookie);
     if (FAILED(hr)) return hr;
-    return ReplaceComposition(context, editCookie, japanese_.Preedit());
+    hr = ReplaceJapaneseComposition(context, editCookie);
+    if (FAILED(hr)) return hr;
+    ShowJapaneseCandidates(context, editCookie);
+    return S_OK;
+}
+
+HRESULT TextService::ReplaceJapaneseComposition(ITfContext* context, TfEditCookie editCookie) {
+    if (!composition_) return E_UNEXPECTED;
+    ComPtr<ITfRange> range;
+    HRESULT hr = composition_->GetRange(range.Put());
+    if (FAILED(hr)) return hr;
+    const auto segments = japanese_.Segments();
+    std::wstring text;
+    for (const auto& segment : segments) text += segment.text;
+    hr = range->SetText(editCookie, 0, text.c_str(), static_cast<LONG>(text.size()));
+    if (FAILED(hr)) return hr;
+
+    LONG offset = 0;
+    for (const auto& segment : segments) {
+        const auto length = static_cast<LONG>(segment.text.size());
+        ComPtr<ITfRange> part;
+        LONG moved = 0;
+        if (length > 0 && SUCCEEDED(range->Clone(part.Put())) &&
+            SUCCEEDED(part->Collapse(editCookie, TF_ANCHOR_START)) &&
+            SUCCEEDED(part->ShiftEnd(editCookie, offset + length, &moved, nullptr)) &&
+            SUCCEEDED(part->ShiftStart(editCookie, offset, &moved, nullptr))) {
+            const auto underline = !segment.converted ? JapaneseUnderline::Input
+                                   : segment.focused  ? JapaneseUnderline::Focused
+                                                      : JapaneseUnderline::Converted;
+            (void)ApplyDisplayAttribute(context, editCookie, part.Get(), JapaneseUnderlineGuid(underline));
+        }
+        offset += length;
+    }
+
+    hr = range->Collapse(editCookie, TF_ANCHOR_END);
+    if (FAILED(hr)) return hr;
+    TF_SELECTION selection{};
+    selection.range = range.Get();
+    selection.style.ase = TF_AE_END;
+    selection.style.fInterimChar = FALSE;
+    return context->SetSelection(editCookie, 1, &selection);
+}
+
+RECT TextService::JapaneseCandidateAnchor(ITfContext* context, TfEditCookie editCookie) const {
+    // Under the phrase being converted.
+    LONG offset = 0;
+    LONG length = 0;
+    for (const auto& segment : japanese_.Segments()) {
+        if (segment.focused) {
+            length = static_cast<LONG>(segment.text.size());
+            break;
+        }
+        offset += static_cast<LONG>(segment.text.size());
+    }
+    ComPtr<ITfContextView> view;
+    ComPtr<ITfRange> range;
+    ComPtr<ITfRange> part;
+    RECT rect{};
+    BOOL clipped = FALSE;
+    LONG moved = 0;
+    if (context && composition_ && length > 0 && SUCCEEDED(context->GetActiveView(view.Put())) &&
+        SUCCEEDED(composition_->GetRange(range.Put())) && SUCCEEDED(range->Clone(part.Put())) &&
+        SUCCEEDED(part->Collapse(editCookie, TF_ANCHOR_START)) &&
+        SUCCEEDED(part->ShiftEnd(editCookie, offset + length, &moved, nullptr)) &&
+        SUCCEEDED(part->ShiftStart(editCookie, offset, &moved, nullptr)) &&
+        SUCCEEDED(view->GetTextExt(editCookie, part.Get(), &rect, &clipped)) &&
+        (rect.right > rect.left || rect.bottom > rect.top)) {
+        return rect;
+    }
+    return GetCandidateAnchor(context, editCookie);
+}
+
+void TextService::ShowJapaneseCandidates(ITfContext* context, TfEditCookie editCookie) {
+    const auto* candidates = japanese_.FocusedCandidates();
+    if (!userSettings_.candidateWindowEnabled || !japanese_.IsCandidateListOpen() || !candidates ||
+        candidates->empty()) {
+        candidateWindow_.Hide();
+        return;
+    }
+    const std::size_t selected = std::min(japanese_.FocusedSelection(), candidates->size() - 1);
+    const std::size_t page = selected / kCandidatePage * kCandidatePage;
+    std::vector<Candidate> rows;
+    rows.reserve(candidates->size());
+    for (std::size_t i = 0; i < candidates->size(); ++i) {
+        Candidate row;
+        row.text = (*candidates)[i].text;
+        row.id = static_cast<std::uint32_t>(i % kCandidatePage + 1);
+        rows.push_back(std::move(row));
+    }
+    const RECT anchor = JapaneseCandidateAnchor(context, editCookie);
+    candidateAnchor_ = anchor;
+    candidateWindow_.SetStyle(userSettings_.candidateWindowStyle);
+    candidateWindow_.SetJapanese(userdata::UseJapaneseUi(userSettings_.uiLanguage));
+    candidateWindow_.Show(anchor, rows, selected, page, std::min(kCandidatePage, rows.size() - page));
 }
 
 HRESULT TextService::CommitJapanese(ITfContext* context, TfEditCookie editCookie) {
+    candidateWindow_.Hide();
     if (!japanese_.IsComposing()) return EndComposition(editCookie);
     const std::wstring text = japanese_.Commit();
     if (!composition_) {

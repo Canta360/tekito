@@ -2,6 +2,7 @@
 
 #include "Tsf/ComPtr.h"
 #include "Tsf/Compartments.h"
+#include "Tsf/DisplayAttributes.h"
 #include "Tsf/Diagnostics.h"
 #include "Tsf/Globals.h"
 #include "Tsf/TekitoGuids.h"
@@ -377,9 +378,12 @@ bool IsNavigationKey(WPARAM key) {
 
 class DisplayAttributeInfoEnum final : public IEnumTfDisplayAttributeInfo {
 public:
-    explicit DisplayAttributeInfoEnum(ITfDisplayAttributeInfo* info, bool consumed = false)
-        : info_(info), consumed_(consumed) {
-        if (info_) info_->AddRef();
+    // Takes a reference to each info.
+    explicit DisplayAttributeInfoEnum(std::vector<ITfDisplayAttributeInfo*> infos, std::size_t next = 0)
+        : infos_(std::move(infos)), next_(next) {
+        for (auto* info : infos_) {
+            if (info) info->AddRef();
+        }
     }
 
     HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void** object) override {
@@ -403,42 +407,43 @@ public:
 
     HRESULT STDMETHODCALLTYPE Clone(IEnumTfDisplayAttributeInfo** clone) override {
         if (!clone) return E_INVALIDARG;
-        *clone = new (std::nothrow) DisplayAttributeInfoEnum(info_, consumed_);
+        *clone = new (std::nothrow) DisplayAttributeInfoEnum(infos_, next_);
         return *clone ? S_OK : E_OUTOFMEMORY;
     }
 
     HRESULT STDMETHODCALLTYPE Next(ULONG count, ITfDisplayAttributeInfo** info, ULONG* fetched) override {
         if (!info || (count != 1 && !fetched)) return E_INVALIDARG;
-        if (fetched) *fetched = 0;
-        if (count == 0 || consumed_ || !info_) return S_FALSE;
-
-        info[0] = info_;
-        info[0]->AddRef();
-        consumed_ = true;
-        if (fetched) *fetched = 1;
-        return S_OK;
+        ULONG taken = 0;
+        while (taken < count && next_ < infos_.size()) {
+            info[taken] = infos_[next_++];
+            info[taken]->AddRef();
+            ++taken;
+        }
+        if (fetched) *fetched = taken;
+        return taken == count ? S_OK : S_FALSE;
     }
 
     HRESULT STDMETHODCALLTYPE Reset() override {
-        consumed_ = false;
+        next_ = 0;
         return S_OK;
     }
 
     HRESULT STDMETHODCALLTYPE Skip(ULONG count) override {
-        if (count == 0) return S_OK;
-        const bool hadValue = !consumed_;
-        consumed_ = true;
-        return hadValue ? S_OK : S_FALSE;
+        const std::size_t left = infos_.size() - next_;
+        next_ += std::min<std::size_t>(count, left);
+        return count <= left ? S_OK : S_FALSE;
     }
 
 private:
     ~DisplayAttributeInfoEnum() {
-        if (info_) info_->Release();
+        for (auto* info : infos_) {
+            if (info) info->Release();
+        }
     }
 
     std::atomic<ULONG> refCount_{1};
-    ITfDisplayAttributeInfo* info_{nullptr};
-    bool consumed_{false};
+    std::vector<ITfDisplayAttributeInfo*> infos_;
+    std::size_t next_{0};
 };
 
 }  // namespace
@@ -1132,17 +1137,32 @@ HRESULT TextService::OnCompositionTerminated(TfEditCookie, ITfComposition* compo
 
 HRESULT TextService::EnumDisplayAttributeInfo(IEnumTfDisplayAttributeInfo** enumInfo) {
     if (!enumInfo) return E_INVALIDARG;
-    *enumInfo = new (std::nothrow) DisplayAttributeInfoEnum(static_cast<ITfDisplayAttributeInfo*>(this));
+    std::vector<ITfDisplayAttributeInfo*> infos{static_cast<ITfDisplayAttributeInfo*>(this)};
+    for (int i = 0; i < kJapaneseUnderlineCount; ++i) {
+        if (auto* info = CreateJapaneseUnderline(static_cast<JapaneseUnderline>(i))) infos.push_back(info);
+    }
+    *enumInfo = new (std::nothrow) DisplayAttributeInfoEnum(infos);
+    // The enumerator holds its own references to the underlines made here.
+    for (std::size_t i = 1; i < infos.size(); ++i) infos[i]->Release();
     return *enumInfo ? S_OK : E_OUTOFMEMORY;
 }
 
 HRESULT TextService::GetDisplayAttributeInfo(REFGUID guid, ITfDisplayAttributeInfo** info) {
     if (!info) return E_INVALIDARG;
     *info = nullptr;
-    if (guid != GUID_TekitoDisplayAttribute) return E_INVALIDARG;
-    *info = static_cast<ITfDisplayAttributeInfo*>(this);
-    AddRef();
-    return S_OK;
+    if (guid == GUID_TekitoDisplayAttribute) {
+        *info = static_cast<ITfDisplayAttributeInfo*>(this);
+        AddRef();
+        return S_OK;
+    }
+    for (int i = 0; i < kJapaneseUnderlineCount; ++i) {
+        const auto underline = static_cast<JapaneseUnderline>(i);
+        if (guid == JapaneseUnderlineGuid(underline)) {
+            *info = CreateJapaneseUnderline(underline);
+            return *info ? S_OK : E_OUTOFMEMORY;
+        }
+    }
+    return E_INVALIDARG;
 }
 
 HRESULT TextService::GetGUID(GUID* guid) {
@@ -1293,7 +1313,7 @@ HRESULT TextService::RequestKeyEditSession(ITfContext* context, const KeyInput& 
 }
 
 void TextService::OnCandidateSelected(std::size_t index) {
-    if (!compositionContext_ || !state_.IsActive()) return;
+    if (!compositionContext_ || (!state_.IsActive() && !japanese_.IsConverted())) return;
     KeyInput input{};
     input.type = KeyInput::Type::CandidateSelection;
     input.candidateIndex = index;
@@ -1306,6 +1326,10 @@ HRESULT TextService::HandleKeyInEditSession(ITfContext* context, TfEditCookie ed
     if (!context) return E_INVALIDARG;
     if (input.type == KeyInput::Type::Reposition) {
         if (!composition_ || !candidateWindow_.IsShown()) return S_OK;
+        if (japanese_.IsConverted()) {
+            ShowJapaneseCandidates(context, editCookie);
+            return S_OK;
+        }
         const RECT anchor = GetCandidateAnchor(context, editCookie);
         if (!EqualRect(&anchor, &candidateAnchor_)) {
             candidateAnchor_ = anchor;
@@ -1707,8 +1731,13 @@ HRESULT TextService::ReplaceComposition(ITfContext* context, TfEditCookie editCo
 }
 
 HRESULT TextService::ApplyDisplayAttribute(ITfContext* context, TfEditCookie editCookie,
-                                           ITfRange* range) {
-    if (displayAttributeAtom_ == TF_INVALID_GUIDATOM) {
+                                           ITfRange* range, REFGUID attribute) {
+    std::size_t slot = 0;
+    for (int i = 0; i < kJapaneseUnderlineCount; ++i) {
+        if (attribute == JapaneseUnderlineGuid(static_cast<JapaneseUnderline>(i))) slot = i + 1;
+    }
+    TfGuidAtom& atom = displayAttributeAtoms_[slot];
+    if (atom == TF_INVALID_GUIDATOM) {
         ComPtr<ITfCategoryMgr> categoryManager;
         HRESULT hr = CoCreateInstance(CLSID_TF_CategoryMgr, nullptr, CLSCTX_INPROC_SERVER,
                                       IID_PPV_ARGS(categoryManager.Put()));
@@ -1716,8 +1745,7 @@ HRESULT TextService::ApplyDisplayAttribute(ITfContext* context, TfEditCookie edi
             TraceHr(L"ApplyDisplayAttribute CoCreateInstance category manager failed", hr);
             return hr;
         }
-        hr = categoryManager->RegisterGUID(GUID_TekitoDisplayAttribute,
-                                           &displayAttributeAtom_);
+        hr = categoryManager->RegisterGUID(attribute, &atom);
         if (FAILED(hr)) {
             TraceHr(L"ApplyDisplayAttribute RegisterGUID failed", hr);
             return hr;
@@ -1733,7 +1761,7 @@ HRESULT TextService::ApplyDisplayAttribute(ITfContext* context, TfEditCookie edi
 
     VARIANT value{};
     value.vt = VT_I4;
-    value.lVal = static_cast<LONG>(displayAttributeAtom_);
+    value.lVal = static_cast<LONG>(atom);
     return property->SetValue(editCookie, range, &value);
 }
 

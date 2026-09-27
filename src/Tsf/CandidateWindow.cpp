@@ -594,9 +594,11 @@ winrt::com_ptr<IDWriteTextFormat> CreateFormat(IDWriteFactory* factory, IDWriteF
                                                float size, DWRITE_FONT_WEIGHT weight,
                                                DWRITE_TEXT_ALIGNMENT alignment, bool ellipsis) {
     winrt::com_ptr<IDWriteTextFormat> format;
+    // Japanese locale: kanji and kana that M PLUS 1 lacks fall back to a
+    // Japanese font, with Japanese glyph shapes. Latin text is unaffected.
     if (FAILED(factory->CreateTextFormat(brand ? L"M PLUS 1" : L"Segoe UI Variable Text", brand, weight,
                                          DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL,
-                                         size, L"en-us", format.put()))) {
+                                         size, L"ja-jp", format.put()))) {
         return nullptr;
     }
     format->SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP);

@@ -33,6 +33,14 @@ struct KeyInput {
         JapaneseConvert,
         JapaneseCycleKana,
         JapaneseTransliterate,
+        // Japanese conversion: candidates (Up/Down, Shift+Space), phrases
+        // (Left/Right by `delta`), phrase length (Shift+Left/Right), and a
+        // candidate by its number (`candidateIndex`).
+        JapaneseNextCandidate,
+        JapanesePreviousCandidate,
+        JapaneseMoveFocus,
+        JapaneseResize,
+        JapaneseSelectCandidate,
         // Not a key: commit the Japanese text (the mode or focus changed).
         JapaneseCommit,
         // Types `character` outside a composition (a full-width space).
@@ -40,6 +48,7 @@ struct KeyInput {
     } type;
     wchar_t character{0};
     japanese::KanaForm kanaForm{japanese::KanaForm::Hiragana};
+    int delta{0};
     std::size_t candidateIndex{0};
     PunctuationRole punctuationRole{PunctuationRole::ClauseSeparator};
 };
