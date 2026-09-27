@@ -174,8 +174,9 @@ int RunKeys(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary
     if (useMixed) composer.SetMixedConverter(&mixed);
 
     struct KeyTotals {
-        std::size_t rows{0}, exact{0}, english{0}, errors{0}, characters{0};
+        std::size_t rows{0}, exact{0}, inList{0}, english{0}, errors{0}, characters{0};
         std::vector<double> microseconds;
+        std::vector<double> listMicroseconds;
     };
     std::map<std::string, KeyTotals> totals;
     std::size_t shown = 0;
@@ -196,9 +197,35 @@ int RunKeys(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary
                 length = expected.size();
             }
         }
+        // One pick away: what was meant is a phrase's first nine candidates
+        // (the list the second Space opens) with the other phrases kept.
+        // The second Space: the list opens for the first phrase.
+        const auto listStart = Clock::now();
+        composer.NextCandidate();
+        const double listElapsed = std::chrono::duration<double, std::micro>(Clock::now() - listStart).count();
+        composer.PreviousCandidate();
+        bool inList = distance == 0;
+        const std::size_t phraseCount = composer.Segments().size();
+        for (std::size_t f = 0; !inList && f < phraseCount; ++f) {
+            composer.MoveFocus(-static_cast<int>(phraseCount));
+            composer.MoveFocus(static_cast<int>(f));
+            composer.NextCandidate();
+            composer.PreviousCandidate();
+            const auto segments = composer.Segments();
+            const auto* candidates = composer.FocusedCandidates();
+            for (std::size_t j = 0; candidates && j < std::min<std::size_t>(9, candidates->size()) && !inList; ++j) {
+                std::wstring text;
+                for (std::size_t s = 0; s < segments.size(); ++s) {
+                    text += s == f ? (*candidates)[j].text : segments[s].text;
+                }
+                inList = std::find(row.expected.begin(), row.expected.end(), text) != row.expected.end();
+            }
+        }
         for (KeyTotals* t : {&totals[row.source], &totals["all"]}) {
             ++t->rows;
             if (distance == 0) ++t->exact;
+            if (inList) ++t->inList;
+            t->listMicroseconds.push_back(listElapsed);
             if (HasLatinLetter(output)) ++t->english;
             t->errors += distance;
             t->characters += length;
@@ -213,11 +240,15 @@ int RunKeys(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary
     std::cout << std::fixed << std::setprecision(1);
     for (const auto& [source, t] : totals) {
         std::cout << source << ": rows=" << t.rows << " top1=" << 100.0 * t.exact / t.rows << "%"
+                  << " in_list=" << 100.0 * t.inList / t.rows << "%"
                   << " english=" << 100.0 * t.english / t.rows << "%"
                   << " cer=" << (t.characters ? 100.0 * t.errors / t.characters : 0.0) << "%"
                   << " convert_us_p50=" << Percentile(t.microseconds, 0.5)
                   << " p95=" << Percentile(t.microseconds, 0.95)
-                  << " max=" << Percentile(t.microseconds, 1.0) << "\n";
+                  << " max=" << Percentile(t.microseconds, 1.0)
+                  << " list_us_p50=" << Percentile(t.listMicroseconds, 0.5)
+                  << " p95=" << Percentile(t.listMicroseconds, 0.95)
+                  << " max=" << Percentile(t.listMicroseconds, 1.0) << "\n";
     }
     return 0;
 }

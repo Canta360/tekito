@@ -353,6 +353,15 @@ std::optional<MixedConversion> MixedConverter::Convert(std::wstring_view keys) c
     MixedConversion result;
     result.english = english;
     result.corrected = corrected;
+    // The reading is the path's texts in order.
+    std::size_t readingSize = 0;
+    for (const int k : path) readingSize += nodes[k].text.size();
+    result.keyAt.assign(readingSize + 1, std::wstring::npos);
+    for (std::size_t offset = 0; const int k : path) {
+        result.keyAt[offset] = nodes[k].begin;
+        offset += nodes[k].text.size();
+        result.keyAt[offset] = nodes[k].end;
+    }
     std::wstring run;
     const auto flushRun = [&]() {
         if (run.empty()) return;

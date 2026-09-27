@@ -528,6 +528,20 @@ void TestRomajiCorrection(const RomajiTable& table, const MiniPack& pack) {
     RequireText(composer.Preedit(), meant, "a slip inside a sentence");
     composer.Clear();
 
+    // A slip the first choice keeps (a dropped consonant reads as other
+    // kana) is one pick away once the list opens, marked as a slip.
+    Type(composer, L"ikaigatomaru");
+    composer.Convert();
+    const std::wstring first = composer.Preedit();
+    composer.NextCandidate();
+    const auto* listed = composer.FocusedCandidates();
+    Require(first.find(L"機械") == std::wstring::npos, "the first choice is what was typed");
+    Require(listed && !listed->front().slip, "the typed reading stays first");
+    Require(std::any_of(listed->begin(), listed->end(),
+                        [](const tekito::japanese::PhraseCandidate& c) { return c.slip && c.text == L"機械が"; }),
+            "the list offers 機械が for ikaiga");
+    composer.Clear();
+
     Type(composer, L"thnaks");
     composer.Convert();
     RequireText(composer.Preedit(), L"english", "many unreadable letters are English, not a slip");

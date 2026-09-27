@@ -99,4 +99,7 @@ $keys = @("--pack", "data\japanese-core", "--romaji", "data\japanese-romaji",
 `--typo N` changes what a corrected slip costs (0 turns correction off).
 Correct keys must convert as well as with correction off; the typo set
 shows how many slips come out as meant (37.6% with the default, against
-61% for the same sentences typed correctly).
+61% for the same sentences typed correctly). `in_list` counts what was
+meant among the first nine candidates of one phrase, as the second Space
+shows them with the slips undone there (64.3% of the typo set), and
+`list_us` is how long opening that list takes.

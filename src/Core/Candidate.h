@@ -15,6 +15,8 @@ enum class SemanticLabel {
     Reaction,
     Standard,
     Emoji,
+    // A reading of the keys with a slip undone, or a spelling correction.
+    Suggestion,
 };
 
 enum CandidatePolicyFlags : std::uint32_t {
