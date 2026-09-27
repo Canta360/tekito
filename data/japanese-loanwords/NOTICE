@@ -1,0 +1,11 @@
+English words by how they sound in katakana ("みいちんぐ" for meeting), so
+Japanese input can offer the English word for a katakana word. Each romaji
+spelling of the japanese-phonetic pack is read with the japanese-romaji
+table and keyed loosely (long vowels written out, small vowels full size,
+ティ as チ); a key's words come most common first.
+
+Pronunciations: the CMU Pronouncing Dictionary (see the japanese-phonetic
+pack's NOTICE). Frequencies: Leipzig Corpora Collection (English news 2025,
+1M sentences), licensed CC BY 4.0: D. Goldhahn, T. Eckart and U. Quasthoff,
+"Building Large Monolingual Dictionaries at the Leipzig Corpora Collection",
+LREC 2012.

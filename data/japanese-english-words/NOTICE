@@ -1,8 +1,0 @@
-The 40,000 most common words of the standard-english pack, with their
-frequency scores from the frequency pack, so Japanese input can recognize
-English words typed among romaji.
-
-Words: SCOWL / ESDB word list (see the standard-english pack's NOTICE).
-Frequencies: Leipzig Corpora Collection (English news 2025, 1M sentences),
-licensed CC BY 4.0: D. Goldhahn, T. Eckart and U. Quasthoff, "Building Large
-Monolingual Dictionaries at the Leipzig Corpora Collection", LREC 2012.

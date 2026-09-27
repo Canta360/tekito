@@ -3,7 +3,8 @@
 #include "Core/Japanese/JapaneseLearning.h"
 #include "Core/Japanese/KanaText.h"
 #include "Core/TypoModel.h"
-#include "Core/Japanese/MixedConverter.h"
+#include "Core/Japanese/KeyConverter.h"
+#include "Core/Japanese/Loanwords.h"
 #include "Core/Japanese/RomajiTable.h"
 
 #include <algorithm>
@@ -55,6 +56,11 @@ constexpr std::size_t kSlipPosition = 5;
 // Costs in the connection matrix's units, against the phrase as typed.
 constexpr std::int64_t kSlipMargin = 3000;
 constexpr std::int64_t kSlipLikelier = 2000;
+// Loanwords (AddLoanwords): the first candidates that may start in
+// katakana, how long the katakana must be, and the English words offered.
+constexpr std::size_t kLoanwordScan = 5;
+constexpr std::size_t kShortestLoanword = 2;
+constexpr std::size_t kLoanwords = 2;
 
 bool IsAlphanumeric(KanaForm form) {
     return form == KanaForm::FullWidthAlphanumeric || form == KanaForm::HalfWidthAlphanumeric;
@@ -308,22 +314,17 @@ void JapaneseComposer::BuildPhrases(bool convert) {
     focus_ = 0;
     listOpen_ = false;
     if (reading.empty()) return;
-    bool corrected = false;
-    bool mixed = false;
     if (convert && converter_) {
-        // English among the romaji, or a slip in the keys: converted from
-        // the keys. Esc still goes back to what was typed.
-        if (auto conversion = mixed_ ? mixed_->Convert(Keys(false)) : std::nullopt) {
+        // A slip in the keys: converted from the keys as meant. Esc still
+        // goes back to what was typed.
+        if (auto conversion = keyConverter_ ? keyConverter_->Convert(Keys(false)) : std::nullopt) {
             conversionReading_ = ApplyPunctuation(std::move(conversion->reading));
             readingKeys_ = std::move(conversion->keyAt);
             AddPhrases(std::move(conversion->phrases), conversionReading_);
-            mixed = conversion->english;
-            corrected = !mixed;
         } else {
             AddPhrases(converter_->Convert(reading), reading);
         }
     }
-    if (convert && !mixed) AddEnglish(reading, corrected);
     if (phrases_.empty()) {
         phrases_.push_back({0, reading.size(),
                             convert ? KanaCandidates(reading) : std::vector<PhraseCandidate>{}});
@@ -334,6 +335,7 @@ void JapaneseComposer::AddPhrases(std::vector<Phrase> phrases, const std::wstrin
     for (auto& phrase : phrases) {
         if (phrase.candidates.empty()) continue;
         if (learning_) learning_->Reorder(reading.substr(phrase.begin, phrase.length), phrase.candidates);
+        AddLoanwords(phrase.candidates);
         phrases_.push_back({phrase.begin, phrase.length, std::move(phrase.candidates)});
     }
 }
@@ -351,41 +353,26 @@ std::vector<RomajiToken> JapaneseComposer::ParseRomaji(const RomajiTable& table,
     return tokens;
 }
 
-void JapaneseComposer::AddEnglish(const std::wstring& reading, bool romajiCorrected) {
-    if (!english_) return;
-    const std::wstring keys = Keys(false);
-    // A word: letters, and the apostrophe and hyphen inside words.
-    if (keys.size() < 2 || !std::iswalpha(keys.front()) ||
-        !std::all_of(keys.begin(), keys.end(),
-                     [](wchar_t c) { return c < 0x80 && (std::iswalpha(c) || c == L'\'' || c == L'-'); })) {
+void JapaneseComposer::AddLoanwords(std::vector<PhraseCandidate>& candidates) const {
+    if (!loanwords_) return;
+    const auto isKatakana = [](wchar_t c) { return (c >= L'\x30A1' && c <= L'\x30F6') || c == L'\x30FC'; };
+    for (std::size_t i = 0; i < std::min(candidates.size(), kLoanwordScan); ++i) {
+        const auto& candidate = candidates[i];
+        if (candidate.kind != PhraseCandidate::Kind::Dictionary) continue;
+        std::size_t length = 0;
+        while (length < candidate.text.size() && isKatakana(candidate.text[length])) ++length;
+        if (length < kShortestLoanword) continue;
+        // The word in English, and what follows it as it was ("ミーティングが"
+        // -> "meetingが").
+        const std::wstring rest = candidate.text.substr(length);
+        std::vector<PhraseCandidate> words;
+        for (const auto& word : loanwords_->Words(std::wstring_view(candidate.text).substr(0, length), kLoanwords)) {
+            PhraseCandidate english{word + rest, candidate.cost, PhraseCandidate::Kind::English, false};
+            const auto same = [&](const PhraseCandidate& c) { return c.text == english.text; };
+            if (std::none_of(candidates.begin(), candidates.end(), same)) words.push_back(std::move(english));
+        }
+        candidates.insert(candidates.begin() + static_cast<std::ptrdiff_t>(i + 1), words.begin(), words.end());
         return;
-    }
-    // Letters the table could not turn into kana mean English was meant,
-    // unless they were a romaji slip that was corrected.
-    const bool english = !romajiCorrected && LeftoverLetters(reading) > 0;
-    if (!english && phrases_.size() > 1) return;
-
-    std::vector<PhraseCandidate> words;
-    for (auto& word : english_(keys)) {
-        if (!word.empty()) words.push_back({std::move(word), 0, PhraseCandidate::Kind::English, false});
-    }
-    if (english) {
-        // The keys as typed, whatever the engine says.
-        const bool typed = std::any_of(words.begin(), words.end(),
-                                       [&](const PhraseCandidate& c) { return c.text == keys; });
-        if (!typed) words.push_back({keys, 0, PhraseCandidate::Kind::English, false});
-        std::vector<PhraseCandidate> candidates = std::move(words);
-        for (auto& candidate : KanaCandidates(reading)) candidates.push_back(std::move(candidate));
-        phrases_.clear();
-        phrases_.push_back({0, reading.size(), std::move(candidates)});
-        return;
-    }
-    if (phrases_.empty()) return;
-    auto& candidates = phrases_.front().candidates;
-    for (auto& word : words) {
-        const bool present = std::any_of(candidates.begin(), candidates.end(),
-                                         [&](const PhraseCandidate& c) { return c.text == word.text; });
-        if (!present) candidates.push_back(std::move(word));
     }
 }
 

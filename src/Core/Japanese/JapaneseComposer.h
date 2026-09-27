@@ -12,7 +12,8 @@
 namespace tekito::japanese {
 
 class JapaneseLearningStore;
-class MixedConverter;
+class KeyConverter;
+class Loanwords;
 class RomajiTable;
 
 // One romaji unit: the keys it took and the kana it made. Keys the table
@@ -62,20 +63,17 @@ public:
 
     void SetTable(const RomajiTable* table) noexcept;
     void SetConverter(const JapaneseConverter* converter) noexcept { converter_ = converter; }
-    // Converts the keys as typed when English is mixed in (tried first on
-    // Space; nullptr leaves conversion to the kana).
-    void SetMixedConverter(const MixedConverter* mixed) noexcept { mixed_ = mixed; }
+    // Converts the keys as typed, correcting slips in them (tried first on
+    // Space; nullptr leaves conversion to the kana as typed).
+    void SetKeyConverter(const KeyConverter* keyConverter) noexcept { keyConverter_ = keyConverter; }
+    // English words for katakana candidates (ミーティング -> meeting), offered
+    // right after them; nullptr offers none.
+    void SetLoanwords(const Loanwords* loanwords) noexcept { loanwords_ = loanwords; }
     // How the romaji table reads `keys` from the start, unit by unit.
     [[nodiscard]] static std::vector<RomajiToken> ParseRomaji(const RomajiTable& table, std::wstring_view keys);
     // What the user chose before puts candidates first; each commit is
     // recorded. nullptr turns learning off.
     void SetLearning(JapaneseLearningStore* learning) noexcept { learning_ = learning; }
-    // English words for the keys typed (TEKITO's English engine: spelling
-    // corrections, and words from how they sound in romaji). Keys that do
-    // not make kana are taken as English: Space offers these first. Keys
-    // that make one phrase get them after its Japanese candidates.
-    using EnglishCandidates = std::function<std::vector<std::wstring>(std::wstring_view keys)>;
-    void SetEnglishCandidates(EnglishCandidates source) { english_ = std::move(source); }
     // Words that start with what is typed, offered below it from the second
     // kana (dictionary and learning). Off by default.
     void SetPredictionEnabled(bool enabled) noexcept { predictionEnabled_ = enabled; }
@@ -185,17 +183,17 @@ private:
     [[nodiscard]] std::vector<PhraseCandidate> KanaCandidates(std::wstring_view reading) const;
     void AddPhrases(std::vector<Phrase> phrases, const std::wstring& reading);
     void UpdatePredictions();
-    // English candidates for the whole text, when the keys look like a word.
-    void AddEnglish(const std::wstring& reading, bool romajiCorrected);
+    // The English word after the first candidate that starts in katakana.
+    void AddLoanwords(std::vector<PhraseCandidate>& candidates) const;
     // When the list opens: the phrase's keys with one slip undone, as more
     // candidates, so a slip the first choice kept is one pick away.
     void AddSlipCandidates(PhraseState& phrase) const;
 
     const RomajiTable* table_{nullptr};
     const JapaneseConverter* converter_{nullptr};
-    const MixedConverter* mixed_{nullptr};
+    const KeyConverter* keyConverter_{nullptr};
+    const Loanwords* loanwords_{nullptr};
     JapaneseLearningStore* learning_{nullptr};
-    EnglishCandidates english_;
     std::vector<Unit> units_;
     // Units before the caret; pending keys belong at the caret.
     std::size_t caret_{0};

@@ -58,10 +58,10 @@ EXPECTED_FIELDS = {
     "social-expression": 6,
     "japanese-phonetic": 5,
     "japanese-romaji": 3,
-    "japanese-english-words": 2,
+    "japanese-loanwords": 3,
 }
 UNIQUE_KEY_PACKS = {
-    "standard-english", "frequency", "japanese-romaji", "japanese-english-words",
+    "standard-english", "frequency", "japanese-romaji",
     "dictionary-display", "pronunciation", "proper-nouns",
 }
 INDEX_HEADERS = {

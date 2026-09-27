@@ -459,7 +459,6 @@ TextService::TextService()
       processIsElevated_(CurrentProcessIsElevated()),
       processName_(CurrentProcessName()) {
     processPrefersPassThrough_ = IsBuiltInPassThroughProcess(processName_);
-    japanese_.SetEnglishCandidates([this](std::wstring_view keys) { return EnglishWordsFor(keys); });
     ++g_objectCount;
     Trace(L"TextService ctor");
 }

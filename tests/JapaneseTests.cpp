@@ -3,7 +3,8 @@
 #include "Core/Japanese/JapaneseConverter.h"
 #include "Core/Japanese/JapaneseDictionary.h"
 #include "Core/Japanese/JapaneseLearning.h"
-#include "Core/Japanese/MixedConverter.h"
+#include "Core/Japanese/KeyConverter.h"
+#include "Core/Japanese/Loanwords.h"
 #include "Core/Japanese/KanaText.h"
 #include "Core/Japanese/Meanings.h"
 #include "Core/Japanese/RomajiTable.h"
@@ -446,55 +447,48 @@ void TestLearningStore() {
     Require(copy.Empty(), "clearing forgets everything");
 }
 
-void TestEnglishInJapanese(const RomajiTable& table, const MiniPack& pack) {
+void TestLoanwords(const RomajiTable& table, const MiniPack& pack) {
+    using tekito::japanese::LoanwordKey;
+    RequireText(LoanwordKey(L"ミーティング"), L"みいちんぐ", "long vowels are written out, ティ is チ");
+    RequireText(LoanwordKey(L"ファイル"), L"ふあいる", "small vowels are full size");
+
+    tekito::japanese::Loanwords loanwords;
+    Require(loanwords.Open(tekito::ExternalLexiconProvider::DataPackRoot() / L"japanese-loanwords"),
+            "the loanwords pack opens");
+    const auto meeting = loanwords.Words(L"ミーティング", 2);
+    Require(!meeting.empty() && meeting.front() == L"meeting", "ミーティング is meeting");
+    Require(loanwords.Words(L"キカイ", 2).empty(), "katakana that is no English word has none");
+
     const tekito::japanese::JapaneseConverter converter(pack.dictionary, pack.matrix);
     JapaneseComposer composer(&table);
     composer.SetConverter(&converter);
-    std::wstring asked;
-    composer.SetEnglishCandidates([&](std::wstring_view keys) {
-        asked = keys;
-        return std::vector<std::wstring>{L"thanks", L"thank"};
-    });
-
-    Type(composer, L"thnaks");
+    composer.SetLoanwords(&loanwords);
+    Type(composer, L"mi-thingugahajimaru");
     composer.Convert();
-    RequireText(asked, L"thnaks", "the English engine gets the keys as typed");
-    RequireText(SegmentsText(composer), L"*thanks", "keys that are not romaji convert to English first");
     const auto* candidates = composer.FocusedCandidates();
-    Require(candidates && candidates->size() >= 4 && (*candidates)[2].text == L"thnaks",
-            "the keys as typed follow the English words");
-    Require(candidates->back().kind == tekito::japanese::PhraseCandidate::Kind::Hiragana ||
-                candidates->back().kind == tekito::japanese::PhraseCandidate::Kind::Katakana,
-            "kana stay available");
+    Require(candidates && candidates->front().text == L"ミーティングが", "katakana stays the first choice");
+    Require(candidates->size() > 1 && (*candidates)[1].text == L"meetingが" &&
+                (*candidates)[1].kind == tekito::japanese::PhraseCandidate::Kind::English,
+            "the English word comes right after it, with what follows");
     composer.Clear();
 
-    Type(composer, L"kikai");
-    composer.Convert();
-    const auto* kikai = composer.FocusedCandidates();
-    Require(kikai && kikai->front().kind == tekito::japanese::PhraseCandidate::Kind::Dictionary,
-            "romaji that makes Japanese converts to Japanese first");
-    Require(std::any_of(kikai->begin(), kikai->end(),
-                        [](const auto& c) { return c.kind == tekito::japanese::PhraseCandidate::Kind::English; }),
-            "English words come after, for a single phrase");
-    composer.Clear();
-
-    asked.clear();
+    // Romaji that happens to spell English stays Japanese: keys are not
+    // read as English.
     Type(composer, L"kikaigatomaru");
     composer.Convert();
-    Require(composer.Segments().size() > 1 && composer.FocusedCandidates()->back().kind !=
-                                                  tekito::japanese::PhraseCandidate::Kind::English,
-            "a sentence of several phrases gets no English words");
+    for (const auto& segment : composer.Segments()) {
+        Require(std::none_of(segment.text.begin(), segment.text.end(), [](wchar_t c) { return c < 0x80; }),
+                "no English in a Japanese sentence");
+    }
 }
 
 void TestRomajiCorrection(const RomajiTable& table, const MiniPack& pack) {
     const tekito::japanese::JapaneseConverter converter(pack.dictionary, pack.matrix);
     // Slips are corrected in the key lattice, English words or not.
-    const tekito::japanese::EnglishWords noEnglish;
-    const tekito::japanese::MixedConverter mixed(pack.dictionary, pack.matrix, converter, table, noEnglish);
+    const tekito::japanese::KeyConverter keyConverter(pack.dictionary, pack.matrix, converter, table);
     JapaneseComposer composer(&table);
     composer.SetConverter(&converter);
-    composer.SetMixedConverter(&mixed);
-    composer.SetEnglishCandidates([](std::wstring_view) { return std::vector<std::wstring>{L"english"}; });
+    composer.SetKeyConverter(&keyConverter);
 
     RequireText(Type(composer, L"arigatpu"), L"ありがｔぷ", "a slipped key leaves a letter");
     composer.Convert();
@@ -544,7 +538,7 @@ void TestRomajiCorrection(const RomajiTable& table, const MiniPack& pack) {
 
     Type(composer, L"thnaks");
     composer.Convert();
-    RequireText(composer.Preedit(), L"english", "many unreadable letters are English, not a slip");
+    Require(composer.Preedit().find(L'ｔ') != std::wstring::npos, "many unreadable letters stay as typed");
     composer.Clear();
 
     Type(composer, L"kikai");
@@ -590,32 +584,6 @@ void TestPrediction(const RomajiTable& table, const MiniPack& pack) {
     Require(!composer.Predictions().empty(), "Backspace brings them back");
     composer.Convert();
     Require(composer.Predictions().empty(), "converting puts predictions away");
-}
-
-void TestMixedConversion(const RomajiTable& table, const MiniPack& pack) {
-    tekito::japanese::EnglishWords english;
-    Require(english.Open(tekito::ExternalLexiconProvider::DataPackRoot() / L"japanese-english-words"),
-            "the English words pack opens");
-    Require(english.Score("meeting").value_or(0) > 3 && !english.Score("xqzv"), "English words have scores");
-
-    const tekito::japanese::JapaneseConverter converter(pack.dictionary, pack.matrix);
-    const tekito::japanese::MixedConverter mixed(pack.dictionary, pack.matrix, converter, table, english);
-    const auto meeting = mixed.Convert(L"watashinomeetingdesu");
-    Require(meeting.has_value(), "an English word among romaji is found");
-    RequireText(Joined(meeting->phrases, true), L"私の|meeting|です", "the English word is a phrase of its own");
-    Require(meeting->phrases[1].candidates.front().kind == tekito::japanese::PhraseCandidate::Kind::English,
-            "and English comes first for it");
-    Require(!mixed.Convert(L"watashinonamaehanakanodesu"), "all-Japanese keys are left to the usual conversion");
-    Require(!mixed.Convert(L"kikaigatomaru"), "romaji that happens to contain English stays Japanese");
-
-    JapaneseComposer composer(&table);
-    composer.SetConverter(&converter);
-    composer.SetMixedConverter(&mixed);
-    RequireText(Type(composer, L"watashinoMeetingdesu"), L"わたしのＭええちんｇです", "typing shows kana");
-    composer.Convert();
-    RequireText(composer.Preedit(), L"私のMeetingです", "Space converts the keys, keeping the English as typed");
-    composer.Cancel();
-    RequireText(composer.Preedit(), L"わたしのＭええちんｇです", "Esc goes back to the typed kana");
 }
 
 void TestComposerLearning(const RomajiTable& table, const MiniPack& pack) {
@@ -691,10 +659,9 @@ int main(int argc, char** argv) {
     TestComposerConversion(*table, *pack);
     TestLearningStore();
     TestComposerLearning(*table, *pack);
-    TestEnglishInJapanese(*table, *pack);
+    TestLoanwords(*table, *pack);
     TestRomajiCorrection(*table, *pack);
     TestPrediction(*table, *pack);
-    TestMixedConversion(*table, *pack);
     TestMeanings();
     if (argc > 1 && std::string_view(argv[1]) == "--dump") DumpConversions(*pack);
     std::cout << "All TEKITO Japanese tests passed.\n";

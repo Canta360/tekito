@@ -15,9 +15,7 @@ flattened into eval/generated/japanese_eval.tsv (not committed):
 Readings are hiragana, as TEKITO's composer gives them to the converter.
 
 It also writes eval/generated/japanese_eval_keys.tsv, the same sentences as
-the romaji keys a person would type (from the japanese-romaji pack), plus
-sentences with a common English noun typed among the romaji
-("kyouha" + "meeting" + "gaarimasu"):
+the romaji keys a person would type (from the japanese-romaji pack):
 
   source <TAB> id <TAB> keys <TAB> expected [<TAB> expected ...]
 
@@ -43,16 +41,6 @@ TYPO_OUTPUT = ROOT / "eval" / "generated" / "japanese_eval_typo_keys.tsv"
 QWERTY_ROWS = ["qwertyuiop", "asdfghjkl", "zxcvbnm"]
 DATA = ROOT / "data"
 
-# Japanese around the English word: keys before, their text, keys after,
-# their text. The texts are what the converter gives for them alone.
-MIXED_TEMPLATES = [
-    ("kyouha", "今日は", "gaarimasu", "があります"),
-    ("", "", "wotsukaimasu", "を使います"),
-    ("atarashii", "新しい", "desu", "です"),
-    ("", "", "nosettei", "の設定"),
-    ("watashino", "私の", "hakoredesu", "はこれです"),
-    ("", "", "gasukidesu", "が好きです"),
-]
 MOZC_COMMIT = "b9c3fcbd6d76b19649ef572324fa9da2559bc18e"
 AJIMEE_COMMIT = "401666cd56d1a570c2021798b64b6da4396bfd45"
 SOURCES = {
@@ -140,47 +128,6 @@ def romanize(reading: str, keys_for: dict[str, str]) -> str | None:
     return None if double_next else "".join(out)
 
 
-def english_nouns(limit: int, keys_for: dict[str, str]) -> list[str]:
-    """Common English nouns that romaji does not read, 4 to 9 letters."""
-    nouns = set()
-    for line in (DATA / "dictionary-display" / "entries.tsv").read_text(encoding="utf-8").splitlines():
-        fields = line.split("\t")
-        if len(fields) > 3 and fields[3] == "noun" and fields[0].startswith("external:"):
-            nouns.add(fields[0][len("external:"):])
-    scored = []
-    for line in (DATA / "japanese-english-words" / "words.tsv").read_text(encoding="utf-8").splitlines():
-        word, score = line.split("\t")
-        if 4 <= len(word) <= 9 and word.isalpha() and word in nouns:
-            scored.append((-float(score), word))
-    scored.sort()
-    readable = {line.split("	")[0] for line in
-                (DATA / "japanese-romaji" / "romaji.tsv").read_text(encoding="utf-8").splitlines()}
-    words = []
-    for _, word in scored:
-        # A word that is also good romaji is ambiguous; keep the test clear.
-        if reads_as_romaji(word, readable):
-            continue
-        words.append(word)
-        if len(words) >= limit:
-            break
-    return words
-
-
-def reads_as_romaji(word: str, keys: set[str]) -> bool:
-    i = 0
-    while i < len(word):
-        for length in (4, 3, 2, 1):
-            if word[i:i + length] in keys:
-                i += length
-                break
-        else:
-            if word[i] == word[i + 1:i + 2] and word[i] not in "aiueon":
-                i += 1
-                continue
-            return False
-    return True
-
-
 def qwerty_neighbors(key: str) -> str:
     """The same neighbors as TypoModel's AreQwertyNeighbors."""
     for row, letters in enumerate(QWERTY_ROWS):
@@ -247,10 +194,6 @@ def main() -> None:
                         typo_out.write("\t".join([f"typo-{kind}", f"{source}-{row_id}", slipped] +
                                                   [clean(e) for e in expected]) + "\n")
                         typos += 1
-        for word in english_nouns(60, keys_for):
-            for number, (before, before_text, after, after_text) in enumerate(MIXED_TEMPLATES):
-                out.write(f"mixed\t{word}-{number}\t{before}{word}{after}\t{before_text}{word}{after_text}\n")
-                keyed += 1
     print(f"wrote {keyed} rows to {KEYS_OUTPUT}")
     print(f"wrote {typos} rows to {TYPO_OUTPUT}")
 

@@ -7,7 +7,8 @@
 #include "Core/Japanese/JapaneseConverter.h"
 #include "Core/Japanese/JapaneseDictionary.h"
 #include "Core/Japanese/Meanings.h"
-#include "Core/Japanese/MixedConverter.h"
+#include "Core/Japanese/KeyConverter.h"
+#include "Core/Japanese/Loanwords.h"
 #include "Core/Japanese/RomajiTable.h"
 #include "Tsf/Compartments.h"
 #include "Tsf/DisplayAttributes.h"
@@ -62,17 +63,17 @@ const japanese::RomajiTable* ProcessRomajiTable() {
     return table.get();
 }
 
-// The japanese-core pack (and the English words mixed conversion knows),
-// mapped once per process: mapping takes well under a millisecond and the
-// pages are shared with every other process. Without japanese-core,
-// Japanese still types kana, and Space switches kana; without the English
-// words, English among romaji is left to the single-word checks.
+// The japanese-core pack (and the loanwords for katakana), mapped once per
+// process: mapping takes well under a millisecond and the pages are shared
+// with every other process. Without japanese-core, Japanese still types
+// kana, and Space switches kana; without the loanwords, katakana has no
+// English candidates.
 struct JapaneseData {
     japanese::JapaneseDictionary dictionary;
     japanese::ConnectionMatrix matrix;
-    japanese::EnglishWords english;
+    japanese::Loanwords loanwords;
     std::unique_ptr<japanese::JapaneseConverter> converter;
-    std::unique_ptr<japanese::MixedConverter> mixed;
+    std::unique_ptr<japanese::KeyConverter> keys;
 };
 
 const JapaneseData* ProcessJapaneseData() {
@@ -85,14 +86,11 @@ const JapaneseData* ProcessJapaneseData() {
             return std::unique_ptr<JapaneseData>{};
         }
         loaded->converter = std::make_unique<japanese::JapaneseConverter>(loaded->dictionary, loaded->matrix);
-        // Mixed conversion also corrects slips in the keys, so it runs
-        // without the English words too.
         if (const auto* table = ProcessRomajiTable()) {
-            if (!loaded->english.Open(root / L"japanese-english-words")) Trace(L"Japanese English words unavailable");
-            loaded->mixed = std::make_unique<japanese::MixedConverter>(loaded->dictionary, loaded->matrix,
-                                                                      *loaded->converter, *table,
-                                                                      loaded->english);
+            loaded->keys = std::make_unique<japanese::KeyConverter>(loaded->dictionary, loaded->matrix,
+                                                                    *loaded->converter, *table);
         }
+        if (!loaded->loanwords.Open(root / L"japanese-loanwords")) Trace(L"Japanese loanwords unavailable");
         return loaded;
     }();
     return data.get();
@@ -111,7 +109,8 @@ const japanese::MeaningDictionary& ProcessMeanings() {
 void AttachJapaneseData(japanese::JapaneseComposer& composer) {
     const auto* data = ProcessJapaneseData();
     composer.SetConverter(data ? data->converter.get() : nullptr);
-    composer.SetMixedConverter(data ? data->mixed.get() : nullptr);
+    composer.SetKeyConverter(data ? data->keys.get() : nullptr);
+    composer.SetLoanwords(data && data->loanwords.IsOpen() ? &data->loanwords : nullptr);
 }
 
 }  // namespace
@@ -384,29 +383,6 @@ HRESULT TextService::HandleEnglishSegmentEnd(ITfContext* context, TfEditCookie e
     typed.type = KeyInput::Type::Printable;
     typed.character = input.character;
     return HandleJapaneseKey(context, editCookie, typed);
-}
-
-std::vector<std::wstring> TextService::EnglishWordsFor(std::wstring_view keys) {
-    std::vector<std::wstring> words;
-    if (!EnsureEngine()) return words;  // English data still loading
-    ConversionRequest request;
-    request.rawText = keys;
-    request.options.correctionEnabled = userSettings_.correctionEnabled;
-    request.options.commonMisspellingsEnabled = userSettings_.commonMisspellingsEnabled;
-    request.options.completionEnabled = false;
-    request.options.japanesePhoneticSuggestionsEnabled = userSettings_.japanesePhoneticSuggestionsEnabled;
-    request.options.socialExpressionRange = 0;
-    constexpr std::size_t kEnglishWords = 5;
-    for (const auto& candidate : candidateEngine_->Convert(request).candidates) {
-        // Words only: no emoji or reactions among Japanese candidates.
-        if (candidate.isOriginal || candidate.label == SemanticLabel::Emoji ||
-            candidate.socialRange != SocialRangeUnspecified || candidate.text.empty()) {
-            continue;
-        }
-        words.push_back(candidate.text);
-        if (words.size() >= kEnglishWords) break;
-    }
-    return words;
 }
 
 bool TextService::TranslateJapaneseKey(WPARAM wParam, KeyInput& input) {
