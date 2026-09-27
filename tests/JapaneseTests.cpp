@@ -488,8 +488,12 @@ void TestEnglishInJapanese(const RomajiTable& table, const MiniPack& pack) {
 
 void TestRomajiCorrection(const RomajiTable& table, const MiniPack& pack) {
     const tekito::japanese::JapaneseConverter converter(pack.dictionary, pack.matrix);
+    // Slips are corrected in the key lattice, English words or not.
+    const tekito::japanese::EnglishWords noEnglish;
+    const tekito::japanese::MixedConverter mixed(pack.dictionary, pack.matrix, converter, table, noEnglish);
     JapaneseComposer composer(&table);
     composer.SetConverter(&converter);
+    composer.SetMixedConverter(&mixed);
     composer.SetEnglishCandidates([](std::wstring_view) { return std::vector<std::wstring>{L"english"}; });
 
     RequireText(Type(composer, L"arigatpu"), L"ありがｔぷ", "a slipped key leaves a letter");
@@ -504,6 +508,24 @@ void TestRomajiCorrection(const RomajiTable& table, const MiniPack& pack) {
     Type(composer, L"sjigoto");
     composer.Convert();
     Require(composer.Preedit().find(L"仕事") != std::wstring::npos, "sjigoto converts as しごと");
+    composer.Clear();
+
+    // Slips that still read as kana: a neighboring key, a key dropped, an
+    // extra key, two keys swapped.
+    for (const auto* keys : {L"arigayougozaimasu", L"arigtougozaimasu", L"arigatouggozaimasu",
+                             L"arigatougozaimsau"}) {
+        RequireText(Type(composer, keys).substr(0, 2), L"あり", "the slip is typed as it is");
+        composer.Convert();
+        RequireText(composer.Preedit(), L"ありがとうございます", "Space converts what was meant");
+        composer.Clear();
+    }
+    Type(composer, L"shigotogaowatta");
+    composer.Convert();
+    const std::wstring meant = composer.Preedit();
+    composer.Clear();
+    Type(composer, L"shigotogaowqtta");
+    composer.Convert();
+    RequireText(composer.Preedit(), meant, "a slip inside a sentence");
     composer.Clear();
 
     Type(composer, L"thnaks");

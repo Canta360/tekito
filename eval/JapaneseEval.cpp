@@ -6,7 +6,7 @@
 // tekito_ja_eval --pack <data/japanese-core> --corpus <japanese_eval.tsv> [--show-misses N]
 // tekito_ja_eval --pack <data/japanese-core> --keys-corpus <japanese_eval_keys.tsv>
 //                --romaji <data/japanese-romaji> --english <data/japanese-english-words>
-//                [--no-mixed] [--english-base N] [--english-per-score N] [--language-switch N]
+//                [--no-mixed] [--english-base N] [--english-per-score N] [--language-switch N] [--typo N]
 //
 // The second form types the romaji keys into the composer, as TEKITO does,
 // and converts with Space; "english" counts outputs with Latin letters in
@@ -240,6 +240,7 @@ int main(int argc, char** argv) {
         else if (arg == "--english-base" && i + 1 < argc) costs.englishBase = std::stoll(argv[++i]);
         else if (arg == "--english-per-score" && i + 1 < argc) costs.englishPerScore = std::stoll(argv[++i]);
         else if (arg == "--language-switch" && i + 1 < argc) costs.languageSwitch = std::stoll(argv[++i]);
+        else if (arg == "--typo" && i + 1 < argc) costs.typo = std::stoll(argv[++i]);
         else if (arg == "--show-misses" && i + 1 < argc) showMisses = std::stoul(argv[++i]);
     }
     if (!pack.empty() && !keysCorpus.empty()) {

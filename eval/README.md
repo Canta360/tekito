@@ -82,3 +82,21 @@ Per source it reports `top1` (the first conversion is acceptable),
 `top10_per_phrase` (an acceptable text can be made from each phrase's first
 ten candidates), `cer` (character error rate against the closest acceptable
 text) and conversion time. None of them should regress.
+
+The script also writes the same sentences as the romaji keys a person types
+(`japanese_eval_keys.tsv`, plus sentences with an English word among the
+romaji) and with one slip in the keys (`japanese_eval_typo_keys.tsv`: a
+neighboring key, a key dropped, an extra key, two keys swapped). These run
+through the composer, as TEKITO converts on Space:
+
+```powershell
+$keys = @("--pack", "data\japanese-core", "--romaji", "data\japanese-romaji",
+          "--english", "data\japanese-english-words")
+.\out\build\eval\Release\tekito_ja_eval.exe @keys --keys-corpus eval\generated\japanese_eval_keys.tsv
+.\out\build\eval\Release\tekito_ja_eval.exe @keys --keys-corpus eval\generated\japanese_eval_typo_keys.tsv
+```
+
+`--typo N` changes what a corrected slip costs (0 turns correction off).
+Correct keys must convert as well as with correction off; the typo set
+shows how many slips come out as meant (37.6% with the default, against
+61% for the same sentences typed correctly).
