@@ -1,5 +1,6 @@
 #include "Core/Japanese/JapaneseComposer.h"
 
+#include "Core/Japanese/JapaneseLearning.h"
 #include "Core/Japanese/KanaText.h"
 #include "Core/Japanese/RomajiTable.h"
 
@@ -226,15 +227,18 @@ void JapaneseComposer::BuildPhrases(bool convert) {
     focus_ = 0;
     listOpen_ = false;
     if (reading.empty()) return;
-    if (convert && converter_) {
-        for (auto& phrase : converter_->Convert(reading)) {
-            if (phrase.candidates.empty()) continue;
-            phrases_.push_back({phrase.begin, phrase.length, std::move(phrase.candidates)});
-        }
-    }
+    if (convert && converter_) AddPhrases(converter_->Convert(reading), reading);
     if (phrases_.empty()) {
         phrases_.push_back({0, reading.size(),
                             convert ? KanaCandidates(reading) : std::vector<PhraseCandidate>{}});
+    }
+}
+
+void JapaneseComposer::AddPhrases(std::vector<Phrase> phrases, const std::wstring& reading) {
+    for (auto& phrase : phrases) {
+        if (phrase.candidates.empty()) continue;
+        if (learning_) learning_->Reorder(reading.substr(phrase.begin, phrase.length), phrase.candidates);
+        phrases_.push_back({phrase.begin, phrase.length, std::move(phrase.candidates)});
     }
 }
 
@@ -303,9 +307,7 @@ void JapaneseComposer::ResizeFocus(int delta) {
     std::vector<PhraseState> kept(phrases_.begin(), phrases_.begin() + static_cast<long long>(focus_));
 
     phrases_.clear();
-    for (auto& phrase : converter_->Convert(reading, fixed)) {
-        phrases_.push_back({phrase.begin, phrase.length, std::move(phrase.candidates)});
-    }
+    AddPhrases(converter_->Convert(reading, fixed), reading);
     if (phrases_.size() <= focus_) {
         BuildPhrases(true);
         return;
@@ -428,6 +430,14 @@ std::size_t JapaneseComposer::FocusedSelection() const noexcept {
 
 std::wstring JapaneseComposer::Commit() {
     FlushAll();
+    if (learning_ && IsConverted()) {
+        const std::wstring reading = Reading();
+        for (const auto& phrase : phrases_) {
+            const std::wstring chosen = PhraseText(phrase);
+            const std::wstring first = phrase.candidates.empty() ? chosen : phrase.candidates.front().text;
+            learning_->RecordChoice(reading.substr(phrase.begin, phrase.length), chosen, first);
+        }
+    }
     auto text = IsConverted() ? Preedit() : RenderTyping(false);
     Clear();
     return text;

@@ -37,6 +37,7 @@ add_library(tekito_core STATIC
     src/Core/Japanese/JapaneseComposer.cpp
     src/Core/Japanese/JapaneseConverter.cpp
     src/Core/Japanese/JapaneseDictionary.cpp
+    src/Core/Japanese/JapaneseLearning.cpp
     src/Core/Japanese/KanaText.cpp
     src/Core/Japanese/MappedFile.cpp
     src/Core/Japanese/RomajiTable.cpp

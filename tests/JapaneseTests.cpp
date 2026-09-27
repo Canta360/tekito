@@ -2,6 +2,7 @@
 #include "Core/Japanese/JapaneseComposer.h"
 #include "Core/Japanese/JapaneseConverter.h"
 #include "Core/Japanese/JapaneseDictionary.h"
+#include "Core/Japanese/JapaneseLearning.h"
 #include "Core/Japanese/KanaText.h"
 #include "Core/Japanese/RomajiTable.h"
 
@@ -406,6 +407,71 @@ void TestComposerConversion(const RomajiTable& table, const MiniPack& pack) {
     Require(!composer.IsConverted(), "typing after a conversion starts typing again");
 }
 
+std::vector<tekito::japanese::PhraseCandidate> Candidates(std::initializer_list<const wchar_t*> texts) {
+    std::vector<tekito::japanese::PhraseCandidate> out;
+    for (const auto* text : texts) out.push_back({text, 0, tekito::japanese::PhraseCandidate::Kind::Dictionary, false});
+    return out;
+}
+
+void TestLearningStore() {
+    tekito::japanese::JapaneseLearningStore learning;
+    auto candidates = Candidates({L"機会", L"機械", L"器械"});
+    learning.Reorder(L"きかい", candidates);
+    RequireText(candidates[0].text, L"機会", "nothing learned keeps the order");
+
+    learning.RecordChoice(L"きかい", L"機械", L"機会");
+    learning.Reorder(L"きかい", candidates);
+    RequireText(candidates[0].text, L"機械", "a choice moves to the top");
+    RequireText(candidates[1].text, L"機会", "the rest keep their order");
+
+    for (int i = 0; i < 4; ++i) learning.RecordChoice(L"きかい", L"機械", L"機械");
+    learning.RecordChoice(L"きかい", L"器械", L"機械");
+    learning.Reorder(L"きかい", candidates);
+    RequireText(candidates[0].text, L"機械", "one different choice does not displace a habit");
+    RequireText(candidates[1].text, L"器械", "the new choice comes second");
+
+    auto other = Candidates({L"機会", L"機械"});
+    learning.Reorder(L"きかいが", other);
+    RequireText(other[0].text, L"機会", "learning is per reading");
+
+    tekito::japanese::JapaneseLearningStore copy;
+    for (auto entry : learning.Entries()) Require(copy.Add(entry), "entries load back");
+    Require(copy.Preference(L"きかい", L"機械") == learning.Preference(L"きかい", L"機械"),
+            "loaded entries keep their preference");
+    Require(!copy.Add({L"", L"x", 1, 0, 1}), "an entry without a reading is refused");
+    copy.Clear();
+    Require(copy.Empty(), "clearing forgets everything");
+}
+
+void TestComposerLearning(const RomajiTable& table, const MiniPack& pack) {
+    const tekito::japanese::JapaneseConverter converter(pack.dictionary, pack.matrix);
+    tekito::japanese::JapaneseLearningStore learning;
+    JapaneseComposer composer(&table);
+    composer.SetConverter(&converter);
+    composer.SetLearning(&learning);
+
+    Type(composer, L"kikaigatomaru");
+    composer.Convert();
+    const auto first = composer.Segments().front().text;
+    const auto* candidates = composer.FocusedCandidates();
+    std::size_t other = 1;
+    while (other < candidates->size() && (*candidates)[other].text == first) ++other;
+    const auto chosen = (*candidates)[other].text;
+    composer.SelectCandidate(other);
+    (void)composer.Commit();
+
+    Type(composer, L"kikaigatomaru");
+    composer.Convert();
+    RequireText(composer.Segments().front().text, chosen, "the phrase chosen last time comes first");
+    composer.Cancel();
+    composer.Clear();
+
+    composer.SetLearning(nullptr);
+    Type(composer, L"kikaigatomaru");
+    composer.Convert();
+    RequireText(composer.Segments().front().text, first, "without learning the order is the converter's");
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -422,6 +488,8 @@ int main(int argc, char** argv) {
     TestDamagedPacks();
     TestConversion(*pack);
     TestComposerConversion(*table, *pack);
+    TestLearningStore();
+    TestComposerLearning(*table, *pack);
     if (argc > 1 && std::string_view(argv[1]) == "--dump") DumpConversions(*pack);
     std::cout << "All TEKITO Japanese tests passed.\n";
     return 0;

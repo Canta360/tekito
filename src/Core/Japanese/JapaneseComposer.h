@@ -10,6 +10,7 @@
 
 namespace tekito::japanese {
 
+class JapaneseLearningStore;
 class RomajiTable;
 
 // How a phrase (or the whole text before conversion) is written.
@@ -51,6 +52,9 @@ public:
 
     void SetTable(const RomajiTable* table) noexcept;
     void SetConverter(const JapaneseConverter* converter) noexcept { converter_ = converter; }
+    // What the user chose before puts candidates first; each commit is
+    // recorded. nullptr turns learning off.
+    void SetLearning(JapaneseLearningStore* learning) noexcept { learning_ = learning; }
     void SetPunctuationStyle(PunctuationStyle style) noexcept { punctuation_ = style; }
     // Hiragana or Katakana: how new text is shown while typing.
     void SetInputForm(KanaForm form) noexcept;
@@ -141,9 +145,11 @@ private:
     // Phrases from the converter, or one phrase for the whole text.
     void BuildPhrases(bool convert);
     [[nodiscard]] std::vector<PhraseCandidate> KanaCandidates(std::wstring_view reading) const;
+    void AddPhrases(std::vector<Phrase> phrases, const std::wstring& reading);
 
     const RomajiTable* table_{nullptr};
     const JapaneseConverter* converter_{nullptr};
+    JapaneseLearningStore* learning_{nullptr};
     std::vector<Unit> units_;
     // Units before the caret; pending keys belong at the caret.
     std::size_t caret_{0};

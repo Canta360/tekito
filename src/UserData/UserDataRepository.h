@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Core/Japanese/JapaneseLearning.h"
 #include "Core/UserDictionary.h"
 #include "Core/UserLearning.h"
 #include "UserData/UserSettings.h"
@@ -25,6 +26,9 @@ public:
     [[nodiscard]] virtual bool LoadSocialLearning(SocialLearningStore& learning) const noexcept = 0;
     [[nodiscard]] virtual bool SaveSocialLearning(const SocialLearningStore& learning) noexcept = 0;
     [[nodiscard]] virtual bool ResetSocialLearning() noexcept = 0;
+    [[nodiscard]] virtual bool LoadJapaneseLearning(japanese::JapaneseLearningStore& learning) const noexcept = 0;
+    [[nodiscard]] virtual bool SaveJapaneseLearning(const japanese::JapaneseLearningStore& learning) noexcept = 0;
+    [[nodiscard]] virtual bool ResetJapaneseLearning() noexcept = 0;
     [[nodiscard]] virtual bool IsOpen() const noexcept = 0;
 };
 

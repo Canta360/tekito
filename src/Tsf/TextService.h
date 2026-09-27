@@ -207,6 +207,7 @@ private:
     // rather than followed.
     bool activationSettling_{false};
     japanese::JapaneseComposer japanese_;
+    japanese::JapaneseLearningStore japaneseLearning_;
     RECT candidateAnchor_{};
     CandidateWindow candidateWindow_;
     ComPtr<ITfLangBarItemMgr> langBarItemMgr_;

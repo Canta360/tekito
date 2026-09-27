@@ -28,6 +28,9 @@ public:
     [[nodiscard]] bool LoadSocialLearning(SocialLearningStore& learning) const noexcept override;
     [[nodiscard]] bool SaveSocialLearning(const SocialLearningStore& learning) noexcept override;
     [[nodiscard]] bool ResetSocialLearning() noexcept override;
+    [[nodiscard]] bool LoadJapaneseLearning(japanese::JapaneseLearningStore& learning) const noexcept override;
+    [[nodiscard]] bool SaveJapaneseLearning(const japanese::JapaneseLearningStore& learning) noexcept override;
+    [[nodiscard]] bool ResetJapaneseLearning() noexcept override;
     [[nodiscard]] bool IsOpen() const noexcept override;
 
 private:

@@ -526,6 +526,7 @@ HRESULT TextService::ActivateEx(ITfThreadMgr* threadManager, TfClientId clientId
     userDictionary_ = {};
     userLearning_ = {};
     socialLearning_ = {};
+    japaneseLearning_.Clear();
     userSettings_ = {};
     userLearningProvider_.SetEnabled(true);
 
@@ -536,6 +537,9 @@ HRESULT TextService::ActivateEx(ITfThreadMgr* threadManager, TfClientId clientId
             }
             if (!settingsRepository_->LoadSocialLearning(socialLearning_)) {
                 Trace(L"ActivateEx SocialLearning load skipped");
+            }
+            if (!settingsRepository_->LoadJapaneseLearning(japaneseLearning_)) {
+                Trace(L"ActivateEx JapaneseLearning load skipped");
             }
             Trace(L"ActivateEx UserDictionary loaded");
         } else {
@@ -623,6 +627,9 @@ HRESULT TextService::Deactivate() {
         if (!settingsRepository_->SaveSocialLearning(socialLearning_)) {
             Trace(L"Deactivate SocialLearning save failed");
         }
+        if (!settingsRepository_->SaveJapaneseLearning(japaneseLearning_)) {
+            Trace(L"Deactivate JapaneseLearning save failed");
+        }
         if (settingsRepository_) settingsRepository_->Close();
         settingsLoaded_ = false;
     }
@@ -704,6 +711,10 @@ void TextService::SyncRuntimeState() {
         if (settingsRepository_->LoadSocialLearning(loadedSocialLearning)) {
             socialLearning_ = std::move(loadedSocialLearning);
         }
+        japanese::JapaneseLearningStore loadedJapaneseLearning;
+        if (settingsRepository_->LoadJapaneseLearning(loadedJapaneseLearning)) {
+            japaneseLearning_ = std::move(loadedJapaneseLearning);
+        }
         runtimeLearningGeneration_ = learningGeneration;
     }
 
@@ -737,6 +748,7 @@ void TextService::ApplySettings() {
     if (threadManager_) UpdateToggleKey(userSettings_.toggleKey);
     japanese_.SetPunctuationStyle(
         static_cast<japanese::PunctuationStyle>(std::clamp(userSettings_.japanesePunctuation, 0, 3)));
+    japanese_.SetLearning(userSettings_.learningEnabled ? &japaneseLearning_ : nullptr);
 }
 
 // Keys that end the word and still reach the application: anything that is
