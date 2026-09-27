@@ -35,6 +35,9 @@ struct UserSettings {
     int toggleKey{1};
     // Enter adds a period to a line that ends without punctuation.
     bool periodOnEnter{false};
+    // Language of TEKITO's own windows: 0 = the Windows display language,
+    // 1 = English, 2 = Japanese. See UiLanguage.h.
+    int uiLanguage{0};
     // Executable names (e.g. "code.exe") where TEKITO passes every key
     // through, in addition to the built-in terminal list.
     std::vector<std::wstring> excludedApps;

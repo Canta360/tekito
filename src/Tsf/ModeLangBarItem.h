@@ -15,9 +15,10 @@ public:
     using ModeGetter = std::function<InputMode()>;
     using ModeSetter = std::function<void(InputMode)>;
     using SettingsLauncher = std::function<void()>;
+    using LanguageQuery = std::function<bool()>;  // true when the UI is in Japanese
 
     ModeLangBarItem(HINSTANCE instance, ModeGetter getMode, ModeSetter setMode,
-                    SettingsLauncher launchSettings);
+                    SettingsLauncher launchSettings, LanguageQuery japanese);
 
     HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void** object) override;
     ULONG STDMETHODCALLTYPE AddRef() override;
@@ -41,6 +42,7 @@ private:
     ~ModeLangBarItem();
 
     [[nodiscard]] InputMode Mode() const;
+    [[nodiscard]] const wchar_t* Text(const wchar_t* english, const wchar_t* japanese) const;
     void ShowContextMenu(POINT point);
 
     std::atomic<ULONG> refCount_{1};
@@ -48,6 +50,7 @@ private:
     ModeGetter getMode_;
     ModeSetter setMode_;
     SettingsLauncher launchSettings_;
+    LanguageQuery japanese_;
     ITfLangBarItemSink* sink_{nullptr};
 };
 

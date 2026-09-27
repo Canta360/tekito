@@ -115,6 +115,7 @@ add_executable(TEKITO WIN32
 )
 target_include_directories(TEKITO PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} src third_party/webview2/include)
 target_compile_definitions(TEKITO PRIVATE ${TEKITO_WINDOWS_DEFINES})
+target_compile_options(TEKITO PRIVATE /utf-8)
 target_link_libraries(TEKITO PRIVATE
     tekito_userdata tekito_dictionary
     user32 gdi32 comctl32 comdlg32 shell32 advapi32

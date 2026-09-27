@@ -15,6 +15,7 @@
 #include "Dictionary/ExternalDictionaryProvider.h"
 #include "UserData/DataPackValidation.h"
 #include "UserData/RuntimeModeState.h"
+#include "UserData/UiLanguage.h"
 #include "UserData/UserDataRepository.h"
 #include "UserData/UserDictionaryFile.h"
 #include "assets/tekito_resource.h"
@@ -379,7 +380,7 @@ public:
             return false;
         }
 
-        hwnd_ = CreateWindowExW(0, kClassName, L"TEKITO Settings",
+        hwnd_ = CreateWindowExW(0, kClassName, WindowTitle(),
                                 WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU |
                                     WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_THICKFRAME |
                                     WS_VISIBLE | WS_CLIPCHILDREN,
@@ -405,11 +406,11 @@ public:
 private:
     void CreateWebViewStatusControls() {
         fallbackLabel_ = CreateWindowExW(
-            0, L"STATIC", L"Loading TEKITO Settings...",
+            0, L"STATIC", Text(L"Loading TEKITO Settings...", L"TEKITO の設定を読み込んでいます…"),
             WS_CHILD | WS_VISIBLE | SS_CENTER | SS_CENTERIMAGE,
             32, 32, 876, 64, hwnd_, nullptr, instance_, nullptr);
         fallbackRetry_ = CreateWindowExW(
-            0, L"BUTTON", L"Retry",
+            0, L"BUTTON", Text(L"Retry", L"再試行"),
             WS_CHILD | WS_TABSTOP | BS_PUSHBUTTON,
             410, 112, 120, 32, hwnd_,
             reinterpret_cast<HMENU>(static_cast<INT_PTR>(kRetryWebView)),
@@ -435,7 +436,8 @@ private:
     }
 
     void FailWebView(std::wstring_view reason) {
-        std::wstring message = L"TEKITO Settings could not be loaded.\r\n";
+        std::wstring message = Text(L"TEKITO Settings could not be loaded.\r\n",
+                                    L"TEKITO の設定を開けませんでした。\r\n");
         message += reason;
         SetWebViewStatus(message, true);
     }
@@ -456,7 +458,7 @@ private:
     bool ValidateSettingsUi(std::wstring& error) const {
         const auto root = ExecutableDirectory() / L"settings-ui";
         if (!std::filesystem::exists(root / L"index.html")) {
-            error = L"The local settings package is missing index.html.";
+            error = Text(L"The local settings package is missing index.html.", L"設定画面のファイル（index.html）が見つかりません。");
             return false;
         }
         for (const auto* icon : {L"auto.ico", L"direct.ico", L"tekito.ico"}) {
@@ -466,7 +468,7 @@ private:
             if (!std::filesystem::is_regular_file(path) ||
                 !file.read(reinterpret_cast<char*>(header), sizeof(header)) ||
                 header[0] != 0 || header[1] != 0 || header[2] != 1 || header[3] != 0) {
-                error = L"The installed settings package is missing a provided ICO asset.";
+                error = Text(L"The installed settings package is missing a provided ICO asset.", L"設定画面のアイコンファイルが見つかりません。");
                 return false;
             }
         }
@@ -475,7 +477,7 @@ private:
 
     void InitializeWebView() {
         ResetWebView();
-        SetWebViewStatus(L"Loading TEKITO Settings...", false);
+        SetWebViewStatus(Text(L"Loading TEKITO Settings...", L"TEKITO の設定を読み込んでいます…"), false);
         std::wstring uiError;
         if (!ValidateSettingsUi(uiError)) {
             FailWebView(uiError);
@@ -483,13 +485,13 @@ private:
         }
         const auto userData = WebViewUserDataDirectory();
         if (userData.empty()) {
-            FailWebView(L"The WebView2 user data folder could not be resolved.");
+            FailWebView(Text(L"The WebView2 user data folder could not be resolved.", L"WebView2 のデータフォルダーの場所を特定できませんでした。"));
             return;
         }
         std::error_code error;
         std::filesystem::create_directories(userData, error);
         if (error) {
-            FailWebView(L"The WebView2 user data folder could not be created.");
+            FailWebView(Text(L"The WebView2 user data folder could not be created.", L"WebView2 のデータフォルダーを作成できませんでした。"));
             return;
         }
         const HRESULT result = CreateCoreWebView2EnvironmentWithOptions(
@@ -497,7 +499,7 @@ private:
             Callback<ICoreWebView2CreateCoreWebView2EnvironmentCompletedHandler>(
                 [this](HRESULT environmentResult, ICoreWebView2Environment* environment) -> HRESULT {
                     if (FAILED(environmentResult) || !environment) {
-                        FailWebView(L"WebView2 Runtime is unavailable or could not start.");
+                        FailWebView(Text(L"WebView2 Runtime is unavailable or could not start.", L"WebView2 Runtime が見つからないか、起動できませんでした。"));
                         return S_OK;
                     }
                     return environment->CreateCoreWebView2Controller(
@@ -506,13 +508,13 @@ private:
                             [this](HRESULT controllerResult,
                                    ICoreWebView2Controller* controller) -> HRESULT {
                                 if (FAILED(controllerResult) || !controller) {
-                                    FailWebView(L"WebView2 could not create the settings view.");
+                                    FailWebView(Text(L"WebView2 could not create the settings view.", L"WebView2 で設定画面を作成できませんでした。"));
                                     return S_OK;
                                 }
                                 controller_ = controller;
                                 ApplyTheme();
                                 if (FAILED(controller_->get_CoreWebView2(&webview_)) || !webview_) {
-                                    FailWebView(L"WebView2 returned no settings view.");
+                                    FailWebView(Text(L"WebView2 returned no settings view.", L"WebView2 から設定画面が返されませんでした。"));
                                     return S_OK;
                                 }
                                 const auto uiFolder = (ExecutableDirectory() / L"settings-ui").wstring();
@@ -520,7 +522,7 @@ private:
                                     FAILED(webview3_->SetVirtualHostNameToFolderMapping(
                                         L"tekito.settings", uiFolder.c_str(),
                                         COREWEBVIEW2_HOST_RESOURCE_ACCESS_KIND_ALLOW))) {
-                                    FailWebView(L"The local settings package could not be mapped.");
+                                    FailWebView(Text(L"The local settings package could not be mapped.", L"設定画面のファイルを読み込めませんでした。"));
                                     return S_OK;
                                 }
                                 webview_->add_NavigationCompleted(
@@ -530,7 +532,7 @@ private:
                                             BOOL success = FALSE;
                                             if (args) args->get_IsSuccess(&success);
                                             if (!success) {
-                                                FailWebView(L"The local settings page failed to navigate.");
+                                                FailWebView(Text(L"The local settings page failed to navigate.", L"設定画面を表示できませんでした。"));
                                             } else {
                                                 if (fallbackLabel_) ShowWindow(fallbackLabel_, SW_HIDE);
                                                 if (fallbackRetry_) ShowWindow(fallbackRetry_, SW_HIDE);
@@ -559,13 +561,13 @@ private:
                                 const HRESULT navigationResult =
                                     webview_->Navigate(L"https://tekito.settings/index.html");
                                 if (FAILED(navigationResult)) {
-                                    FailWebView(L"The local settings page could not be opened.");
+                                    FailWebView(Text(L"The local settings page could not be opened.", L"設定画面を開けませんでした。"));
                                 }
                                 return S_OK;
                             }).Get());
                 }).Get());
         if (FAILED(result)) {
-            FailWebView(L"WebView2 environment creation failed.");
+            FailWebView(Text(L"WebView2 environment creation failed.", L"WebView2 の準備に失敗しました。"));
         }
     }
 
@@ -731,6 +733,7 @@ private:
         json += L",\"toggleKey\":" + std::to_wstring(settings_.toggleKey);
         json += L",\"periodOnEnter\":";
         json += settings_.periodOnEnter ? L"true" : L"false";
+        json += L",\"uiLanguage\":" + std::to_wstring(settings_.uiLanguage);
         json += L",\"excludedApps\":" + NameListJson(settings_.excludedApps);
         json += L",\"builtInExcludedApps\":" +
                 NameListJson({std::begin(tekito::userdata::kBuiltInExcludedApps),
@@ -742,7 +745,8 @@ private:
         json += L",\"count\":" + std::to_wstring(learning_.Entries().size() + learning_.PreferenceCount()) + L"},\"dictionary\":";
         json += DictionaryJson();
         json += L",\"packs\":" + packs;
-        json += L",\"appearance\":{\"accent\":\"" + AccentColorHex() + L"\"}}";
+        json += L",\"appearance\":{\"accent\":\"" + AccentColorHex() + L"\",\"systemLanguage\":\"" +
+                std::wstring(tekito::userdata::UseJapaneseUi(0) ? L"ja" : L"en") + L"\"}}";
         return json;
     }
 
@@ -768,7 +772,7 @@ private:
     bool AddExcludedApp(std::wstring_view input, std::wstring& error) {
         const auto name = ExecutableName(input);
         if (name.empty()) {
-            error = L"Enter an app name, such as code.exe.";
+            error = Text(L"Enter an app name, such as code.exe.", L"アプリ名を入力してください（例: code.exe）。");
             return false;
         }
         const auto sameName = [&](const std::wstring& other) {
@@ -784,7 +788,7 @@ private:
         settings_.excludedApps.push_back(name);
         if (!SaveSettings()) {
             settings_ = previous;
-            error = L"The app list could not be saved.";
+            error = Text(L"The app list could not be saved.", L"アプリの一覧を保存できませんでした。");
             return false;
         }
         return true;
@@ -804,13 +808,13 @@ private:
         const auto raw = message.String(L"raw");
         const auto candidate = message.String(L"candidate");
         if (raw.empty() || candidate.empty()) {
-            error = L"Input and output are required.";
+            error = Text(L"Input and output are required.", L"入力と変換後の両方を入れてください。");
             return false;
         }
         const auto previous = dictionary_;
         const auto id = update ? static_cast<std::uint64_t>(message.Number(L"id")) : NextDictionaryId();
         if (update && id == 0) {
-            error = L"The dictionary entry was not found.";
+            error = Text(L"The dictionary entry was not found.", L"辞書の単語が見つかりませんでした。");
             return false;
         }
         if (update) (void)dictionary_.Remove(id);
@@ -820,7 +824,7 @@ private:
                               message.Bool(L"enabled", true)}) ||
             !repository_->Save(dictionary_)) {
             dictionary_ = previous;
-            error = L"The dictionary entry could not be saved.";
+            error = Text(L"The dictionary entry could not be saved.", L"辞書の単語を保存できませんでした。");
             return false;
         }
         runtime_->NotifyDictionaryChanged();
@@ -864,17 +868,19 @@ private:
                 settings_.candidateWindowStyle = std::clamp(integerValue, 0, 1);
             }
             else if (key == L"periodOnEnter") settings_.periodOnEnter = value;
+            else if (key == L"uiLanguage") settings_.uiLanguage = std::clamp(integerValue, 0, 2);
             else if (key == L"toggleKey") {
                 settings_.toggleKey = std::clamp(integerValue, 0, 3);
             }
             else known = false;
             if (!known) {
                 settings_ = previous;
-                Reply(requestId, false, L"Unknown setting or startup entry could not be updated.");
+                Reply(requestId, false, Text(L"Unknown setting or startup entry could not be updated.", L"この設定は変更できません。"));
             } else if (!SaveSettings()) {
                 settings_ = previous;
-                Reply(requestId, false, L"Settings could not be saved.");
+                Reply(requestId, false, Text(L"Settings could not be saved.", L"設定を保存できませんでした。"));
             } else {
+                if (key == L"uiLanguage") SetWindowTextW(hwnd_, WindowTitle());
                 Reply(requestId, true);
             }
         } else if (type == L"mode.set") {
@@ -901,7 +907,7 @@ private:
             });
             if (!SaveSettings()) {
                 settings_ = previous;
-                Reply(requestId, false, L"The app list could not be saved.");
+                Reply(requestId, false, Text(L"The app list could not be saved.", L"アプリの一覧を保存できませんでした。"));
             } else {
                 Reply(requestId, true);
             }
@@ -909,7 +915,7 @@ private:
             // Clears everything learned from the user's choices: word
             // preferences and the expressions they tend to pick.
             if (!repository_ || !repository_->ResetLearning() || !repository_->ResetSocialLearning()) {
-                Reply(requestId, false, L"Learning data could not be reset.");
+                Reply(requestId, false, Text(L"Learning data could not be reset.", L"学習データを消去できませんでした。"));
             } else {
                 learning_.Reset();
                 runtime_->NotifyLearningChanged();
@@ -923,7 +929,7 @@ private:
             const auto previous = dictionary_;
             if (!dictionary_.Remove(static_cast<std::uint64_t>(message.Number(L"id"))) || !repository_->Save(dictionary_)) {
                 dictionary_ = previous;
-                Reply(requestId, false, L"The dictionary entry could not be deleted.");
+                Reply(requestId, false, Text(L"The dictionary entry could not be deleted.", L"辞書の単語を削除できませんでした。"));
             } else {
                 runtime_->NotifyDictionaryChanged();
                 Reply(requestId, true);
@@ -939,7 +945,7 @@ private:
             } else if (path.empty()) {
                 Reply(requestId, true);
             } else {
-                Reply(requestId, false, L"The dictionary could not be imported.");
+                Reply(requestId, false, Text(L"The dictionary could not be imported.", L"辞書を読み込めませんでした。"));
             }
         } else if (type == L"dictionary.export") {
             const auto path = ChooseFile(true);
@@ -947,30 +953,30 @@ private:
                 Reply(requestId, true);
             } else {
                 const bool exported = tekito::userdata::ExportUserDictionary(dictionary_, path);
-                Reply(requestId, exported, exported ? L"" : L"The dictionary could not be exported.");
+                Reply(requestId, exported, exported ? L"" : Text(L"The dictionary could not be exported.", L"辞書を書き出せませんでした。"));
             }
         } else if (type == L"diagnostics.copy") {
             const auto text = Diagnostics();
             const bool copied = CopyToClipboard(hwnd_, text);
-            Reply(requestId, copied, copied ? L"" : L"Diagnostics could not be copied.");
+            Reply(requestId, copied, copied ? L"" : Text(L"Diagnostics could not be copied.", L"診断情報をコピーできませんでした。"));
         } else if (type == L"logs.open") {
             const auto path = LogFolder();
             const auto result = path.empty() ? 0 : reinterpret_cast<INT_PTR>(ShellExecuteW(
                 hwnd_, L"open", path.c_str(), nullptr, nullptr, SW_SHOWNORMAL));
-            Reply(requestId, result > 32, result > 32 ? L"" : L"The log folder could not be opened.");
+            Reply(requestId, result > 32, result > 32 ? L"" : Text(L"The log folder could not be opened.", L"ログのフォルダーを開けませんでした。"));
         } else if (type == L"license.get") {
             const auto text = LicenseText();
-            Reply(requestId, !text.empty(), text.empty() ? L"The license text could not be loaded." : L"",
+            Reply(requestId, !text.empty(), text.empty() ? Text(L"The license text could not be loaded.", L"ライセンスの本文を読み込めませんでした。") : L"",
                   L",\"text\":\"" + JsonEscape(text) + L"\"");
         } else if (type == L"website.open") {
             const auto result = reinterpret_cast<INT_PTR>(ShellExecuteW(
                 hwnd_, L"open", kPublisherWebsite, nullptr, nullptr, SW_SHOWNORMAL));
-            Reply(requestId, result > 32, result > 32 ? L"" : L"The website could not be opened.");
+            Reply(requestId, result > 32, result > 32 ? L"" : Text(L"The website could not be opened.", L"Web サイトを開けませんでした。"));
         } else if (type == L"notices.open") {
             const auto path = tekito::ExternalLexiconProvider::DataPackRoot();
             const auto result = path.empty() ? 0 : reinterpret_cast<INT_PTR>(ShellExecuteW(
                 hwnd_, L"open", path.c_str(), nullptr, nullptr, SW_SHOWNORMAL));
-            Reply(requestId, result > 32, result > 32 ? L"" : L"The data folder could not be opened.");
+            Reply(requestId, result > 32, result > 32 ? L"" : Text(L"The data folder could not be opened.", L"データのフォルダーを開けませんでした。"));
         }
     }
 
@@ -1047,7 +1053,7 @@ private:
         dialog.lpstrFile = buffer;
         dialog.nMaxFile = MAX_PATH;
         dialog.lpstrFilter = L"Apps (*.exe)\0*.exe\0";
-        dialog.lpstrTitle = L"Choose an app where TEKITO stays off";
+        dialog.lpstrTitle = Text(L"Choose an app where TEKITO stays off", L"TEKITO をオフにするアプリを選ぶ");
         dialog.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_NOCHANGEDIR;
         return GetOpenFileNameW(&dialog) ? std::filesystem::path(buffer)
                                          : std::filesystem::path{};
@@ -1084,6 +1090,13 @@ private:
         return text;
     }
 
+    // Messages shown to the user follow UserSettings::uiLanguage.
+    bool Japanese() const { return tekito::userdata::UseJapaneseUi(settings_.uiLanguage); }
+    const wchar_t* Text(const wchar_t* english, const wchar_t* japanese) const {
+        return Japanese() ? japanese : english;
+    }
+    const wchar_t* WindowTitle() const { return Text(L"TEKITO Settings", L"TEKITO 設定"); }
+
     bool SaveSettings() {
         if (runtime_) settings_.lastInputMode = runtime_->Mode();
         const bool saved = repository_ && repository_->SaveSettings(settings_);
@@ -1099,7 +1112,7 @@ private:
         if (!repository_ || !repository_->SaveSettings(settings_)) {
             settings_ = previousSettings;
             if (runtime_) runtime_->SetMode(previousMode);
-            error = L"The current mode could not be saved.";
+            error = Text(L"The current mode could not be saved.", L"入力モードを保存できませんでした。");
             return false;
         }
         if (runtime_) runtime_->NotifySettingsChanged();

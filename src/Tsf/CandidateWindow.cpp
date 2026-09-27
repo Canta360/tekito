@@ -470,7 +470,7 @@ POINT CandidatePosition(const RECT& caretRect, int width, int height, int caretG
     return {x, y};
 }
 
-std::wstring LabelText(const Candidate& candidate) {
+std::wstring LabelText(const Candidate& candidate, bool japanese) {
     // Deliberately minimal: a label only earns a place here if knowing it
     // changes whether the user would pick this candidate. ORIGINAL says
     // "nothing was changed"; SLANG says "this is an informal substitution,
@@ -479,9 +479,9 @@ std::wstring LabelText(const Candidate& candidate) {
     // phrase, reaction, abbreviation, standard correction, ...) explains
     // *why* the engine generated the candidate, not whether the user should
     // want it, so it stays unlabeled to keep the row scannable.
-    if (candidate.isOriginal) return L"ORIGINAL";
-    if (candidate.label == SemanticLabel::Slang) return L"SLANG";
-    if (candidate.label == SemanticLabel::Emoji) return L"EMOJI";
+    if (candidate.isOriginal) return japanese ? L"そのまま" : L"ORIGINAL";
+    if (candidate.label == SemanticLabel::Slang) return japanese ? L"スラング" : L"SLANG";
+    if (candidate.label == SemanticLabel::Emoji) return japanese ? L"絵文字" : L"EMOJI";
     return {};
 }
 
@@ -2020,7 +2020,7 @@ void CandidateWindow::Show(const RECT& caretRect,
         const auto index = pageStart_ + row;
         const auto& candidate = candidates_[index];
         const auto displayId = candidate.id == 0 ? index + 1 : candidate.id;
-        frame.rows.push_back({std::to_wstring(displayId), candidate.text, LabelText(candidate)});
+        frame.rows.push_back({std::to_wstring(displayId), candidate.text, LabelText(candidate, japanese_)});
     }
     if (selectedIndex_ >= pageStart_ && selectedIndex_ - pageStart_ < visibleCount_) {
         frame.selectedRow = selectedIndex_ - pageStart_;

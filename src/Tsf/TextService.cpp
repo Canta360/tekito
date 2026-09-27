@@ -4,6 +4,7 @@
 #include "Tsf/Diagnostics.h"
 #include "Tsf/Globals.h"
 #include "Tsf/TekitoGuids.h"
+#include "UserData/UiLanguage.h"
 
 #include <inputscope.h>
 #include <algorithm>
@@ -894,7 +895,8 @@ void TextService::RegisterLangBarItem() {
         g_moduleInstance,
         [this]() { return runtimeMode_ ? runtimeMode_->Mode() : state_.Mode(); },
         [this](InputMode mode) { ChangeInputMode(mode); },
-        [this]() { OpenSettings(); });
+        [this]() { OpenSettings(); },
+        [this]() { return userdata::UseJapaneseUi(userSettings_.uiLanguage); });
     if (!item) return;
 
     ComPtr<ModeLangBarItem> ownedItem(item);
@@ -1766,6 +1768,7 @@ void TextService::ShowCandidates(ITfContext* context, TfEditCookie editCookie) {
     const RECT anchor = GetCandidateAnchor(context, editCookie);
     candidateAnchor_ = anchor;
     candidateWindow_.SetStyle(userSettings_.candidateWindowStyle);
+    candidateWindow_.SetJapanese(userdata::UseJapaneseUi(userSettings_.uiLanguage));
     candidateWindow_.Show(anchor, state_.Candidates(), state_.SelectedIndex(),
                           state_.PageStart(), state_.VisibleCount());
     if (userSettings_.socialPersonalization > 0) {

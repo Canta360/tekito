@@ -2,14 +2,15 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { CapitataLogo } from "./CapitataLogo.jsx";
 import { hostRequest, onHostStateChanged } from "./host.js";
+import { messages, resolveLanguage, TextContext, useText } from "./i18n.js";
 import { Backdrop, Button, Dialog, Glass, Icon, Row, Segmented, Tile, Toggle } from "./ui.jsx";
 import "./styles.css";
 
 const pages = [
-  { id: "general", label: "General", icon: "general", description: "Choose how TEKITO handles your typing." },
-  { id: "typing", label: "Typing", icon: "typing", description: "Choose what Auto mode does for you." },
-  { id: "dictionary", label: "Dictionary", icon: "dictionary", description: "Your own words, and what TEKITO learns from your choices." },
-  { id: "about", label: "About", icon: "about", description: "Version, language data and support." },
+  { id: "general", icon: "general" },
+  { id: "typing", icon: "typing" },
+  { id: "dictionary", icon: "dictionary" },
+  { id: "about", icon: "about" },
 ];
 
 // Mirrors the defaults in src/UserData/UserSettings.h; only shown
@@ -28,6 +29,7 @@ const initialSettings = {
   candidateWindowStyle: 0,
   toggleKey: 1,
   periodOnEnter: false,
+  uiLanguage: 0,
   excludedApps: [],
   builtInExcludedApps: [],
 };
@@ -36,39 +38,23 @@ const initialSettings = {
 // misspellings and context ranking stay on (they only make corrections
 // better) and are no longer shown.
 const features = [
-  { key: "correctionEnabled", icon: "spelling", title: "Spelling correction", description: "Fix likely typos when you press Space." },
-  { key: "completionEnabled", icon: "completion", title: "Word completion", description: "Offer the rest of a word early." },
-  { key: "candidateWindowEnabled", icon: "candidates", title: "Candidate list", description: "Show choices while you type." },
-  { key: "japanesePhoneticSuggestionsEnabled", icon: "japanese", title: "Japanese sounds", description: "Suggest English from romaji." },
+  { key: "correctionEnabled", icon: "spelling" },
+  { key: "completionEnabled", icon: "completion" },
+  { key: "candidateWindowEnabled", icon: "candidates" },
+  { key: "japanesePhoneticSuggestionsEnabled", icon: "japanese" },
 ];
-
-const expressionRanges = [[0, "Off"], [1, "Common"], [2, "Familiar"], [3, "Broad"], [4, "Full"]];
-
-// UserSettings::toggleKey.
-const toggleKeys = [[1, "Alt+`"], [2, "Ctrl+Space"], [3, "Ctrl+Shift+Space"], [0, "None"]];
 
 // Candidate list look (UserSettings::candidateWindowStyle).
-const candidateStyles = [
-  { value: 0, id: "glass", title: "Glass list", description: "Frosted glass, with light under your choice." },
-  { value: 1, id: "simple", title: "Simple list", description: "A plain, solid list with a marker." },
-];
+const candidateStyles = [{ value: 0, id: "glass" }, { value: 1, id: "simple" }];
 
 // The six engine policies boil down to three behaviors a person can tell
 // apart: replace on Space, only suggest, or never touch the word.
-const actions = {
-  replace: { label: "Replace", policy: "Correct spelling", help: "Space changes it for you." },
-  suggest: { label: "Suggest", policy: "Suggest alternative", help: "Shown as a choice; never changed on its own." },
-  keep: { label: "Keep as typed", policy: "Protect original", help: "TEKITO never corrects this word." },
-};
+const actionPolicies = { replace: "Correct spelling", suggest: "Suggest alternative", keep: "Protect original" };
 
 function actionOf(policy) {
   if (policy === "Protect original") return "keep";
   if (policy === "Correct spelling" || policy === "Normalize") return "replace";
   return "suggest";
-}
-
-function plural(count, singular, pluralForm = `${singular}s`) {
-  return `${count.toLocaleString("en-US")} ${count === 1 ? singular : pluralForm}`;
 }
 
 function App() {
@@ -81,10 +67,12 @@ function App() {
   const [learning, setLearning] = useState({ enabled: true, count: 0 });
   const [dictionary, setDictionary] = useState([]);
   const [packs, setPacks] = useState([]);
-  const [accent, setAccent] = useState("#0078d4");
+  const [appearance, setAppearance] = useState({ accent: "#0078d4", systemLanguage: navigator.language.startsWith("ja") ? "ja" : "en" });
   const [modal, setModal] = useState(null);
   const [confirm, setConfirm] = useState(null);
   const [notice, setNotice] = useState(null);
+
+  const t = messages[resolveLanguage(settings.uiLanguage, appearance.systemLanguage)];
 
   const applyState = useCallback((state) => {
     if (!state) return;
@@ -94,7 +82,7 @@ function App() {
     setLearning((value) => ({ ...value, ...(state.learning || {}) }));
     setDictionary(state.dictionary || []);
     setPacks(state.packs || []);
-    if (state.appearance?.accent) setAccent(state.appearance.accent);
+    if (state.appearance) setAppearance((value) => ({ ...value, ...state.appearance }));
   }, []);
 
   const reload = useCallback(async () => {
@@ -103,7 +91,7 @@ function App() {
       applyState(response.state);
       setConnection({ status: "ready", error: "" });
     } else {
-      setConnection({ status: "error", error: response.error || "The settings host could not be reached." });
+      setConnection({ status: "error", error: response.error });
     }
   }, [applyState]);
 
@@ -115,8 +103,13 @@ function App() {
   }, [reload, applyState]);
 
   useEffect(() => {
-    document.documentElement.style.setProperty("--accent", accent);
-  }, [accent]);
+    document.documentElement.style.setProperty("--accent", appearance.accent);
+  }, [appearance.accent]);
+
+  useEffect(() => {
+    document.documentElement.lang = t.lang;
+    document.title = `TEKITO ${t.settings}`;
+  }, [t]);
 
   const showNotice = (message, tone = "positive") => setNotice({ message, tone, key: Date.now() });
   useEffect(() => {
@@ -135,7 +128,7 @@ function App() {
     } else {
       setSettings((current) => ({ ...current, [key]: previous }));
       if (key === "learningEnabled") setLearning((current) => ({ ...current, enabled: previous }));
-      showNotice(response.error || "The setting could not be saved.", "negative");
+      showNotice(response.error || t.settingNotSaved, "negative");
     }
     return response.ok;
   };
@@ -149,7 +142,7 @@ function App() {
       applyState(response.state);
     } else {
       setMode(previous);
-      showNotice(response.error || "The input mode could not be saved.", "negative");
+      showNotice(response.error || t.modeNotSaved, "negative");
     }
   };
 
@@ -159,7 +152,7 @@ function App() {
       applyState(response.state);
       if (successMessage) showNotice(successMessage);
     } else {
-      showNotice(response.error || "That did not work.", "negative");
+      showNotice(response.error || t.failed, "negative");
     }
     return response;
   };
@@ -168,7 +161,7 @@ function App() {
     const response = await runAction(update ? "dictionary.update" : "dictionary.create", {
       ...entry,
       ...(update ? { id: modal?.entry?.id } : {}),
-    }, update ? "Word updated" : "Word added");
+    }, update ? t.words.updated : t.words.added);
     if (response.ok) setModal(null);
     return response.ok;
   };
@@ -176,78 +169,87 @@ function App() {
   const current = pages.find((item) => item.id === page) || pages[0];
 
   return (
-    <div className="app">
-      <Backdrop />
-      <Glass as="aside" className="sidebar">
-        <div className="brand">
-          <img src="./assets/tekito.ico" alt="" />
-          <span>
-            <img className="wordmark" src="./assets/tekito-wordmark-dark.svg" alt="TEKITO" />
-            <small>Settings</small>
-          </span>
-        </div>
-        <nav aria-label="Settings">
-          {pages.map((item) => (
-            <button key={item.id} type="button" className={`nav-item ${page === item.id ? "is-current" : ""}`}
-              aria-current={page === item.id ? "page" : undefined} onClick={() => setPage(item.id)}>
-              <Icon name={item.icon} />
-              <span>{item.label}</span>
-            </button>
-          ))}
-        </nav>
-      </Glass>
-
-      <main className="content">
-        <header className="page-header">
-          <h1>{current.label}</h1>
-          <p>{current.description}</p>
-        </header>
-        {connection.status !== "ready" ? (
-          <Glass className="card state-card" role="status">
-            <h2>{connection.status === "loading" ? "Loading settings" : "Settings unavailable"}</h2>
-            <p>{connection.status === "loading" ? "Connecting to TEKITO on this PC." : connection.error}</p>
-            {connection.status === "error" && <Button variant="primary" onClick={reload}>Try again</Button>}
-          </Glass>
-        ) : (
-          <div className="page" key={page}>
-            {page === "general" && <GeneralPage mode={mode} settings={settings} changeMode={changeMode} setSetting={setSetting} runAction={runAction} />}
-            {page === "typing" && <TypingPage settings={settings} setSetting={setSetting} />}
-            {page === "dictionary" && <DictionaryPage learning={learning} settings={settings} setSetting={setSetting} dictionary={dictionary} setModal={setModal} setConfirm={setConfirm} runAction={runAction} />}
-            {page === "about" && <AboutPage runtime={runtime} packs={packs} runAction={runAction} />}
+    <TextContext.Provider value={t}>
+      <div className="app">
+        <Backdrop />
+        <Glass as="aside" className="sidebar">
+          <div className="brand">
+            <img src="./assets/tekito.ico" alt="" />
+            <span>
+              <img className="wordmark" src="./assets/tekito-wordmark-dark.svg" alt="TEKITO" />
+              <small>{t.settings}</small>
+            </span>
           </div>
-        )}
-      </main>
+          <nav aria-label={t.settings}>
+            {pages.map((item) => (
+              <button key={item.id} type="button" className={`nav-item ${page === item.id ? "is-current" : ""}`}
+                aria-current={page === item.id ? "page" : undefined} onClick={() => setPage(item.id)}>
+                <Icon name={item.icon} />
+                <span>{t.pages[item.id].label}</span>
+              </button>
+            ))}
+          </nav>
+        </Glass>
 
-      <Dialog open={Boolean(modal)} title={modal?.mode === "edit" ? "Edit word" : "Add a word"} onClose={() => setModal(null)}>
-        <DictionaryForm entry={modal?.entry || {}} onCancel={() => setModal(null)} onSave={(entry) => saveDictionary(entry, modal?.mode === "edit")} />
-      </Dialog>
-      <Dialog open={Boolean(confirm)} title={confirm?.title} onClose={() => setConfirm(null)}>
-        <p className="dialog-message">{confirm?.message}</p>
-        <div className="dialog-actions">
-          <Button onClick={() => setConfirm(null)}>Cancel</Button>
-          <Button variant="danger-solid" onClick={async () => { const action = confirm.action; setConfirm(null); await action(); }}>{confirm?.confirmLabel}</Button>
-        </div>
-      </Dialog>
-      {notice && <div key={notice.key} className={`toast glass ${notice.tone}`} role="status" aria-live="polite">{notice.tone === "positive" && <span className="dot" />}{notice.message}</div>}
-    </div>
+        <main className="content">
+          <header className="page-header">
+            <h1>{t.pages[current.id].label}</h1>
+            <p>{t.pages[current.id].description}</p>
+          </header>
+          {connection.status !== "ready" ? (
+            <Glass className="card state-card" role="status">
+              <h2>{connection.status === "loading" ? t.loading.title : t.unavailable.title}</h2>
+              <p>{connection.status === "loading" ? t.loading.body : connection.error || t.unavailable.body}</p>
+              {connection.status === "error" && <Button variant="primary" onClick={reload}>{t.tryAgain}</Button>}
+            </Glass>
+          ) : (
+            <div className="page" key={page}>
+              {page === "general" && <GeneralPage mode={mode} settings={settings} changeMode={changeMode} setSetting={setSetting} runAction={runAction} />}
+              {page === "typing" && <TypingPage settings={settings} setSetting={setSetting} />}
+              {page === "dictionary" && <DictionaryPage learning={learning} settings={settings} setSetting={setSetting} dictionary={dictionary} setModal={setModal} setConfirm={setConfirm} runAction={runAction} />}
+              {page === "about" && <AboutPage runtime={runtime} packs={packs} runAction={runAction} />}
+            </div>
+          )}
+        </main>
+
+        <Dialog open={Boolean(modal)} title={modal?.mode === "edit" ? t.words.editTitle : t.words.addTitle} onClose={() => setModal(null)}>
+          <DictionaryForm entry={modal?.entry || {}} onCancel={() => setModal(null)} onSave={(entry) => saveDictionary(entry, modal?.mode === "edit")} />
+        </Dialog>
+        <Dialog open={Boolean(confirm)} title={confirm?.title} onClose={() => setConfirm(null)}>
+          <p className="dialog-message">{confirm?.message}</p>
+          <div className="dialog-actions">
+            <Button onClick={() => setConfirm(null)}>{t.cancel}</Button>
+            <Button variant="danger-solid" onClick={async () => { const action = confirm.action; setConfirm(null); await action(); }}>{confirm?.confirmLabel}</Button>
+          </div>
+        </Dialog>
+        {notice && <div key={notice.key} className={`toast glass ${notice.tone}`} role="status" aria-live="polite">{notice.tone === "positive" && <span className="dot" />}{notice.message}</div>}
+      </div>
+    </TextContext.Provider>
   );
 }
 
 function GeneralPage({ mode, settings, changeMode, setSetting, runAction }) {
+  const t = useText();
+  // UserSettings::toggleKey and UserSettings::uiLanguage.
+  const toggleKeys = [[1, "Alt+`"], [2, "Ctrl+Space"], [3, "Ctrl+Shift+Space"], [0, t.switchKey.none]];
+  const languages = [[0, t.language.system], [1, "English"], [2, "日本語"]];
   return (
     <>
       <div className="tile-grid mode-grid">
-        <Tile on={mode === "auto"} image="./assets/auto.ico" title="Auto" status={mode === "auto" ? "In use" : undefined}
-          description="Corrects spelling and suggests words as you type." onPress={() => changeMode("auto")} />
-        <Tile on={mode === "direct"} image="./assets/direct.ico" title="Direct" status={mode === "direct" ? "In use" : undefined}
-          description="Types exactly the keys you press." onPress={() => changeMode("direct")} />
+        <Tile on={mode === "auto"} image="./assets/auto.ico" title="Auto" status={mode === "auto" ? t.inUse : undefined}
+          description={t.modes.auto} onPress={() => changeMode("auto")} />
+        <Tile on={mode === "direct"} image="./assets/direct.ico" title="Direct" status={mode === "direct" ? t.inUse : undefined}
+          description={t.modes.direct} onPress={() => changeMode("direct")} />
       </div>
       <Glass className="card">
-        <Row title="Start in the last mode used" description="Otherwise TEKITO always starts in Auto.">
-          <Toggle label="Start in the last mode used" checked={settings.restoreLastInputMode} onChange={(value) => setSetting("restoreLastInputMode", value)} />
+        <Row title={t.restoreMode.title} description={t.restoreMode.description}>
+          <Toggle label={t.restoreMode.title} checked={settings.restoreLastInputMode} onChange={(value) => setSetting("restoreLastInputMode", value)} />
         </Row>
-        <Row title="Switch key" description="Toggles Auto and Direct from any app.">
-          <Segmented label="Switch key" value={settings.toggleKey} options={toggleKeys} onChange={(value) => setSetting("toggleKey", value)} />
+        <Row title={t.switchKey.title} description={t.switchKey.description}>
+          <Segmented label={t.switchKey.title} value={settings.toggleKey} options={toggleKeys} onChange={(value) => setSetting("toggleKey", value)} />
+        </Row>
+        <Row title={t.language.title} description={t.language.description}>
+          <Segmented label={t.language.title} value={settings.uiLanguage} options={languages} onChange={(value) => setSetting("uiLanguage", value)} />
         </Row>
       </Glass>
       <ExcludedApps settings={settings} runAction={runAction} />
@@ -256,6 +258,7 @@ function GeneralPage({ mode, settings, changeMode, setSetting, runAction }) {
 }
 
 function ExcludedApps({ settings, runAction }) {
+  const t = useText();
   const [name, setName] = useState("");
   const add = async (event) => {
     event.preventDefault();
@@ -267,16 +270,16 @@ function ExcludedApps({ settings, runAction }) {
     <Glass className="card">
       <div className="card-head">
         <div>
-          <h2 className="card-title">Apps where TEKITO stays off</h2>
-          <p className="muted">Every key goes straight through, as if TEKITO were not installed.</p>
+          <h2 className="card-title">{t.excluded.title}</h2>
+          <p className="muted">{t.excluded.description}</p>
         </div>
-        <Button icon="folder" onClick={() => runAction("excludedApps.browse", {})}>Choose app</Button>
+        <Button icon="folder" onClick={() => runAction("excludedApps.browse", {})}>{t.excluded.choose}</Button>
       </div>
-      <ul className="app-list" aria-label="Apps where TEKITO stays off">
+      <ul className="app-list" aria-label={t.excluded.title}>
         {settings.excludedApps.map((app) => (
           <li key={app} className="word">
             <span className="app-name">{app}</span>
-            <button type="button" className="icon-btn" aria-label={`Turn TEKITO back on in ${app}`}
+            <button type="button" className="icon-btn" aria-label={t.excluded.remove(app)}
               onClick={() => runAction("excludedApps.remove", { name: app })}>
               <Icon name="trash" size={16} />
             </button>
@@ -286,50 +289,52 @@ function ExcludedApps({ settings, runAction }) {
       <form className="app-add" onSubmit={add}>
         <label className="search">
           <Icon name="plus" size={17} />
-          <input aria-label="App name" placeholder="App name, such as code.exe" value={name} onChange={(event) => setName(event.target.value)} />
+          <input aria-label={t.excluded.name} placeholder={t.excluded.placeholder} value={name} onChange={(event) => setName(event.target.value)} />
         </label>
-        <Button type="submit" disabled={!name.trim()}>Add</Button>
+        <Button type="submit" disabled={!name.trim()}>{t.add}</Button>
       </form>
       {settings.builtInExcludedApps.length > 0 && (
-        <p className="fine-print">Also off in terminals: {settings.builtInExcludedApps.join(", ")}.</p>
+        <p className="fine-print">{t.excluded.builtIn(settings.builtInExcludedApps.join(", "))}</p>
       )}
     </Glass>
   );
 }
 
 function TypingPage({ settings, setSetting }) {
+  const t = useText();
+  const expressionRanges = t.casual.ranges.map((label, value) => [value, label]);
   return (
     <>
       <div className="tile-grid feature-grid">
         {features.map((feature) => (
-          <Tile key={feature.key} on={Boolean(settings[feature.key])} icon={feature.icon} title={feature.title}
-            description={feature.description} status={settings[feature.key] ? "On" : "Off"}
+          <Tile key={feature.key} on={Boolean(settings[feature.key])} icon={feature.icon} title={t.features[feature.key].title}
+            description={t.features[feature.key].description} status={settings[feature.key] ? t.on : t.off}
             onPress={() => setSetting(feature.key, !settings[feature.key])} />
         ))}
       </div>
       <div className="tile-grid mode-grid">
         {candidateStyles.map((style) => (
-          <Tile key={style.value} on={settings.candidateWindowStyle === style.value} title={style.title}
-            description={style.description} status={settings.candidateWindowStyle === style.value ? "In use" : undefined}
+          <Tile key={style.value} on={settings.candidateWindowStyle === style.value} title={t.styles[style.id].title}
+            description={t.styles[style.id].description} status={settings.candidateWindowStyle === style.value ? t.inUse : undefined}
             art={<MiniList variant={style.id} />} onPress={() => setSetting("candidateWindowStyle", style.value)} />
         ))}
       </div>
       <Glass className="card">
-        <Row title="Casual expressions" description="How much chat vocabulary, like “gonna” or “lol”, shows up.">
-          <Segmented label="Casual expressions" value={settings.socialExpressionRange} options={expressionRanges} onChange={(value) => setSetting("socialExpressionRange", value)} />
+        <Row title={t.casual.title} description={t.casual.description}>
+          <Segmented label={t.casual.title} value={settings.socialExpressionRange} options={expressionRanges} onChange={(value) => setSetting("socialExpressionRange", value)} />
         </Row>
-        <Row title="Period at the end of a line" description="Enter adds a period when a line ends without punctuation.">
-          <Toggle label="Period at the end of a line" checked={settings.periodOnEnter} onChange={(value) => setSetting("periodOnEnter", value)} />
+        <Row title={t.period.title} description={t.period.description}>
+          <Toggle label={t.period.title} checked={settings.periodOnEnter} onChange={(value) => setSetting("periodOnEnter", value)} />
         </Row>
       </Glass>
       <Glass className="card">
-        <h2 className="card-title">Keys</h2>
+        <h2 className="card-title">{t.keys.title}</h2>
         <div className="keys">
-          <Key label="Correct, then next choice" keys={["Space"]} />
-          <Key label="Previous choice" keys={["Shift", "Space"]} />
-          <Key label="Browse choices" keys={["Tab", "↑", "↓"]} />
-          <Key label="Undo the correction" keys={["Backspace"]} />
-          <Key label="Keep what you typed" keys={["Esc"]} />
+          <Key label={t.keys.next} keys={["Space"]} />
+          <Key label={t.keys.previous} keys={["Shift", "Space"]} />
+          <Key label={t.keys.browse} keys={["Tab", "↑", "↓"]} />
+          <Key label={t.keys.undo} keys={["Backspace"]} />
+          <Key label={t.keys.keep} keys={["Esc"]} />
         </div>
       </Glass>
     </>
@@ -350,6 +355,7 @@ function Key({ label, keys }) {
 }
 
 function DictionaryPage({ learning, settings, setSetting, dictionary, setModal, setConfirm, runAction }) {
+  const t = useText();
   const [query, setQuery] = useState("");
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -364,45 +370,45 @@ function DictionaryPage({ learning, settings, setSetting, dictionary, setModal, 
     }
   };
   const askDelete = (entry) => setConfirm({
-    title: "Remove this word?",
-    message: `“${entry.raw}” will be removed from your dictionary.`,
-    confirmLabel: "Remove",
-    action: () => runAction("dictionary.delete", { id: entry.id }, "Word removed"),
+    title: t.words.removeTitle,
+    message: t.words.removeMessage(entry.raw),
+    confirmLabel: t.words.remove,
+    action: () => runAction("dictionary.delete", { id: entry.id }, t.words.removed),
   });
   const askClear = () => learning.count && setConfirm({
-    title: "Forget what TEKITO learned?",
-    message: "Your choices so far will no longer affect suggestions. This cannot be undone.",
-    confirmLabel: "Forget",
-    action: () => runAction("learning.clear", {}, "Learning data cleared"),
+    title: t.learning.confirmTitle,
+    message: t.learning.confirmMessage,
+    confirmLabel: t.learning.forget,
+    action: () => runAction("learning.clear", {}, t.learning.cleared),
   });
 
   return (
     <>
       <Glass className="card">
-        <Row title="Learn from my choices" description="Words and expressions you pick move up next time.">
-          <Toggle label="Learn from my choices" checked={learning.enabled} onChange={setLearningEnabled} />
+        <Row title={t.learning.title} description={t.learning.description}>
+          <Toggle label={t.learning.title} checked={learning.enabled} onChange={setLearningEnabled} />
         </Row>
         <div className="learning-meta">
-          <span className="muted">{learning.count ? `Learned from ${plural(learning.count, "choice")} so far.` : "Nothing learned yet."}</span>
-          <Button variant="quiet" disabled={!learning.count} onClick={askClear}>Forget</Button>
+          <span className="muted">{learning.count ? t.learning.learned(learning.count) : t.learning.nothing}</span>
+          <Button variant="quiet" disabled={!learning.count} onClick={askClear}>{t.learning.forget}</Button>
         </div>
       </Glass>
 
       <Glass className="card">
         <div className="card-head">
           <div>
-            <h2 className="card-title">Your words</h2>
-            <p className="muted">Names, abbreviations and anything TEKITO should handle your way.</p>
+            <h2 className="card-title">{t.words.title}</h2>
+            <p className="muted">{t.words.description}</p>
           </div>
-          <Button variant="primary" icon="plus" onClick={() => setModal({ mode: "new", entry: {} })}>Add</Button>
+          <Button variant="primary" icon="plus" onClick={() => setModal({ mode: "new", entry: {} })}>{t.add}</Button>
         </div>
         {dictionary.length > 0 && (
           <label className="search">
             <Icon name="search" size={17} />
-            <input aria-label="Search your words" placeholder="Search" value={query} onChange={(event) => setQuery(event.target.value)} />
+            <input aria-label={t.words.searchLabel} placeholder={t.words.search} value={query} onChange={(event) => setQuery(event.target.value)} />
           </label>
         )}
-        <ul className="word-list" aria-label="Your words">
+        <ul className="word-list" aria-label={t.words.title}>
           {filtered.map((entry) => {
             const action = actionOf(entry.policy);
             return (
@@ -410,9 +416,9 @@ function DictionaryPage({ learning, settings, setSetting, dictionary, setModal, 
                 <button type="button" className="word-main" onClick={() => setModal({ mode: "edit", entry })}>
                   <b>{entry.raw}</b>
                   {action !== "keep" && <><Icon name="arrow" size={15} className="word-arrow" /><span>{entry.candidate}</span></>}
-                  <span className={`badge ${action}`}>{actions[action].label}</span>
+                  <span className={`badge ${action}`}>{t.actions[action].label}</span>
                 </button>
-                <button type="button" className="icon-btn" aria-label={`Remove ${entry.raw}`} onClick={() => askDelete(entry)}>
+                <button type="button" className="icon-btn" aria-label={t.words.removeLabel(entry.raw)} onClick={() => askDelete(entry)}>
                   <Icon name="trash" size={16} />
                 </button>
               </li>
@@ -420,11 +426,11 @@ function DictionaryPage({ learning, settings, setSetting, dictionary, setModal, 
           })}
         </ul>
         {filtered.length === 0 && (
-          <div className="empty">{dictionary.length === 0 ? "No words yet. Add a name or abbreviation you use often." : "Nothing matches your search."}</div>
+          <div className="empty">{dictionary.length === 0 ? t.words.empty : t.words.noMatch}</div>
         )}
         <div className="card-foot">
-          <Button variant="quiet" icon="import" onClick={() => runAction("dictionary.import", {}, "Words imported")}>Import</Button>
-          <Button variant="quiet" icon="export" onClick={() => runAction("dictionary.export", {}, "Words exported")}>Export</Button>
+          <Button variant="quiet" icon="import" onClick={() => runAction("dictionary.import", {}, t.words.imported)}>{t.words.import}</Button>
+          <Button variant="quiet" icon="export" onClick={() => runAction("dictionary.export", {}, t.words.exported)}>{t.words.export}</Button>
         </div>
       </Glass>
     </>
@@ -432,10 +438,11 @@ function DictionaryPage({ learning, settings, setSetting, dictionary, setModal, 
 }
 
 function AboutPage({ runtime, packs, runAction }) {
+  const t = useText();
   const [license, setLicense] = useState(null);
   const openLicense = async () => {
     const response = await hostRequest("license.get");
-    setLicense(response.ok ? response.text : "The license text could not be loaded.");
+    setLicense(response.ok ? response.text : t.about.licenseMissing);
   };
   const problems = packs.filter((pack) => !pack.valid);
   const installed = runtime.tsf === "Loaded";
@@ -445,41 +452,42 @@ function AboutPage({ runtime, packs, runAction }) {
         <img className="about-icon" src="./assets/tekito.ico" alt="" />
         <div>
           <img className="wordmark large" src="./assets/tekito-wordmark-dark.svg" alt="TEKITO" />
-          <p>English typing help for Windows keyboards.</p>
+          <p>{t.about.tagline}</p>
         </div>
-        <span className="version"><small>Version</small><b>0.1.0</b></span>
+        <span className="version"><small>{t.about.version}</small><b>0.1.0</b></span>
       </Glass>
 
       <Glass className="card">
         <div className="status-line">
-          <span><b>Input method</b><small>{installed ? "Installed and registered with Windows." : "Not registered with Windows. Reinstall TEKITO."}</small></span>
-          <span className={`state ${installed ? "" : "problem"}`}><span className="dot" />{installed ? "Ready" : "Problem"}</span>
+          <span><b>{t.about.inputMethod}</b><small>{installed ? t.about.installed : t.about.notInstalled}</small></span>
+          <span className={`state ${installed ? "" : "problem"}`}><span className="dot" />{installed ? t.about.ready : t.about.problem}</span>
         </div>
         <div className="status-line">
-          <span><b>Language data</b><small>{problems.length === 0 ? `All ${packs.length} packs are installed and verified.` : `${runtime.dataPacks} ready. Some suggestions may be missing.`}</small></span>
-          <span className={`state ${problems.length ? "problem" : ""}`}><span className="dot" />{problems.length ? "Problem" : "Ready"}</span>
+          <span><b>{t.about.languageData}</b><small>{problems.length === 0 ? t.about.allPacks(packs.length) : t.about.somePacks(runtime.dataPacks)}</small></span>
+          <span className={`state ${problems.length ? "problem" : ""}`}><span className="dot" />{problems.length ? t.about.problem : t.about.ready}</span>
         </div>
         {problems.map((pack) => (
-          <div className="pack-problem" key={pack.packPath}><b>{pack.displayName}</b><span>{pack.reason || "Unavailable"}</span></div>
+          <div className="pack-problem" key={pack.packPath}><b>{pack.displayName}</b><span>{pack.reason || t.about.unavailable}</span></div>
         ))}
         <div className="card-foot">
-          <Button variant="quiet" icon="copy" onClick={() => runAction("diagnostics.copy", {}, "Diagnostics copied")}>Copy diagnostics</Button>
-          <Button variant="quiet" icon="folder" onClick={() => runAction("logs.open", {})}>Log folder</Button>
-          <Button variant="quiet" icon="license" onClick={openLicense}>License</Button>
-          <Button variant="quiet" icon="folder" onClick={() => runAction("notices.open", {})}>Third-party notices</Button>
+          <Button variant="quiet" icon="copy" onClick={() => runAction("diagnostics.copy", {}, t.about.diagnosticsCopied)}>{t.about.copyDiagnostics}</Button>
+          <Button variant="quiet" icon="folder" onClick={() => runAction("logs.open", {})}>{t.about.logFolder}</Button>
+          <Button variant="quiet" icon="license" onClick={openLicense}>{t.about.license}</Button>
+          <Button variant="quiet" icon="folder" onClick={() => runAction("notices.open", {})}>{t.about.notices}</Button>
         </div>
-        <p className="fine-print">TEKITO works entirely on this PC. What you type is never sent anywhere, and diagnostics never include it.</p>
+        <p className="fine-print">{t.about.privacy}</p>
       </Glass>
 
       <Glass className="card publisher">
-        <span className="publisher-label">Distributed by</span>
+        <span className="publisher-label">{t.about.distributedBy}</span>
         <CapitataLogo className="capitata" />
         <Button variant="quiet" icon="globe" onClick={() => runAction("website.open", {})}>capitata.dev</Button>
       </Glass>
 
-      <Dialog open={license !== null} title="TEKITO License Agreement" wide onClose={() => setLicense(null)}>
+      <Dialog open={license !== null} title={t.about.licenseTitle} wide onClose={() => setLicense(null)}>
+        {t.about.licenseNote && <p className="muted">{t.about.licenseNote}</p>}
         <LicenseText text={license || ""} />
-        <div className="dialog-actions"><Button variant="primary" onClick={() => setLicense(null)}>Close</Button></div>
+        <div className="dialog-actions"><Button variant="primary" onClick={() => setLicense(null)}>{t.close}</Button></div>
       </Dialog>
     </>
   );
@@ -501,7 +509,7 @@ function LicenseText({ text }) {
     }
   });
   return (
-    <div className="license-text" tabIndex={0}>
+    <div className="license-text" tabIndex={0} lang="en">
       {blocks.map((block, index) => block.kind === "list"
         ? <ul key={index}>{block.items.map((item) => <li key={item}>{item}</li>)}</ul>
         : block.kind === "heading" ? <h3 key={index}>{block.text}</h3> : <p key={index}>{block.text}</p>)}
@@ -510,6 +518,7 @@ function LicenseText({ text }) {
 }
 
 function DictionaryForm({ entry, onSave, onCancel }) {
+  const t = useText();
   const [value, setValue] = useState({ raw: entry.raw || "", candidate: entry.candidate || "", action: entry.policy ? actionOf(entry.policy) : "replace" });
   const keep = value.action === "keep";
   const valid = value.raw.trim() && (keep || value.candidate.trim());
@@ -517,21 +526,21 @@ function DictionaryForm({ entry, onSave, onCancel }) {
     event.preventDefault();
     if (!valid) return;
     const raw = value.raw.trim();
-    onSave({ raw, candidate: keep ? raw : value.candidate.trim(), policy: actions[value.action].policy });
+    onSave({ raw, candidate: keep ? raw : value.candidate.trim(), policy: actionPolicies[value.action] });
   };
   return (
     <form className="form" onSubmit={submit}>
-      <label className="field"><span>When I type</span><input autoFocus value={value.raw} placeholder="e.g. omw" onChange={(event) => setValue({ ...value, raw: event.target.value })} /></label>
+      <label className="field"><span>{t.words.whenITypeLabel}</span><input autoFocus value={value.raw} placeholder={t.words.whenITypePlaceholder} onChange={(event) => setValue({ ...value, raw: event.target.value })} /></label>
       <div className="field">
-        <span>TEKITO should</span>
-        <Segmented label="What TEKITO should do" value={value.action} options={Object.entries(actions).map(([key, item]) => [key, item.label])}
+        <span>{t.words.actionLabel}</span>
+        <Segmented label={t.words.actionLabel} value={value.action} options={Object.keys(actionPolicies).map((key) => [key, t.actions[key].label])}
           onChange={(action) => setValue({ ...value, action })} />
-        <small className="field-help">{actions[value.action].help}</small>
+        <small className="field-help">{t.actions[value.action].help}</small>
       </div>
-      {!keep && <label className="field"><span>Change it to</span><input value={value.candidate} placeholder="e.g. on my way" onChange={(event) => setValue({ ...value, candidate: event.target.value })} /></label>}
+      {!keep && <label className="field"><span>{t.words.changeToLabel}</span><input value={value.candidate} placeholder={t.words.changeToPlaceholder} onChange={(event) => setValue({ ...value, candidate: event.target.value })} /></label>}
       <div className="dialog-actions">
-        <Button onClick={onCancel}>Cancel</Button>
-        <Button type="submit" variant="primary" disabled={!valid}>Save</Button>
+        <Button onClick={onCancel}>{t.cancel}</Button>
+        <Button type="submit" variant="primary" disabled={!valid}>{t.save}</Button>
       </div>
     </form>
   );

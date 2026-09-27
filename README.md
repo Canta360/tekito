@@ -76,6 +76,10 @@ apps you list in Settings.
 
 ![TEKITO Settings](docs/images/settings.png)
 
+Settings, the setup program and TEKITO's own messages are available in
+English and Japanese; they follow the Windows display language unless you
+pick one under **Settings → General → Language**.
+
 ## Privacy
 
 Everything TEKITO does happens on your computer. It does not send your
