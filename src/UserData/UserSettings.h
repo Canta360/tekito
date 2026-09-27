@@ -33,6 +33,10 @@ struct UserSettings {
     // Rows in the candidate list: 0 = automatic (English shows 5, then 10
     // once paged; Japanese 9), or a fixed 5, 7 or 9.
     int candidateRows{0};
+    // The candidate list shows what the highlighted word means, in a pane
+    // beside it (the japanese-wiktionary, japanese-wordnet and
+    // dictionary-display packs).
+    bool meaningsEnabled{true};
     // Key that switches between Convert and Direct: 0 = none, 1 = Alt+`,
     // 2 = Ctrl+Space, 3 = Ctrl+Shift+Space.
     int toggleKey{1};

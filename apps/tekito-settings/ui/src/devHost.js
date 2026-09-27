@@ -23,6 +23,7 @@ function initialState() {
       socialPersonalization: 1,
       candidateWindowStyle: 0,
       candidateRows: 0,
+      meaningsEnabled: true,
       toggleKey: 1,
       keyboardType: 0,
       periodOnEnter: false,

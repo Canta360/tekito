@@ -646,6 +646,13 @@ std::size_t JapaneseComposer::FocusedSelection() const noexcept {
     return IsConverted() ? phrases_[focus_].selected : 0;
 }
 
+std::wstring JapaneseComposer::FocusedReading() const {
+    if (!IsConverted()) return {};
+    const auto& phrase = phrases_[focus_];
+    if (phrase.begin >= conversionReading_.size()) return {};
+    return conversionReading_.substr(phrase.begin, phrase.length);
+}
+
 std::wstring JapaneseComposer::Commit() {
     FlushAll();
     if (chosenPrediction_ && *chosenPrediction_ < predictions_.size() && !IsConverted()) {

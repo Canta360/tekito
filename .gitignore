@@ -27,3 +27,6 @@ third_party/webview2/build/
 data/phrase/
 # Built by scripts/build-japanese-packs.py from the Mozc dictionary
 data/japanese-core/
+# Built by scripts/build-japanese-meaning-packs.py from Wiktionary and WordNet
+data/japanese-wiktionary/
+data/japanese-wordnet/

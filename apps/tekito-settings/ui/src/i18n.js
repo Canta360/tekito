@@ -83,6 +83,10 @@ const en = {
     description: "How many choices the list shows at a time. Automatic shows 5 in English (10 once you page) and 9 in Japanese.",
     automatic: "Automatic",
   },
+  meanings: {
+    title: "Word meanings",
+    description: "Show what the highlighted choice means beside the list, for English and Japanese words.",
+  },
   japanese: {
     space: {
       title: "Space",
@@ -258,6 +262,10 @@ const ja = {
     title: "候補の行数",
     description: "一覧に一度に出す候補の数です。自動では、英語は 5 件（ページを送ると 10 件）、日本語は 9 件です。",
     automatic: "自動",
+  },
+  meanings: {
+    title: "語の意味",
+    description: "選んでいる候補の意味を一覧の横に出します。英語と日本語の語に対応します。",
   },
   japanese: {
     space: {

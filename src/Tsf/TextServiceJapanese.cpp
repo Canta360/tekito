@@ -6,6 +6,7 @@
 #include "Core/ExternalLexiconProvider.h"
 #include "Core/Japanese/JapaneseConverter.h"
 #include "Core/Japanese/JapaneseDictionary.h"
+#include "Core/Japanese/Meanings.h"
 #include "Core/Japanese/MixedConverter.h"
 #include "Core/Japanese/RomajiTable.h"
 #include "Tsf/Compartments.h"
@@ -95,6 +96,16 @@ const JapaneseData* ProcessJapaneseData() {
         return loaded;
     }();
     return data.get();
+}
+
+// The meaning packs, mapped on first use; lookups read them in place.
+const japanese::MeaningDictionary& ProcessMeanings() {
+    static const std::unique_ptr<japanese::MeaningDictionary> meanings = [] {
+        auto opened = std::make_unique<japanese::MeaningDictionary>();
+        if (!opened->Open(ExternalLexiconProvider::DataPackRoot())) Trace(L"Meaning packs unavailable");
+        return opened;
+    }();
+    return *meanings;
 }
 
 void AttachJapaneseData(japanese::JapaneseComposer& composer) {
@@ -733,6 +744,19 @@ RECT TextService::JapaneseCandidateAnchor(ITfContext* context, TfEditCookie edit
     return GetCandidateAnchor(context, editCookie);
 }
 
+CandidateDetail TextService::MeaningFor(std::wstring_view text, std::wstring_view reading) const {
+    if (!userSettings_.meaningsEnabled || text.empty()) return {};
+    const auto meaning = ProcessMeanings().Lookup(text, reading);
+    if (!meaning) return {};
+    return {meaning->headword, meaning->senses};
+}
+
+CandidateDetail TextService::SelectedEnglishMeaning() const {
+    const auto& candidates = state_.Candidates();
+    const std::size_t selected = state_.SelectedIndex();
+    return selected < candidates.size() ? MeaningFor(candidates[selected].text) : CandidateDetail{};
+}
+
 void TextService::ShowJapaneseCandidates(ITfContext* context, TfEditCookie editCookie) {
     const auto& predictions = japanese_.Predictions();
     if (TraceEnabled()) {
@@ -754,7 +778,12 @@ void TextService::ShowJapaneseCandidates(ITfContext* context, TfEditCookie editC
         candidateAnchor_ = anchor;
         candidateWindow_.SetStyle(userSettings_.candidateWindowStyle);
         candidateWindow_.SetJapanese(userdata::UseJapaneseUi(userSettings_.uiLanguage));
-        candidateWindow_.Show(anchor, rows, chosen ? *chosen : CandidateWindow::kNoSelection, 0, rows.size());
+        const CandidateDetail detail =
+            chosen && *chosen < predictions.size()
+                ? MeaningFor(predictions[*chosen].text, predictions[*chosen].reading)
+                : CandidateDetail{};
+        candidateWindow_.Show(anchor, rows, chosen ? *chosen : CandidateWindow::kNoSelection, 0, rows.size(),
+                              detail);
         return;
     }
     const auto* candidates = japanese_.FocusedCandidates();
@@ -777,7 +806,8 @@ void TextService::ShowJapaneseCandidates(ITfContext* context, TfEditCookie editC
     candidateAnchor_ = anchor;
     candidateWindow_.SetStyle(userSettings_.candidateWindowStyle);
     candidateWindow_.SetJapanese(userdata::UseJapaneseUi(userSettings_.uiLanguage));
-    candidateWindow_.Show(anchor, rows, selected, page, std::min(japanesePage_, rows.size() - page));
+    candidateWindow_.Show(anchor, rows, selected, page, std::min(japanesePage_, rows.size() - page),
+                          MeaningFor((*candidates)[selected].text, japanese_.FocusedReading()));
 }
 
 HRESULT TextService::CommitJapanese(ITfContext* context, TfEditCookie editCookie) {

@@ -228,6 +228,31 @@ std::vector<tekito::Candidate> SampleCandidates(bool longList) {
     return candidates;
 }
 
+std::vector<tekito::Candidate> SampleKanjiCandidates() {
+    using tekito::SemanticLabel;
+    return {
+        MakeCandidate(L"\u6a5f\u68b0", SemanticLabel::None, 1),       // kikai: machine
+        MakeCandidate(L"\u6a5f\u4f1a", SemanticLabel::None, 2),       // opportunity
+        MakeCandidate(L"\u5668\u68b0", SemanticLabel::None, 3),       // instrument
+        MakeCandidate(L"\u304d\u304b\u3044", SemanticLabel::None, 4),  // hiragana
+        MakeCandidate(L"\u30ad\u30ab\u30a4", SemanticLabel::None, 5),  // katakana
+    };
+}
+
+// The meaning pane, as the TSF fills it from the meaning packs.
+tekito::tsf::CandidateDetail SampleDetail(bool kanji) {
+    if (kanji) {
+        return {L"\u6a5f\u4f1a",
+                {L"\u7269\u4e8b\u3092\u884c\u3046\u306e\u306b\u3001\u6700\u3082\u9069\u3057\u305f"
+                 L"\u6642\u671f\u3002\u3061\u3087\u3046\u3069\u3088\u3044\u6642\u3002\u304a\u308a\u3002",
+                 L"\u3061\u3087\u3046\u3069\u3088\u3044\u30c1\u30e3\u30f3\u30b9\u3002"}};
+    }
+    return {L"world",
+            {L"everything that exists anywhere",
+             L"people in general; especially a distinctive group of people with some shared interest",
+             L"all of your experiences that determine how things appear to you"}};
+}
+
 }  // namespace
 
 int wmain(int argc, wchar_t** argv) {
@@ -235,7 +260,11 @@ int wmain(int argc, wchar_t** argv) {
     bool longList = false;
     bool glide = false;
     bool click = false;
+    bool meaning = false;
+    bool kanji = false;
     for (int i = 2; i < argc; ++i) {
+        if (wcscmp(argv[i], L"meaning") == 0) meaning = true;
+        if (wcscmp(argv[i], L"kanji") == 0) kanji = meaning = true;
         if (wcscmp(argv[i], L"doc") == 0) g_documentBackdrop = true;
         if (wcscmp(argv[i], L"dusk") == 0) g_duskBackdrop = true;
         if (wcscmp(argv[i], L"paper") == 0) g_paperBackdrop = true;
@@ -266,14 +295,15 @@ int wmain(int argc, wchar_t** argv) {
     if (GetEnvironmentVariableW(L"TEKITO_PREVIEW_LANGUAGE", language, 8) > 0 && wcscmp(language, L"ja") == 0) {
         window.SetJapanese(true);
     }
-    const auto candidates = SampleCandidates(longList);
+    const auto candidates = kanji ? SampleKanjiCandidates() : SampleCandidates(longList);
+    const auto detail = meaning ? SampleDetail(kanji) : tekito::tsf::CandidateDetail{};
     // Caret under "wrold" on the document's third line.
     RECT caret{232, 280, 234, 302};
     LARGE_INTEGER frequency{};
     LARGE_INTEGER shown{};
     QueryPerformanceFrequency(&frequency);
     QueryPerformanceCounter(&shown);
-    window.Show(caret, candidates, 1, 0, 5);
+    window.Show(caret, candidates, 1, 0, 5, detail);
     // Time until the UI thread has built its windows and presented the first
     // frame (composition init, device creation and effect compilation).
     for (int spin = 0; spin < 5000; ++spin) {

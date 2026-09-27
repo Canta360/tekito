@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <string>
 #include <vector>
 
 namespace tekito::tsf {
@@ -21,6 +22,12 @@ namespace tekito::tsf {
 // threads the host application owns. Click selections come back to the host
 // thread through a message-only window, so onSelection always runs on the
 // thread that called Initialize.
+// What the highlighted candidate means, shown in a pane beside the list.
+struct CandidateDetail {
+    std::wstring headword;
+    std::vector<std::wstring> senses;
+};
+
 class CandidateWindow final {
 public:
     CandidateWindow();
@@ -36,7 +43,8 @@ public:
               const std::vector<Candidate>& candidates,
               std::size_t selectedIndex,
               std::size_t pageStart,
-              std::size_t visibleCount);
+              std::size_t visibleCount,
+              const CandidateDetail& detail = {});
     void Hide() noexcept;
     bool IsShown() const noexcept { return shown_; }
     // 0 = glass, 1 = simple (see UserSettings::candidateWindowStyle). Takes

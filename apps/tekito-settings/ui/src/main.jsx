@@ -29,6 +29,7 @@ const initialSettings = {
   socialPersonalization: 1,
   candidateWindowStyle: 0,
   candidateRows: 0,
+  meaningsEnabled: true,
   toggleKey: 1,
   keyboardType: 0,
   periodOnEnter: false,
@@ -387,6 +388,9 @@ function TypingPage({ settings, setSetting }) {
       <Glass className="card">
         <Row title={t.rows.title} description={t.rows.description}>
           <Segmented label={t.rows.title} value={settings.candidateRows} options={rowCounts} onChange={(value) => setSetting("candidateRows", value)} />
+        </Row>
+        <Row title={t.meanings.title} description={t.meanings.description}>
+          <Toggle label={t.meanings.title} checked={settings.meaningsEnabled} onChange={(value) => setSetting("meaningsEnabled", value)} />
         </Row>
         <Row title={t.casual.title} description={t.casual.description}>
           <Segmented label={t.casual.title} value={settings.socialExpressionRange} options={expressionRanges} onChange={(value) => setSetting("socialExpressionRange", value)} />
