@@ -154,7 +154,16 @@ private:
     [[nodiscard]] std::vector<PhraseCandidate> KanaCandidates(std::wstring_view reading) const;
     void AddPhrases(std::vector<Phrase> phrases, const std::wstring& reading);
     // English candidates for the whole text, when the keys look like a word.
-    void AddEnglish(const std::wstring& reading);
+    void AddEnglish(const std::wstring& reading, bool romajiCorrected);
+    // The kana `keys` make, and whether every key became kana.
+    [[nodiscard]] std::wstring ReadingOf(std::wstring_view keys, bool& complete) const;
+    // A mistyped key that left letters the table cannot read ("arigatpu"):
+    // the one-edit spelling nearby that reads as the most likely Japanese.
+    struct RomajiCorrection {
+        std::wstring reading;
+        std::vector<Phrase> phrases;
+    };
+    [[nodiscard]] std::optional<RomajiCorrection> CorrectRomaji() const;
 
     const RomajiTable* table_{nullptr};
     const JapaneseConverter* converter_{nullptr};
@@ -167,6 +176,10 @@ private:
     KanaForm inputForm_{KanaForm::Hiragana};
     PunctuationStyle punctuation_{PunctuationStyle::ToutenKuten};
     std::vector<PhraseState> phrases_;
+    // The reading the phrases were converted from: the typed one, or the
+    // corrected one after a romaji correction (Esc still goes back to what
+    // was typed).
+    std::wstring conversionReading_;
     std::size_t focus_{0};
     bool listOpen_{false};
 };
