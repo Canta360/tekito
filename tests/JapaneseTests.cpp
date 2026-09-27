@@ -1,9 +1,13 @@
 #include "Core/ExternalLexiconProvider.h"
 #include "Core/Japanese/JapaneseComposer.h"
+#include "Core/Japanese/JapaneseConverter.h"
+#include "Core/Japanese/JapaneseDictionary.h"
 #include "Core/Japanese/KanaText.h"
 #include "Core/Japanese/RomajiTable.h"
 
 #include <cstdlib>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <memory>
 #include <string>
@@ -188,9 +192,138 @@ void TestInputFormAndPunctuation(const RomajiTable& table) {
     RequireText(composer.Commit(), L"あ，い。", "comma and kuten");
 }
 
+struct MiniPack {
+    tekito::japanese::JapaneseDictionary dictionary;
+    tekito::japanese::ConnectionMatrix matrix;
+};
+
+std::unique_ptr<MiniPack> LoadMiniPack() {
+    auto pack = std::make_unique<MiniPack>();
+    const std::filesystem::path root = std::filesystem::path(TEKITO_TEST_DATA_DIR) / L"japanese-mini";
+    Require(pack->dictionary.Open(root / L"dictionary.bin"), "the test dictionary opens");
+    Require(pack->matrix.Open(root / L"connection.bin"), "the test connection matrix opens");
+    return pack;
+}
+
+std::wstring Joined(const std::vector<tekito::japanese::Phrase>& phrases, bool markPhrases) {
+    std::wstring out;
+    for (const auto& phrase : phrases) {
+        if (markPhrases && !out.empty()) out += L'|';
+        if (!phrase.candidates.empty()) out += phrase.candidates.front().text;
+    }
+    return out;
+}
+
+void DumpConversions(const MiniPack& pack) {
+    const tekito::japanese::JapaneseConverter converter(pack.dictionary, pack.matrix);
+    for (const wchar_t* reading : {L"わたしのなまえはなかのです", L"きょうはいいてんきですね",
+                                   L"にほんごをにゅうりょくする", L"かんじにへんかんします",
+                                   L"あしたはあめがふるでしょう", L"とうきょうにすんでいます",
+                                   L"ここではきものをぬぐ", L"きかいがとまる"}) {
+        const auto phrases = converter.Convert(reading);
+        std::cout << Utf8(reading) << " -> " << Utf8(Joined(phrases, true)) << '\n';
+        for (const auto& phrase : phrases) {
+            std::cout << "   ";
+            for (std::size_t i = 0; i < phrase.candidates.size() && i < 8; ++i) {
+                std::cout << ' ' << Utf8(phrase.candidates[i].text);
+            }
+            std::cout << '\n';
+        }
+    }
+}
+
+bool HasCandidate(const tekito::japanese::Phrase& phrase, std::wstring_view text, std::size_t within) {
+    for (std::size_t i = 0; i < phrase.candidates.size() && i < within; ++i) {
+        if (phrase.candidates[i].text == text) return true;
+    }
+    return false;
+}
+
+void TestDictionary(const MiniPack& pack) {
+    const auto& dictionary = pack.dictionary;
+    const auto record = dictionary.Find(dictionary.Encode(L"きかい"));
+    Require(record.has_value(), "the dictionary has きかい");
+    bool machine = false, chance = false;
+    int previousCost = -1;
+    bool sorted = true;
+    dictionary.ForEachWord(*record, [&](const tekito::japanese::DictionaryWord& word) {
+        const auto text = dictionary.Surface(word, L"きかい");
+        machine = machine || text == L"機械";
+        chance = chance || text == L"機会";
+        sorted = sorted && static_cast<int>(word.cost) >= previousCost;
+        previousCost = word.cost;
+    });
+    Require(machine && chance, "きかい has both 機械 and 機会");
+    Require(sorted, "words come cheapest first");
+    Require(!dictionary.Find(dictionary.Encode(L"きかいがとまるよ")), "an unknown reading is not found");
+
+    std::size_t prefixes = 0;
+    dictionary.CommonPrefixSearch(dictionary.Encode(L"きかいが"), [&](std::size_t length, std::uint32_t) {
+        Require(length >= 1 && length <= 4, "prefix lengths stay within the reading");
+        ++prefixes;
+    });
+    Require(prefixes >= 2, "き and きかい are prefixes of きかいが");
+
+    Require(pack.matrix.IsBoundary(0, 1) && pack.matrix.Cost(0, 0) >= 0,
+            "the start of the text is a phrase boundary");
+}
+
+void TestDamagedPacks() {
+    const auto source = std::filesystem::path(TEKITO_TEST_DATA_DIR) / L"japanese-mini" / L"dictionary.bin";
+    const auto damaged = std::filesystem::temp_directory_path() / L"tekito-damaged-dictionary.bin";
+    std::error_code error;
+    std::filesystem::copy_file(source, damaged, std::filesystem::copy_options::overwrite_existing, error);
+    Require(!error, "the test dictionary copies");
+    std::filesystem::resize_file(damaged, std::filesystem::file_size(damaged) / 2, error);
+    tekito::japanese::JapaneseDictionary dictionary;
+    Require(!dictionary.Open(damaged), "a truncated dictionary does not open");
+    {
+        std::ofstream garbage(damaged, std::ios::binary | std::ios::trunc);
+        garbage << std::string(4096, 'x');
+    }
+    Require(!dictionary.Open(damaged), "a file that is not a dictionary does not open");
+    tekito::japanese::ConnectionMatrix matrix;
+    Require(!matrix.Open(damaged), "a file that is not a matrix does not open");
+    Require(!dictionary.Open(std::filesystem::temp_directory_path() / L"tekito-missing.bin"),
+            "a missing dictionary does not open");
+    std::filesystem::remove(damaged, error);
+}
+
+void TestConversion(const MiniPack& pack) {
+    const tekito::japanese::JapaneseConverter converter(pack.dictionary, pack.matrix);
+    RequireText(Joined(converter.Convert(L"わたしのなまえはなかのです"), true), L"私の|名前は|中野です",
+                "a sentence splits into phrases and converts");
+    RequireText(Joined(converter.Convert(L"ここではきものをぬぐ"), true), L"ここでは|着物を|脱ぐ",
+                "the likelier split wins");
+
+    const auto kanji = converter.Convert(L"かんじにへんかんします");
+    Require(kanji.size() == 2 && HasCandidate(kanji[0], L"漢字に", 3),
+            "漢字に is among the first candidates of かんじに");
+    const auto machine = converter.Convert(L"きかいがとまる");
+    Require(HasCandidate(machine[0], L"機械が", 3) && HasCandidate(machine[0], L"機会が", 3),
+            "homophones are offered for the phrase");
+    for (const auto& phrase : machine) {
+        const auto reading = std::wstring_view(L"きかいがとまる").substr(phrase.begin, phrase.length);
+        Require(HasCandidate(phrase, reading, 100) &&
+                    HasCandidate(phrase, tekito::japanese::ToKatakana(reading), 100),
+                "every phrase can stay in hiragana or katakana");
+    }
+
+    const std::size_t fixed[] = {5};
+    const auto resized = converter.Convert(L"きかいがとまる", fixed);
+    Require(!resized.empty() && resized[0].begin == 0 && resized[0].length == 5,
+            "a fixed phrase length is kept");
+    Require(resized.size() == 2 && resized[1].begin == 5 && resized[1].length == 2,
+            "the rest is converted after the fixed phrase");
+
+    RequireText(Joined(converter.Convert(L"ＴＥＫＩＴＯです"), false).substr(0, 6), L"ＴＥＫＩＴＯ",
+                "letters the dictionary does not know stay as typed");
+    Require(converter.Convert(L"").empty(), "nothing to convert gives no phrases");
+}
+
 }  // namespace
 
-int main() {
+int main(int argc, char** argv) {
     const auto table = LoadTable();
     TestKanaText();
     TestRomajiTable(*table);
@@ -198,6 +331,11 @@ int main() {
     TestEditing(*table);
     TestConversionForms(*table);
     TestInputFormAndPunctuation(*table);
+    const auto pack = LoadMiniPack();
+    TestDictionary(*pack);
+    TestDamagedPacks();
+    TestConversion(*pack);
+    if (argc > 1 && std::string_view(argv[1]) == "--dump") DumpConversions(*pack);
     std::cout << "All TEKITO Japanese tests passed.\n";
     return 0;
 }
