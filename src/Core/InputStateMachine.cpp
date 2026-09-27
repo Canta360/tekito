@@ -23,7 +23,7 @@ void InputStateMachine::BeginOrUpdate(std::wstring rawText, std::vector<Candidat
     state_ = CompositionState::Composing;
     selectedIndex_ = 0;
     pageStart_ = 0;
-    visibleCount_ = std::min<std::size_t>(5, candidates_.size());
+    visibleCount_ = std::min<std::size_t>(firstPage_, candidates_.size());
     candidateNavigationActive_ = false;
     boundarySpaceActive_ = false;
 }
@@ -167,7 +167,7 @@ InputAction InputStateMachine::OnBackspace() {
         state_ = CompositionState::Composing;
         selectedIndex_ = 0;
         pageStart_ = 0;
-        visibleCount_ = std::min<std::size_t>(5, candidates_.size());
+        visibleCount_ = std::min<std::size_t>(firstPage_, candidates_.size());
         candidateNavigationActive_ = false;
         boundarySpaceActive_ = false;
         return {ActionKind::RestoreOriginal, rawText_, true};
@@ -213,7 +213,7 @@ InputAction InputStateMachine::OnCancel() {
         state_ = CompositionState::Composing;
         selectedIndex_ = 0;
         pageStart_ = 0;
-        visibleCount_ = std::min<std::size_t>(5, candidates_.size());
+        visibleCount_ = std::min<std::size_t>(firstPage_, candidates_.size());
         candidateNavigationActive_ = false;
         boundarySpaceActive_ = false;
         return {ActionKind::RestoreOriginal, rawText_, true};
@@ -316,20 +316,25 @@ void InputStateMachine::UpdatePageForSelection(bool resetOnLoop) noexcept {
         return;
     }
 
-    if (resetOnLoop || selectedIndex_ < 5) {
+    if (resetOnLoop || selectedIndex_ < firstPage_) {
         pageStart_ = 0;
-        visibleCount_ = std::min<std::size_t>(5, count);
+        visibleCount_ = std::min<std::size_t>(firstPage_, count);
         return;
     }
 
-    if (selectedIndex_ < 10) {
+    if (selectedIndex_ < page_) {
         pageStart_ = 0;
-        visibleCount_ = std::min<std::size_t>(10, count);
+        visibleCount_ = std::min<std::size_t>(page_, count);
         return;
     }
 
-    pageStart_ = (selectedIndex_ / 10) * 10;
-    visibleCount_ = std::min<std::size_t>(10, count - pageStart_);
+    pageStart_ = (selectedIndex_ / page_) * page_;
+    visibleCount_ = std::min<std::size_t>(page_, count - pageStart_);
+}
+
+void InputStateMachine::SetPageSizes(std::size_t first, std::size_t paged) noexcept {
+    firstPage_ = std::max<std::size_t>(1, first);
+    page_ = std::max(firstPage_, paged);
 }
 
 }  // namespace tekito

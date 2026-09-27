@@ -222,6 +222,8 @@ private:
     bool englishSegment_{false};
     japanese::JapaneseComposer japanese_;
     japanese::JapaneseLearningStore japaneseLearning_;
+    // Candidates per page of the Japanese list (UserSettings::candidateRows).
+    std::size_t japanesePage_{9};
     RECT candidateAnchor_{};
     CandidateWindow candidateWindow_;
     ComPtr<ITfLangBarItemMgr> langBarItemMgr_;

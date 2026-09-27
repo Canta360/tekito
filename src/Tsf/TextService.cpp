@@ -755,6 +755,9 @@ void TextService::ApplySettings() {
         static_cast<japanese::PunctuationStyle>(std::clamp(userSettings_.japanesePunctuation, 0, 3)));
     japanese_.SetLearning(userSettings_.learningEnabled ? &japaneseLearning_ : nullptr);
     japanese_.SetPredictionEnabled(userSettings_.japanesePredictionEnabled);
+    const auto rows = static_cast<std::size_t>(userSettings_.candidateRows);
+    state_.SetPageSizes(rows ? rows : 5, rows ? rows : 10);
+    japanesePage_ = rows ? rows : 9;
 }
 
 // Keys that end the word and still reach the application: anything that is

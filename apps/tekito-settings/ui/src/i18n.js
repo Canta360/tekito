@@ -78,6 +78,11 @@ const en = {
     keep: "Keep what you typed",
   },
 
+  rows: {
+    title: "Rows in the list",
+    description: "How many choices the list shows at a time. Automatic shows 5 in English (10 once you page) and 9 in Japanese.",
+    automatic: "Automatic",
+  },
   japanese: {
     space: {
       title: "Space",
@@ -249,6 +254,11 @@ const ja = {
     keep: "打ったとおりにする",
   },
 
+  rows: {
+    title: "候補の行数",
+    description: "一覧に一度に出す候補の数です。自動では、英語は 5 件（ページを送ると 10 件）、日本語は 9 件です。",
+    automatic: "自動",
+  },
   japanese: {
     space: {
       title: "スペース",

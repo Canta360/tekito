@@ -28,6 +28,7 @@ const initialSettings = {
   socialExpressionRange: 1,
   socialPersonalization: 1,
   candidateWindowStyle: 0,
+  candidateRows: 0,
   toggleKey: 1,
   keyboardType: 0,
   periodOnEnter: false,
@@ -365,6 +366,8 @@ function JapanesePage({ settings, setSetting, setConfirm, runAction }) {
 function TypingPage({ settings, setSetting }) {
   const t = useText();
   const expressionRanges = t.casual.ranges.map((label, value) => [value, label]);
+  // UserSettings::candidateRows.
+  const rowCounts = [[0, t.rows.automatic], [5, "5"], [7, "7"], [9, "9"]];
   return (
     <>
       <div className="tile-grid feature-grid">
@@ -382,6 +385,9 @@ function TypingPage({ settings, setSetting }) {
         ))}
       </div>
       <Glass className="card">
+        <Row title={t.rows.title} description={t.rows.description}>
+          <Segmented label={t.rows.title} value={settings.candidateRows} options={rowCounts} onChange={(value) => setSetting("candidateRows", value)} />
+        </Row>
         <Row title={t.casual.title} description={t.casual.description}>
           <Segmented label={t.casual.title} value={settings.socialExpressionRange} options={expressionRanges} onChange={(value) => setSetting("socialExpressionRange", value)} />
         </Row>
