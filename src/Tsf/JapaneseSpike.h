@@ -16,6 +16,8 @@ namespace tekito::tsf::spike {
 void TraceKey(const wchar_t* stage, WPARAM wParam, LPARAM lParam) noexcept;
 void TraceProfile(const wchar_t* stage) noexcept;
 void TraceCompartment(ITfThreadMgr* threadManager, REFGUID compartment) noexcept;
+// True while the ja-JP profile is the active keyboard profile.
+bool JapaneseProfileActive() noexcept;
 
 // Watches the conversion-mode compartment and profile switches for the
 // thread; call Stop before the thread manager goes away.
