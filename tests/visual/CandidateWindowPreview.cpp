@@ -14,7 +14,8 @@
 // `glide` moves the selection two rows down and captures mid-animation.
 // `click` clicks row 4 and reports the index the host callback received.
 //
-// TEKITO_PREVIEW_STYLE=simple renders the simple candidate window style.
+// TEKITO_PREVIEW_STYLE=simple renders the simple candidate window style;
+// TEKITO_PREVIEW_LANGUAGE=ja shows the Japanese tags.
 // Environment overrides (preview builds only): TEKITO_PREVIEW_THEME=dark|light,
 // TEKITO_PREVIEW_NO_COMPOSITION=1 (HWND fallback renderer),
 // TEKITO_PREVIEW_HIGH_CONTRAST=1 (high-contrast palette from system colors).
@@ -260,6 +261,10 @@ int wmain(int argc, wchar_t** argv) {
     wchar_t style[16]{};
     if (GetEnvironmentVariableW(L"TEKITO_PREVIEW_STYLE", style, 16) > 0 && wcscmp(style, L"simple") == 0) {
         window.SetStyle(1);
+    }
+    wchar_t language[8]{};
+    if (GetEnvironmentVariableW(L"TEKITO_PREVIEW_LANGUAGE", language, 8) > 0 && wcscmp(language, L"ja") == 0) {
+        window.SetJapanese(true);
     }
     const auto candidates = SampleCandidates(longList);
     // Caret under "wrold" on the document's third line.

@@ -41,7 +41,7 @@ export function hostRequest(type, payload = {}) {
       });
     };
     if (!webview()) {
-      finish({ ok: false, error: "TEKITO Settings host is unavailable.", state: null });
+      finish({ ok: false, error: "", state: null });  // the page shows its own message
       return;
     }
     webview().addEventListener("message", onMessage);
@@ -49,7 +49,7 @@ export function hostRequest(type, payload = {}) {
     // File dialogs (import/export) keep the host busy until the user closes them.
     const opensDialog = ["dictionary.import", "dictionary.export", "excludedApps.browse"].includes(type);
     const timeout = opensDialog ? 600000 : 4000;
-    window.setTimeout(() => finish({ ok: false, error: "The settings host did not respond.", state: null }), timeout);
+    window.setTimeout(() => finish({ ok: false, error: "", state: null }), timeout);
   });
 }
 

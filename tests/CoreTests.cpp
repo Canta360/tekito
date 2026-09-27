@@ -1857,6 +1857,7 @@ void TestSqliteUserSettingsRepository() {
     source.candidateWindowStyle = 1;
     source.toggleKey = 3;
     source.periodOnEnter = true;
+    source.uiLanguage = 2;
     source.excludedApps = {L"Code.exe", L"code.exe", L"game.exe"};
     {
         tekito::userdata::SqliteUserDictionaryRepository repository(path);
@@ -1880,7 +1881,8 @@ void TestSqliteUserSettingsRepository() {
                 !loaded.candidateWindowEnabled && !loaded.japanesePhoneticSuggestionsEnabled &&
                 loaded.socialExpressionRange == 4 && loaded.socialPersonalization == 2,
             "settings repository restores Input and Learning settings");
-    Require(loaded.candidateWindowStyle == 1 && loaded.toggleKey == 3 && loaded.periodOnEnter,
+    Require(loaded.candidateWindowStyle == 1 && loaded.toggleKey == 3 && loaded.periodOnEnter &&
+                loaded.uiLanguage == 2,
             "settings repository restores the candidate style and toggle key");
     Require(loaded.excludedApps.size() == 2 && loaded.excludedApps[0] == L"Code.exe" &&
                 loaded.excludedApps[1] == L"game.exe",

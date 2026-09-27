@@ -39,6 +39,9 @@ public:
     // 0 = glass, 1 = simple (see UserSettings::candidateWindowStyle). Takes
     // effect from the next Show.
     void SetStyle(int style) noexcept;
+    // Japanese tags (そのまま, スラング, 絵文字) instead of English ones.
+    // Takes effect from the next Show.
+    void SetJapanese(bool japanese) noexcept { japanese_ = japanese; }
 
     struct Channel;
 
@@ -59,6 +62,7 @@ private:
     std::size_t visibleCount_{0};
     std::uint64_t generation_{0};
     bool shown_{false};
+    bool japanese_{false};
     int style_{0};
 };
 

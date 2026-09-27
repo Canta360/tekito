@@ -18,11 +18,16 @@ constexpr UINT kMenuSettings = 3;
 }  // namespace
 
 ModeLangBarItem::ModeLangBarItem(HINSTANCE instance, ModeGetter getMode, ModeSetter setMode,
-                                 SettingsLauncher launchSettings)
+                                 SettingsLauncher launchSettings, LanguageQuery japanese)
     : instance_(instance),
       getMode_(std::move(getMode)),
       setMode_(std::move(setMode)),
-      launchSettings_(std::move(launchSettings)) {}
+      launchSettings_(std::move(launchSettings)),
+      japanese_(std::move(japanese)) {}
+
+const wchar_t* ModeLangBarItem::Text(const wchar_t* english, const wchar_t* japanese) const {
+    return japanese_ && japanese_() ? japanese : english;
+}
 
 ModeLangBarItem::~ModeLangBarItem() {
     if (sink_) sink_->Release();
@@ -61,7 +66,7 @@ HRESULT ModeLangBarItem::GetInfo(TF_LANGBARITEMINFO* info) {
     info->guidItem = GUID_LBI_INPUTMODE;
     info->dwStyle = TF_LBI_STYLE_BTN_BUTTON | TF_LBI_STYLE_BTN_MENU;
     info->ulSort = 0;
-    wcscpy_s(info->szDescription, L"TEKITO Mode");
+    wcscpy_s(info->szDescription, Text(L"TEKITO Mode", L"TEKITO のモード"));
     return S_OK;
 }
 
@@ -75,8 +80,9 @@ HRESULT ModeLangBarItem::Show(BOOL) { return E_NOTIMPL; }
 
 HRESULT ModeLangBarItem::GetTooltipString(BSTR* tooltip) {
     if (!tooltip) return E_INVALIDARG;
-    *tooltip = SysAllocString(Mode() == InputMode::Direct ? L"TEKITO Direct mode"
-                                                          : L"TEKITO Auto mode");
+    *tooltip = SysAllocString(Mode() == InputMode::Direct
+                                  ? Text(L"TEKITO Direct mode", L"TEKITO Direct モード")
+                                  : Text(L"TEKITO Auto mode", L"TEKITO Auto モード"));
     return *tooltip ? S_OK : E_OUTOFMEMORY;
 }
 
@@ -102,7 +108,7 @@ void ModeLangBarItem::ShowContextMenu(POINT point) {
     AppendMenuW(menu, flags(InputMode::Convert), kMenuAuto, L"Auto");
     AppendMenuW(menu, flags(InputMode::Direct), kMenuDirect, L"Direct");
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
-    AppendMenuW(menu, MF_STRING, kMenuSettings, L"Settings...");
+    AppendMenuW(menu, MF_STRING, kMenuSettings, Text(L"Settings...", L"設定..."));
 
     const HWND owner = GetForegroundWindow();
     if (owner) SetForegroundWindow(owner);
@@ -127,7 +133,7 @@ HRESULT ModeLangBarItem::InitMenu(ITfMenu* menu) {
     if (FAILED(hr)) return hr;
     hr = addItem(0, TF_LBMENUF_SEPARATOR, nullptr);
     if (FAILED(hr)) return hr;
-    return addItem(kMenuSettings, 0, L"Settings...");
+    return addItem(kMenuSettings, 0, Text(L"Settings...", L"設定..."));
 }
 
 HRESULT ModeLangBarItem::OnMenuSelect(UINT id) {

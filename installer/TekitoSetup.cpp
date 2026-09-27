@@ -29,6 +29,25 @@
 
 namespace {
 
+// The wizard speaks Japanese when Windows does. Preview builds can force it
+// with TEKITO_PREVIEW_LANGUAGE=ja or =en.
+bool UseJapanese() {
+    static const bool japanese = [] {
+#ifdef TEKITO_SETUP_PREVIEW
+        wchar_t value[8]{};
+        if (GetEnvironmentVariableW(L"TEKITO_PREVIEW_LANGUAGE", value, 8) > 0) {
+            return wcscmp(value, L"ja") == 0;
+        }
+#endif
+        return PRIMARYLANGID(GetUserDefaultUILanguage()) == LANG_JAPANESE;
+    }();
+    return japanese;
+}
+
+const wchar_t* Tr(const wchar_t* english, const wchar_t* japanese) {
+    return UseJapanese() ? japanese : english;
+}
+
 constexpr char kPayloadMagic[] = "TEKITO_PAYLOAD_V1";
 constexpr std::size_t kPayloadMagicSize = sizeof(kPayloadMagic) - 1;
 constexpr int kLogoIcon = 101;
@@ -263,7 +282,7 @@ std::filesystem::path BrowseForDirectory(HWND owner) {
     BROWSEINFOW browse{};
     browse.hwndOwner = owner;
     browse.ulFlags = BIF_RETURNONLYFSDIRS | BIF_NEWDIALOGSTYLE;
-    browse.lpszTitle = L"Choose where to install TEKITO";
+    browse.lpszTitle = Tr(L"Choose where to install TEKITO", L"TEKITO のインストール先を選んでください");
     const auto selected = SHBrowseForFolderW(&browse);
     if (!selected) return {};
     wchar_t path[MAX_PATH]{};
@@ -295,7 +314,7 @@ void LoadLicenseText(Wizard& wizard) {
         text.resize(static_cast<std::size_t>(std::max(count, 0)));
         MultiByteToWideChar(CP_UTF8, 0, chars, static_cast<int>(size), text.data(), count);
     }
-    if (text.empty()) text = L"The license text could not be loaded. See the license file in the TEKITO package.";
+    if (text.empty()) text = Tr(L"The license text could not be loaded. See the license file in the TEKITO package.", L"使用許諾契約を読み込めませんでした。TEKITO のパッケージに含まれるライセンスファイルをご覧ください。");
 
     std::size_t start = 0;
     while (start <= text.size()) {
@@ -431,11 +450,16 @@ int InstallEmbeddedPackage(const std::filesystem::path& self, const std::filesys
 
 std::wstring FailureMessage(int code) {
     switch (code) {
-    case 2: return L"This setup file is incomplete or damaged. Download TEKITO again and run the new file.";
-    case 3: return L"Setup couldn't create a temporary folder. Make sure the drive has free space, then try again.";
-    case 4: return L"Setup couldn't unpack its files. Make sure the drive has free space, then try again.";
-    case 5: return L"Setup couldn't start Windows PowerShell, which it needs to install TEKITO.";
+    case 2: return Tr(L"This setup file is incomplete or damaged. Download TEKITO again and run the new file.", L"このセットアップファイルは不完全か、壊れています。TEKITO をダウンロードし直して、新しいファイルを実行してください。");
+    case 3: return Tr(L"Setup couldn't create a temporary folder. Make sure the drive has free space, then try again.", L"一時フォルダーを作成できませんでした。ドライブの空き容量を確認して、もう一度お試しください。");
+    case 4: return Tr(L"Setup couldn't unpack its files. Make sure the drive has free space, then try again.", L"ファイルを展開できませんでした。ドライブの空き容量を確認して、もう一度お試しください。");
+    case 5: return Tr(L"Setup couldn't start Windows PowerShell, which it needs to install TEKITO.", L"インストールに必要な Windows PowerShell を起動できませんでした。");
     default:
+        if (UseJapanese()) {
+            return L"インストールがエラー " + std::to_wstring(code) +
+                   L" で止まりました。新しいインストールだった場合、何も残っていません。もう一度お試しください。"
+                   L"繰り返し起きる場合は、問い合わせのときにこのエラー番号をお伝えください。";
+        }
         return L"The install step stopped with error " + std::to_wstring(code) +
                L". If this was a new install, nothing was left behind. Try again, and if it keeps happening, "
                L"copy this error number when you ask for help.";
@@ -496,42 +520,42 @@ std::vector<Control> Controls(const Wizard& wizard) {
     case Screen::Welcome: {
         if (!wizard.webViewReady) {
             const float y = kWebViewCard.top + 58.0f;
-            controls.push_back({Action::GetRuntime, Kind::Secondary, D2D1::RectF(58.0f, y, 188.0f, y + 32.0f), L"Get WebView2"});
-            controls.push_back({Action::CheckRuntime, Kind::Quiet, D2D1::RectF(196.0f, y, 306.0f, y + 32.0f), L"Check again"});
+            controls.push_back({Action::GetRuntime, Kind::Secondary, D2D1::RectF(58.0f, y, 188.0f, y + 32.0f), Tr(L"Get WebView2", L"WebView2 を入手")});
+            controls.push_back({Action::CheckRuntime, Kind::Quiet, D2D1::RectF(196.0f, y, 306.0f, y + 32.0f), Tr(L"Check again", L"もう一度確認")});
         }
-        const std::wstring agree = L"I agree to the license terms";
+        const std::wstring agree = Tr(L"I agree to the license terms", L"使用許諾契約に同意する");
         const float agreeWidth = TextWidth(wizard, wizard.body.Get(), agree);
         const float row = wizard.webViewReady ? 336.0f : 350.0f;
         controls.push_back({Action::Agree, Kind::Checkbox, D2D1::RectF(kMargin, row, kMargin + 30.0f + agreeWidth, row + 24.0f),
                             agree, true, wizard.agreed});
         const float linkLeft = kMargin + 30.0f + agreeWidth + 12.0f;
-        controls.push_back({Action::ReadLicense, Kind::Link, D2D1::RectF(linkLeft, row, linkLeft + 72.0f, row + 24.0f), L"Read them"});
-        controls.push_back({Action::Options, Kind::Quiet, D2D1::RectF(22.0f, kFooterTop, 130.0f, kFooterTop + kButtonHeight), L"Options"});
-        controls.push_back({Action::Cancel, Kind::Secondary, FooterButton(1), L"Cancel"});
-        controls.push_back({Action::Install, Kind::Primary, FooterButton(0), L"Install", wizard.agreed && wizard.webViewReady});
+        controls.push_back({Action::ReadLicense, Kind::Link, D2D1::RectF(linkLeft, row, linkLeft + 72.0f, row + 24.0f), Tr(L"Read them", L"内容を読む")});
+        controls.push_back({Action::Options, Kind::Quiet, D2D1::RectF(22.0f, kFooterTop, 130.0f, kFooterTop + kButtonHeight), Tr(L"Options", L"オプション")});
+        controls.push_back({Action::Cancel, Kind::Secondary, FooterButton(1), Tr(L"Cancel", L"キャンセル")});
+        controls.push_back({Action::Install, Kind::Primary, FooterButton(0), Tr(L"Install", L"インストール"), wizard.agreed && wizard.webViewReady});
         break;
     }
     case Screen::License:
-        controls.push_back({Action::Back, Kind::Secondary, FooterButton(1), L"Back"});
-        controls.push_back({Action::AcceptLicense, Kind::Primary, FooterButton(0), L"I agree"});
+        controls.push_back({Action::Back, Kind::Secondary, FooterButton(1), Tr(L"Back", L"戻る")});
+        controls.push_back({Action::AcceptLicense, Kind::Primary, FooterButton(0), Tr(L"I agree", L"同意する")});
         break;
     case Screen::Options:
         controls.push_back({Action::Browse, Kind::Secondary, D2D1::RectF(kOptionsCard.right - 118.0f, kOptionsCard.top + 20.0f,
                                                                         kOptionsCard.right - 18.0f, kOptionsCard.top + 52.0f),
-                            L"Change"});
+                            Tr(L"Change", L"変更")});
         controls.push_back({Action::Shortcut, Kind::Toggle, D2D1::RectF(kOptionsCard.right - 66.0f, kOptionsCard.top + 104.0f,
                                                                        kOptionsCard.right - 18.0f, kOptionsCard.top + 132.0f),
-                            L"Start menu shortcut", true, wizard.startMenuShortcut});
-        controls.push_back({Action::Back, Kind::Primary, FooterButton(0), L"Done"});
+                            Tr(L"Start menu shortcut", L"スタートメニューのショートカット"), true, wizard.startMenuShortcut});
+        controls.push_back({Action::Back, Kind::Primary, FooterButton(0), Tr(L"Done", L"完了")});
         break;
     case Screen::Installing:
         break;
     case Screen::Done:
-        controls.push_back({Action::Finish, Kind::Primary, FooterButton(0), L"Finish"});
+        controls.push_back({Action::Finish, Kind::Primary, FooterButton(0), Tr(L"Finish", L"完了")});
         break;
     case Screen::Failed:
-        controls.push_back({Action::Close, Kind::Secondary, FooterButton(1), L"Close"});
-        controls.push_back({Action::Retry, Kind::Primary, FooterButton(0), L"Try again"});
+        controls.push_back({Action::Close, Kind::Secondary, FooterButton(1), Tr(L"Close", L"閉じる")});
+        controls.push_back({Action::Retry, Kind::Primary, FooterButton(0), Tr(L"Try again", L"再試行")});
         break;
     }
     return controls;
@@ -568,7 +592,8 @@ Com<IDWriteTextFormat> MakeFormat(const Wizard& wizard, const wchar_t* family, f
     // `family` is the system fallback; the brand face is used when it loaded.
     const bool brand = wizard.fonts && family != nullptr && wcscmp(family, L"Cascadia Mono") != 0;
     if (SUCCEEDED(wizard.dwrite->CreateTextFormat(brand ? L"M PLUS 1" : family, brand ? wizard.fonts.Get() : nullptr, weight,
-                                                  DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, size, L"en-us",
+                                                  DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, size,
+                                                  UseJapanese() ? L"ja-jp" : L"en-us",
                                                   format.Put()))) {
         format->SetTextAlignment(alignment);
         format->SetParagraphAlignment(paragraph);
@@ -843,19 +868,21 @@ void Paint(Wizard& wizard) {
     case Screen::Welcome:
         DrawLogo(wizard, kMargin, 42.0f, 60.0f);
         DrawWordmark(wizard, kMargin + 78.0f, 58.0f);
-        DrawText(wizard, L"English typing help for Windows", wizard.title.Get(),
+        DrawText(wizard, Tr(L"English typing help for Windows", L"英語を楽に打つための入力方式"), wizard.title.Get(),
                  D2D1::RectF(kMargin, 128.0f, kWidth - kMargin, 164.0f), p.ink);
         DrawText(wizard,
-                 L"TEKITO fixes typos and suggests words as you type. Everything runs on this PC, and nothing you "
-                 L"type is ever sent anywhere.",
+                 Tr(L"TEKITO fixes typos and suggests words as you type. Everything runs on this PC, and "
+                    L"nothing you type is ever sent anywhere.",
+                    L"TEKITO は打ち間違いを直し、打ちながら単語を提案します。処理はすべてこの PC の中で行われ、"
+                    L"入力した内容がどこかに送られることはありません。"),
                  wizard.body.Get(), D2D1::RectF(kMargin, 170.0f, kMargin + bodyWidth, 214.0f), p.ink2);
         if (!wizard.webViewReady) {
             DrawCard(wizard, kWebViewCard);
-            DrawText(wizard, L"One more thing is needed first", wizard.body.Get(),
+            DrawText(wizard, Tr(L"One more thing is needed first", L"先にもうひとつ必要なものがあります"), wizard.body.Get(),
                      D2D1::RectF(kWebViewCard.left + 18.0f, kWebViewCard.top + 14.0f, kWebViewCard.right - 18.0f,
                                  kWebViewCard.top + 34.0f),
                      p.problem);
-            DrawText(wizard, L"TEKITO Settings needs the Microsoft Edge WebView2 Runtime.",
+            DrawText(wizard, Tr(L"TEKITO Settings needs the Microsoft Edge WebView2 Runtime.", L"TEKITO の設定画面には Microsoft Edge WebView2 Runtime が必要です。"),
                      wizard.caption.Get(),
                      D2D1::RectF(kWebViewCard.left + 18.0f, kWebViewCard.top + 36.0f, kWebViewCard.right - 18.0f,
                                  kWebViewCard.top + 70.0f),
@@ -863,8 +890,8 @@ void Paint(Wizard& wizard) {
         }
         break;
     case Screen::License: {
-        DrawText(wizard, L"License terms", wizard.heading.Get(), D2D1::RectF(kMargin, 34.0f, kWidth - kMargin, 64.0f), p.ink);
-        DrawText(wizard, L"Please read these before installing TEKITO.", wizard.caption.Get(),
+        DrawText(wizard, Tr(L"License terms", L"使用許諾契約"), wizard.heading.Get(), D2D1::RectF(kMargin, 34.0f, kWidth - kMargin, 64.0f), p.ink);
+        DrawText(wizard, Tr(L"Please read these before installing TEKITO.", L"インストールの前にお読みください（英文）。"), wizard.caption.Get(),
                  D2D1::RectF(kMargin, 68.0f, kWidth - kMargin, 88.0f), p.ink2);
         DrawCard(wizard, kLicenseCard);
         if (wizard.license) {
@@ -894,26 +921,26 @@ void Paint(Wizard& wizard) {
         break;
     }
     case Screen::Options: {
-        DrawText(wizard, L"Install options", wizard.heading.Get(), D2D1::RectF(kMargin, 34.0f, kWidth - kMargin, 64.0f), p.ink);
+        DrawText(wizard, Tr(L"Install options", L"インストールのオプション"), wizard.heading.Get(), D2D1::RectF(kMargin, 34.0f, kWidth - kMargin, 64.0f), p.ink);
         DrawCard(wizard, kOptionsCard);
         const float left = kOptionsCard.left + 18.0f;
-        DrawText(wizard, L"Install location", wizard.body.Get(),
+        DrawText(wizard, Tr(L"Install location", L"インストール先"), wizard.body.Get(),
                  D2D1::RectF(left, kOptionsCard.top + 16.0f, kOptionsCard.right - 130.0f, kOptionsCard.top + 36.0f), p.ink);
         DrawText(wizard, wizard.installRoot.wstring(), wizard.mono.Get(),
                  D2D1::RectF(left, kOptionsCard.top + 40.0f, kOptionsCard.right - 132.0f, kOptionsCard.top + 58.0f), p.ink2);
         auto divider = Brush(wizard, p.hairline);
         t->DrawLine(D2D1::Point2F(left, kOptionsCard.top + 80.0f), D2D1::Point2F(kOptionsCard.right - 18.0f, kOptionsCard.top + 80.0f),
                     divider.Get(), 1.0f);
-        DrawText(wizard, L"Start menu shortcut", wizard.body.Get(),
+        DrawText(wizard, Tr(L"Start menu shortcut", L"スタートメニューのショートカット"), wizard.body.Get(),
                  D2D1::RectF(left, kOptionsCard.top + 98.0f, kOptionsCard.right - 90.0f, kOptionsCard.top + 118.0f), p.ink);
-        DrawText(wizard, L"Adds TEKITO Settings to the Start menu.", wizard.caption.Get(),
+        DrawText(wizard, Tr(L"Adds TEKITO Settings to the Start menu.", L"TEKITO の設定をスタートメニューに追加します。"), wizard.caption.Get(),
                  D2D1::RectF(left, kOptionsCard.top + 120.0f, kOptionsCard.right - 90.0f, kOptionsCard.top + 140.0f), p.ink2);
         break;
     }
     case Screen::Installing: {
         DrawLogo(wizard, kWidth / 2.0f - 30.0f, 96.0f, 60.0f);
-        DrawText(wizard, L"Installing TEKITO", wizard.headingCentered.Get(), D2D1::RectF(0.0f, 180.0f, kWidth, 212.0f), p.ink);
-        DrawText(wizard, L"This takes about a minute. Please keep this window open.", wizard.captionCentered.Get(),
+        DrawText(wizard, Tr(L"Installing TEKITO", L"TEKITO をインストールしています"), wizard.headingCentered.Get(), D2D1::RectF(0.0f, 180.0f, kWidth, 212.0f), p.ink);
+        DrawText(wizard, Tr(L"This takes about a minute. Please keep this window open.", L"1 分ほどかかります。このウィンドウは開いたままにしてください。"), wizard.captionCentered.Get(),
                  D2D1::RectF(0.0f, 216.0f, kWidth, 236.0f), p.ink2);
         // Indeterminate progress: a short segment of accent light sliding
         // along a recessed track.
@@ -962,15 +989,17 @@ void Paint(Wizard& wizard) {
             sink->Close();
             t->DrawGeometry(path.Get(), mark.Get(), 4.0f, round.Get());
         }
-        DrawText(wizard, L"TEKITO is installed", wizard.headingCentered.Get(), D2D1::RectF(0.0f, 196.0f, kWidth, 228.0f), p.ink);
+        DrawText(wizard, Tr(L"TEKITO is installed", L"TEKITO をインストールしました"), wizard.headingCentered.Get(), D2D1::RectF(0.0f, 196.0f, kWidth, 228.0f), p.ink);
         DrawText(wizard,
-                 L"Restart the apps you want to type in, then choose TEKITO from the input menu on the "
-                 L"taskbar or press Win+Space.",
+                 Tr(L"Restart the apps you want to type in, then choose TEKITO from the input menu on the "
+                    L"taskbar or press Win+Space.",
+                    L"使いたいアプリを再起動してから、タスクバーの入力メニューで TEKITO を選ぶか、"
+                    L"Win+Space を押してください。"),
                  wizard.bodyCentered.Get(), D2D1::RectF(90.0f, 238.0f, kWidth - 90.0f, 290.0f), p.ink2);
         break;
     }
     case Screen::Failed:
-        DrawText(wizard, L"Setup couldn't finish", wizard.heading.Get(), D2D1::RectF(kMargin, 40.0f, kWidth - kMargin, 72.0f), p.ink);
+        DrawText(wizard, Tr(L"Setup couldn't finish", L"インストールを完了できませんでした"), wizard.heading.Get(), D2D1::RectF(kMargin, 40.0f, kWidth - kMargin, 72.0f), p.ink);
         DrawText(wizard, FailureMessage(wizard.installExitCode.load()), wizard.body.Get(),
                  D2D1::RectF(kMargin, 84.0f, kWidth - kMargin, 200.0f), p.ink2);
         break;
@@ -1276,7 +1305,7 @@ bool ShowWizard(const std::filesystem::path& self) {
     if (FAILED(D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, wizard.factory.Put())) ||
         FAILED(DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory),
                                    reinterpret_cast<IUnknown**>(wizard.dwrite.Put())))) {
-        MessageBoxW(nullptr, L"TEKITO Setup couldn't start its graphics.", L"TEKITO Setup", MB_OK | MB_ICONERROR);
+        MessageBoxW(nullptr, Tr(L"TEKITO Setup couldn't start its graphics.", L"セットアップの画面を表示できませんでした。"), Tr(L"TEKITO Setup", L"TEKITO セットアップ"), MB_OK | MB_ICONERROR);
         return false;
     }
     LoadLicenseText(wizard);
@@ -1294,7 +1323,7 @@ bool ShowWizard(const std::filesystem::path& self) {
     windowClass.lpszClassName = className;
     RegisterClassExW(&windowClass);
 
-    const HWND window = CreateWindowExW(0, className, L"TEKITO Setup", WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
+    const HWND window = CreateWindowExW(0, className, Tr(L"TEKITO Setup", L"TEKITO セットアップ"), WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
                                         CW_USEDEFAULT, CW_USEDEFAULT, 100, 100, nullptr, nullptr, windowClass.hInstance,
                                         &wizard);
     if (!window) return false;
