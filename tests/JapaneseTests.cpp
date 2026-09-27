@@ -139,6 +139,32 @@ void TestEditing(const RomajiTable& table) {
     Require(!composer.IsComposing(), "Esc drops typed text");
 }
 
+void TestCaret(const RomajiTable& table) {
+    JapaneseComposer composer(&table);
+    Type(composer, L"kyouha");
+    Require(composer.CaretOffset() == 4, "the caret follows typing");
+    composer.MoveCaret(-2);
+    Require(composer.CaretOffset() == 2, "Left moves by kana");
+    RequireText(Type(composer, L"ka"), L"きょかうは", "typing goes in at the caret");
+    Require(composer.CaretOffset() == 3, "the caret is after what was typed");
+    composer.Insert(L'k');
+    RequireText(composer.Preedit(), L"きょかｋうは", "pending keys show at the caret");
+    composer.Backspace();
+    composer.Backspace();
+    RequireText(composer.Preedit(), L"きょうは", "Backspace removes before the caret");
+    composer.MoveCaret(-1);
+    RequireText(Type(composer, L"a"), L"きあょうは", "the caret can stop inside きょ");
+    composer.MoveCaret(-100);
+    Require(composer.CaretOffset() == 0, "Home goes to the start");
+    composer.Delete();
+    RequireText(composer.Preedit(), L"あょうは", "Delete removes after the caret");
+    composer.MoveCaret(100);
+    Require(composer.CaretOffset() == 4, "End goes to the end");
+    composer.Convert();
+    composer.Cancel();
+    RequireText(Type(composer, L"ne"), L"あょうはね", "after a conversion, typing goes on at the end");
+}
+
 void TestConversionForms(const RomajiTable& table) {
     JapaneseComposer composer(&table);
     Type(composer, L"katakana");
@@ -388,6 +414,7 @@ int main(int argc, char** argv) {
     TestRomajiTable(*table);
     TestRomajiConversion(*table);
     TestEditing(*table);
+    TestCaret(*table);
     TestConversionForms(*table);
     TestInputFormAndPunctuation(*table);
     const auto pack = LoadMiniPack();
