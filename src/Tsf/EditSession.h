@@ -44,6 +44,10 @@ struct KeyInput {
         // Japanese typing: the caret by `delta` kana, and Delete.
         JapaneseMoveCaret,
         JapaneseDelete,
+        // Japanese predictions: Tab/Down, Up/Shift+Tab, and Esc to step out.
+        JapaneseNextPrediction,
+        JapanesePreviousPrediction,
+        JapaneseClearPrediction,
         // Not a key: commit the Japanese text (the mode or focus changed).
         JapaneseCommit,
         // Types `character` outside a composition (a full-width space).

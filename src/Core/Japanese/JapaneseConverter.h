@@ -23,6 +23,13 @@ struct PhraseCandidate {
     bool spellingCorrection{false};
 };
 
+// A word that starts with what has been typed, for prediction.
+struct Prediction {
+    std::wstring reading;
+    std::wstring text;
+    std::int64_t cost{0};
+};
+
 // One phrase (bunsetsu) of the reading and what it can be written as, most
 // likely first.
 struct Phrase {
@@ -44,6 +51,11 @@ public:
     // they are (after the user resized a phrase); the rest is split freely.
     [[nodiscard]] std::vector<Phrase> Convert(std::wstring_view reading,
                                               std::span<const std::size_t> fixedLengths = {}) const;
+
+    // Words whose reading starts with `reading` and is longer, likeliest
+    // first. Readings shared by too many words to look through quickly give
+    // nothing; typing on narrows them.
+    [[nodiscard]] std::vector<Prediction> Predict(std::wstring_view reading, std::size_t limit) const;
 
     static constexpr std::size_t kMaxCandidates = 40;
 

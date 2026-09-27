@@ -45,6 +45,10 @@ bool JapaneseDictionary::Open(const std::filesystem::path& file) noexcept {
     if (!Within(recordsOffset, recordsEnd, surfacesOffset)) return false;
 
     reverse_ = p + reverseOffset;
+    const std::uint32_t charsOffset = field(5);
+    if (!Within(charsOffset, 2ull * charCount, size)) return false;
+    chars_ = p + charsOffset;
+    charCount_ = charCount;
     index_ = p + indexOffset;
     records_ = p + recordsOffset;
     recordsSize_ = recordsEnd;
@@ -83,6 +87,41 @@ std::optional<std::uint32_t> JapaneseDictionary::Find(ReadingCodesView codes) co
         if (length == codes.size()) result = record;
     });
     return result;
+}
+
+std::pair<std::uint32_t, std::uint32_t> JapaneseDictionary::PrefixRange(ReadingCodesView codes) const {
+    std::uint32_t lo = 0;
+    std::uint32_t hi = keyCount_;
+    for (std::size_t depth = 0; depth < codes.size() && lo < hi; ++depth) {
+        const std::uint8_t code = codes[depth];
+        if (code == 0) return {0, 0};
+        const auto codeAt = [&](std::uint32_t record) -> int {
+            const auto key = Key(record);
+            return depth < key.size() ? key[depth] : -1;
+        };
+        std::uint32_t first = lo, last = hi;
+        while (first < last) {
+            const std::uint32_t middle = first + (last - first) / 2;
+            if (codeAt(middle) < code) first = middle + 1; else last = middle;
+        }
+        std::uint32_t end = first, limit = hi;
+        while (end < limit) {
+            const std::uint32_t middle = end + (limit - end) / 2;
+            if (codeAt(middle) <= code) end = middle + 1; else limit = middle;
+        }
+        lo = first;
+        hi = end;
+    }
+    return {lo, lo < hi ? hi : lo};
+}
+
+std::wstring JapaneseDictionary::KeyText(std::uint32_t record) const {
+    std::wstring text;
+    for (const std::uint8_t code : Key(record)) {
+        if (code == 0 || code > charCount_) return {};
+        text += static_cast<wchar_t>(Read<std::uint16_t>(chars_ + 2ull * (code - 1)));
+    }
+    return text;
 }
 
 std::wstring JapaneseDictionary::Surface(const DictionaryWord& word, std::wstring_view reading) const {

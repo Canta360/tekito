@@ -75,6 +75,48 @@ void JapaneseComposer::Insert(wchar_t key) {
     phrases_.clear();
     listOpen_ = false;
     Feed(key);
+    UpdatePredictions();
+}
+
+void JapaneseComposer::UpdatePredictions() {
+    predictions_.clear();
+    chosenPrediction_.reset();
+    if (!predictionEnabled_ || IsConverted()) return;
+    // Complete kana only (no key waiting to become one), at least two of
+    // them, typed at the end.
+    const std::wstring reading = Reading();
+    if (!pending_.empty() || reading.size() < 2 || LeftoverLetters(reading) > 0 || caret_ != units_.size()) {
+        return;
+    }
+    constexpr std::size_t kPredictions = 5;
+    if (learning_) {
+        for (auto& entry : learning_->StartingWith(reading, kPredictions)) {
+            predictions_.push_back({std::move(entry.reading), std::move(entry.surface), 0});
+        }
+    }
+    if (converter_) {
+        for (auto& prediction : converter_->Predict(reading, kPredictions)) {
+            if (predictions_.size() >= kPredictions) break;
+            const bool seen = std::any_of(predictions_.begin(), predictions_.end(),
+                                          [&](const Prediction& p) { return p.text == prediction.text; });
+            if (!seen) predictions_.push_back(std::move(prediction));
+        }
+    }
+}
+
+void JapaneseComposer::NextPrediction() {
+    if (predictions_.empty()) return;
+    chosenPrediction_ = chosenPrediction_ ? (*chosenPrediction_ + 1) % predictions_.size() : 0;
+}
+
+void JapaneseComposer::PreviousPrediction() {
+    if (predictions_.empty()) return;
+    const std::size_t count = predictions_.size();
+    chosenPrediction_ = chosenPrediction_ ? (*chosenPrediction_ + count - 1) % count : count - 1;
+}
+
+void JapaneseComposer::ChoosePrediction(std::size_t index) {
+    if (index < predictions_.size()) chosenPrediction_ = index;
 }
 
 void JapaneseComposer::Feed(wchar_t key) {
@@ -169,6 +211,8 @@ std::size_t JapaneseComposer::SplitAt(std::size_t offset) {
 void JapaneseComposer::MoveCaret(int delta) {
     if (IsConverted() || !IsComposing()) return;
     FlushAll();
+    predictions_.clear();
+    chosenPrediction_.reset();
     const auto total = static_cast<long long>(ReadingOffset(units_.size()));
     const auto target = std::clamp(static_cast<long long>(ReadingOffset(caret_)) + delta, 0LL, total);
     caret_ = SplitAt(static_cast<std::size_t>(target));
@@ -200,6 +244,7 @@ void JapaneseComposer::Backspace() {
     }
     if (!pending_.empty()) {
         pending_.pop_back();
+        UpdatePredictions();
         return;
     }
     if (caret_ == 0) return;
@@ -208,11 +253,13 @@ void JapaneseComposer::Backspace() {
     if (last.kana.empty()) {
         units_.erase(units_.begin() + static_cast<std::ptrdiff_t>(caret_) - 1);
         --caret_;
+        UpdatePredictions();
         return;
     }
     // "きゃ" lost its "ゃ": keep what "き" is typed as, for F9 and F10.
     auto keys = table_ ? table_->KeysFor(last.kana) : std::wstring{};
     last.keys = keys.empty() ? last.kana : std::move(keys);
+    UpdatePredictions();
 }
 
 void JapaneseComposer::Cancel() {
@@ -242,6 +289,8 @@ std::vector<PhraseCandidate> JapaneseComposer::KanaCandidates(std::wstring_view 
 
 void JapaneseComposer::BuildPhrases(bool convert) {
     FlushAll();
+    predictions_.clear();
+    chosenPrediction_.reset();
     // Back from a conversion, typing goes on at the end.
     caret_ = units_.size();
     const std::wstring reading = Reading();
@@ -580,6 +629,12 @@ std::size_t JapaneseComposer::FocusedSelection() const noexcept {
 
 std::wstring JapaneseComposer::Commit() {
     FlushAll();
+    if (chosenPrediction_ && *chosenPrediction_ < predictions_.size() && !IsConverted()) {
+        const auto prediction = predictions_[*chosenPrediction_];
+        if (learning_) learning_->RecordChoice(prediction.reading, prediction.text, prediction.text);
+        Clear();
+        return prediction.text;
+    }
     if (learning_ && IsConverted()) {
         const std::wstring& reading = conversionReading_;
         for (const auto& phrase : phrases_) {
@@ -594,6 +649,8 @@ std::wstring JapaneseComposer::Commit() {
 }
 
 void JapaneseComposer::Clear() noexcept {
+    predictions_.clear();
+    chosenPrediction_.reset();
     units_.clear();
     conversionReading_.clear();
     caret_ = 0;

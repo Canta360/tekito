@@ -62,6 +62,9 @@ public:
     // that make one phrase get them after its Japanese candidates.
     using EnglishCandidates = std::function<std::vector<std::wstring>(std::wstring_view keys)>;
     void SetEnglishCandidates(EnglishCandidates source) { english_ = std::move(source); }
+    // Words that start with what is typed, offered below it from the second
+    // kana (dictionary and learning). Off by default.
+    void SetPredictionEnabled(bool enabled) noexcept { predictionEnabled_ = enabled; }
     void SetPunctuationStyle(PunctuationStyle style) noexcept { punctuation_ = style; }
     // Hiragana or Katakana: how new text is shown while typing.
     void SetInputForm(KanaForm form) noexcept;
@@ -109,8 +112,18 @@ public:
     [[nodiscard]] std::size_t FocusedSelection() const noexcept;
     [[nodiscard]] bool IsCandidateListOpen() const noexcept { return listOpen_ && IsConverted(); }
 
-    // The text to commit (pending keys are resolved first); clears the
-    // composition.
+    // Predictions for what is typed (empty once converted), and which one
+    // is chosen (Tab, Down and Up step through them; nothing is chosen until
+    // then).
+    [[nodiscard]] const std::vector<Prediction>& Predictions() const noexcept { return predictions_; }
+    [[nodiscard]] std::optional<std::size_t> ChosenPrediction() const noexcept { return chosenPrediction_; }
+    void NextPrediction();
+    void PreviousPrediction();
+    void ChoosePrediction(std::size_t index);
+    void ClearPredictionChoice() noexcept { chosenPrediction_.reset(); }
+
+    // The text to commit (pending keys are resolved first, and a chosen
+    // prediction replaces what is typed); clears the composition.
     [[nodiscard]] std::wstring Commit();
     void Clear() noexcept;
 
@@ -153,6 +166,7 @@ private:
     void BuildPhrases(bool convert);
     [[nodiscard]] std::vector<PhraseCandidate> KanaCandidates(std::wstring_view reading) const;
     void AddPhrases(std::vector<Phrase> phrases, const std::wstring& reading);
+    void UpdatePredictions();
     // English candidates for the whole text, when the keys look like a word.
     void AddEnglish(const std::wstring& reading, bool romajiCorrected);
     // The kana `keys` make, and whether every key became kana.
@@ -182,6 +196,9 @@ private:
     std::wstring conversionReading_;
     std::size_t focus_{0};
     bool listOpen_{false};
+    bool predictionEnabled_{false};
+    std::vector<Prediction> predictions_;
+    std::optional<std::size_t> chosenPrediction_;
 };
 
 }  // namespace tekito::japanese

@@ -754,6 +754,7 @@ void TextService::ApplySettings() {
     japanese_.SetPunctuationStyle(
         static_cast<japanese::PunctuationStyle>(std::clamp(userSettings_.japanesePunctuation, 0, 3)));
     japanese_.SetLearning(userSettings_.learningEnabled ? &japaneseLearning_ : nullptr);
+    japanese_.SetPredictionEnabled(userSettings_.japanesePredictionEnabled);
 }
 
 // Keys that end the word and still reach the application: anything that is

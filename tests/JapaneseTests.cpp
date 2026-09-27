@@ -514,6 +514,46 @@ void TestRomajiCorrection(const RomajiTable& table, const MiniPack& pack) {
     Require(composer.Preedit().find(L"機") != std::wstring::npos, "correct romaji is not touched");
 }
 
+void TestPrediction(const RomajiTable& table, const MiniPack& pack) {
+    const tekito::japanese::JapaneseConverter converter(pack.dictionary, pack.matrix);
+    const auto predicted = converter.Predict(L"ありが", 5);
+    Require(!predicted.empty() && predicted.front().reading.starts_with(L"ありが") &&
+                predicted.front().reading.size() > 3,
+            "words that start with ありが are predicted");
+
+    tekito::japanese::JapaneseLearningStore learning;
+    JapaneseComposer composer(&table);
+    composer.SetConverter(&converter);
+    composer.SetLearning(&learning);
+    Type(composer, L"a");
+    Require(composer.Predictions().empty(), "prediction is off by default");
+    composer.Clear();
+
+    composer.SetPredictionEnabled(true);
+    Type(composer, L"a");
+    Require(composer.Predictions().empty(), "one kana predicts nothing");
+    Type(composer, L"riga");
+    Require(!composer.Predictions().empty(), "ありが predicts words");
+    Require(!composer.ChosenPrediction(), "nothing is chosen until Tab");
+    RequireText(composer.Preedit(), L"ありが", "predictions do not change the text");
+    composer.NextPrediction();
+    Require(composer.ChosenPrediction() == 0u, "Tab chooses the first prediction");
+    composer.PreviousPrediction();
+    Require(composer.ChosenPrediction() == composer.Predictions().size() - 1, "Up wraps to the last");
+    composer.ChoosePrediction(0);
+    const auto chosen = composer.Predictions().front().text;
+    RequireText(composer.Commit(), chosen, "Enter commits the chosen prediction");
+
+    Type(composer, L"ariga");
+    RequireText(composer.Predictions().front().text, chosen, "a prediction chosen before comes first");
+    Type(composer, L"k");
+    Require(composer.Predictions().empty(), "a pending key hides predictions");
+    composer.Backspace();
+    Require(!composer.Predictions().empty(), "Backspace brings them back");
+    composer.Convert();
+    Require(composer.Predictions().empty(), "converting puts predictions away");
+}
+
 void TestComposerLearning(const RomajiTable& table, const MiniPack& pack) {
     const tekito::japanese::JapaneseConverter converter(pack.dictionary, pack.matrix);
     tekito::japanese::JapaneseLearningStore learning;
@@ -563,6 +603,7 @@ int main(int argc, char** argv) {
     TestComposerLearning(*table, *pack);
     TestEnglishInJapanese(*table, *pack);
     TestRomajiCorrection(*table, *pack);
+    TestPrediction(*table, *pack);
     if (argc > 1 && std::string_view(argv[1]) == "--dump") DumpConversions(*pack);
     std::cout << "All TEKITO Japanese tests passed.\n";
     return 0;
