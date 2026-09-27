@@ -6,6 +6,7 @@
 #include "Core/ExternalLexiconProvider.h"
 #include "Core/Japanese/JapaneseConverter.h"
 #include "Core/Japanese/JapaneseDictionary.h"
+#include "Core/Japanese/MixedConverter.h"
 #include "Core/Japanese/RomajiTable.h"
 #include "Tsf/Compartments.h"
 #include "Tsf/DisplayAttributes.h"
@@ -60,27 +61,46 @@ const japanese::RomajiTable* ProcessRomajiTable() {
     return table.get();
 }
 
-// The japanese-core pack, mapped once per process (mapping it takes well
-// under a millisecond; the pages are shared with every other process).
-// Without it Japanese still types kana, and Space switches kana.
-const japanese::JapaneseConverter* ProcessJapaneseConverter() {
-    struct Data {
-        japanese::JapaneseDictionary dictionary;
-        japanese::ConnectionMatrix matrix;
-        std::unique_ptr<japanese::JapaneseConverter> converter;
-    };
-    static const std::unique_ptr<Data> data = [] {
-        auto loaded = std::make_unique<Data>();
-        const auto root = ExternalLexiconProvider::DataPackRoot() / L"japanese-core";
-        if (!loaded->dictionary.Open(root / L"dictionary.bin") ||
-            !loaded->matrix.Open(root / L"connection.bin")) {
+// The japanese-core pack (and the English words mixed conversion knows),
+// mapped once per process: mapping takes well under a millisecond and the
+// pages are shared with every other process. Without japanese-core,
+// Japanese still types kana, and Space switches kana; without the English
+// words, English among romaji is left to the single-word checks.
+struct JapaneseData {
+    japanese::JapaneseDictionary dictionary;
+    japanese::ConnectionMatrix matrix;
+    japanese::EnglishWords english;
+    std::unique_ptr<japanese::JapaneseConverter> converter;
+    std::unique_ptr<japanese::MixedConverter> mixed;
+};
+
+const JapaneseData* ProcessJapaneseData() {
+    static const std::unique_ptr<JapaneseData> data = [] {
+        auto loaded = std::make_unique<JapaneseData>();
+        const auto root = ExternalLexiconProvider::DataPackRoot();
+        if (!loaded->dictionary.Open(root / L"japanese-core" / L"dictionary.bin") ||
+            !loaded->matrix.Open(root / L"japanese-core" / L"connection.bin")) {
             Trace(L"Japanese dictionary unavailable");
-            return std::unique_ptr<Data>{};
+            return std::unique_ptr<JapaneseData>{};
         }
         loaded->converter = std::make_unique<japanese::JapaneseConverter>(loaded->dictionary, loaded->matrix);
+        const auto* table = ProcessRomajiTable();
+        if (table && loaded->english.Open(root / L"japanese-english-words")) {
+            loaded->mixed = std::make_unique<japanese::MixedConverter>(loaded->dictionary, loaded->matrix,
+                                                                      *loaded->converter, *table,
+                                                                      loaded->english);
+        } else {
+            Trace(L"Japanese mixed conversion unavailable");
+        }
         return loaded;
     }();
-    return data ? data->converter.get() : nullptr;
+    return data.get();
+}
+
+void AttachJapaneseData(japanese::JapaneseComposer& composer) {
+    const auto* data = ProcessJapaneseData();
+    composer.SetConverter(data ? data->converter.get() : nullptr);
+    composer.SetMixedConverter(data ? data->mixed.get() : nullptr);
 }
 
 }  // namespace
@@ -115,7 +135,7 @@ void TextService::UpdateActiveProfile() {
     japaneseProfile_ = japanese;
     if (japanese) {
         japanese_.SetTable(ProcessRomajiTable());
-        japanese_.SetConverter(ProcessJapaneseConverter());
+        AttachJapaneseData(japanese_);
     }
 }
 
@@ -127,7 +147,7 @@ void TextService::SetJapaneseProfile(bool japanese) {
     activationSettling_ = japanese;
     if (japanese) {
         japanese_.SetTable(ProcessRomajiTable());
-        japanese_.SetConverter(ProcessJapaneseConverter());
+        AttachJapaneseData(japanese_);
     }
     SetInputMode(SharedMode());
 }

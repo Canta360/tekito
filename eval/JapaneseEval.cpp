@@ -4,13 +4,23 @@
 // acceptable ones.
 //
 // tekito_ja_eval --pack <data/japanese-core> --corpus <japanese_eval.tsv> [--show-misses N]
+// tekito_ja_eval --pack <data/japanese-core> --keys-corpus <japanese_eval_keys.tsv>
+//                --romaji <data/japanese-romaji> --english <data/japanese-english-words>
+//                [--no-mixed] [--english-base N] [--english-per-score N] [--language-switch N]
+//
+// The second form types the romaji keys into the composer, as TEKITO does,
+// and converts with Space; "english" counts outputs with Latin letters in
+// them (wanted for the mixed sentences, a mistake for the others).
 //
 // Per source: sentences whose first conversion is acceptable, the character
 // error rate against the closest acceptable text, how often an acceptable
 // text is among the first phrase-by-phrase choices, and conversion time.
 
+#include "Core/Japanese/JapaneseComposer.h"
 #include "Core/Japanese/JapaneseConverter.h"
 #include "Core/Japanese/JapaneseDictionary.h"
+#include "Core/Japanese/MixedConverter.h"
+#include "Core/Japanese/RomajiTable.h"
 
 #include <algorithm>
 #include <chrono>
@@ -91,9 +101,13 @@ std::vector<Row> LoadCorpus(const std::filesystem::path& path) {
         std::vector<std::string> fields;
         std::stringstream parts(line);
         for (std::string field; std::getline(parts, field, '\t');) fields.push_back(field);
-        if (fields.size() < 5) continue;
-        Row row{fields[0], fields[1], Widen(fields[3]), {}};
-        for (std::size_t i = 4; i < fields.size(); ++i) row.expected.push_back(Widen(fields[i]));
+        // Readings files: source, id, context, reading, expected...
+        // Keys files: source, id, keys, expected...
+        const bool keys = path.filename().string().find("_keys") != std::string::npos;
+        const std::size_t text = keys ? 2 : 3;
+        if (fields.size() < text + 2) continue;
+        Row row{fields[0], fields[1], Widen(fields[text]), {}};
+        for (std::size_t i = text + 1; i < fields.size(); ++i) row.expected.push_back(Widen(fields[i]));
         rows.push_back(std::move(row));
     }
     return rows;
@@ -138,16 +152,108 @@ double Percentile(std::vector<double> values, double q) {
     return values[std::min(values.size() - 1, static_cast<std::size_t>(q * values.size()))];
 }
 
+bool HasLatinLetter(std::wstring_view text) {
+    return std::any_of(text.begin(), text.end(), [](wchar_t c) {
+        return (c >= L'a' && c <= L'z') || (c >= L'A' && c <= L'Z');
+    });
+}
+
+int RunKeys(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary, const JapaneseConverter& converter,
+            const std::filesystem::path& corpus, const std::filesystem::path& romaji,
+            const std::filesystem::path& englishPack, bool useMixed,
+            tekito::japanese::MixedConverter::Costs costs, std::size_t showMisses) {
+    const auto table = tekito::japanese::RomajiTable::Load(romaji);
+    tekito::japanese::EnglishWords english;
+    if (!table || !english.Open(englishPack)) {
+        std::cerr << "could not open the romaji table or the English words\n";
+        return 1;
+    }
+    const tekito::japanese::MixedConverter mixed(dictionary, matrix, converter, *table, english, costs);
+    tekito::japanese::JapaneseComposer composer(table.get());
+    composer.SetConverter(&converter);
+    if (useMixed) composer.SetMixedConverter(&mixed);
+
+    struct KeyTotals {
+        std::size_t rows{0}, exact{0}, english{0}, errors{0}, characters{0};
+        std::vector<double> microseconds;
+    };
+    std::map<std::string, KeyTotals> totals;
+    std::size_t shown = 0;
+    // Keys files share the layout source, id, keys, expected...: LoadCorpus
+    // reads keys where it reads readings.
+    for (const auto& row : LoadCorpus(corpus)) {
+        composer.Clear();
+        for (const wchar_t key : row.reading) composer.Insert(key);
+        const auto start = Clock::now();
+        composer.Convert();
+        const double elapsed = std::chrono::duration<double, std::micro>(Clock::now() - start).count();
+        const std::wstring output = composer.Preedit();
+        std::size_t distance = SIZE_MAX, length = 0;
+        for (const auto& expected : row.expected) {
+            const std::size_t d = EditDistance(output, expected);
+            if (d < distance) {
+                distance = d;
+                length = expected.size();
+            }
+        }
+        for (KeyTotals* t : {&totals[row.source], &totals["all"]}) {
+            ++t->rows;
+            if (distance == 0) ++t->exact;
+            if (HasLatinLetter(output)) ++t->english;
+            t->errors += distance;
+            t->characters += length;
+            t->microseconds.push_back(elapsed);
+        }
+        if (distance != 0 && shown < showMisses) {
+            ++shown;
+            std::cout << "miss " << row.source << ":" << row.id << "  " << Narrow(output) << "  (want "
+                      << Narrow(row.expected.front()) << ")\n";
+        }
+    }
+    std::cout << std::fixed << std::setprecision(1);
+    for (const auto& [source, t] : totals) {
+        std::cout << source << ": rows=" << t.rows << " top1=" << 100.0 * t.exact / t.rows << "%"
+                  << " english=" << 100.0 * t.english / t.rows << "%"
+                  << " cer=" << (t.characters ? 100.0 * t.errors / t.characters : 0.0) << "%"
+                  << " convert_us_p50=" << Percentile(t.microseconds, 0.5)
+                  << " p95=" << Percentile(t.microseconds, 0.95)
+                  << " max=" << Percentile(t.microseconds, 1.0) << "\n";
+    }
+    return 0;
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
-    std::filesystem::path pack, corpus;
+    std::filesystem::path pack, corpus, keysCorpus, romaji, englishPack;
     std::size_t showMisses = 0;
+    bool useMixed = true;
+    tekito::japanese::MixedConverter::Costs costs;
     for (int i = 1; i < argc; ++i) {
         const std::string_view arg = argv[i];
         if (arg == "--pack" && i + 1 < argc) pack = argv[++i];
         else if (arg == "--corpus" && i + 1 < argc) corpus = argv[++i];
+        else if (arg == "--keys-corpus" && i + 1 < argc) keysCorpus = argv[++i];
+        else if (arg == "--romaji" && i + 1 < argc) romaji = argv[++i];
+        else if (arg == "--english" && i + 1 < argc) englishPack = argv[++i];
+        else if (arg == "--no-mixed") useMixed = false;
+        else if (arg == "--english-base" && i + 1 < argc) costs.englishBase = std::stoll(argv[++i]);
+        else if (arg == "--english-per-score" && i + 1 < argc) costs.englishPerScore = std::stoll(argv[++i]);
+        else if (arg == "--language-switch" && i + 1 < argc) costs.languageSwitch = std::stoll(argv[++i]);
         else if (arg == "--show-misses" && i + 1 < argc) showMisses = std::stoul(argv[++i]);
+    }
+    if (!pack.empty() && !keysCorpus.empty()) {
+#if defined(_WIN32)
+        SetConsoleOutputCP(CP_UTF8);
+#endif
+        JapaneseDictionary dictionary;
+        ConnectionMatrix matrix;
+        if (!dictionary.Open(pack / "dictionary.bin") || !matrix.Open(pack / "connection.bin")) {
+            std::cerr << "could not open the japanese-core pack at " << pack.string() << "\n";
+            return 1;
+        }
+        const JapaneseConverter converter(dictionary, matrix);
+        return RunKeys(matrix, dictionary, converter, keysCorpus, romaji, englishPack, useMixed, costs, showMisses);
     }
     if (pack.empty() || corpus.empty()) {
         std::cerr << "usage: tekito_ja_eval --pack <dir> --corpus <japanese_eval.tsv> [--show-misses N]\n";

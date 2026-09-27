@@ -12,7 +12,16 @@
 namespace tekito::japanese {
 
 class JapaneseLearningStore;
+class MixedConverter;
 class RomajiTable;
+
+// One romaji unit: the keys it took and the kana it made. Keys the table
+// cannot read come out as they are, as leftovers.
+struct RomajiToken {
+    std::size_t keys{0};
+    std::wstring kana;
+    bool leftover{false};
+};
 
 // How a phrase (or the whole text before conversion) is written.
 enum class KanaForm : std::uint8_t {
@@ -53,6 +62,11 @@ public:
 
     void SetTable(const RomajiTable* table) noexcept;
     void SetConverter(const JapaneseConverter* converter) noexcept { converter_ = converter; }
+    // Converts the keys as typed when English is mixed in (tried first on
+    // Space; nullptr leaves conversion to the kana).
+    void SetMixedConverter(const MixedConverter* mixed) noexcept { mixed_ = mixed; }
+    // How the romaji table reads `keys` from the start, unit by unit.
+    [[nodiscard]] static std::vector<RomajiToken> ParseRomaji(const RomajiTable& table, std::wstring_view keys);
     // What the user chose before puts candidates first; each commit is
     // recorded. nullptr turns learning off.
     void SetLearning(JapaneseLearningStore* learning) noexcept { learning_ = learning; }
@@ -181,6 +195,7 @@ private:
 
     const RomajiTable* table_{nullptr};
     const JapaneseConverter* converter_{nullptr};
+    const MixedConverter* mixed_{nullptr};
     JapaneseLearningStore* learning_{nullptr};
     EnglishCandidates english_;
     std::vector<Unit> units_;

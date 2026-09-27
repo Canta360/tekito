@@ -3,6 +3,7 @@
 #include "Core/Japanese/JapaneseConverter.h"
 #include "Core/Japanese/JapaneseDictionary.h"
 #include "Core/Japanese/JapaneseLearning.h"
+#include "Core/Japanese/MixedConverter.h"
 #include "Core/Japanese/KanaText.h"
 #include "Core/Japanese/RomajiTable.h"
 
@@ -554,6 +555,32 @@ void TestPrediction(const RomajiTable& table, const MiniPack& pack) {
     Require(composer.Predictions().empty(), "converting puts predictions away");
 }
 
+void TestMixedConversion(const RomajiTable& table, const MiniPack& pack) {
+    tekito::japanese::EnglishWords english;
+    Require(english.Open(tekito::ExternalLexiconProvider::DataPackRoot() / L"japanese-english-words"),
+            "the English words pack opens");
+    Require(english.Score("meeting").value_or(0) > 3 && !english.Score("xqzv"), "English words have scores");
+
+    const tekito::japanese::JapaneseConverter converter(pack.dictionary, pack.matrix);
+    const tekito::japanese::MixedConverter mixed(pack.dictionary, pack.matrix, converter, table, english);
+    const auto meeting = mixed.Convert(L"watashinomeetingdesu");
+    Require(meeting.has_value(), "an English word among romaji is found");
+    RequireText(Joined(meeting->phrases, true), L"私の|meeting|です", "the English word is a phrase of its own");
+    Require(meeting->phrases[1].candidates.front().kind == tekito::japanese::PhraseCandidate::Kind::English,
+            "and English comes first for it");
+    Require(!mixed.Convert(L"watashinonamaehanakanodesu"), "all-Japanese keys are left to the usual conversion");
+    Require(!mixed.Convert(L"kikaigatomaru"), "romaji that happens to contain English stays Japanese");
+
+    JapaneseComposer composer(&table);
+    composer.SetConverter(&converter);
+    composer.SetMixedConverter(&mixed);
+    RequireText(Type(composer, L"watashinoMeetingdesu"), L"わたしのＭええちんｇです", "typing shows kana");
+    composer.Convert();
+    RequireText(composer.Preedit(), L"私のMeetingです", "Space converts the keys, keeping the English as typed");
+    composer.Cancel();
+    RequireText(composer.Preedit(), L"わたしのＭええちんｇです", "Esc goes back to the typed kana");
+}
+
 void TestComposerLearning(const RomajiTable& table, const MiniPack& pack) {
     const tekito::japanese::JapaneseConverter converter(pack.dictionary, pack.matrix);
     tekito::japanese::JapaneseLearningStore learning;
@@ -604,6 +631,7 @@ int main(int argc, char** argv) {
     TestEnglishInJapanese(*table, *pack);
     TestRomajiCorrection(*table, *pack);
     TestPrediction(*table, *pack);
+    TestMixedConversion(*table, *pack);
     if (argc > 1 && std::string_view(argv[1]) == "--dump") DumpConversions(*pack);
     std::cout << "All TEKITO Japanese tests passed.\n";
     return 0;

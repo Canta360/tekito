@@ -10,6 +10,10 @@ downloaded dataset:
                        ("konpyuutaa" -> computer), generated from the CMU
                        Pronouncing Dictionary in the pronunciation pack
   qwerty-typo-catalog  synthetic typos of common words, for evaluation only
+  japanese-english-words
+                       the common English words Japanese input recognizes
+                       inside romaji ("kyouhameetinggaaru"), with how common
+                       each is
 
 The pronunciation, frequency and standard-english packs must already be in
 data/. The output is deterministic: running it twice gives identical packs.
@@ -432,6 +436,32 @@ Every entry is a suggestion only; TEKITO never replaces a word with one.
 
 
 # ---------------------------------------------------------------------------
+# japanese-english-words
+
+
+def build_japanese_english_words(word_count: int) -> dict:
+    scores = read_first_fields(DATA / "frequency" / "word-scores.tsv")
+    words = sorted(common_words(word_count))
+    pack = new_pack("japanese-english-words")
+    with (pack / "words.tsv").open("w", encoding="utf-8", newline="\n") as output:
+        for word in words:
+            output.write(f"{word}\t{float(scores[word]):.4f}\n")
+    return finish(pack, "English Words for Japanese Input", "japanese-english-words", "words.tsv",
+                  "SCOWL-permission-terms + CC-BY-4.0",
+                  "scripts/build-expression-packs.py from the standard-english and frequency packs",
+                  f"""
+The {len(words):,} most common words of the standard-english pack, with their
+frequency scores from the frequency pack, so Japanese input can recognize
+English words typed among romaji.
+
+Words: SCOWL / ESDB word list (see the standard-english pack's NOTICE).
+Frequencies: Leipzig Corpora Collection (English news 2025, 1M sentences),
+licensed CC BY 4.0: D. Goldhahn, T. Eckart and U. Quasthoff, "Building Large
+Monolingual Dictionaries at the Leipzig Corpora Collection", LREC 2012.
+""", len(words))
+
+
+# ---------------------------------------------------------------------------
 # qwerty-typo-catalog
 
 KEY_ROWS = ["qwertyuiop", "asdfghjkl", "zxcvbnm"]
@@ -516,15 +546,17 @@ the Leipzig Corpora Collection (English news 2025), licensed CC BY 4.0.
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--only", choices=("slang", "social-expression", "japanese-phonetic",
-                                           "qwerty-typo-catalog"))
+                                           "qwerty-typo-catalog", "japanese-english-words"))
     parser.add_argument("--phonetic-words", type=int, default=20000)
     parser.add_argument("--typo-words", type=int, default=5000)
+    parser.add_argument("--english-words", type=int, default=40000)
     args = parser.parse_args()
     builders = {
         "slang": build_slang,
         "social-expression": build_social,
         "japanese-phonetic": lambda: build_japanese_phonetic(args.phonetic_words),
         "qwerty-typo-catalog": lambda: build_typo_catalog(args.typo_words),
+        "japanese-english-words": lambda: build_japanese_english_words(args.english_words),
     }
     for name, builder in builders.items():
         if args.only in (None, name):

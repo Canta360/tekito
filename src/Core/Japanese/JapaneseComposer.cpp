@@ -2,6 +2,7 @@
 
 #include "Core/Japanese/JapaneseLearning.h"
 #include "Core/Japanese/KanaText.h"
+#include "Core/Japanese/MixedConverter.h"
 #include "Core/Japanese/RomajiTable.h"
 #include "Core/TypoModel.h"
 
@@ -300,8 +301,13 @@ void JapaneseComposer::BuildPhrases(bool convert) {
     listOpen_ = false;
     if (reading.empty()) return;
     bool corrected = false;
+    bool mixed = false;
     if (convert && converter_) {
-        if (auto correction = CorrectRomaji()) {
+        if (auto conversion = mixed_ ? mixed_->Convert(Keys(false)) : std::nullopt) {
+            conversionReading_ = ApplyPunctuation(std::move(conversion->reading));
+            AddPhrases(std::move(conversion->phrases), conversionReading_);
+            mixed = true;
+        } else if (auto correction = CorrectRomaji()) {
             conversionReading_ = std::move(correction->reading);
             AddPhrases(std::move(correction->phrases), conversionReading_);
             corrected = true;
@@ -309,7 +315,7 @@ void JapaneseComposer::BuildPhrases(bool convert) {
             AddPhrases(converter_->Convert(reading), reading);
         }
     }
-    if (convert) AddEnglish(reading, corrected);
+    if (convert && !mixed) AddEnglish(reading, corrected);
     if (phrases_.empty()) {
         phrases_.push_back({0, reading.size(),
                             convert ? KanaCandidates(reading) : std::vector<PhraseCandidate>{}});
@@ -322,6 +328,19 @@ void JapaneseComposer::AddPhrases(std::vector<Phrase> phrases, const std::wstrin
         if (learning_) learning_->Reorder(reading.substr(phrase.begin, phrase.length), phrase.candidates);
         phrases_.push_back({phrase.begin, phrase.length, std::move(phrase.candidates)});
     }
+}
+
+std::vector<RomajiToken> JapaneseComposer::ParseRomaji(const RomajiTable& table, std::wstring_view keys) {
+    JapaneseComposer typing(&table);
+    for (const wchar_t key : keys) typing.Feed(key);
+    typing.FlushAll();
+    std::vector<RomajiToken> tokens;
+    tokens.reserve(typing.units_.size());
+    for (auto& unit : typing.units_) {
+        const bool leftover = LeftoverLetters(ToFullWidthAscii(unit.kana)) > 0;
+        tokens.push_back({unit.keys.size(), std::move(unit.kana), leftover});
+    }
+    return tokens;
 }
 
 std::wstring JapaneseComposer::ReadingOf(std::wstring_view keys, bool& complete) const {
