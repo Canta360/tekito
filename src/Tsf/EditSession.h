@@ -48,6 +48,11 @@ struct KeyInput {
         JapaneseNextPrediction,
         JapanesePreviousPrediction,
         JapaneseClearPrediction,
+        // An English word typed with Shift in Japanese: Enter commits it (no
+        // new line); a letter without Shift after its space goes back to
+        // Japanese and becomes `character`.
+        EnglishSegmentCommit,
+        EnglishSegmentEnd,
         // Not a key: commit the Japanese text (the mode or focus changed).
         JapaneseCommit,
         // Types `character` outside a composition (a full-width space).
@@ -56,6 +61,8 @@ struct KeyInput {
     wchar_t character{0};
     japanese::KanaForm kanaForm{japanese::KanaForm::Hiragana};
     int delta{0};
+    // The key belongs to an English word typed with Shift in Japanese.
+    bool englishSegment{false};
     std::size_t candidateIndex{0};
     PunctuationRole punctuationRole{PunctuationRole::ClauseSeparator};
 };
