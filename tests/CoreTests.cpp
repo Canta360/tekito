@@ -1875,7 +1875,6 @@ void TestSqliteUserSettingsRepository() {
     source.japaneseSpaceWidth = 2;
     source.japanesePunctuation = 3;
     source.japanesePredictionEnabled = false;
-    source.japaneseDropSpaceBeforeKana = false;
     source.candidateRows = 7;
     source.meaningsEnabled = false;
     source.excludedApps = {L"Code.exe", L"code.exe", L"game.exe"};
@@ -1915,7 +1914,7 @@ void TestSqliteUserSettingsRepository() {
                 loaded.lastJapaneseProfileMode == tekito::InputMode::Convert &&
                 loaded.japaneseProfileEnglishMode == tekito::InputMode::Direct &&
                 loaded.japaneseSpaceWidth == 2 && loaded.japanesePunctuation == 3 &&
-                !loaded.japanesePredictionEnabled && !loaded.japaneseDropSpaceBeforeKana &&
+                !loaded.japanesePredictionEnabled &&
                 loaded.candidateRows == 7 && !loaded.meaningsEnabled,
             "settings repository restores the keyboard and Japanese settings");
     Require(loaded.excludedApps.size() == 2 && loaded.excludedApps[0] == L"Code.exe" &&

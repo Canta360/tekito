@@ -97,10 +97,6 @@ const en = {
     },
     punctuation: { title: "Punctuation", description: "What the comma and period keys type." },
     prediction: { title: "Predict words", description: "Offers words that start with what you type. Tab picks one." },
-    dropSpace: {
-      title: "No space before kana",
-      description: "After an English word typed with Shift, the space goes away when you type on in Japanese.",
-    },
     forget: {
       title: "Forget Japanese choices",
       description: "Conversions go back to their usual order. English learning is kept.",
@@ -277,10 +273,6 @@ const ja = {
     },
     punctuation: { title: "句読点", description: "読点と句点のキーで入る記号です。" },
     prediction: { title: "予測候補", description: "打った読みで始まる語を出します。Tab で選びます。" },
-    dropSpace: {
-      title: "かなの前にスペースを入れない",
-      description: "Shift で打った英単語のあと、続けて日本語を打つとスペースを取り除きます。",
-    },
     forget: {
       title: "日本語の学習を消す",
       description: "変換の順番が元に戻ります。英語の学習は残ります。",

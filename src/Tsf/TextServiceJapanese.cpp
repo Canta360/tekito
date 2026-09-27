@@ -371,21 +371,7 @@ HRESULT TextService::HandleEnglishSegmentEnd(ITfContext* context, TfEditCookie e
                                              const KeyInput& input) {
     candidateWindow_.Hide();
     if (composition_) {
-        // The word as shown, without the space Space added if kana follows.
-        std::wstring text;
-        ComPtr<ITfRange> range;
-        if (SUCCEEDED(composition_->GetRange(range.Put()))) {
-            wchar_t buffer[256]{};
-            ULONG length = 0;
-            if (SUCCEEDED(range->GetText(editCookie, 0, buffer, 255, &length))) text.assign(buffer, length);
-        }
-        const bool dropSpace = input.type == KeyInput::Type::EnglishSegmentEnd &&
-                               userSettings_.japaneseDropSpaceBeforeKana;
-        if (dropSpace && !text.empty() && text.back() == L' ') {
-            text.pop_back();
-            const HRESULT hr = ReplaceComposition(context, editCookie, text);
-            if (FAILED(hr)) return hr;
-        }
+        // The word stays as shown, with any space the user typed after it.
         const HRESULT hr = EndComposition(editCookie);
         if (FAILED(hr)) return hr;
     }

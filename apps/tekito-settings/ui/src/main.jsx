@@ -36,7 +36,6 @@ const initialSettings = {
   japaneseSpaceWidth: 0,
   japanesePunctuation: 0,
   japanesePredictionEnabled: true,
-  japaneseDropSpaceBeforeKana: true,
   uiLanguage: 0,
   excludedApps: [],
   builtInExcludedApps: [],
@@ -339,9 +338,6 @@ function JapanesePage({ settings, setSetting, setConfirm, runAction }) {
         </Row>
         <Row title={j.prediction.title} description={j.prediction.description}>
           <Toggle label={j.prediction.title} checked={settings.japanesePredictionEnabled} onChange={(value) => setSetting("japanesePredictionEnabled", value)} />
-        </Row>
-        <Row title={j.dropSpace.title} description={j.dropSpace.description}>
-          <Toggle label={j.dropSpace.title} checked={settings.japaneseDropSpaceBeforeKana} onChange={(value) => setSetting("japaneseDropSpaceBeforeKana", value)} />
         </Row>
         <Row title={j.forget.title} description={j.forget.description}>
           <Button variant="quiet" onClick={askForget}>{t.learning.forget}</Button>
