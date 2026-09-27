@@ -35,7 +35,10 @@ add_library(tekito_core STATIC
     src/Core/ExternalSlangProvider.cpp
     src/Core/InputStateMachine.cpp
     src/Core/Japanese/JapaneseComposer.cpp
+    src/Core/Japanese/JapaneseConverter.cpp
+    src/Core/Japanese/JapaneseDictionary.cpp
     src/Core/Japanese/KanaText.cpp
+    src/Core/Japanese/MappedFile.cpp
     src/Core/Japanese/RomajiTable.cpp
     src/Core/LexiconProvider.cpp
     src/Core/MisspellingProvider.cpp
@@ -163,6 +166,9 @@ if(TEKITO_BUILD_TESTS)
     add_executable(tekito_japanese_tests tests/JapaneseTests.cpp)
     target_compile_options(tekito_japanese_tests PRIVATE ${TEKITO_WARNINGS})
     target_link_libraries(tekito_japanese_tests PRIVATE tekito_core)
+    # A small dictionary built from Mozc for the conversion tests.
+    target_compile_definitions(tekito_japanese_tests PRIVATE
+        TEKITO_TEST_DATA_DIR=L"${CMAKE_CURRENT_SOURCE_DIR}/tests/data")
     add_test(NAME tekito_japanese_tests COMMAND tekito_japanese_tests)
     set_tests_properties(tekito_japanese_tests PROPERTIES
         ENVIRONMENT "TEKITO_DATA_PACK_DIR=${CMAKE_CURRENT_SOURCE_DIR}/data")
@@ -212,7 +218,7 @@ if(TEKITO_BUILD_BENCHMARKS)
     add_executable(tekito_ja_benchmark benchmarks/JapaneseBenchmark.cpp)
     target_compile_definitions(tekito_ja_benchmark PRIVATE NOMINMAX UNICODE _UNICODE)
     target_compile_options(tekito_ja_benchmark PRIVATE ${TEKITO_WARNINGS})
-    target_link_libraries(tekito_ja_benchmark PRIVATE psapi)
+    target_link_libraries(tekito_ja_benchmark PRIVATE tekito_core psapi)
 endif()
 
 if(TEKITO_BUILD_EVAL)

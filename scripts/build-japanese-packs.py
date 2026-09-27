@@ -1,35 +1,40 @@
 """Builds the japanese-core data pack from the Mozc OSS dictionary.
 
-The pack holds two memory-mappable files:
+The pack holds two memory-mappable files, little-endian, read in place:
+TEKITO maps them and never parses or copies them, so every process shares
+the same pages.
 
-  dictionary.bin  (ja-dict-v1)   readings -> (left id, right id, cost, surface)
-  connection.bin  (ja-matrix-v1) the cost of each right id followed by each left id
-
-Both are little-endian and read in place: TEKITO maps them into memory and
-never parses or copies them, so every process shares the same pages.
-
-ja-dict-v1
-  header       magic "TKJD", u32 version (1), then u32 fields, see HEADER
-  reverse map  u8[65536]: UTF-16 code unit -> reading code (0 = not a reading character)
+dictionary.bin (ja-dict-v1): readings -> words
+  header       see DICT_HEADER; offsets are from the start of the file;
+               unknown_id is the id of UNKNOWN_POS
+  reverse map  u8[65536]: UTF-16 code unit -> reading code (0 = none)
   char table   u16[char_count]: reading code - 1 -> UTF-16 code unit
-  key offsets  u32[key_count + 1] into the key blob
-  key blob     reading codes, keys sorted bytewise
-  token starts u32[key_count + 1] into the token array
-  tokens       10 bytes each: u16 left id, u16 right id, u16 cost, u32 surface
+  record index u32[key_count + 1]: offsets of the records (the last one is
+               the end), in bytewise order of their keys
+  records      u8 key length, the key's reading codes, u16 word count, words
   surfaces     u16 units: [length][code units...]
 
-  A token's surface field holds the kind in bits 30-31 (0 = string in the
-  surface pool at the offset in bits 0-28, 1 = same as the reading,
-  2 = the reading in katakana) and, in bit 29, whether Mozc lists the entry
-  as a spelling correction (shown as a suggestion, never chosen on its own).
+  A word is: u8 flags, u16 left id, [u16 right id], u16 cost, [u24 surface]
+    flags bits 0-1  surface: 0 = from the surface pool (the u24 offset, in
+                    u16 units), 1 = the reading, 2 = the reading in katakana
+    flags bit 2     Mozc lists it as a spelling correction: offer it, never
+                    choose it on its own
+    flags bit 3     the right id equals the left id and is not stored
+  Words of a reading are sorted cheapest first.
 
-ja-matrix-v1
-  header       magic "TKJM", u32 version (1), u32 size, u32 format, u32 scale
-  costs        format 0: i16[size * size]; format 1: u8[size * size] times scale
-               indexed [right id of the previous word * size + left id of the next]
+connection.bin (ja-matrix-v1): how words join
+  header       see MATRIX_HEADER
+  costs        u8[size * size] times `scale`, indexed
+               [right id of the previous word * size + left id of the next]
+  row classes  u16[size]: the boundary class of each right id
+  boundaries   class_count rows of ceil(size / 8) bytes: bit `left id` is set
+               when a new phrase (bunsetsu) starts between the two words
+               (Mozc's segmenter.def rules; id 0 is the start and end)
 
 Usage:
-  python scripts/build-japanese-packs.py --mozc <dir with dictionary_oss/> --out data/japanese-core
+  python scripts/build-japanese-packs.py --mozc <Mozc src/data> --commit <sha> --out data/japanese-core
+  python scripts/build-japanese-packs.py --mozc ... --commit ... --out tests/data/japanese-mini \\
+      --sentences tests/data/japanese-mini-sentences.txt
 """
 
 from __future__ import annotations
@@ -37,21 +42,24 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import struct
 from pathlib import Path
 
-HEADER = struct.Struct("<4sIIIIIIIIIIIII")  # magic, version, then the fields below
-HEADER_FIELDS = (
-    "key_count", "token_count", "char_count", "surface_units",
-    "reverse_offset", "chars_offset", "key_offsets_offset", "key_blob_offset",
-    "token_starts_offset", "tokens_offset", "surfaces_offset", "file_size",
-)
-TOKEN = struct.Struct("<HHHI")
+DICT_HEADER = struct.Struct("<4s12I12x")  # magic + 12 fields + reserved
+DICT_FIELDS = ("version", "key_count", "word_count", "char_count", "reverse_offset",
+               "chars_offset", "index_offset", "records_offset", "surfaces_offset",
+               "surface_units", "file_size", "unknown_id")
+# The part of speech given to a character no word covers.
+UNKNOWN_POS = "名詞,一般,*,*,*,*,*"
+MATRIX_HEADER = struct.Struct("<4s9I")
+MATRIX_FIELDS = ("version", "size", "format", "scale", "class_count", "costs_offset",
+                 "classes_offset", "boundaries_offset", "file_size")
 
-SURFACE_POOL = 0
-SURFACE_READING = 1
-SURFACE_KATAKANA = 2
-SPELLING_CORRECTION_BIT = 1 << 29
+SURFACE_POOL, SURFACE_READING, SURFACE_KATAKANA = 0, 1, 2
+FLAG_SPELLING_CORRECTION = 1 << 2
+FLAG_SAME_IDS = 1 << 3
+COST_SCALE = 64
 
 
 def katakana(text: str) -> str:
@@ -59,14 +67,14 @@ def katakana(text: str) -> str:
 
 
 def sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as stream:
-        for block in iter(lambda: stream.read(1 << 20), b""):
-            digest.update(block)
-    return digest.hexdigest().upper()
+    return hashlib.sha256(path.read_bytes()).hexdigest().upper()
 
 
-def read_mozc_entries(mozc: Path):
+def align(blob: bytearray, boundary: int = 4) -> None:
+    blob.extend(b"\0" * (-len(blob) % boundary))
+
+
+def read_entries(mozc: Path):
     entries = []
     for path in sorted((mozc / "dictionary_oss").glob("dictionary0*.txt")):
         with path.open(encoding="utf-8") as stream:
@@ -80,11 +88,62 @@ def read_mozc_entries(mozc: Path):
     return entries
 
 
-def align(blob: bytearray, boundary: int) -> None:
-    blob.extend(b"\0" * (-len(blob) % boundary))
+def read_pos_names(mozc: Path) -> list[str]:
+    names = []
+    for line in (mozc / "dictionary_oss" / "id.def").read_text(encoding="utf-8").splitlines():
+        number, name = line.split(" ", 1)
+        if int(number) != len(names):
+            raise ValueError("id.def is not numbered in order")
+        names.append(name)
+    return names
 
 
-def build_dictionary(entries, out: Path) -> dict:
+def read_matrix(mozc: Path) -> tuple[int, list[int]]:
+    values = (mozc / "dictionary_oss" / "connection_single_column.txt").read_text().split()
+    size = int(values[0])
+    costs = list(map(int, values[1:]))
+    if len(costs) != size * size:
+        raise ValueError(f"expected {size * size} connection costs, found {len(costs)}")
+    return size, costs
+
+
+def boundary_rows(mozc: Path, pos_names: list[str]) -> list[int]:
+    """Mozc's segmenter.def as one bitmask of left ids per right id."""
+    size = len(pos_names)
+    everything = (1 << size) - 1
+
+    def ids(pattern: str) -> tuple[list[int], int]:
+        if pattern == "*":
+            return list(range(size)), everything
+        regex = re.compile(pattern.replace("*", "[^,]+"))
+        matched = [i for i, name in enumerate(pos_names) if regex.match(name)]
+        return matched, sum(1 << i for i in matched)
+
+    decided = [0] * size
+    boundary = [0] * size
+    rules = (mozc / "rules" / "segmenter.def").read_text(encoding="utf-8").splitlines()
+    for line in rules:
+        if not line.strip() or line.startswith("#"):
+            continue
+        left, right, result = line.split()
+        rights, _ = ids(left)       # the previous word's right id
+        _, lefts = ids(right)       # the next word's left id
+        for r in rights:
+            fresh = lefts & ~decided[r]
+            if not fresh:
+                continue
+            decided[r] |= fresh
+            if result.lower() == "true":
+                boundary[r] |= fresh
+    # Unmatched pairs, and anything next to the start or end, are boundaries.
+    for r in range(size):
+        boundary[r] |= everything & ~decided[r]
+        boundary[r] |= 1  # before the end (left id 0)
+    boundary[0] = everything  # after the start (right id 0)
+    return boundary
+
+
+def build_dictionary(entries, unknown_id: int, out: Path) -> dict:
     chars = sorted({c for reading, *_ in entries for c in reading})
     if len(chars) > 255:
         raise ValueError(f"{len(chars)} reading characters; ja-dict-v1 codes hold 255")
@@ -92,27 +151,34 @@ def build_dictionary(entries, out: Path) -> dict:
         raise ValueError("reading characters must be in the BMP")
     code_of = {c: i + 1 for i, c in enumerate(chars)}
 
-    def encode(reading: str) -> bytes:
-        return bytes(code_of[c] for c in reading)
-
     by_key: dict[bytes, list] = {}
     for entry in entries:
-        by_key.setdefault(encode(entry[0]), []).append(entry)
+        by_key.setdefault(bytes(code_of[c] for c in entry[0]), []).append(entry)
     keys = sorted(by_key)
 
     surface_units: list[int] = []
     surface_offset: dict[str, int] = {}
-    key_offsets, key_blob, token_starts, tokens = [0], bytearray(), [0], bytearray()
+    records = bytearray()
+    index = []
     for key in keys:
-        key_blob.extend(key)
-        key_offsets.append(len(key_blob))
-        # Cheapest first, so a reader that stops early keeps the likely words.
-        for reading, left, right, cost, surface, spelling in sorted(by_key[key], key=lambda e: e[3]):
+        if len(key) > 255:
+            raise ValueError("reading longer than 255 characters")
+        words = sorted(by_key[key], key=lambda e: (e[3], e[4]))
+        if len(words) > 0xFFFF:
+            raise ValueError("too many words for one reading")
+        index.append(len(records))
+        records.append(len(key))
+        records.extend(key)
+        records.extend(struct.pack("<H", len(words)))
+        for reading, left, right, cost, surface, spelling in words:
+            if not (0 <= cost <= 0xFFFF and 0 <= left <= 0xFFFF and 0 <= right <= 0xFFFF):
+                raise ValueError(f"value out of range for {reading}")
             if surface == reading:
-                ref = SURFACE_READING << 30
+                kind, offset = SURFACE_READING, None
             elif surface == katakana(reading):
-                ref = SURFACE_KATAKANA << 30
+                kind, offset = SURFACE_KATAKANA, None
             else:
+                kind = SURFACE_POOL
                 offset = surface_offset.get(surface)
                 if offset is None:
                     units = surface.encode("utf-16-le")
@@ -120,64 +186,83 @@ def build_dictionary(entries, out: Path) -> dict:
                     surface_offset[surface] = offset
                     surface_units.append(len(units) // 2)
                     surface_units.extend(struct.unpack(f"<{len(units) // 2}H", units))
-                if offset >= SPELLING_CORRECTION_BIT:
+                if offset >= 1 << 24:
                     raise ValueError("surface pool too large for ja-dict-v1")
-                ref = (SURFACE_POOL << 30) | offset
-            if spelling:
-                ref |= SPELLING_CORRECTION_BIT
-            tokens.extend(TOKEN.pack(left, right, cost, ref))
-        token_starts.append(len(tokens) // TOKEN.size)
+            flags = kind | (FLAG_SPELLING_CORRECTION if spelling else 0)
+            if left == right:
+                flags |= FLAG_SAME_IDS
+            records.append(flags)
+            records.extend(struct.pack("<H", left))
+            if left != right:
+                records.extend(struct.pack("<H", right))
+            records.extend(struct.pack("<H", cost))
+            if offset is not None:
+                records.extend(offset.to_bytes(3, "little"))
+    index.append(len(records))
 
     reverse = bytearray(65536)
     for c, code in code_of.items():
         reverse[ord(c)] = code
 
-    blob = bytearray(HEADER.size)
+    blob = bytearray(DICT_HEADER.size)
     offsets = {}
-    for name, data, boundary in (
-        ("reverse_offset", bytes(reverse), 4),
-        ("chars_offset", struct.pack(f"<{len(chars)}H", *map(ord, chars)), 4),
-        ("key_offsets_offset", struct.pack(f"<{len(key_offsets)}I", *key_offsets), 4),
-        ("key_blob_offset", bytes(key_blob), 4),
-        ("token_starts_offset", struct.pack(f"<{len(token_starts)}I", *token_starts), 4),
-        ("tokens_offset", bytes(tokens), 4),
-        ("surfaces_offset", struct.pack(f"<{len(surface_units)}H", *surface_units), 4),
+    for name, data in (
+        ("reverse_offset", bytes(reverse)),
+        ("chars_offset", struct.pack(f"<{len(chars)}H", *map(ord, chars))),
+        ("index_offset", b""),  # placeholder, filled below
+        ("records_offset", bytes(records)),
+        ("surfaces_offset", struct.pack(f"<{len(surface_units)}H", *surface_units)),
     ):
-        align(blob, boundary)
+        align(blob)
         offsets[name] = len(blob)
-        blob.extend(data)
-    fields = dict(offsets, key_count=len(keys), token_count=len(tokens) // TOKEN.size,
-                  char_count=len(chars), surface_units=len(surface_units), file_size=len(blob))
-    blob[: HEADER.size] = HEADER.pack(b"TKJD", 1, *(fields[name] for name in HEADER_FIELDS))
+        if name == "index_offset":
+            blob.extend(struct.pack(f"<{len(index)}I", *index))
+        else:
+            blob.extend(data)
+    fields = dict(offsets, version=1, key_count=len(keys), word_count=len(entries),
+                  char_count=len(chars), surface_units=len(surface_units), file_size=len(blob),
+                  unknown_id=unknown_id)
+    blob[: DICT_HEADER.size] = DICT_HEADER.pack(b"TKJD", *(fields[name] for name in DICT_FIELDS))
     out.write_bytes(blob)
-    sections = {
-        "key_blob": len(key_blob),
-        "key_offsets": 4 * len(key_offsets),
-        "token_starts": 4 * len(token_starts),
-        "tokens": len(tokens),
-        "surfaces": 2 * len(surface_units),
-        "reverse_map": len(reverse),
-    }
-    return {"keys": len(keys), "tokens": fields["token_count"], "chars": len(chars),
-            "pooled_surfaces": len(surface_offset), "bytes": len(blob), "sections": sections}
+    return {"keys": len(keys), "words": len(entries), "chars": len(chars),
+            "pooled_surfaces": len(surface_offset), "bytes": len(blob),
+            "sections": {"records": len(records), "index": 4 * len(index),
+                         "surfaces": 2 * len(surface_units), "reverse_map": len(reverse)}}
 
 
-def build_matrix(mozc: Path, out: Path, quantize: int) -> dict:
-    values = (mozc / "dictionary_oss" / "connection_single_column.txt").read_text().split()
-    size = int(values[0])
-    costs = list(map(int, values[1:]))
-    if len(costs) != size * size:
-        raise ValueError(f"expected {size * size} connection costs, found {len(costs)}")
-    if quantize:
-        packed = bytes(min(255, (c + quantize // 2) // quantize) for c in costs)
-        body, fmt = packed, 1
-    else:
-        if max(costs) > 32767:
-            raise ValueError("connection cost does not fit in i16")
-        body, fmt = struct.pack(f"<{len(costs)}h", *costs), 0
-    out.write_bytes(struct.pack("<4sIIII", b"TKJM", 1, size, fmt, quantize or 1) + body)
-    return {"size": size, "format": fmt, "scale": quantize or 1, "bytes": out.stat().st_size,
+def build_matrix(size: int, costs: list[int], boundary: list[int], out: Path) -> dict:
+    row_bytes = (size + 7) // 8
+    classes: dict[int, int] = {}
+    row_class = []
+    for mask in boundary:
+        row_class.append(classes.setdefault(mask, len(classes)))
+    blob = bytearray(MATRIX_HEADER.size)
+    offsets = {}
+    align(blob)
+    offsets["costs_offset"] = len(blob)
+    blob.extend(min(255, (c + COST_SCALE // 2) // COST_SCALE) for c in costs)
+    align(blob)
+    offsets["classes_offset"] = len(blob)
+    blob.extend(struct.pack(f"<{size}H", *row_class))
+    align(blob)
+    offsets["boundaries_offset"] = len(blob)
+    for mask in classes:
+        blob.extend(mask.to_bytes(row_bytes, "little"))
+    fields = dict(offsets, version=1, size=size, format=1, scale=COST_SCALE,
+                  class_count=len(classes), file_size=len(blob))
+    blob[: MATRIX_HEADER.size] = MATRIX_HEADER.pack(b"TKJM", *(fields[n] for n in MATRIX_FIELDS))
+    out.write_bytes(blob)
+    return {"size": size, "boundary_classes": len(classes), "bytes": len(blob),
             "max_cost": max(costs)}
+
+
+def keep_for_sentences(entries, sentences: list[str], unknown_id: int):
+    """Only the words whose reading occurs in the given readings, with the
+    part-of-speech ids they use renumbered from 1 (0 stays the start/end)."""
+    wanted = [e for e in entries if any(e[0] in s for s in sentences)]
+    used = sorted({0, unknown_id} | {e[1] for e in wanted} | {e[2] for e in wanted})
+    remap = {old: new for new, old in enumerate(used)}
+    return [(r, remap[l], remap[rt], c, s, sp) for r, l, rt, c, s, sp in wanted], used
 
 
 def write_notice(mozc: Path, out: Path, commit: str) -> None:
@@ -194,32 +279,48 @@ def write_notice(mozc: Path, out: Path, commit: str) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--mozc", type=Path, required=True,
-                        help="Mozc src/data directory holding dictionary_oss/ and LICENSE")
+                        help="Mozc src/data directory holding dictionary_oss/, rules/ and LICENSE")
     parser.add_argument("--commit", required=True, help="Mozc commit the files came from")
     parser.add_argument("--out", type=Path, required=True)
-    parser.add_argument("--quantize", type=int, default=0,
-                        help="store connection costs as u8 in steps of this size (0 = i16)")
+    parser.add_argument("--sentences", type=Path,
+                        help="build a small pack for tests: keep only words found in these readings")
     args = parser.parse_args()
 
+    entries = read_entries(args.mozc)
+    pos_names = read_pos_names(args.mozc)
+    size, costs = read_matrix(args.mozc)
+    if size != len(pos_names):
+        raise ValueError("id.def and the connection matrix disagree on the id count")
+    unknown_id = pos_names.index(UNKNOWN_POS)
+    if args.sentences:
+        sentences = [line.strip() for line in args.sentences.read_text(encoding="utf-8").splitlines()
+                     if line.strip() and not line.startswith("#")]
+        entries, used = keep_for_sentences(entries, sentences, unknown_id)
+        costs = [costs[r * size + l] for r in used for l in used]
+        pos_names = [pos_names[i] for i in used]
+        unknown_id = used.index(unknown_id)
+        size = len(used)
+    boundary = boundary_rows(args.mozc, pos_names)
+
     args.out.mkdir(parents=True, exist_ok=True)
-    dictionary = build_dictionary(read_mozc_entries(args.mozc), args.out / "dictionary.bin")
-    matrix = build_matrix(args.mozc, args.out / "connection.bin", args.quantize)
+    dictionary = build_dictionary(entries, unknown_id, args.out / "dictionary.bin")
+    matrix = build_matrix(size, costs, boundary, args.out / "connection.bin")
     write_notice(args.mozc, args.out / "NOTICE", args.commit)
     manifest = {
         "pack_id": "japanese-core",
         "display_name": "Japanese Conversion Dictionary",
         "schema_version": 1,
-        "version": "prototype",
+        "version": f"mozc-{args.commit[:12]}",
         "language": "ja-JP",
         "type": "japanese-dictionary",
         "format": "ja-dict-v1+ja-matrix-v1",
         "file": "dictionary.bin",
         "index_file": "connection.bin",
-        "entry_count": dictionary["tokens"],
+        "entry_count": dictionary["words"],
         "sha256": {"file": sha256(args.out / "dictionary.bin"),
                    "index": sha256(args.out / "connection.bin")},
         "license": "IPAdic + BSD-3-Clause (Mozc)",
-        "source": f"https://github.com/google/mozc/tree/{args.commit}/src/data/dictionary_oss",
+        "source": f"https://github.com/google/mozc/tree/{args.commit}/src/data",
         "notice_file": "NOTICE",
     }
     (args.out / "manifest.json").write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n",

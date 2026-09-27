@@ -1,0 +1,11 @@
+# Readings the unit tests convert. scripts/build-japanese-packs.py keeps only
+# the Mozc words whose reading appears in one of these lines, so the test pack
+# stays small (tests/data/japanese-mini).
+わたしのなまえはなかのです
+きょうはいいてんきですね
+にほんごをにゅうりょくする
+かんじにへんかんします
+あしたはあめがふるでしょう
+とうきょうにすんでいます
+ここではきものをぬぐ
+きかいがとまる

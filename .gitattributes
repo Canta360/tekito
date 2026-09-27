@@ -9,3 +9,6 @@ data/** -text
 *.ttf binary
 *.png binary
 *.gz binary
+
+# Test fixtures include binary data packs.
+tests/data/** -text

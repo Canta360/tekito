@@ -1,0 +1,19 @@
+{
+  "pack_id": "japanese-core",
+  "display_name": "Japanese Conversion Dictionary",
+  "schema_version": 1,
+  "version": "mozc-b9c3fcbd6d76",
+  "language": "ja-JP",
+  "type": "japanese-dictionary",
+  "format": "ja-dict-v1+ja-matrix-v1",
+  "file": "dictionary.bin",
+  "index_file": "connection.bin",
+  "entry_count": 2146,
+  "sha256": {
+    "file": "7207B99BEF41E77077C1D0A486FA983B5008C17E0B7742AE1D5F9643B7F92160",
+    "index": "A240B3217C6A89DC961692DF7A0AB38CF32563BAD4D7DBE95C69CC86D7E127A6"
+  },
+  "license": "IPAdic + BSD-3-Clause (Mozc)",
+  "source": "https://github.com/google/mozc/tree/b9c3fcbd6d76b19649ef572324fa9da2559bc18e/src/data",
+  "notice_file": "NOTICE"
+}
