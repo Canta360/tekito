@@ -97,7 +97,8 @@ bool IsWordCharacter(wchar_t ch) {
     return std::iswalpha(ch) != 0 || ch == L'\'' || ch == L'\u2019';
 }
 
-// A word may begin after whitespace, an opening bracket or quote, or a dash.
+// A word may begin after whitespace, an opening bracket or quote, a dash, or
+// Japanese text.
 // Right after anything else -- a letter or digit we did not compose, or the
 // '/', '.', '@', ':', '_' of a URL, address, path or identifier -- the typing
 // is part of a token that must be left exactly as typed.
@@ -105,6 +106,9 @@ bool CanStartWordAfter(std::wstring_view preceding) {
     if (preceding.empty()) return true;
     const wchar_t ch = preceding.back();
     if (std::iswspace(ch)) return true;
+    // Japanese text puts English words right after kana, kanji or
+    // full-width marks, with no space ("Macを使う", "これはMac").
+    if (ch >= L'　') return true;
     switch (ch) {
     case L'(': case L'[': case L'{': case L'<':
     case L'"': case L'\'': case L'\u201C': case L'\u2018': case L'\u00AB':
@@ -455,6 +459,7 @@ TextService::TextService()
       processIsElevated_(CurrentProcessIsElevated()),
       processName_(CurrentProcessName()) {
     processPrefersPassThrough_ = IsBuiltInPassThroughProcess(processName_);
+    japanese_.SetEnglishCandidates([this](std::wstring_view keys) { return EnglishWordsFor(keys); });
     ++g_objectCount;
     Trace(L"TextService ctor");
 }
