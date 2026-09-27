@@ -3,6 +3,7 @@
 #include "Core/Japanese/KanaText.h"
 #include "Core/Japanese/RomajiTable.h"
 
+#include <algorithm>
 #include <cwctype>
 
 namespace tekito::japanese {
@@ -30,6 +31,10 @@ std::wstring ChangeCase(std::wstring text, int letterCase) {
     return text;
 }
 
+bool IsAlphanumeric(KanaForm form) {
+    return form == KanaForm::FullWidthAlphanumeric || form == KanaForm::HalfWidthAlphanumeric;
+}
+
 }  // namespace
 
 void JapaneseComposer::SetTable(const RomajiTable* table) noexcept {
@@ -39,16 +44,13 @@ void JapaneseComposer::SetTable(const RomajiTable* table) noexcept {
 
 void JapaneseComposer::SetInputForm(KanaForm form) noexcept {
     inputForm_ = form == KanaForm::Katakana ? KanaForm::Katakana : KanaForm::Hiragana;
-    if (!converted_) form_ = inputForm_;
 }
 
 void JapaneseComposer::Insert(wchar_t key) {
-    if (converted_) {
-        // The caller commits a converted text before typing on; if it did
-        // not, typing continues from the typed kana.
-        converted_ = false;
-        form_ = inputForm_;
-    }
+    // The caller commits a converted text before typing on; if it did not,
+    // typing continues from the typed kana.
+    phrases_.clear();
+    listOpen_ = false;
     Feed(key);
 }
 
@@ -90,9 +92,8 @@ void JapaneseComposer::FlushOnce() {
     for (std::size_t length = pending.size(); length > 0; --length) {
         const std::wstring_view head(pending.data(), length);
         const RomajiRule* rule = table_ ? table_->Find(head) : nullptr;
-        if (!rule) continue;
         // A rule that leaves keys pending cannot settle anything here.
-        if (!rule->pending.empty()) continue;
+        if (!rule || !rule->pending.empty()) continue;
         Emit(std::wstring(head), rule->output);
         for (wchar_t rest : std::wstring_view(pending).substr(length)) Feed(rest);
         return;
@@ -114,9 +115,8 @@ void JapaneseComposer::Emit(std::wstring keys, std::wstring kana) {
 }
 
 void JapaneseComposer::Backspace() {
-    if (converted_) {
-        converted_ = false;
-        form_ = inputForm_;
+    if (IsConverted()) {
+        Cancel();
         return;
     }
     if (!pending_.empty()) {
@@ -136,56 +136,166 @@ void JapaneseComposer::Backspace() {
 }
 
 void JapaneseComposer::Cancel() {
-    if (converted_) {
-        converted_ = false;
-        form_ = inputForm_;
+    if (IsConverted()) {
+        phrases_.clear();
+        listOpen_ = false;
         return;
     }
     Clear();
 }
 
+std::wstring JapaneseComposer::Reading() const {
+    std::wstring kana;
+    for (const auto& unit : units_) kana += unit.kana;
+    // Keys the table did not turn into kana are full-width, as in Microsoft
+    // IME ("ｋ" while "ka" is being typed).
+    return ApplyPunctuation(ToFullWidthAscii(kana));
+}
+
+std::vector<PhraseCandidate> JapaneseComposer::KanaCandidates(std::wstring_view reading) const {
+    PhraseCandidate hiragana{std::wstring(reading), 0, PhraseCandidate::Kind::Hiragana, false};
+    PhraseCandidate katakana{ToKatakana(reading), 0, PhraseCandidate::Kind::Katakana, false};
+    // Space gives the other kana than the one being typed.
+    if (inputForm_ == KanaForm::Katakana) return {hiragana, katakana};
+    return {katakana, hiragana};
+}
+
+void JapaneseComposer::BuildPhrases(bool convert) {
+    FlushAll();
+    const std::wstring reading = Reading();
+    phrases_.clear();
+    focus_ = 0;
+    listOpen_ = false;
+    if (reading.empty()) return;
+    if (convert && converter_) {
+        for (auto& phrase : converter_->Convert(reading)) {
+            if (phrase.candidates.empty()) continue;
+            phrases_.push_back({phrase.begin, phrase.length, std::move(phrase.candidates)});
+        }
+    }
+    if (phrases_.empty()) {
+        phrases_.push_back({0, reading.size(),
+                            convert ? KanaCandidates(reading) : std::vector<PhraseCandidate>{}});
+    }
+}
+
 void JapaneseComposer::Convert() {
     if (!IsComposing()) return;
-    FlushAll();
-    form_ = converted_ && form_ == KanaForm::Katakana ? KanaForm::Hiragana
-            : converted_ && form_ == KanaForm::Hiragana ? KanaForm::Katakana
-            : inputForm_ == KanaForm::Katakana         ? KanaForm::Hiragana
-                                                        : KanaForm::Katakana;
-    converted_ = true;
+    if (!IsConverted()) {
+        BuildPhrases(true);
+        return;
+    }
+    NextCandidate();
+}
+
+void JapaneseComposer::NextCandidate() {
+    if (!IsConverted()) {
+        Convert();
+        return;
+    }
+    auto& phrase = phrases_[focus_];
+    if (phrase.candidates.empty()) phrase.candidates = KanaCandidates(Reading().substr(phrase.begin, phrase.length));
+    if (!phrase.form) phrase.selected = (phrase.selected + 1) % phrase.candidates.size();
+    phrase.form.reset();
+    listOpen_ = true;
+}
+
+void JapaneseComposer::PreviousCandidate() {
+    if (!IsConverted()) {
+        Convert();
+        return;
+    }
+    auto& phrase = phrases_[focus_];
+    if (phrase.candidates.empty()) phrase.candidates = KanaCandidates(Reading().substr(phrase.begin, phrase.length));
+    const std::size_t count = phrase.candidates.size();
+    if (!phrase.form) phrase.selected = (phrase.selected + count - 1) % count;
+    phrase.form.reset();
+    listOpen_ = true;
+}
+
+void JapaneseComposer::SelectCandidate(std::size_t index) {
+    if (!IsConverted()) return;
+    auto& phrase = phrases_[focus_];
+    if (index >= phrase.candidates.size()) return;
+    phrase.selected = index;
+    phrase.form.reset();
+    listOpen_ = false;
+}
+
+void JapaneseComposer::MoveFocus(int delta) {
+    if (!IsConverted()) return;
+    listOpen_ = false;
+    const auto count = static_cast<int>(phrases_.size());
+    focus_ = static_cast<std::size_t>(std::clamp(static_cast<int>(focus_) + delta, 0, count - 1));
+}
+
+void JapaneseComposer::ResizeFocus(int delta) {
+    if (!IsConverted() || !converter_) return;
+    const std::wstring reading = Reading();
+    const auto& focused = phrases_[focus_];
+    const auto length = static_cast<long long>(focused.length) + delta;
+    if (length < 1 || focused.begin + static_cast<std::size_t>(length) > reading.size()) return;
+
+    // Phrases before the focus keep their length and choice; the focused one
+    // takes its new length; the rest is split and converted again.
+    std::vector<std::size_t> fixed;
+    for (std::size_t i = 0; i < focus_; ++i) fixed.push_back(phrases_[i].length);
+    fixed.push_back(static_cast<std::size_t>(length));
+    std::vector<PhraseState> kept(phrases_.begin(), phrases_.begin() + static_cast<long long>(focus_));
+
+    phrases_.clear();
+    for (auto& phrase : converter_->Convert(reading, fixed)) {
+        phrases_.push_back({phrase.begin, phrase.length, std::move(phrase.candidates)});
+    }
+    if (phrases_.size() <= focus_) {
+        BuildPhrases(true);
+        return;
+    }
+    for (std::size_t i = 0; i < kept.size(); ++i) phrases_[i] = std::move(kept[i]);
+    listOpen_ = false;
 }
 
 void JapaneseComposer::CycleKana() {
     if (!IsComposing()) return;
-    FlushAll();
-    const bool cycling = converted_ && (form_ == KanaForm::Hiragana || form_ == KanaForm::Katakana ||
-                                        form_ == KanaForm::HalfWidthKatakana);
-    if (!cycling) {
+    if (!IsConverted()) BuildPhrases(false);
+    auto& phrase = phrases_[focus_];
+    if (!phrase.form || IsAlphanumeric(*phrase.form)) {
         // First press: the other kana than the one being typed.
-        form_ = inputForm_ == KanaForm::Katakana ? KanaForm::Hiragana : KanaForm::Katakana;
-    } else if (form_ == KanaForm::Hiragana) {
-        form_ = KanaForm::Katakana;
-    } else if (form_ == KanaForm::Katakana) {
-        form_ = KanaForm::HalfWidthKatakana;
+        phrase.form = inputForm_ == KanaForm::Katakana ? KanaForm::Hiragana : KanaForm::Katakana;
+    } else if (*phrase.form == KanaForm::Hiragana) {
+        phrase.form = KanaForm::Katakana;
+    } else if (*phrase.form == KanaForm::Katakana) {
+        phrase.form = KanaForm::HalfWidthKatakana;
     } else {
-        form_ = KanaForm::Hiragana;
+        phrase.form = KanaForm::Hiragana;
     }
-    converted_ = true;
+    listOpen_ = false;
 }
 
 void JapaneseComposer::Transliterate(KanaForm form) {
     if (!IsComposing()) return;
-    FlushAll();
-    const bool alphanumeric = form == KanaForm::FullWidthAlphanumeric ||
-                              form == KanaForm::HalfWidthAlphanumeric;
-    letterCase_ = alphanumeric && converted_ && form_ == form ? (letterCase_ + 1) % 4 : 0;
-    form_ = form;
-    converted_ = true;
+    if (!IsConverted()) BuildPhrases(false);
+    auto& phrase = phrases_[focus_];
+    phrase.letterCase = IsAlphanumeric(form) && phrase.form == form ? (phrase.letterCase + 1) % 4 : 0;
+    phrase.form = form;
+    listOpen_ = false;
 }
 
 std::wstring JapaneseComposer::Keys(bool includePending) const {
     std::wstring keys;
     for (const auto& unit : units_) keys += unit.keys;
     if (includePending) keys += pending_;
+    return keys;
+}
+
+std::wstring JapaneseComposer::KeysFor(std::size_t begin, std::size_t length) const {
+    std::wstring keys;
+    std::size_t at = 0;
+    for (const auto& unit : units_) {
+        const std::size_t end = at + unit.kana.size();
+        if (end > begin && at < begin + length) keys += unit.keys;
+        at = end;
+    }
     return keys;
 }
 
@@ -201,35 +311,64 @@ std::wstring JapaneseComposer::ApplyPunctuation(std::wstring text) const {
     return text;
 }
 
-std::wstring JapaneseComposer::Render(bool includePending) const {
-    switch (form_) {
-    case KanaForm::FullWidthAlphanumeric:
-        return ToFullWidthAscii(ChangeCase(Keys(includePending), letterCase_));
-    case KanaForm::HalfWidthAlphanumeric:
-        return ChangeCase(Keys(includePending), letterCase_);
-    default:
-        break;
-    }
-    std::wstring kana;
-    for (const auto& unit : units_) kana += unit.kana;
-    // Keys the table did not turn into kana are shown full-width, as in
-    // Microsoft IME ("ｋ" while "ka" is being typed).
-    kana = ApplyPunctuation(ToFullWidthAscii(kana));
+std::wstring JapaneseComposer::RenderTyping(bool includePending) const {
+    std::wstring kana = Reading();
     if (includePending) kana += ToFullWidthAscii(pending_);
-    switch (form_) {
-    case KanaForm::Katakana: return ToKatakana(kana);
-    case KanaForm::HalfWidthKatakana: return ToHalfWidthKatakana(kana);
-    default: return kana;
+    return inputForm_ == KanaForm::Katakana ? ToKatakana(kana) : kana;
+}
+
+std::wstring JapaneseComposer::FormText(KanaForm form, std::size_t begin, std::size_t length,
+                                        int letterCase) const {
+    const std::wstring reading = Reading().substr(begin, length);
+    switch (form) {
+    case KanaForm::Hiragana: return ToHiragana(reading);
+    case KanaForm::Katakana: return ToKatakana(reading);
+    case KanaForm::HalfWidthKatakana: return ToHalfWidthKatakana(reading);
+    case KanaForm::FullWidthAlphanumeric:
+        return ToFullWidthAscii(ChangeCase(KeysFor(begin, length), letterCase));
+    case KanaForm::HalfWidthAlphanumeric:
+        return ChangeCase(KeysFor(begin, length), letterCase);
     }
+    return reading;
+}
+
+std::wstring JapaneseComposer::PhraseText(const PhraseState& phrase) const {
+    if (phrase.form) return FormText(*phrase.form, phrase.begin, phrase.length, phrase.letterCase);
+    if (phrase.selected < phrase.candidates.size()) return phrase.candidates[phrase.selected].text;
+    return Reading().substr(phrase.begin, phrase.length);
 }
 
 std::wstring JapaneseComposer::Preedit() const {
-    return Render(true);
+    if (!IsConverted()) return RenderTyping(true);
+    std::wstring text;
+    for (const auto& phrase : phrases_) text += PhraseText(phrase);
+    return text;
+}
+
+std::vector<PreeditSegment> JapaneseComposer::Segments() const {
+    if (!IsConverted()) {
+        if (!IsComposing()) return {};
+        return {{RenderTyping(true), false, false}};
+    }
+    std::vector<PreeditSegment> segments;
+    for (std::size_t i = 0; i < phrases_.size(); ++i) {
+        segments.push_back({PhraseText(phrases_[i]), true, i == focus_});
+    }
+    return segments;
+}
+
+const std::vector<PhraseCandidate>* JapaneseComposer::FocusedCandidates() const noexcept {
+    if (!IsConverted()) return nullptr;
+    return &phrases_[focus_].candidates;
+}
+
+std::size_t JapaneseComposer::FocusedSelection() const noexcept {
+    return IsConverted() ? phrases_[focus_].selected : 0;
 }
 
 std::wstring JapaneseComposer::Commit() {
     FlushAll();
-    auto text = Render(false);
+    auto text = IsConverted() ? Preedit() : RenderTyping(false);
     Clear();
     return text;
 }
@@ -237,9 +376,9 @@ std::wstring JapaneseComposer::Commit() {
 void JapaneseComposer::Clear() noexcept {
     units_.clear();
     pending_.clear();
-    converted_ = false;
-    form_ = inputForm_;
-    letterCase_ = 0;
+    phrases_.clear();
+    focus_ = 0;
+    listOpen_ = false;
 }
 
 }  // namespace tekito::japanese

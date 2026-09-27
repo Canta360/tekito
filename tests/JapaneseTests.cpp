@@ -321,6 +321,65 @@ void TestConversion(const MiniPack& pack) {
     Require(converter.Convert(L"").empty(), "nothing to convert gives no phrases");
 }
 
+std::wstring SegmentsText(const JapaneseComposer& composer) {
+    std::wstring out;
+    for (const auto& segment : composer.Segments()) {
+        if (!out.empty()) out += L'|';
+        if (segment.focused) out += L'*';
+        out += segment.text;
+    }
+    return out;
+}
+
+void TestComposerConversion(const RomajiTable& table, const MiniPack& pack) {
+    const tekito::japanese::JapaneseConverter converter(pack.dictionary, pack.matrix);
+    JapaneseComposer composer(&table);
+    composer.SetConverter(&converter);
+
+    Type(composer, L"watashinonamaehanakanodesu");
+    composer.Convert();
+    RequireText(SegmentsText(composer), L"*私の|名前は|中野です", "Space converts into phrases");
+    Require(!composer.IsCandidateListOpen(), "the first Space does not open the list");
+    composer.Convert();
+    Require(composer.IsCandidateListOpen(), "the second Space opens the list");
+    Require(composer.FocusedSelection() == 1, "the second Space picks the next candidate");
+    composer.PreviousCandidate();
+    RequireText(SegmentsText(composer), L"*私の|名前は|中野です", "Shift+Space goes back");
+    composer.SelectCandidate(0);
+    Require(!composer.IsCandidateListOpen(), "choosing a candidate closes the list");
+
+    composer.MoveFocus(1);
+    RequireText(SegmentsText(composer), L"私の|*名前は|中野です", "Right moves to the next phrase");
+    composer.Transliterate(KanaForm::Katakana);
+    RequireText(SegmentsText(composer), L"私の|*ナマエハ|中野です", "F7 writes the focused phrase in katakana");
+    composer.Transliterate(KanaForm::HalfWidthAlphanumeric);
+    RequireText(SegmentsText(composer), L"私の|*namaeha|中野です", "F10 gives the keys typed for the phrase");
+    composer.MoveFocus(5);
+    RequireText(SegmentsText(composer), L"私の|namaeha|*中野です", "focus stops at the last phrase");
+
+    composer.MoveFocus(-5);
+    composer.ResizeFocus(-1);
+    const auto resized = SegmentsText(composer);
+    Require(resized.starts_with(L"*私|の"), "Shift+Left shortens the focused phrase to わたし");
+    composer.ResizeFocus(-10);
+    RequireText(SegmentsText(composer), resized, "a phrase cannot shrink below one character");
+    composer.ResizeFocus(1);
+    Require(SegmentsText(composer).starts_with(L"*私の|"), "Shift+Right gives the character back");
+
+    composer.Cancel();
+    Require(composer.IsComposing() && !composer.IsConverted(), "Esc goes back to the kana");
+    composer.Convert();
+    RequireText(composer.Commit(), L"私の名前は中野です", "Enter commits every phrase");
+    Require(!composer.IsComposing(), "committing clears the composition");
+
+    Type(composer, L"kikaigatomaru");
+    composer.Convert();
+    const auto* candidates = composer.FocusedCandidates();
+    Require(candidates && candidates->size() >= 3, "the focused phrase has candidates");
+    composer.Insert(L'a');
+    Require(!composer.IsConverted(), "typing after a conversion starts typing again");
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -335,6 +394,7 @@ int main(int argc, char** argv) {
     TestDictionary(*pack);
     TestDamagedPacks();
     TestConversion(*pack);
+    TestComposerConversion(*table, *pack);
     if (argc > 1 && std::string_view(argv[1]) == "--dump") DumpConversions(*pack);
     std::cout << "All TEKITO Japanese tests passed.\n";
     return 0;
