@@ -91,11 +91,20 @@ public:
 
     HRESULT HandleKeyInEditSession(ITfContext* context, TfEditCookie editCookie,
                                    const KeyInput& input);
+    HRESULT HandleKeyInEditSessionCore(ITfContext* context, TfEditCookie editCookie,
+                                       const KeyInput& input);
 
 private:
     ~TextService();
 
     bool TranslateKey(WPARAM wParam, LPARAM lParam, KeyInput& input);
+    // The English typing keys, whatever the mode.
+    bool TranslateEnglishKey(WPARAM wParam, KeyInput& input);
+    // Japanese mode: Shift+letter with nothing typed starts an English word
+    // that works like English Auto (TextServiceJapanese.cpp).
+    bool TranslateEnglishSegmentKey(WPARAM wParam, KeyInput& input);
+    HRESULT HandleEnglishSegmentEnd(ITfContext* context, TfEditCookie editCookie, const KeyInput& input);
+    void EndEnglishSegment();
     bool EnsureEngine();
     HRESULT EnsureComposition(ITfContext* context, TfEditCookie editCookie);
     HRESULT ReplaceComposition(ITfContext* context, TfEditCookie editCookie,
@@ -208,6 +217,9 @@ private:
     // first key, compartment changes are answered with TEKITO's own mode
     // rather than followed.
     bool activationSettling_{false};
+    // An English word typed with Shift in Japanese is being typed; state_
+    // runs in Convert meanwhile.
+    bool englishSegment_{false};
     japanese::JapaneseComposer japanese_;
     japanese::JapaneseLearningStore japaneseLearning_;
     RECT candidateAnchor_{};

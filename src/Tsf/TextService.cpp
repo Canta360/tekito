@@ -773,6 +773,7 @@ bool TextService::ProcessPassesThrough() const noexcept {
 void TextService::SetInputMode(InputMode mode) {
     // Only the Japanese profile has a Japanese mode.
     if (!japaneseProfile_ && mode == InputMode::Japanese) mode = InputMode::Convert;
+    englishSegment_ = false;
     const bool finishWord = (mode != InputMode::Convert && state_.IsActive()) ||
                             (mode != InputMode::Japanese && japanese_.IsComposing());
     mode_ = mode;
@@ -1218,8 +1219,15 @@ HRESULT TextService::Reset() {
 
 bool TextService::TranslateKey(WPARAM wParam, LPARAM, KeyInput& input) {
     if (ProcessPassesThrough() || FocusIsClassicPasswordEdit()) return false;
-    if (mode_ == InputMode::Japanese) return TranslateJapaneseKey(wParam, input);
+    if (mode_ == InputMode::Japanese) {
+        if (TranslateEnglishSegmentKey(wParam, input)) return true;
+        return TranslateJapaneseKey(wParam, input);
+    }
     if (state_.Mode() == InputMode::Direct) return false;
+    return TranslateEnglishKey(wParam, input);
+}
+
+bool TextService::TranslateEnglishKey(WPARAM wParam, KeyInput& input) {
     if (!EnsureEngine()) return false;  // language data still loading
 
     if (HasBlockedModifier()) {
@@ -1340,6 +1348,14 @@ void TextService::OnCandidateSelected(std::size_t index) {
 
 HRESULT TextService::HandleKeyInEditSession(ITfContext* context, TfEditCookie editCookie,
                                             const KeyInput& input) {
+    const HRESULT hr = HandleKeyInEditSessionCore(context, editCookie, input);
+    // An English word typed with Shift in Japanese ends once it is committed.
+    if (englishSegment_ && !state_.IsActive()) EndEnglishSegment();
+    return hr;
+}
+
+HRESULT TextService::HandleKeyInEditSessionCore(ITfContext* context, TfEditCookie editCookie,
+                                                const KeyInput& input) {
     Trace(L"HandleKeyInEditSession");
     if (!context) return E_INVALIDARG;
     if (input.type == KeyInput::Type::Reposition) {
@@ -1356,9 +1372,17 @@ HRESULT TextService::HandleKeyInEditSession(ITfContext* context, TfEditCookie ed
         }
         return S_OK;
     }
+    if (input.type == KeyInput::Type::EnglishSegmentEnd ||
+        input.type == KeyInput::Type::EnglishSegmentCommit) {
+        return HandleEnglishSegmentEnd(context, editCookie, input);
+    }
+    if (input.englishSegment && !englishSegment_ && mode_ == InputMode::Japanese) {
+        englishSegment_ = true;
+        state_.SetInputMode(InputMode::Convert);
+    }
     // Japanese typing, and committing it after the mode or focus changed.
-    if (mode_ == InputMode::Japanese || input.type == KeyInput::Type::JapaneseCommit ||
-        japanese_.IsComposing()) {
+    if ((mode_ == InputMode::Japanese && !englishSegment_) ||
+        input.type == KeyInput::Type::JapaneseCommit || japanese_.IsComposing()) {
         if (input.type != KeyInput::Type::JapaneseCommit &&
             (ContextHasPassThroughInputScope(context, editCookie) || FocusIsClassicPasswordEdit() ||
              ProcessPassesThrough())) {

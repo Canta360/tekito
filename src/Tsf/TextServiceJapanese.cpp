@@ -287,6 +287,91 @@ void TextService::ApplyModeKey(ITfContext* context, const ModeKey& key) {
     }
 }
 
+// The character a key types with the current layout and modifiers, or 0.
+wchar_t TypedCharacter(WPARAM wParam) {
+    BYTE keyboardState[256]{};
+    if (!GetKeyboardState(keyboardState)) return 0;
+    wchar_t buffer[8]{};
+    const UINT scanCode = MapVirtualKeyW(static_cast<UINT>(wParam), MAPVK_VK_TO_VSC);
+    const int count = ToUnicodeEx(static_cast<UINT>(wParam), scanCode, keyboardState, buffer,
+                                  static_cast<int>(std::size(buffer)), 0, GetKeyboardLayout(0));
+    return count == 1 ? buffer[0] : 0;
+}
+
+bool TextService::TranslateEnglishSegmentKey(WPARAM wParam, KeyInput& input) {
+    if (HasCommandModifier()) {
+        if (!englishSegment_ || !TranslateEnglishKey(wParam, input)) return false;
+        input.englishSegment = true;
+        return true;
+    }
+    if (!englishSegment_) {
+        // Shift+letter with nothing typed starts an English word.
+        if (japanese_.IsComposing() || !KeyDown(VK_SHIFT)) return false;
+        const wchar_t ch = TypedCharacter(wParam);
+        if (!(ch >= L'A' && ch <= L'Z')) return false;
+        if (!TranslateEnglishKey(wParam, input)) return false;
+        input.englishSegment = true;
+        return true;
+    }
+    if (wParam == VK_RETURN) {
+        // Enter settles the word and goes back to Japanese; no new line.
+        input.type = KeyInput::Type::EnglishSegmentCommit;
+        input.englishSegment = true;
+        return true;
+    }
+    // After the word and its space, a letter without Shift is Japanese again.
+    const bool afterWord = !state_.IsActive() || state_.State() == CompositionState::Boundary ||
+                           (state_.State() == CompositionState::Cycling && !state_.IsCandidateNavigationActive());
+    const wchar_t ch = TypedCharacter(wParam);
+    if (afterWord && !KeyDown(VK_SHIFT) && ch > 0x20 && ch < 0x7F) {
+        input.type = KeyInput::Type::EnglishSegmentEnd;
+        input.character = ch;
+        input.englishSegment = true;
+        return true;
+    }
+    if (!TranslateEnglishKey(wParam, input)) return false;
+    input.englishSegment = true;
+    return true;
+}
+
+void TextService::EndEnglishSegment() {
+    englishSegment_ = false;
+    if (mode_ == InputMode::Japanese) state_.SetInputMode(InputMode::Direct);
+}
+
+HRESULT TextService::HandleEnglishSegmentEnd(ITfContext* context, TfEditCookie editCookie,
+                                             const KeyInput& input) {
+    candidateWindow_.Hide();
+    if (composition_) {
+        // The word as shown, without the space Space added if kana follows.
+        std::wstring text;
+        ComPtr<ITfRange> range;
+        if (SUCCEEDED(composition_->GetRange(range.Put()))) {
+            wchar_t buffer[256]{};
+            ULONG length = 0;
+            if (SUCCEEDED(range->GetText(editCookie, 0, buffer, 255, &length))) text.assign(buffer, length);
+        }
+        const bool dropSpace = input.type == KeyInput::Type::EnglishSegmentEnd &&
+                               userSettings_.japaneseDropSpaceBeforeKana;
+        if (dropSpace && !text.empty() && text.back() == L' ') {
+            text.pop_back();
+            const HRESULT hr = ReplaceComposition(context, editCookie, text);
+            if (FAILED(hr)) return hr;
+        }
+        const HRESULT hr = EndComposition(editCookie);
+        if (FAILED(hr)) return hr;
+    }
+    state_.Reset();
+    rawText_.clear();
+    EndEnglishSegment();
+    if (input.type != KeyInput::Type::EnglishSegmentEnd) return S_OK;
+    // The letter starts Japanese typing.
+    KeyInput typed{};
+    typed.type = KeyInput::Type::Printable;
+    typed.character = input.character;
+    return HandleJapaneseKey(context, editCookie, typed);
+}
+
 std::vector<std::wstring> TextService::EnglishWordsFor(std::wstring_view keys) {
     std::vector<std::wstring> words;
     if (!EnsureEngine()) return words;  // English data still loading

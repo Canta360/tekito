@@ -53,6 +53,9 @@ struct UserSettings {
     int japanesePunctuation{0};
     // Words that start with what is typed, offered while typing Japanese.
     bool japanesePredictionEnabled{true};
+    // After an English word typed with Shift in Japanese, the space Space
+    // added is removed when kana follows, as Japanese puts none there.
+    bool japaneseDropSpaceBeforeKana{true};
     // Language of TEKITO's own windows: 0 = the Windows display language,
     // 1 = English, 2 = Japanese. See UiLanguage.h.
     int uiLanguage{0};
