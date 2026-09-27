@@ -746,8 +746,6 @@ private:
         json += L",\"japanesePunctuation\":" + std::to_wstring(settings_.japanesePunctuation);
         json += L",\"japanesePredictionEnabled\":";
         json += settings_.japanesePredictionEnabled ? L"true" : L"false";
-        json += L",\"japaneseDropSpaceBeforeKana\":";
-        json += settings_.japaneseDropSpaceBeforeKana ? L"true" : L"false";
         json += L",\"uiLanguage\":" + std::to_wstring(settings_.uiLanguage);
         json += L",\"excludedApps\":" + NameListJson(settings_.excludedApps);
         json += L",\"builtInExcludedApps\":" +
@@ -894,7 +892,6 @@ private:
                 settings_.japanesePunctuation = std::clamp(integerValue, 0, 3);
             }
             else if (key == L"japanesePredictionEnabled") settings_.japanesePredictionEnabled = value;
-            else if (key == L"japaneseDropSpaceBeforeKana") settings_.japaneseDropSpaceBeforeKana = value;
             else if (key == L"uiLanguage") settings_.uiLanguage = std::clamp(integerValue, 0, 2);
             else if (key == L"toggleKey") {
                 settings_.toggleKey = std::clamp(integerValue, 0, 3);
