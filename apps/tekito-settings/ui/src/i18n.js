@@ -34,6 +34,13 @@ const en = {
   },
   restoreMode: { title: "Start in the last mode used", description: "Otherwise TEKITO always starts in Auto." },
   switchKey: { title: "Switch key", description: "Toggles Auto and Direct from any app.", none: "None" },
+  keyboard: {
+    title: "Keyboard",
+    description: "The keyboard you type on, so symbols come out as printed on the keys. Changing it asks for administrator permission.",
+    detect: "Detect",
+    japanese: "Japanese (JIS)",
+    us: "US",
+  },
   language: { title: "Language", description: "The language of Settings and TEKITO's messages.", system: "Match Windows" },
   excluded: {
     title: "Apps where TEKITO stays off",
@@ -166,6 +173,13 @@ const ja = {
   },
   restoreMode: { title: "前回のモードで始める", description: "オフにすると、常に Auto で始まります。" },
   switchKey: { title: "切り替えキー", description: "どのアプリでも Auto と Direct を切り替えます。", none: "なし" },
+  keyboard: {
+    title: "キーボード",
+    description: "使っているキーボードです。記号がキーの刻印どおりに入るようにします。変えると管理者の確認が出ます。",
+    detect: "自動",
+    japanese: "日本語（JIS）",
+    us: "英語（US）",
+  },
   language: { title: "表示言語", description: "設定画面などの表示に使う言語です。", system: "Windows に合わせる" },
   excluded: {
     title: "TEKITO をオフにするアプリ",

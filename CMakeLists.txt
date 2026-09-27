@@ -16,9 +16,6 @@ set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 option(TEKITO_BUILD_TESTS "Build the unit tests" ON)
 option(TEKITO_BUILD_BENCHMARKS "Build the engine latency benchmark" OFF)
 option(TEKITO_BUILD_EVAL "Build the offline accuracy evaluation" OFF)
-# Phase 0 probe for Japanese input: registers a ja-JP profile and traces
-# IME keys and compartments. Never on for a release.
-option(TEKITO_JA_SPIKE "Build the Japanese input probe (development only)" OFF)
 
 set(TEKITO_WARNINGS /W4 /permissive- /EHsc /utf-8)
 set(TEKITO_WINDOWS_DEFINES UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
@@ -87,7 +84,7 @@ add_library(Tekito.Tsf SHARED
     src/Tsf/ClassFactory.cpp
     src/Tsf/DllMain.cpp
     src/Tsf/EditSession.cpp
-    src/Tsf/JapaneseSpike.cpp
+    src/Tsf/TextServiceJapanese.cpp
     src/Tsf/ModeLangBarItem.cpp
     src/Tsf/Registration.cpp
     src/Tsf/TekitoGuids.cpp
@@ -103,9 +100,6 @@ if(TEKITO_TSF_OUTPUT_NAME MATCHES "(^|\\.)Trace[0-9]*$")
     target_compile_definitions(Tekito.Tsf PRIVATE TEKITO_TSF_TRACE_DEFAULT=1)
 endif()
 target_compile_options(Tekito.Tsf PRIVATE ${TEKITO_WARNINGS})
-if(TEKITO_JA_SPIKE)
-    target_compile_definitions(Tekito.Tsf PRIVATE TEKITO_JA_SPIKE=1)
-endif()
 target_link_libraries(Tekito.Tsf PRIVATE
     tekito_core tekito_userdata
     ole32 oleaut32 advapi32 user32 gdi32 uuid

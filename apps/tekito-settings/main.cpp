@@ -736,6 +736,7 @@ private:
         json += L",\"socialPersonalization\":" + std::to_wstring(settings_.socialPersonalization);
         json += L",\"candidateWindowStyle\":" + std::to_wstring(settings_.candidateWindowStyle);
         json += L",\"toggleKey\":" + std::to_wstring(settings_.toggleKey);
+        json += L",\"keyboardType\":" + std::to_wstring(settings_.keyboardType);
         json += L",\"periodOnEnter\":";
         json += settings_.periodOnEnter ? L"true" : L"false";
         json += L",\"uiLanguage\":" + std::to_wstring(settings_.uiLanguage);
@@ -877,6 +878,9 @@ private:
             else if (key == L"toggleKey") {
                 settings_.toggleKey = std::clamp(integerValue, 0, 3);
             }
+            else if (key == L"keyboardType") {
+                settings_.keyboardType = std::clamp(integerValue, 0, 2);
+            }
             else known = false;
             if (!known) {
                 settings_ = previous;
@@ -886,6 +890,11 @@ private:
                 Reply(requestId, false, Text(L"Settings could not be saved.", L"設定を保存できませんでした。"));
             } else {
                 if (key == L"uiLanguage") SetWindowTextW(hwnd_, WindowTitle());
+                // The English profile's keyboard layout is part of its
+                // registration, which needs administrator rights.
+                if (key == L"keyboardType" && settings_.keyboardType != previous.keyboardType) {
+                    ReregisterInputMethod();
+                }
                 Reply(requestId, true);
             }
         } else if (type == L"mode.set") {
@@ -1101,6 +1110,34 @@ private:
         return Japanese() ? japanese : english;
     }
     const wchar_t* WindowTitle() const { return Text(L"TEKITO Settings", L"TEKITO 設定"); }
+
+    // Registers the input method again (regsvr32, elevated) so a changed
+    // keyboard type reaches the English profile's layout. Declining the
+    // prompt keeps the old layout until TEKITO is next installed.
+    void ReregisterInputMethod() {
+        wchar_t modulePath[MAX_PATH]{};
+        const DWORD length = GetModuleFileNameW(nullptr, modulePath, MAX_PATH);
+        if (length == 0 || length >= MAX_PATH) return;
+        const auto dll =
+            std::filesystem::path(modulePath, modulePath + length).parent_path() / L"Tekito.Tsf.dll";
+        wchar_t system[MAX_PATH]{};
+        if (!std::filesystem::exists(dll) || GetSystemDirectoryW(system, MAX_PATH) == 0) return;
+        const auto regsvr32 = std::filesystem::path(system) / L"regsvr32.exe";
+        const std::wstring parameters = L"/s \"" + dll.wstring() + L"\"";
+        SHELLEXECUTEINFOW info{};
+        info.cbSize = sizeof(info);
+        info.fMask = SEE_MASK_NOCLOSEPROCESS;
+        info.hwnd = hwnd_;
+        info.lpVerb = L"runas";
+        info.lpFile = regsvr32.c_str();
+        info.lpParameters = parameters.c_str();
+        info.nShow = SW_HIDE;
+        if (!ShellExecuteExW(&info)) return;
+        if (info.hProcess) {
+            WaitForSingleObject(info.hProcess, 30000);
+            CloseHandle(info.hProcess);
+        }
+    }
 
     bool SaveSettings() {
         if (runtime_) settings_.lastInputMode = runtime_->Mode();

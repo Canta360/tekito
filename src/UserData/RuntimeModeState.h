@@ -7,13 +7,15 @@
 
 namespace tekito::userdata {
 
+inline constexpr const wchar_t* kRuntimeStateName = L"Local\\TEKITO.RuntimeState.V3";
+
 // State every TEKITO client in the session shares: the English profile's
 // mode, the Japanese profile's, and counters that tell clients to reload
 // settings, the dictionary or learning. The fallbacks seed a new session.
 class RuntimeModeState final {
 public:
     explicit RuntimeModeState(InputMode fallbackMode,
-                              const wchar_t* mappingName = L"Local\\TEKITO.RuntimeState.V3",
+                              const wchar_t* mappingName = kRuntimeStateName,
                               InputMode japaneseFallbackMode = InputMode::Japanese) noexcept;
     ~RuntimeModeState();
 

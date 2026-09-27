@@ -9,16 +9,19 @@
 
 namespace tekito::tsf {
 
+// The mode button in the taskbar: Auto and Direct, and in the Japanese
+// profile also Japanese. A click goes where the switch key goes.
 class ModeLangBarItem final : public ITfLangBarItemButton,
                               public ITfSource {
 public:
     using ModeGetter = std::function<InputMode()>;
     using ModeSetter = std::function<void(InputMode)>;
     using SettingsLauncher = std::function<void()>;
-    using LanguageQuery = std::function<bool()>;  // true when the UI is in Japanese
+    using Query = std::function<bool()>;
 
     ModeLangBarItem(HINSTANCE instance, ModeGetter getMode, ModeSetter setMode,
-                    SettingsLauncher launchSettings, LanguageQuery japanese);
+                    ModeGetter toggledMode, Query japaneseProfile, SettingsLauncher launchSettings,
+                    Query japaneseUi);
 
     HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void** object) override;
     ULONG STDMETHODCALLTYPE AddRef() override;
@@ -42,6 +45,7 @@ private:
     ~ModeLangBarItem();
 
     [[nodiscard]] InputMode Mode() const;
+    [[nodiscard]] bool JapaneseProfile() const;
     [[nodiscard]] const wchar_t* Text(const wchar_t* english, const wchar_t* japanese) const;
     void ShowContextMenu(POINT point);
 
@@ -49,8 +53,10 @@ private:
     HINSTANCE instance_{nullptr};
     ModeGetter getMode_;
     ModeSetter setMode_;
+    ModeGetter toggledMode_;
+    Query japaneseProfile_;
     SettingsLauncher launchSettings_;
-    LanguageQuery japanese_;
+    Query japaneseUi_;
     ITfLangBarItemSink* sink_{nullptr};
 };
 

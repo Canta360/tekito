@@ -6,7 +6,6 @@
 #include "Tsf/CandidateWindow.h"
 #include "Tsf/ComPtr.h"
 #include "Tsf/EditSession.h"
-#include "Tsf/JapaneseSpike.h"
 #include "Tsf/ModeLangBarItem.h"
 #include "UserData/UserDataRepository.h"
 #include "UserData/RuntimeModeState.h"
@@ -28,7 +27,8 @@ class TextService final : public ITfTextInputProcessorEx,
                           public ITfThreadMgrEventSink,
                           public ITfTextEditSink,
                           public ITfTextLayoutSink,
-                          public ITfCompartmentEventSink {
+                          public ITfCompartmentEventSink,
+                          public ITfInputProcessorProfileActivationSink {
 public:
     TextService();
 
@@ -82,6 +82,12 @@ public:
     // ITfCompartmentEventSink
     HRESULT STDMETHODCALLTYPE OnChange(REFGUID compartment) override;
 
+    // ITfInputProcessorProfileActivationSink: switching between TEKITO's
+    // English and Japanese profiles does not always reactivate the service.
+    HRESULT STDMETHODCALLTYPE OnActivated(DWORD profileType, LANGID langid, REFCLSID clsid,
+                                          REFGUID category, REFGUID profile, HKL layout,
+                                          DWORD flags) override;
+
     HRESULT HandleKeyInEditSession(ITfContext* context, TfEditCookie editCookie,
                                    const KeyInput& input);
 
@@ -113,8 +119,31 @@ private:
     void AdviseContextSinks(ITfContext* context);
     void UnadviseContextSinks();
     void UpdateToggleKey(int key);
-    void SyncOpenCloseCompartment();
+    // Mirrors the mode in the open/close compartment, and in the Japanese
+    // profile also in the conversion-mode compartment.
+    void SyncModeCompartments();
     void ApplySettings();
+
+    // Japanese profile (TextServiceJapanese.cpp).
+    struct ModeKey {
+        InputMode mode{InputMode::Direct};
+        bool setsInputForm{false};
+        japanese::KanaForm inputForm{japanese::KanaForm::Hiragana};
+    };
+    // Keys that switch modes: Hankaku/Zenkaku, Henkan and Muhenkan outside
+    // a composition, Hiragana/Katakana, IME On/Off.
+    bool TranslateModeKey(WPARAM wParam, ModeKey& key) const;
+    void ApplyModeKey(ITfContext* context, const ModeKey& key);
+    // The mode the switch key (and a click on the mode button) goes to.
+    InputMode ToggledMode() const noexcept;
+    bool TranslateJapaneseKey(WPARAM wParam, KeyInput& input);
+    HRESULT HandleJapaneseKey(ITfContext* context, TfEditCookie editCookie, const KeyInput& input);
+    HRESULT ShowJapanesePreedit(ITfContext* context, TfEditCookie editCookie);
+    HRESULT CommitJapanese(ITfContext* context, TfEditCookie editCookie);
+    // The mode shared for the active profile.
+    InputMode SharedMode() const noexcept;
+    void UpdateActiveProfile();
+    void SetJapaneseProfile(bool japanese);
     bool ProcessPassesThrough() const noexcept;
     bool LetsKeyThrough(const KeyInput& input) const noexcept;
     void OpenSettings();
@@ -153,18 +182,27 @@ private:
     std::wstring processName_;
     DWORD threadManagerSinkCookie_{TF_INVALID_COOKIE};
     DWORD openCloseSinkCookie_{TF_INVALID_COOKIE};
+    DWORD conversionSinkCookie_{TF_INVALID_COOKIE};
+    DWORD profileSinkCookie_{TF_INVALID_COOKIE};
     ComPtr<ITfContext> sinkContext_;
     DWORD textEditSinkCookie_{TF_INVALID_COOKIE};
     DWORD textLayoutSinkCookie_{TF_INVALID_COOKIE};
     int preservedToggleKey_{0};
-    bool updatingOpenClose_{false};
+    bool updatingCompartments_{false};
+
+    // The mode in effect: Convert or Direct, or Japanese in the ja-JP
+    // profile. state_ holds Convert only while English Auto is on.
+    InputMode mode_{InputMode::Convert};
+    bool japaneseProfile_{false};
+    // Windows closes a ja-JP profile right after it activates; until the
+    // first key, compartment changes are answered with TEKITO's own mode
+    // rather than followed.
+    bool activationSettling_{false};
+    japanese::JapaneseComposer japanese_;
     RECT candidateAnchor_{};
     CandidateWindow candidateWindow_;
     ComPtr<ITfLangBarItemMgr> langBarItemMgr_;
     ComPtr<ModeLangBarItem> modeLangBarItem_;
-#if defined(TEKITO_JA_SPIKE)
-    spike::Watcher spikeWatcher_;
-#endif
 };
 
 }  // namespace tekito::tsf
