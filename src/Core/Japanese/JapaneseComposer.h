@@ -60,9 +60,18 @@ public:
     // True once converted (Space, Muhenkan, F6-F10): typing on commits.
     [[nodiscard]] bool IsConverted() const noexcept { return !phrases_.empty(); }
 
+    // Types a key at the caret.
     void Insert(wchar_t key);
-    // Before conversion: removes the last key or kana. After: back to kana.
+    // Before conversion: removes the key or kana before the caret. After:
+    // back to kana.
     void Backspace();
+    // Before conversion: removes the kana after the caret.
+    void Delete();
+    // Before conversion: moves the caret by kana (Left, Right; Home and End
+    // move by a large amount).
+    void MoveCaret(int delta);
+    // Where the caret is in Preedit(), in characters.
+    [[nodiscard]] std::size_t CaretOffset() const;
     // Back to the typed kana after a conversion; otherwise drops everything.
     void Cancel();
     // Space and Henkan: converts, then steps through the candidates.
@@ -112,6 +121,10 @@ private:
     };
 
     void Feed(wchar_t key);
+    // Splits the unit around reading position `offset` so a unit boundary
+    // falls there; returns the index of the unit that starts there.
+    std::size_t SplitAt(std::size_t offset);
+    [[nodiscard]] std::size_t ReadingOffset(std::size_t units) const;
     void FlushOnce();
     void FlushAll();
     void Emit(std::wstring keys, std::wstring kana);
@@ -132,6 +145,8 @@ private:
     const RomajiTable* table_{nullptr};
     const JapaneseConverter* converter_{nullptr};
     std::vector<Unit> units_;
+    // Units before the caret; pending keys belong at the caret.
+    std::size_t caret_{0};
     std::wstring pending_;
     KanaForm inputForm_{KanaForm::Hiragana};
     PunctuationStyle punctuation_{PunctuationStyle::ToutenKuten};

@@ -41,6 +41,9 @@ struct KeyInput {
         JapaneseMoveFocus,
         JapaneseResize,
         JapaneseSelectCandidate,
+        // Japanese typing: the caret by `delta` kana, and Delete.
+        JapaneseMoveCaret,
+        JapaneseDelete,
         // Not a key: commit the Japanese text (the mode or focus changed).
         JapaneseCommit,
         // Types `character` outside a composition (a full-width space).

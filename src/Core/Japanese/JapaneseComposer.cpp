@@ -111,7 +111,63 @@ void JapaneseComposer::FlushAll() {
 }
 
 void JapaneseComposer::Emit(std::wstring keys, std::wstring kana) {
-    units_.push_back({std::move(keys), std::move(kana)});
+    units_.insert(units_.begin() + static_cast<std::ptrdiff_t>(caret_), {std::move(keys), std::move(kana)});
+    ++caret_;
+}
+
+std::size_t JapaneseComposer::ReadingOffset(std::size_t units) const {
+    std::size_t offset = 0;
+    for (std::size_t i = 0; i < units && i < units_.size(); ++i) offset += units_[i].kana.size();
+    return offset;
+}
+
+std::size_t JapaneseComposer::SplitAt(std::size_t offset) {
+    std::size_t at = 0;
+    for (std::size_t i = 0; i < units_.size(); ++i) {
+        if (at == offset) return i;
+        const std::size_t size = units_[i].kana.size();
+        if (offset < at + size) {
+            // "きゃ" split into "き" and "ゃ", each with the keys that type it.
+            Unit head{{}, units_[i].kana.substr(0, offset - at)};
+            Unit tail{{}, units_[i].kana.substr(offset - at)};
+            for (Unit* part : {&head, &tail}) {
+                auto keys = table_ ? table_->KeysFor(part->kana) : std::wstring{};
+                part->keys = keys.empty() ? part->kana : std::move(keys);
+            }
+            units_[i] = std::move(head);
+            units_.insert(units_.begin() + static_cast<std::ptrdiff_t>(i) + 1, std::move(tail));
+            return i + 1;
+        }
+        at += size;
+    }
+    return units_.size();
+}
+
+void JapaneseComposer::MoveCaret(int delta) {
+    if (IsConverted() || !IsComposing()) return;
+    FlushAll();
+    const auto total = static_cast<long long>(ReadingOffset(units_.size()));
+    const auto target = std::clamp(static_cast<long long>(ReadingOffset(caret_)) + delta, 0LL, total);
+    caret_ = SplitAt(static_cast<std::size_t>(target));
+}
+
+std::size_t JapaneseComposer::CaretOffset() const {
+    if (IsConverted()) return Preedit().size();
+    return ReadingOffset(caret_) + pending_.size();
+}
+
+void JapaneseComposer::Delete() {
+    if (IsConverted() || !IsComposing()) return;
+    FlushAll();
+    if (caret_ >= units_.size()) return;
+    auto& next = units_[caret_];
+    next.kana.erase(0, 1);
+    if (next.kana.empty()) {
+        units_.erase(units_.begin() + static_cast<std::ptrdiff_t>(caret_));
+        return;
+    }
+    auto keys = table_ ? table_->KeysFor(next.kana) : std::wstring{};
+    next.keys = keys.empty() ? next.kana : std::move(keys);
 }
 
 void JapaneseComposer::Backspace() {
@@ -123,11 +179,12 @@ void JapaneseComposer::Backspace() {
         pending_.pop_back();
         return;
     }
-    if (units_.empty()) return;
-    auto& last = units_.back();
+    if (caret_ == 0) return;
+    auto& last = units_[caret_ - 1];
     last.kana.pop_back();
     if (last.kana.empty()) {
-        units_.pop_back();
+        units_.erase(units_.begin() + static_cast<std::ptrdiff_t>(caret_) - 1);
+        --caret_;
         return;
     }
     // "きゃ" lost its "ゃ": keep what "き" is typed as, for F9 and F10.
@@ -162,6 +219,8 @@ std::vector<PhraseCandidate> JapaneseComposer::KanaCandidates(std::wstring_view 
 
 void JapaneseComposer::BuildPhrases(bool convert) {
     FlushAll();
+    // Back from a conversion, typing goes on at the end.
+    caret_ = units_.size();
     const std::wstring reading = Reading();
     phrases_.clear();
     focus_ = 0;
@@ -313,7 +372,8 @@ std::wstring JapaneseComposer::ApplyPunctuation(std::wstring text) const {
 
 std::wstring JapaneseComposer::RenderTyping(bool includePending) const {
     std::wstring kana = Reading();
-    if (includePending) kana += ToFullWidthAscii(pending_);
+    // Pending keys show at the caret, where the kana they make will go.
+    if (includePending) kana.insert(ReadingOffset(caret_), ToFullWidthAscii(pending_));
     return inputForm_ == KanaForm::Katakana ? ToKatakana(kana) : kana;
 }
 
@@ -375,6 +435,7 @@ std::wstring JapaneseComposer::Commit() {
 
 void JapaneseComposer::Clear() noexcept {
     units_.clear();
+    caret_ = 0;
     pending_.clear();
     phrases_.clear();
     focus_ = 0;

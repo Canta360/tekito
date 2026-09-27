@@ -328,6 +328,23 @@ bool TextService::TranslateJapaneseKey(WPARAM wParam, KeyInput& input) {
             }
         }
     }
+    if (composing && !japanese_.IsConverted()) {
+        // Before conversion the arrows edit the typed text, as in Microsoft IME.
+        switch (wParam) {
+        case VK_LEFT:
+        case VK_RIGHT:
+        case VK_HOME:
+        case VK_END:
+            input.type = KeyInput::Type::JapaneseMoveCaret;
+            input.delta = wParam == VK_LEFT ? -1 : wParam == VK_RIGHT ? 1 : wParam == VK_HOME ? -100000 : 100000;
+            return true;
+        case VK_DELETE:
+            input.type = KeyInput::Type::JapaneseDelete;
+            return true;
+        default:
+            break;
+        }
+    }
     switch (wParam) {
     case VK_SPACE:
     case VK_CONVERT:
@@ -441,6 +458,12 @@ HRESULT TextService::HandleJapaneseKey(ITfContext* context, TfEditCookie editCoo
     case KeyInput::Type::CandidateSelection:
         japanese_.SelectCandidate(input.candidateIndex);
         return ShowJapanesePreedit(context, editCookie);
+    case KeyInput::Type::JapaneseMoveCaret:
+        japanese_.MoveCaret(input.delta);
+        return ShowJapanesePreedit(context, editCookie);
+    case KeyInput::Type::JapaneseDelete:
+        japanese_.Delete();
+        return ShowJapanesePreedit(context, editCookie);
     case KeyInput::Type::Enter:
     case KeyInput::Type::JapaneseCommit:
     case KeyInput::Type::EndComposition: {
@@ -503,7 +526,13 @@ HRESULT TextService::ReplaceJapaneseComposition(ITfContext* context, TfEditCooki
         offset += length;
     }
 
-    hr = range->Collapse(editCookie, TF_ANCHOR_END);
+    // The caret: where typing goes before conversion, the end after.
+    hr = range->Collapse(editCookie, TF_ANCHOR_START);
+    if (FAILED(hr)) return hr;
+    LONG moved = 0;
+    hr = range->ShiftStart(editCookie, static_cast<LONG>(japanese_.CaretOffset()), &moved, nullptr);
+    if (FAILED(hr)) return hr;
+    hr = range->Collapse(editCookie, TF_ANCHOR_START);
     if (FAILED(hr)) return hr;
     TF_SELECTION selection{};
     selection.range = range.Get();
