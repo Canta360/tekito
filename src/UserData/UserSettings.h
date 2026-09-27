@@ -30,6 +30,9 @@ struct UserSettings {
     // 0 = glass (frosted, with light under the selection), 1 = simple
     // (opaque panel with a flat selection row).
     int candidateWindowStyle{0};
+    // Rows in the candidate list: 0 = automatic (English shows 5, then 10
+    // once paged; Japanese 9), or a fixed 5, 7 or 9.
+    int candidateRows{0};
     // Key that switches between Convert and Direct: 0 = none, 1 = Alt+`,
     // 2 = Ctrl+Space, 3 = Ctrl+Shift+Space.
     int toggleKey{1};

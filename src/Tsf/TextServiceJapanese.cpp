@@ -83,9 +83,6 @@ const japanese::JapaneseConverter* ProcessJapaneseConverter() {
     return data ? data->converter.get() : nullptr;
 }
 
-// Candidates per page of the list, numbered 1 to 9 as in Microsoft IME.
-constexpr std::size_t kCandidatePage = 9;
-
 }  // namespace
 
 InputMode TextService::SharedMode() const noexcept {
@@ -427,7 +424,7 @@ bool TextService::TranslateJapaneseKey(WPARAM wParam, KeyInput& input) {
         const bool digit = (wParam >= '1' && wParam <= '9') || (wParam >= VK_NUMPAD1 && wParam <= VK_NUMPAD9);
         if (digit && japanese_.IsCandidateListOpen() && !shift) {
             const std::size_t number = wParam >= VK_NUMPAD1 ? wParam - VK_NUMPAD1 : wParam - '1';
-            const std::size_t page = japanese_.FocusedSelection() / kCandidatePage * kCandidatePage;
+            const std::size_t page = japanese_.FocusedSelection() / japanesePage_ * japanesePage_;
             const auto* candidates = japanese_.FocusedCandidates();
             if (candidates && page + number < candidates->size()) {
                 input.type = KeyInput::Type::JapaneseSelectCandidate;
@@ -747,20 +744,20 @@ void TextService::ShowJapaneseCandidates(ITfContext* context, TfEditCookie editC
         return;
     }
     const std::size_t selected = std::min(japanese_.FocusedSelection(), candidates->size() - 1);
-    const std::size_t page = selected / kCandidatePage * kCandidatePage;
+    const std::size_t page = selected / japanesePage_ * japanesePage_;
     std::vector<Candidate> rows;
     rows.reserve(candidates->size());
     for (std::size_t i = 0; i < candidates->size(); ++i) {
         Candidate row;
         row.text = (*candidates)[i].text;
-        row.id = static_cast<std::uint32_t>(i % kCandidatePage + 1);
+        row.id = static_cast<std::uint32_t>(i % japanesePage_ + 1);
         rows.push_back(std::move(row));
     }
     const RECT anchor = JapaneseCandidateAnchor(context, editCookie);
     candidateAnchor_ = anchor;
     candidateWindow_.SetStyle(userSettings_.candidateWindowStyle);
     candidateWindow_.SetJapanese(userdata::UseJapaneseUi(userSettings_.uiLanguage));
-    candidateWindow_.Show(anchor, rows, selected, page, std::min(kCandidatePage, rows.size() - page));
+    candidateWindow_.Show(anchor, rows, selected, page, std::min(japanesePage_, rows.size() - page));
 }
 
 HRESULT TextService::CommitJapanese(ITfContext* context, TfEditCookie editCookie) {

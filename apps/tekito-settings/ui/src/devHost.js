@@ -22,6 +22,7 @@ function initialState() {
       socialExpressionRange: 1,
       socialPersonalization: 1,
       candidateWindowStyle: 0,
+      candidateRows: 0,
       toggleKey: 1,
       keyboardType: 0,
       periodOnEnter: false,

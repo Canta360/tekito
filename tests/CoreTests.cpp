@@ -324,6 +324,17 @@ void TestEngineAndAutoApplyPolicyIntegration() {
             "punctuation after Space uses the currently selected Candidate");
 }
 
+void TestFixedPageSize() {
+    tekito::InputStateMachine state;
+    state.SetPageSizes(7, 7);
+    std::vector<tekito::Candidate> candidates;
+    for (int i = 0; i < 20; ++i) candidates.push_back({L"word" + std::to_wstring(i)});
+    state.BeginOrUpdate(L"wrod", candidates);
+    Require(state.VisibleCount() == 7, "a fixed row count shows that many at first");
+    for (int i = 0; i < 8; ++i) (void)state.OnNextCandidate();
+    Require(state.PageStart() == 7 && state.VisibleCount() == 7, "and pages by the same count");
+}
+
 void TestPagingAndLoop() {
     tekito::InputStateMachine state;
     state.BeginOrUpdate(L"x", MakeCandidates(23));
@@ -1865,6 +1876,7 @@ void TestSqliteUserSettingsRepository() {
     source.japanesePunctuation = 3;
     source.japanesePredictionEnabled = false;
     source.japaneseDropSpaceBeforeKana = false;
+    source.candidateRows = 7;
     source.excludedApps = {L"Code.exe", L"code.exe", L"game.exe"};
     {
         const tekito::userdata::UserSettings defaults;
@@ -1902,7 +1914,8 @@ void TestSqliteUserSettingsRepository() {
                 loaded.lastJapaneseProfileMode == tekito::InputMode::Convert &&
                 loaded.japaneseProfileEnglishMode == tekito::InputMode::Direct &&
                 loaded.japaneseSpaceWidth == 2 && loaded.japanesePunctuation == 3 &&
-                !loaded.japanesePredictionEnabled && !loaded.japaneseDropSpaceBeforeKana,
+                !loaded.japanesePredictionEnabled && !loaded.japaneseDropSpaceBeforeKana &&
+                loaded.candidateRows == 7,
             "settings repository restores the keyboard and Japanese settings");
     Require(loaded.excludedApps.size() == 2 && loaded.excludedApps[0] == L"Code.exe" &&
                 loaded.excludedApps[1] == L"game.exe",
@@ -1989,6 +2002,7 @@ int main() {
     TestSpaceCyclesAndPreservesCandidateSelection();
     TestEngineAndAutoApplyPolicyIntegration();
     TestPagingAndLoop();
+    TestFixedPageSize();
     TestShiftSpaceAndRestore();
     TestTabAndShiftTabCandidateSelection();
     TestSemanticCandidateActions();

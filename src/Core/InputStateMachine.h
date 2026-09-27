@@ -45,6 +45,9 @@ public:
     void BeginOrUpdate(std::wstring rawText, std::vector<Candidate> candidates);
 
     void SetInputMode(InputMode mode) noexcept;
+    // Rows the list shows at first, and once the user pages through it
+    // (UserSettings::candidateRows).
+    void SetPageSizes(std::size_t first, std::size_t paged) noexcept;
 
     [[nodiscard]] InputAction OnNextCandidate();
     [[nodiscard]] InputAction OnPreviousCandidate();
@@ -86,6 +89,8 @@ private:
     std::size_t selectedIndex_{0};
     std::size_t pageStart_{0};
     std::size_t visibleCount_{0};
+    std::size_t firstPage_{5};
+    std::size_t page_{10};
     bool candidateNavigationActive_{false};
     bool boundarySpaceActive_{false};
 };

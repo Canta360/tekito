@@ -735,6 +735,7 @@ private:
         json += L",\"socialExpressionRange\":" + std::to_wstring(settings_.socialExpressionRange);
         json += L",\"socialPersonalization\":" + std::to_wstring(settings_.socialPersonalization);
         json += L",\"candidateWindowStyle\":" + std::to_wstring(settings_.candidateWindowStyle);
+        json += L",\"candidateRows\":" + std::to_wstring(settings_.candidateRows);
         json += L",\"toggleKey\":" + std::to_wstring(settings_.toggleKey);
         json += L",\"keyboardType\":" + std::to_wstring(settings_.keyboardType);
         json += L",\"periodOnEnter\":";
@@ -878,6 +879,9 @@ private:
             }
             else if (key == L"candidateWindowStyle") {
                 settings_.candidateWindowStyle = std::clamp(integerValue, 0, 1);
+            }
+            else if (key == L"candidateRows") {
+                settings_.candidateRows = integerValue == 5 || integerValue == 7 || integerValue == 9 ? integerValue : 0;
             }
             else if (key == L"periodOnEnter") settings_.periodOnEnter = value;
             else if (key == L"japaneseSpaceWidth") {
