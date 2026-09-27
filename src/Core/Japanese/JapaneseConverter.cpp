@@ -277,6 +277,55 @@ std::vector<Phrase> JapaneseConverter::Convert(std::wstring_view reading,
     return phrases;
 }
 
+std::optional<PhraseCandidate> JapaneseConverter::Best(std::wstring_view reading) const {
+    const std::size_t n = reading.size();
+    if (n == 0) return std::nullopt;
+    const ReadingCodes codes = dictionary_.Encode(reading);
+    const std::vector<bool> noBoundary(n + 1, false);
+    const Lattice lattice = BuildLattice(dictionary_, codes, noBoundary);
+    const auto& nodes = lattice.nodes;
+    std::vector<std::int64_t> best(nodes.size(), kInfinity);
+    std::vector<int> previous(nodes.size(), -1);
+    for (std::size_t i = 0; i < n; ++i) {
+        for (const int k : lattice.beginningAt[i]) {
+            const Node& node = nodes[k];
+            if (!node.known) continue;
+            if (i == 0) {
+                best[k] = node.cost + matrix_.Cost(0, node.left);
+                continue;
+            }
+            for (const int p : lattice.endingAt[i]) {
+                if (best[p] >= kInfinity) continue;
+                const std::int64_t cost = best[p] + matrix_.Cost(nodes[p].right, node.left) + node.cost;
+                if (cost < best[k]) {
+                    best[k] = cost;
+                    previous[k] = p;
+                }
+            }
+        }
+    }
+    int last = -1;
+    std::int64_t lastCost = kInfinity;
+    for (const int p : lattice.endingAt[n]) {
+        if (best[p] >= kInfinity) continue;
+        const std::int64_t cost = best[p] + matrix_.Cost(nodes[p].right, 0);
+        if (cost < lastCost) {
+            lastCost = cost;
+            last = p;
+        }
+    }
+    if (last < 0) return std::nullopt;
+    std::vector<int> path;
+    for (int k = last; k >= 0; k = previous[k]) path.push_back(k);
+    PhraseCandidate result{{}, lastCost, PhraseCandidate::Kind::Dictionary, false};
+    for (auto it = path.rbegin(); it != path.rend(); ++it) {
+        const Node& node = nodes[*it];
+        result.text += dictionary_.Surface(node.word, reading.substr(node.begin, node.end - node.begin));
+        result.spellingCorrection = result.spellingCorrection || node.word.spellingCorrection;
+    }
+    return result;
+}
+
 std::vector<Prediction> JapaneseConverter::Predict(std::wstring_view reading, std::size_t limit) const {
     // Going through more keys than this would take too long per keystroke.
     constexpr std::uint32_t kMaxKeys = 2000;

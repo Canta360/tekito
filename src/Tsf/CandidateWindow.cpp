@@ -491,6 +491,8 @@ std::wstring LabelText(const Candidate& candidate, bool japanese) {
     if (candidate.isOriginal) return japanese ? L"そのまま" : L"ORIGINAL";
     if (candidate.label == SemanticLabel::Slang) return japanese ? L"スラング" : L"SLANG";
     if (candidate.label == SemanticLabel::Emoji) return japanese ? L"絵文字" : L"EMOJI";
+    // Not what was typed: the user should know before picking it.
+    if (candidate.label == SemanticLabel::Suggestion) return japanese ? L"もしかして" : L"TYPO";
     return {};
 }
 

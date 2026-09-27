@@ -158,6 +158,8 @@ private:
         // F9/F10 pressed again: 0 as typed, 1 upper case, 2 capitalized,
         // 3 lower case.
         int letterCase{0};
+        // The list has been given what the keys mean with a slip undone.
+        bool slipsAdded{false};
     };
 
     void Feed(wchar_t key);
@@ -185,6 +187,9 @@ private:
     void UpdatePredictions();
     // English candidates for the whole text, when the keys look like a word.
     void AddEnglish(const std::wstring& reading, bool romajiCorrected);
+    // When the list opens: the phrase's keys with one slip undone, as more
+    // candidates, so a slip the first choice kept is one pick away.
+    void AddSlipCandidates(PhraseState& phrase) const;
 
     const RomajiTable* table_{nullptr};
     const JapaneseConverter* converter_{nullptr};
@@ -202,6 +207,9 @@ private:
     // corrected one after a romaji correction (Esc still goes back to what
     // was typed).
     std::wstring conversionReading_;
+    // For each position in conversionReading_ (and its end), the key it
+    // was read from, or npos inside a word or unit.
+    std::vector<std::size_t> readingKeys_;
     std::size_t focus_{0};
     bool listOpen_{false};
     bool predictionEnabled_{false};

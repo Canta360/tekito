@@ -37,6 +37,9 @@ struct MixedConversion {
     // the English words as typed.
     std::wstring reading;
     std::vector<Phrase> phrases;
+    // For each position in `reading` (and its end), the key position it
+    // was read from, or npos inside a word.
+    std::vector<std::size_t> keyAt;
     bool english{false};
     bool corrected{false};
 };

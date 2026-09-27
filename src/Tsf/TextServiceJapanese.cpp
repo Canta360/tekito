@@ -800,6 +800,7 @@ void TextService::ShowJapaneseCandidates(ITfContext* context, TfEditCookie editC
         Candidate row;
         row.text = (*candidates)[i].text;
         row.id = static_cast<std::uint32_t>(i % japanesePage_ + 1);
+        if ((*candidates)[i].slip || (*candidates)[i].spellingCorrection) row.label = SemanticLabel::Suggestion;
         rows.push_back(std::move(row));
     }
     const RECT anchor = JapaneseCandidateAnchor(context, editCookie);

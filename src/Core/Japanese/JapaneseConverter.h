@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -21,6 +22,8 @@ struct PhraseCandidate {
     Kind kind{Kind::Dictionary};
     // Uses a word Mozc lists as a spelling correction ("もしかして").
     bool spellingCorrection{false};
+    // Read from the keys with a slip undone (offered in the list, "もしかして").
+    bool slip{false};
 };
 
 // A word that starts with what has been typed, for prediction.
@@ -51,6 +54,10 @@ public:
     // they are (after the user resized a phrase); the rest is split freely.
     [[nodiscard]] std::vector<Phrase> Convert(std::wstring_view reading,
                                               std::span<const std::size_t> fixedLengths = {}) const;
+
+    // Only the likeliest text for the whole reading and its cost, much
+    // quicker than Convert; nothing when a character is in no word.
+    [[nodiscard]] std::optional<PhraseCandidate> Best(std::wstring_view reading) const;
 
     // Words whose reading starts with `reading` and is longer, likeliest
     // first. Readings shared by too many words to look through quickly give
