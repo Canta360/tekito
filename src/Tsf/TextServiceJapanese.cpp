@@ -287,6 +287,29 @@ void TextService::ApplyModeKey(ITfContext* context, const ModeKey& key) {
     }
 }
 
+std::vector<std::wstring> TextService::EnglishWordsFor(std::wstring_view keys) {
+    std::vector<std::wstring> words;
+    if (!EnsureEngine()) return words;  // English data still loading
+    ConversionRequest request;
+    request.rawText = keys;
+    request.options.correctionEnabled = userSettings_.correctionEnabled;
+    request.options.commonMisspellingsEnabled = userSettings_.commonMisspellingsEnabled;
+    request.options.completionEnabled = false;
+    request.options.japanesePhoneticSuggestionsEnabled = userSettings_.japanesePhoneticSuggestionsEnabled;
+    request.options.socialExpressionRange = 0;
+    constexpr std::size_t kEnglishWords = 5;
+    for (const auto& candidate : candidateEngine_->Convert(request).candidates) {
+        // Words only: no emoji or reactions among Japanese candidates.
+        if (candidate.isOriginal || candidate.label == SemanticLabel::Emoji ||
+            candidate.socialRange != SocialRangeUnspecified || candidate.text.empty()) {
+            continue;
+        }
+        words.push_back(candidate.text);
+        if (words.size() >= kEnglishWords) break;
+    }
+    return words;
+}
+
 bool TextService::TranslateJapaneseKey(WPARAM wParam, KeyInput& input) {
     const bool composing = japanese_.IsComposing();
     if (HasCommandModifier()) {

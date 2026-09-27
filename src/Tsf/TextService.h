@@ -138,6 +138,8 @@ private:
     // The mode the switch key (and a click on the mode button) goes to.
     InputMode ToggledMode() const noexcept;
     bool TranslateJapaneseKey(WPARAM wParam, KeyInput& input);
+    // English words for keys typed in Japanese, from the English engine.
+    std::vector<std::wstring> EnglishWordsFor(std::wstring_view keys);
     HRESULT HandleJapaneseKey(ITfContext* context, TfEditCookie editCookie, const KeyInput& input);
     HRESULT ShowJapanesePreedit(ITfContext* context, TfEditCookie editCookie);
     // The composition text as the composer's segments, each underlined by

@@ -228,6 +228,7 @@ void JapaneseComposer::BuildPhrases(bool convert) {
     listOpen_ = false;
     if (reading.empty()) return;
     if (convert && converter_) AddPhrases(converter_->Convert(reading), reading);
+    if (convert) AddEnglish(reading);
     if (phrases_.empty()) {
         phrases_.push_back({0, reading.size(),
                             convert ? KanaCandidates(reading) : std::vector<PhraseCandidate>{}});
@@ -239,6 +240,44 @@ void JapaneseComposer::AddPhrases(std::vector<Phrase> phrases, const std::wstrin
         if (phrase.candidates.empty()) continue;
         if (learning_) learning_->Reorder(reading.substr(phrase.begin, phrase.length), phrase.candidates);
         phrases_.push_back({phrase.begin, phrase.length, std::move(phrase.candidates)});
+    }
+}
+
+void JapaneseComposer::AddEnglish(const std::wstring& reading) {
+    if (!english_) return;
+    const std::wstring keys = Keys(false);
+    // A word: letters, and the apostrophe and hyphen inside words.
+    if (keys.size() < 2 || !std::iswalpha(keys.front()) ||
+        !std::all_of(keys.begin(), keys.end(),
+                     [](wchar_t c) { return c < 0x80 && (std::iswalpha(c) || c == L'\'' || c == L'-'); })) {
+        return;
+    }
+    // Letters the table could not turn into kana mean English was meant.
+    const bool english = std::any_of(reading.begin(), reading.end(),
+                                     [](wchar_t c) { return c >= L'\xFF21' && c <= L'\xFF5A'; });
+    if (!english && phrases_.size() > 1) return;
+
+    std::vector<PhraseCandidate> words;
+    for (auto& word : english_(keys)) {
+        if (!word.empty()) words.push_back({std::move(word), 0, PhraseCandidate::Kind::English, false});
+    }
+    if (english) {
+        // The keys as typed, whatever the engine says.
+        const bool typed = std::any_of(words.begin(), words.end(),
+                                       [&](const PhraseCandidate& c) { return c.text == keys; });
+        if (!typed) words.push_back({keys, 0, PhraseCandidate::Kind::English, false});
+        std::vector<PhraseCandidate> candidates = std::move(words);
+        for (auto& candidate : KanaCandidates(reading)) candidates.push_back(std::move(candidate));
+        phrases_.clear();
+        phrases_.push_back({0, reading.size(), std::move(candidates)});
+        return;
+    }
+    if (phrases_.empty()) return;
+    auto& candidates = phrases_.front().candidates;
+    for (auto& word : words) {
+        const bool present = std::any_of(candidates.begin(), candidates.end(),
+                                         [&](const PhraseCandidate& c) { return c.text == word.text; });
+        if (!present) candidates.push_back(std::move(word));
     }
 }
 
