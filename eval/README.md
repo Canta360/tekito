@@ -61,3 +61,24 @@ should regress. The per-category breakdown (`accuracy_category` /
 `safety_category` rows) shows which failure mode dominates (missing from the
 candidate list at all vs. ranked too low vs. wrongly auto-applied) so the
 next fix can be targeted.
+
+## Japanese conversion
+
+`tekito_ja_eval` measures kana-kanji conversion with the `japanese-core` pack
+on two public sets, which `scripts/prepare-japanese-eval.py` downloads at
+pinned commits and flattens into `eval/generated/japanese_eval.tsv`:
+
+- Mozc's `evaluation.tsv` (BSD-3-Clause): the rows whose first conversion
+  must be a given text.
+- AJIMEE-Bench (azooKey; the items built on the Japanese Wikipedia Typo
+  Dataset are CC BY-SA 3.0): 200 readings with every acceptable conversion.
+
+```powershell
+.\scripts\prepare-japanese-packs.ps1   # once, builds data\japanese-core
+.\scripts\run-ja-eval.ps1 -ShowMisses 20
+```
+
+Per source it reports `top1` (the first conversion is acceptable),
+`top10_per_phrase` (an acceptable text can be made from each phrase's first
+ten candidates), `cer` (character error rate against the closest acceptable
+text) and conversion time. None of them should regress.
