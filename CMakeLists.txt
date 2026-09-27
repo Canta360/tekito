@@ -40,6 +40,7 @@ add_library(tekito_core STATIC
     src/Core/Japanese/JapaneseLearning.cpp
     src/Core/Japanese/KanaText.cpp
     src/Core/Japanese/MappedFile.cpp
+    src/Core/Japanese/MixedConverter.cpp
     src/Core/Japanese/RomajiTable.cpp
     src/Core/LexiconProvider.cpp
     src/Core/MisspellingProvider.cpp

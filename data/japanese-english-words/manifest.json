@@ -1,0 +1,19 @@
+{
+  "pack_id": "japanese-english-words",
+  "display_name": "English Words for Japanese Input",
+  "schema_version": 1,
+  "version": "2026.09",
+  "language": "en-US",
+  "type": "japanese-english-words",
+  "format": "indexed-tsv-v1",
+  "file": "words.tsv",
+  "index_file": "words.tsv.idx",
+  "entry_count": 40000,
+  "sha256": {
+    "file": "FDE193DE42EC29F727B87E2B5B8AF86F08673B9B438D2E58016F7BA710B069D0",
+    "index": "EB2EDE533DDB5B333B61FAB24464FEEFF1578A200918896BA448437C2031B47C"
+  },
+  "license": "SCOWL-permission-terms + CC-BY-4.0",
+  "source": "scripts/build-expression-packs.py from the standard-english and frequency packs",
+  "notice_file": "NOTICE"
+}
