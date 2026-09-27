@@ -85,6 +85,7 @@ set(TEKITO_CANDIDATE_WINDOW_LIBS d2d1 dwrite dwmapi d3d11 runtimeobject CoreMess
 add_library(Tekito.Tsf SHARED
     src/Tsf/CandidateWindow.cpp
     src/Tsf/ClassFactory.cpp
+    src/Tsf/DisplayAttributes.cpp
     src/Tsf/DllMain.cpp
     src/Tsf/EditSession.cpp
     src/Tsf/TextServiceJapanese.cpp
