@@ -2,7 +2,7 @@
 
 ## いちばん簡単な方法
 
-`TEKITO-0.1.0-full-installer.exe` を実行します。使用許諾への同意を求められたあと、自動でインストールされます。
+`TEKITO-0.1.1-full-installer.exe` を実行します。使用許諾への同意を求められたあと、自動でインストールされます。
 
 - Microsoft Edge WebView2 Runtime が必要です。Windows 11 には最初から入っています。見つからない場合はインストーラーが案内します。
 - 終わったらサインアウトしてサインインし直すか、使いたいアプリを再起動してください。
@@ -11,7 +11,7 @@
 
 ## ZIP から手動でインストールする
 
-`TEKITO-0.1.0-full.zip` を展開し、そのフォルダで管理者 PowerShell を開いて次を実行します。
+`TEKITO-0.1.1-full.zip` を展開し、そのフォルダで管理者 PowerShell を開いて次を実行します。
 
 ```powershell
 Set-ExecutionPolicy -Scope Process Bypass -Force

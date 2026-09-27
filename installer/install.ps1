@@ -147,7 +147,7 @@ try {
 
     [ordered]@{
         product = "TEKITO"
-        version = if ($packageManifest) { [string]$packageManifest.version } else { "0.1.0" }
+        version = if ($packageManifest) { [string]$packageManifest.version } else { "unknown" }
         installed_at = [DateTime]::UtcNow.ToString("o")
         install_root = $installRoot
         tsf_dll = $installedDll

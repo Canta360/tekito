@@ -28,6 +28,7 @@ function initialState() {
       excludedApps: ["Code.exe"],
       builtInExcludedApps: ["WindowsTerminal.exe", "OpenConsole.exe", "conhost.exe", "cmd.exe", "powershell.exe", "pwsh.exe"],
     },
+    version: "0.1.1",
     mode: "auto",
     runtime: { tsf: "Loaded", dataPacks: "12 / 13" },
     appearance: { accent: "#0078d4", systemLanguage: navigator.language.startsWith("ja") ? "ja" : "en" },
