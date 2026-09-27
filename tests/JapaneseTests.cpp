@@ -6,6 +6,7 @@
 #include "Core/Japanese/KanaText.h"
 #include "Core/Japanese/RomajiTable.h"
 
+#include <algorithm>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -443,6 +444,46 @@ void TestLearningStore() {
     Require(copy.Empty(), "clearing forgets everything");
 }
 
+void TestEnglishInJapanese(const RomajiTable& table, const MiniPack& pack) {
+    const tekito::japanese::JapaneseConverter converter(pack.dictionary, pack.matrix);
+    JapaneseComposer composer(&table);
+    composer.SetConverter(&converter);
+    std::wstring asked;
+    composer.SetEnglishCandidates([&](std::wstring_view keys) {
+        asked = keys;
+        return std::vector<std::wstring>{L"thanks", L"thank"};
+    });
+
+    Type(composer, L"thnaks");
+    composer.Convert();
+    RequireText(asked, L"thnaks", "the English engine gets the keys as typed");
+    RequireText(SegmentsText(composer), L"*thanks", "keys that are not romaji convert to English first");
+    const auto* candidates = composer.FocusedCandidates();
+    Require(candidates && candidates->size() >= 4 && (*candidates)[2].text == L"thnaks",
+            "the keys as typed follow the English words");
+    Require(candidates->back().kind == tekito::japanese::PhraseCandidate::Kind::Hiragana ||
+                candidates->back().kind == tekito::japanese::PhraseCandidate::Kind::Katakana,
+            "kana stay available");
+    composer.Clear();
+
+    Type(composer, L"kikai");
+    composer.Convert();
+    const auto* kikai = composer.FocusedCandidates();
+    Require(kikai && kikai->front().kind == tekito::japanese::PhraseCandidate::Kind::Dictionary,
+            "romaji that makes Japanese converts to Japanese first");
+    Require(std::any_of(kikai->begin(), kikai->end(),
+                        [](const auto& c) { return c.kind == tekito::japanese::PhraseCandidate::Kind::English; }),
+            "English words come after, for a single phrase");
+    composer.Clear();
+
+    asked.clear();
+    Type(composer, L"kikaigatomaru");
+    composer.Convert();
+    Require(composer.Segments().size() > 1 && composer.FocusedCandidates()->back().kind !=
+                                                  tekito::japanese::PhraseCandidate::Kind::English,
+            "a sentence of several phrases gets no English words");
+}
+
 void TestComposerLearning(const RomajiTable& table, const MiniPack& pack) {
     const tekito::japanese::JapaneseConverter converter(pack.dictionary, pack.matrix);
     tekito::japanese::JapaneseLearningStore learning;
@@ -490,6 +531,7 @@ int main(int argc, char** argv) {
     TestComposerConversion(*table, *pack);
     TestLearningStore();
     TestComposerLearning(*table, *pack);
+    TestEnglishInJapanese(*table, *pack);
     if (argc > 1 && std::string_view(argv[1]) == "--dump") DumpConversions(*pack);
     std::cout << "All TEKITO Japanese tests passed.\n";
     return 0;

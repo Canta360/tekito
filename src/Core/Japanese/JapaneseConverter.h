@@ -13,7 +13,7 @@ class ConnectionMatrix;
 class JapaneseDictionary;
 
 struct PhraseCandidate {
-    enum class Kind : std::uint8_t { Dictionary, Hiragana, Katakana };
+    enum class Kind : std::uint8_t { Dictionary, Hiragana, Katakana, English };
 
     std::wstring text;
     // Lower is more likely, in the matrix's cost units.
