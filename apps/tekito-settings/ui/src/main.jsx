@@ -9,6 +9,7 @@ import "./styles.css";
 const pages = [
   { id: "general", icon: "general" },
   { id: "typing", icon: "typing" },
+  { id: "japanese", icon: "japanese" },
   { id: "dictionary", icon: "dictionary" },
   { id: "about", icon: "about" },
 ];
@@ -30,6 +31,10 @@ const initialSettings = {
   toggleKey: 1,
   keyboardType: 0,
   periodOnEnter: false,
+  japaneseSpaceWidth: 0,
+  japanesePunctuation: 0,
+  japanesePredictionEnabled: true,
+  japaneseDropSpaceBeforeKana: true,
   uiLanguage: 0,
   excludedApps: [],
   builtInExcludedApps: [],
@@ -209,6 +214,7 @@ function App() {
             <div className="page" key={page}>
               {page === "general" && <GeneralPage mode={mode} settings={settings} changeMode={changeMode} setSetting={setSetting} runAction={runAction} />}
               {page === "typing" && <TypingPage settings={settings} setSetting={setSetting} />}
+              {page === "japanese" && <JapanesePage settings={settings} setSetting={setSetting} setConfirm={setConfirm} runAction={runAction} />}
               {page === "dictionary" && <DictionaryPage learning={learning} settings={settings} setSetting={setSetting} dictionary={dictionary} setModal={setModal} setConfirm={setConfirm} runAction={runAction} />}
               {page === "about" && <AboutPage version={version} runtime={runtime} packs={packs} runAction={runAction} />}
             </div>
@@ -305,6 +311,54 @@ function ExcludedApps({ settings, runAction }) {
         <p className="fine-print">{t.excluded.builtIn(settings.builtInExcludedApps.join(", "))}</p>
       )}
     </Glass>
+  );
+}
+
+function JapanesePage({ settings, setSetting, setConfirm, runAction }) {
+  const t = useText();
+  const j = t.japanese;
+  // UserSettings::japaneseSpaceWidth and ::japanesePunctuation.
+  const spaces = [[0, j.space.follow], [1, j.space.half], [2, j.space.full]];
+  const marks = [[0, "、。"], [1, "，．"], [2, "，。"], [3, "、．"]];
+  const askForget = () => setConfirm({
+    title: j.forget.confirmTitle,
+    message: j.forget.confirmMessage,
+    confirmLabel: t.learning.forget,
+    action: () => runAction("japaneseLearning.clear", {}, t.learning.cleared),
+  });
+  return (
+    <>
+      <Glass className="card">
+        <Row title={j.space.title} description={j.space.description}>
+          <Segmented label={j.space.title} value={settings.japaneseSpaceWidth} options={spaces} onChange={(value) => setSetting("japaneseSpaceWidth", value)} />
+        </Row>
+        <Row title={j.punctuation.title} description={j.punctuation.description}>
+          <Segmented label={j.punctuation.title} value={settings.japanesePunctuation} options={marks} onChange={(value) => setSetting("japanesePunctuation", value)} />
+        </Row>
+        <Row title={j.prediction.title} description={j.prediction.description}>
+          <Toggle label={j.prediction.title} checked={settings.japanesePredictionEnabled} onChange={(value) => setSetting("japanesePredictionEnabled", value)} />
+        </Row>
+        <Row title={j.dropSpace.title} description={j.dropSpace.description}>
+          <Toggle label={j.dropSpace.title} checked={settings.japaneseDropSpaceBeforeKana} onChange={(value) => setSetting("japaneseDropSpaceBeforeKana", value)} />
+        </Row>
+        <Row title={j.forget.title} description={j.forget.description}>
+          <Button variant="quiet" onClick={askForget}>{t.learning.forget}</Button>
+        </Row>
+      </Glass>
+      <Glass className="card">
+        <h2 className="card-title">{t.keys.title}</h2>
+        <div className="keys">
+          <Key label={j.keys.convert} keys={["Space"]} />
+          <Key label={j.keys.phrases} keys={["←", "→"]} />
+          <Key label={j.keys.resize} keys={["Shift", "←", "→"]} />
+          <Key label={j.keys.predictions} keys={["Tab", "↓"]} />
+          <Key label={j.keys.kana} keys={["F6", "F7", "F8"]} />
+          <Key label={j.keys.letters} keys={["F9", "F10"]} />
+          <Key label={j.keys.english} keys={["Shift", "A-Z"]} />
+          <Key label={j.keys.back} keys={["Esc"]} />
+        </div>
+      </Glass>
+    </>
   );
 }
 

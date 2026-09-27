@@ -11,6 +11,7 @@ const en = {
   pages: {
     general: { label: "General", description: "Choose how TEKITO handles your typing." },
     typing: { label: "Typing", description: "Choose what Auto mode does for you." },
+    japanese: { label: "Japanese", description: "How TEKITO types Japanese." },
     dictionary: { label: "Dictionary", description: "Your own words, and what TEKITO learns from your choices." },
     about: { label: "About", description: "Version, language data and support." },
   },
@@ -77,6 +78,37 @@ const en = {
     keep: "Keep what you typed",
   },
 
+  japanese: {
+    space: {
+      title: "Space",
+      description: "The space Space types when nothing is being converted. Shift+Space types the other one.",
+      follow: "Full-width in Japanese",
+      half: "Half-width",
+      full: "Full-width",
+    },
+    punctuation: { title: "Punctuation", description: "What the comma and period keys type." },
+    prediction: { title: "Predict words", description: "Offers words that start with what you type. Tab picks one." },
+    dropSpace: {
+      title: "No space before kana",
+      description: "After an English word typed with Shift, the space goes away when you type on in Japanese.",
+    },
+    forget: {
+      title: "Forget Japanese choices",
+      description: "Conversions go back to their usual order. English learning is kept.",
+      confirmTitle: "Forget your Japanese choices?",
+      confirmMessage: "Conversions will no longer put your earlier choices first. This cannot be undone.",
+    },
+    keys: {
+      convert: "Convert, then next candidate",
+      phrases: "Move between phrases",
+      resize: "Make a phrase shorter or longer",
+      predictions: "Pick a predicted word",
+      kana: "Hiragana, katakana, half-width",
+      letters: "The letters you typed",
+      english: "Type an English word",
+      back: "Back to kana",
+    },
+  },
   learning: {
     title: "Learn from my choices",
     description: "Words and expressions you pick move up next time.",
@@ -150,6 +182,7 @@ const ja = {
   pages: {
     general: { label: "一般", description: "TEKITO の動き方を選びます。" },
     typing: { label: "入力", description: "Auto モードで TEKITO がすることを選びます。" },
+    japanese: { label: "日本語", description: "TEKITO で日本語を打つときの動きを選びます。" },
     dictionary: { label: "辞書", description: "自分の単語と、TEKITO があなたの選択から学んだこと。" },
     about: { label: "情報", description: "バージョン、言語データ、サポート。" },
   },
@@ -216,6 +249,37 @@ const ja = {
     keep: "打ったとおりにする",
   },
 
+  japanese: {
+    space: {
+      title: "スペース",
+      description: "変換していないときに Space で入るスペースです。Shift+Space ではもう一方が入ります。",
+      follow: "日本語では全角",
+      half: "半角",
+      full: "全角",
+    },
+    punctuation: { title: "句読点", description: "読点と句点のキーで入る記号です。" },
+    prediction: { title: "予測候補", description: "打った読みで始まる語を出します。Tab で選びます。" },
+    dropSpace: {
+      title: "かなの前にスペースを入れない",
+      description: "Shift で打った英単語のあと、続けて日本語を打つとスペースを取り除きます。",
+    },
+    forget: {
+      title: "日本語の学習を消す",
+      description: "変換の順番が元に戻ります。英語の学習は残ります。",
+      confirmTitle: "日本語の学習を消しますか？",
+      confirmMessage: "これまでの選択が変換の順番に反映されなくなります。元に戻せません。",
+    },
+    keys: {
+      convert: "変換、次の候補",
+      phrases: "文節を移る",
+      resize: "文節を縮める・伸ばす",
+      predictions: "予測候補を選ぶ",
+      kana: "ひらがな・カタカナ・半角",
+      letters: "打った英字のまま",
+      english: "英単語を打つ",
+      back: "かなに戻す",
+    },
+  },
   learning: {
     title: "選んだ候補から学ぶ",
     description: "選んだ単語や表現が、次から上に出ます。",
