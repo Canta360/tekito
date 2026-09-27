@@ -57,9 +57,10 @@ EXPECTED_FIELDS = {
     "emoji": 5,
     "social-expression": 6,
     "japanese-phonetic": 5,
+    "japanese-romaji": 3,
 }
 UNIQUE_KEY_PACKS = {
-    "standard-english", "frequency",
+    "standard-english", "frequency", "japanese-romaji",
     "dictionary-display", "pronunciation", "proper-nouns",
 }
 INDEX_HEADERS = {
@@ -70,7 +71,10 @@ INDEX_HEADERS = {
     "dictionary-display": "TEKITO_DICTIONARY_INDEX_V1",
     "pronunciation": "TEKITO_PRONUNCIATION_INDEX_V1",
     "qwerty-typo-catalog": "TEKITO_INPUT_CATALOG_INDEX_V1",
+    "japanese-romaji": "TEKITO_JAPANESE_ROMAJI_INDEX_V1",
 }
+# Packs whose rows may start with "#" (the romaji table maps the # key).
+NO_COMMENT_PACKS = {"japanese-romaji"}
 INDEX_KEY_FIELDS = {pack_id: 2 if pack_id == "phrase" else 1
                     for pack_id in EXPECTED_FIELDS}
 SOCIAL_KINDS = {"text_expansion", "emoticon", "kaomoji", "symbol", "emoji"}
@@ -183,7 +187,7 @@ def validate_pack(pack: Path, manifest: dict) -> list[str]:
     previous_key = None
     seen_keys = set()
     for number, line in text_lines(data_path):
-        if not line or line.startswith("#"):
+        if not line or (line.startswith("#") and pack_id not in NO_COMMENT_PACKS):
             continue
         count += 1
         if pack_id == "qwerty-typo-catalog":

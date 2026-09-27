@@ -37,6 +37,9 @@ add_library(tekito_core STATIC
     src/Core/ExternalRankingProviders.cpp
     src/Core/ExternalSlangProvider.cpp
     src/Core/InputStateMachine.cpp
+    src/Core/Japanese/JapaneseComposer.cpp
+    src/Core/Japanese/KanaText.cpp
+    src/Core/Japanese/RomajiTable.cpp
     src/Core/LexiconProvider.cpp
     src/Core/MisspellingProvider.cpp
     src/Core/PolicyEngine.cpp
@@ -161,6 +164,13 @@ if(TEKITO_BUILD_TESTS)
     target_link_libraries(tekito_core_tests PRIVATE tekito_userdata tekito_dictionary)
     add_test(NAME tekito_core_tests COMMAND tekito_core_tests)
     set_tests_properties(tekito_core_tests PROPERTIES
+        ENVIRONMENT "TEKITO_DATA_PACK_DIR=${CMAKE_CURRENT_SOURCE_DIR}/data")
+
+    add_executable(tekito_japanese_tests tests/JapaneseTests.cpp)
+    target_compile_options(tekito_japanese_tests PRIVATE ${TEKITO_WARNINGS})
+    target_link_libraries(tekito_japanese_tests PRIVATE tekito_core)
+    add_test(NAME tekito_japanese_tests COMMAND tekito_japanese_tests)
+    set_tests_properties(tekito_japanese_tests PROPERTIES
         ENVIRONMENT "TEKITO_DATA_PACK_DIR=${CMAKE_CURRENT_SOURCE_DIR}/data")
 
     # Renders the candidate window with sample candidates and screenshots it,
