@@ -10,10 +10,8 @@ downloaded dataset:
                        ("konpyuutaa" -> computer), generated from the CMU
                        Pronouncing Dictionary in the pronunciation pack
   qwerty-typo-catalog  synthetic typos of common words, for evaluation only
-  japanese-english-words
-                       the common English words Japanese input recognizes
-                       inside romaji ("kyouhameetinggaaru"), with how common
-                       each is
+  japanese-loanwords   English words by how they sound in katakana
+                       (ミーティング -> meeting), from japanese-phonetic
 
 The pronunciation, frequency and standard-english packs must already be in
 data/. The output is deterministic: running it twice gives identical packs.
@@ -439,26 +437,121 @@ Every entry is a suggestion only; TEKITO never replaces a word with one.
 # japanese-english-words
 
 
-def build_japanese_english_words(word_count: int) -> dict:
-    scores = read_first_fields(DATA / "frequency" / "word-scores.tsv")
-    words = sorted(common_words(word_count))
-    pack = new_pack("japanese-english-words")
-    with (pack / "words.tsv").open("w", encoding="utf-8", newline="\n") as output:
-        for word in words:
-            output.write(f"{word}\t{float(scores[word]):.4f}\n")
-    return finish(pack, "English Words for Japanese Input", "japanese-english-words", "words.tsv",
-                  "SCOWL-permission-terms + CC-BY-4.0",
-                  "scripts/build-expression-packs.py from the standard-english and frequency packs",
-                  f"""
-The {len(words):,} most common words of the standard-english pack, with their
-frequency scores from the frequency pack, so Japanese input can recognize
-English words typed among romaji.
+# Hiragana by the vowel they end in, for the long-vowel mark (as in
+# src/Core/Japanese/Loanwords.cpp).
+VOWELS = {
+    "あ": "あかさたなはまやらわがざだばぱぁゃゎ",
+    "い": "いきしちにひみりぎじぢびぴぃ",
+    "う": "うくすつぬふむゆるぐずづぶぷぅゅゔ",
+    "え": "えけせてねへめれげぜでべぺぇ",
+    "お": "おこそとのほもよろをごぞどぼぽぉょ",
+}
 
-Words: SCOWL / ESDB word list (see the standard-english pack's NOTICE).
-Frequencies: Leipzig Corpora Collection (English news 2025, 1M sentences),
-licensed CC BY 4.0: D. Goldhahn, T. Eckart and U. Quasthoff, "Building Large
-Monolingual Dictionaries at the Leipzig Corpora Collection", LREC 2012.
-""", len(words))
+
+def loanword_key(kana: str) -> str:
+    """LoanwordKey in src/Core/Japanese/Loanwords.cpp: how katakana sounds,
+    loosely, so ミーティング and the romaji "miitingu" meet."""
+    text = "".join(chr(ord(c) - 0x60) if "ァ" <= c <= "ヶ" else c for c in kana)
+    for spelled, sound in (("てぃ", "ち"), ("でぃ", "じ"), ("ぢ", "じ"), ("づ", "ず"), ("ゔ", "ぶ")):
+        text = text.replace(spelled, sound)
+    key = ""
+    for c in text:
+        if c == "ー":
+            vowel = next((v for v, row in VOWELS.items() if key and key[-1] in row), "")
+            key += vowel
+            continue
+        key += c
+    return key.translate(str.maketrans("ぁぃぅぇぉ", "あいうえお"))
+
+
+class Romaji:
+    """The japanese-romaji table, read the way JapaneseComposer reads keys."""
+
+    def __init__(self) -> None:
+        self.rules: dict[str, tuple[str, str]] = {}
+        for line in (DATA / "japanese-romaji" / "romaji.tsv").read_text(encoding="utf-8").splitlines():
+            keys, output, pending = line.split("\t")
+            self.rules[keys] = (output, pending)
+        self.longer = {keys[:i] for keys in self.rules for i in range(1, len(keys))}
+
+    def kana(self, keys: str) -> str | None:
+        """The kana `keys` type, or None when a key is left unread."""
+        out: list[str] = []
+        pending = ""
+
+        def feed(key: str) -> bool:
+            nonlocal pending
+            for _ in range(64):
+                typed = pending + key
+                if typed in self.longer:
+                    pending = typed
+                    return True
+                if typed in self.rules:
+                    output, keep = self.rules[typed]
+                    out.append(output)
+                    pending = keep if typed.endswith(keep) else ""
+                    return True
+                if not pending:
+                    return False
+                if not flush_once():
+                    return False
+            return False
+
+        def flush_once() -> bool:
+            nonlocal pending
+            held, pending = pending, ""
+            for length in range(len(held), 0, -1):
+                rule = self.rules.get(held[:length])
+                if rule and not rule[1]:
+                    out.append(rule[0])
+                    return all(feed(rest) for rest in held[length:])
+            return False
+
+        for key in keys:
+            if not feed(key):
+                return None
+        while pending:
+            if not flush_once():
+                return None
+        return "".join(out)
+
+
+def build_japanese_loanwords() -> dict:
+    scores = read_first_fields(DATA / "frequency" / "word-scores.tsv")
+    romaji = Romaji()
+    rows: dict[tuple[str, str], float] = {}
+    with (DATA / "japanese-phonetic" / "entries.tsv").open(encoding="utf-8") as source:
+        for line in source:
+            form, word = line.rstrip("\n").split("\t")[:2]
+            kana = romaji.kana(form)
+            if kana and len(kana) >= 2:
+                rows[(loanword_key(kana), word)] = float(scores.get(word, 0))
+    by_key: dict[str, list[tuple[float, str]]] = {}
+    for (key, word), score in rows.items():
+        by_key.setdefault(key, []).append((-score, word))
+    pack = new_pack("japanese-loanwords")
+    count = 0
+    with (pack / "words.tsv").open("wb") as output:
+        for key in sorted(by_key, key=lambda k: k.encode("utf-8")):
+            for score, word in sorted(by_key[key])[:3]:
+                output.write(f"{key}\t{word}\t{-score:.4f}\n".encode("utf-8"))
+                count += 1
+    return finish(pack, "Loanwords for Japanese Input", "japanese-loanwords", "words.tsv",
+                  "CMUdict + CC-BY-4.0",
+                  "scripts/build-expression-packs.py from the japanese-phonetic, japanese-romaji and frequency packs",
+                  f"""
+English words by how they sound in katakana ("みいちんぐ" for meeting), so
+Japanese input can offer the English word for a katakana word. Each romaji
+spelling of the japanese-phonetic pack is read with the japanese-romaji
+table and keyed loosely (long vowels written out, small vowels full size,
+ティ as チ); a key's words come most common first.
+
+Pronunciations: the CMU Pronouncing Dictionary (see the japanese-phonetic
+pack's NOTICE). Frequencies: Leipzig Corpora Collection (English news 2025,
+1M sentences), licensed CC BY 4.0: D. Goldhahn, T. Eckart and U. Quasthoff,
+"Building Large Monolingual Dictionaries at the Leipzig Corpora Collection",
+LREC 2012.
+""", count, language="ja-JP")
 
 
 # ---------------------------------------------------------------------------
@@ -546,17 +639,16 @@ the Leipzig Corpora Collection (English news 2025), licensed CC BY 4.0.
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--only", choices=("slang", "social-expression", "japanese-phonetic",
-                                           "qwerty-typo-catalog", "japanese-english-words"))
+                                           "qwerty-typo-catalog", "japanese-loanwords"))
     parser.add_argument("--phonetic-words", type=int, default=20000)
     parser.add_argument("--typo-words", type=int, default=5000)
-    parser.add_argument("--english-words", type=int, default=40000)
     args = parser.parse_args()
     builders = {
         "slang": build_slang,
         "social-expression": build_social,
         "japanese-phonetic": lambda: build_japanese_phonetic(args.phonetic_words),
         "qwerty-typo-catalog": lambda: build_typo_catalog(args.typo_words),
-        "japanese-english-words": lambda: build_japanese_english_words(args.english_words),
+        "japanese-loanwords": build_japanese_loanwords,
     }
     for name, builder in builders.items():
         if args.only in (None, name):

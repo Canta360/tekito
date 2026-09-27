@@ -1,4 +1,4 @@
-#include "Core/Japanese/MixedConverter.h"
+#include "Core/Japanese/KeyConverter.h"
 
 #include "Core/Japanese/JapaneseComposer.h"
 #include "Core/Japanese/JapaneseDictionary.h"
@@ -6,7 +6,6 @@
 #include "Core/TypoModel.h"
 
 #include <algorithm>
-#include <cwctype>
 #include <limits>
 #include <set>
 #include <tuple>
@@ -14,12 +13,12 @@
 namespace tekito::japanese {
 namespace {
 
-// Costs in the connection matrix's units (English words: see Costs).
+// Costs in the connection matrix's units (slips: see Costs).
 constexpr std::int64_t kUnknownKanaCost = 10000;
 constexpr std::int64_t kUnknownKeyCost = 20000;
 constexpr std::int64_t kSpellingCorrectionPenalty = 5000;
-constexpr std::size_t kShortestEnglishWord = 3;
-constexpr std::size_t kLongestEnglishWord = 24;
+// Fewer keys than this are left as typed.
+constexpr std::size_t kShortestKeys = 3;
 // Slips are looked for this many keys into a word, and a corrected word is
 // at most this long; longer words are rare enough to leave as typed.
 constexpr std::size_t kTypoWindow = 12;
@@ -28,13 +27,13 @@ constexpr std::wstring_view kDroppedKeys = L"aiueon";
 // Of the words a corrected reading can be, the cheapest this many.
 constexpr std::size_t kCorrectedForms = 2;
 // Corrected words allowed per this many keys (at least one): more slips than
-// that is not Japanese mistyped but something else (English the words pack
-// lacks, a name), left as typed.
+// that is not Japanese mistyped but something else (English, a name), left
+// as typed.
 constexpr std::size_t kKeysPerSlip = 12;
 constexpr std::int64_t kInfinity = std::numeric_limits<std::int64_t>::max() / 4;
 constexpr std::size_t kNoKey = static_cast<std::size_t>(-1);
 
-enum class NodeKind : std::uint8_t { Japanese, UnknownKana, English, UnknownKey };
+enum class NodeKind : std::uint8_t { Japanese, UnknownKana, UnknownKey };
 
 struct Node {
     std::uint32_t begin{0};
@@ -43,7 +42,7 @@ struct Node {
     std::uint16_t right{0};
     std::int64_t cost{0};
     NodeKind kind{NodeKind::Japanese};
-    // Kana for Japanese nodes, the keys as typed otherwise.
+    // Kana, or the key as typed for an unknown key.
     std::wstring text;
     // A Japanese word read through a slip in the keys.
     bool corrected{false};
@@ -103,67 +102,11 @@ void SlipsAt(std::wstring_view typed, std::size_t at, std::vector<Slip>& slips) 
     }
 }
 
-bool IsWordLetter(wchar_t ch) {
-    return ch < 0x80 && std::iswalpha(ch);
-}
-
 }  // namespace
 
-bool EnglishWords::Open(const std::filesystem::path& packDirectory) noexcept {
-    lines_.clear();
-    if (!file_.Open(packDirectory / L"words.tsv")) return false;
-    const auto* data = file_.Data();
-    const std::size_t size = file_.Size();
-    try {
-        std::size_t start = 0;
-        for (std::size_t i = 0; i < size; ++i) {
-            if (data[i] != '\n') continue;
-            if (i > start) lines_.push_back(static_cast<std::uint32_t>(start));
-            start = i + 1;
-        }
-    } catch (...) {
-        lines_.clear();
-    }
-    return !lines_.empty();
-}
-
-std::optional<double> EnglishWords::Score(std::string_view word) const noexcept {
-    if (lines_.empty() || word.empty()) return std::nullopt;
-    const auto* data = reinterpret_cast<const char*>(file_.Data());
-    const std::size_t size = file_.Size();
-    const auto keyAt = [&](std::uint32_t offset) {
-        std::size_t end = offset;
-        while (end < size && data[end] != '\t' && data[end] != '\n') ++end;
-        return std::string_view(data + offset, end - offset);
-    };
-    std::size_t lo = 0, hi = lines_.size();
-    while (lo < hi) {
-        const std::size_t middle = lo + (hi - lo) / 2;
-        if (keyAt(lines_[middle]) < word) lo = middle + 1; else hi = middle;
-    }
-    if (lo >= lines_.size() || keyAt(lines_[lo]) != word) return std::nullopt;
-    std::size_t at = lines_[lo] + word.size() + 1;
-    double score = 0;
-    double scale = 0;
-    for (; at < size && data[at] != '\n' && data[at] != '\r'; ++at) {
-        const char c = data[at];
-        if (c == '.') {
-            scale = 1;
-        } else if (c >= '0' && c <= '9') {
-            if (scale > 0) {
-                scale /= 10;
-                score += (c - '0') * scale;
-            } else {
-                score = score * 10 + (c - '0');
-            }
-        }
-    }
-    return score;
-}
-
-std::optional<MixedConversion> MixedConverter::Convert(std::wstring_view keys) const {
+std::optional<KeyConversion> KeyConverter::Convert(std::wstring_view keys) const {
     const std::size_t n = keys.size();
-    if (n < kShortestEnglishWord) return std::nullopt;
+    if (n < kShortestKeys || costs_.typo <= 0) return std::nullopt;
     const std::uint16_t unknown = dictionary_.UnknownId();
 
     std::vector<Node> nodes;
@@ -220,23 +163,7 @@ std::optional<MixedConversion> MixedConverter::Convert(std::wstring_view keys) c
 
     for (std::size_t i = 0; i < n; ++i) {
         readWords(i);
-
-        // English: the keys from here as they are.
-        std::string word;
-        for (std::size_t j = i; j < n && english_.IsOpen() && j - i < kLongestEnglishWord && IsWordLetter(keys[j]);
-             ++j) {
-            word += static_cast<char>(std::towlower(keys[j]));
-            if (word.size() < kShortestEnglishWord) continue;
-            if (const auto score = english_.Score(word)) {
-                const auto cost = costs_.englishBase -
-                                  static_cast<std::int64_t>(static_cast<double>(costs_.englishPerScore) * *score) +
-                                  costs_.languageSwitch;
-                add({static_cast<std::uint32_t>(i), static_cast<std::uint32_t>(j + 1), unknown, unknown, cost,
-                     NodeKind::English, std::wstring(keys.substr(i, j + 1 - i))});
-            }
-        }
-
-        // A key neither language reads, as it is.
+        // A key the table does not read, as it is.
         add({static_cast<std::uint32_t>(i), static_cast<std::uint32_t>(i + 1), unknown, unknown, kUnknownKeyCost,
              NodeKind::UnknownKey, std::wstring(1, keys[i])});
     }
@@ -284,7 +211,7 @@ std::optional<MixedConversion> MixedConverter::Convert(std::wstring_view keys) c
     // only changes the romaji from the unit before it (that unit may be an
     // n the next key decides), so the units before that are read once, from
     // the start.
-    if (costs_.typo > 0 && !path.empty()) {
+    if (!path.empty()) {
         const auto units = JapaneseComposer::ParseRomaji(table_, keys);
         std::vector<std::size_t> bounds{0};
         for (const auto& unit : units) bounds.push_back(bounds.back() + unit.keys);
@@ -339,70 +266,23 @@ std::optional<MixedConversion> MixedConverter::Convert(std::wstring_view keys) c
         if (nodes.size() > before) path = bestPath();
     }
 
-    const bool english = std::any_of(path.begin(), path.end(),
-                                     [&](int k) { return nodes[k].kind == NodeKind::English; });
     const auto slips = static_cast<std::size_t>(
         std::count_if(path.begin(), path.end(), [&](int k) { return nodes[k].corrected; }));
     if (slips > std::max<std::size_t>(1, n / kKeysPerSlip)) return std::nullopt;
-    const bool corrected = slips > 0;
     const bool unreadable = std::any_of(path.begin(), path.end(),
                                         [&](int k) { return nodes[k].kind == NodeKind::UnknownKey; });
-    if (path.empty() || !(english || corrected) || unreadable) return std::nullopt;
+    if (path.empty() || slips == 0 || unreadable) return std::nullopt;
 
-    // Japanese runs are converted as usual; each English word is a phrase.
-    MixedConversion result;
-    result.english = english;
-    result.corrected = corrected;
-    // The reading is the path's texts in order.
-    std::size_t readingSize = 0;
-    for (const int k : path) readingSize += nodes[k].text.size();
-    result.keyAt.assign(readingSize + 1, std::wstring::npos);
+    // The corrected reading is converted as usual.
+    KeyConversion result;
+    for (const int k : path) result.reading += nodes[k].text;
+    result.keyAt.assign(result.reading.size() + 1, std::wstring::npos);
     for (std::size_t offset = 0; const int k : path) {
         result.keyAt[offset] = nodes[k].begin;
         offset += nodes[k].text.size();
         result.keyAt[offset] = nodes[k].end;
     }
-    std::wstring run;
-    const auto flushRun = [&]() {
-        if (run.empty()) return;
-        const std::size_t offset = result.reading.size();
-        for (auto& phrase : converter_.Convert(run)) {
-            phrase.begin += offset;
-            result.phrases.push_back(std::move(phrase));
-        }
-        result.reading += run;
-        run.clear();
-    };
-    for (const int k : path) {
-        const Node& node = nodes[k];
-        if (node.kind != NodeKind::English) {
-            run += node.text;
-            continue;
-        }
-        flushRun();
-        Phrase phrase;
-        phrase.begin = result.reading.size();
-        phrase.length = node.text.size();
-        phrase.candidates.push_back({node.text, 0, PhraseCandidate::Kind::English, false});
-        // The same keys as romaji, in case Japanese was meant after all.
-        std::wstring kana;
-        bool readable = true;
-        for (const auto& token : JapaneseComposer::ParseRomaji(table_, node.text)) {
-            readable = readable && !token.leftover;
-            kana += token.kana;
-        }
-        if (readable && !kana.empty()) {
-            const auto katakana = ToKatakana(kana);
-            for (const auto& text : {katakana, kana}) {
-                phrase.candidates.push_back({text, 0, text == kana ? PhraseCandidate::Kind::Hiragana
-                                                                   : PhraseCandidate::Kind::Katakana,
-                                             false});
-            }
-        }
-        result.reading += node.text;
-        result.phrases.push_back(std::move(phrase));
-    }
-    flushRun();
+    result.phrases = converter_.Convert(result.reading);
     return result;
 }
 

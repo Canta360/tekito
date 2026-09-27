@@ -84,14 +84,12 @@ ten candidates), `cer` (character error rate against the closest acceptable
 text) and conversion time. None of them should regress.
 
 The script also writes the same sentences as the romaji keys a person types
-(`japanese_eval_keys.tsv`, plus sentences with an English word among the
-romaji) and with one slip in the keys (`japanese_eval_typo_keys.tsv`: a
+(`japanese_eval_keys.tsv`) and with one slip in the keys (`japanese_eval_typo_keys.tsv`: a
 neighboring key, a key dropped, an extra key, two keys swapped). These run
 through the composer, as TEKITO converts on Space:
 
 ```powershell
-$keys = @("--pack", "data\japanese-core", "--romaji", "data\japanese-romaji",
-          "--english", "data\japanese-english-words")
+$keys = @("--pack", "data\japanese-core", "--romaji", "data\japanese-romaji")
 .\out\build\eval\Release\tekito_ja_eval.exe @keys --keys-corpus eval\generated\japanese_eval_keys.tsv
 .\out\build\eval\Release\tekito_ja_eval.exe @keys --keys-corpus eval\generated\japanese_eval_typo_keys.tsv
 ```

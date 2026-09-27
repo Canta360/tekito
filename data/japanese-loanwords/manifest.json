@@ -1,0 +1,19 @@
+{
+  "pack_id": "japanese-loanwords",
+  "display_name": "Loanwords for Japanese Input",
+  "schema_version": 1,
+  "version": "2026.09",
+  "language": "ja-JP",
+  "type": "japanese-loanwords",
+  "format": "indexed-tsv-v1",
+  "file": "words.tsv",
+  "index_file": "words.tsv.idx",
+  "entry_count": 54508,
+  "sha256": {
+    "file": "A3B3AE4FDA108983A2CE8C4B8B8879132947FC75819BD66FBDC254ADC6CA9AF2",
+    "index": "9478EC1AD0520B69F437476F97522F0F997577CBC92E7FD9ED39FBE8AC97EB3F"
+  },
+  "license": "CMUdict + CC-BY-4.0",
+  "source": "scripts/build-expression-packs.py from the japanese-phonetic, japanese-romaji and frequency packs",
+  "notice_file": "NOTICE"
+}

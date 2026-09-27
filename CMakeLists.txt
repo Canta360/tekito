@@ -39,10 +39,12 @@ add_library(tekito_core STATIC
     src/Core/Japanese/JapaneseDictionary.cpp
     src/Core/Japanese/JapaneseLearning.cpp
     src/Core/Japanese/KanaText.cpp
+    src/Core/Japanese/KeyConverter.cpp
+    src/Core/Japanese/Loanwords.cpp
     src/Core/Japanese/MappedFile.cpp
     src/Core/Japanese/Meanings.cpp
-    src/Core/Japanese/MixedConverter.cpp
     src/Core/Japanese/RomajiTable.cpp
+    src/Core/Japanese/SortedTsv.cpp
     src/Core/LexiconProvider.cpp
     src/Core/MisspellingProvider.cpp
     src/Core/PolicyEngine.cpp
