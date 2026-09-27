@@ -3,6 +3,7 @@
 #include "Tsf/ComPtr.h"
 #include "Tsf/Diagnostics.h"
 #include "Tsf/Globals.h"
+#include "Tsf/JapaneseSpike.h"
 #include "Tsf/TekitoGuids.h"
 #include "UserData/UiLanguage.h"
 
@@ -587,12 +588,18 @@ HRESULT TextService::ActivateEx(ITfThreadMgr* threadManager, TfClientId clientId
     candidateWindow_.Initialize(g_moduleInstance, [this](std::size_t index) {
         OnCandidateSelected(index);
     });
+#if defined(TEKITO_JA_SPIKE)
+    spikeWatcher_.Start(threadManager_);
+#endif
     Trace(L"ActivateEx ready");
     return S_OK;
 }
 
 HRESULT TextService::Deactivate() {
     Trace(L"Deactivate");
+#if defined(TEKITO_JA_SPIKE)
+    spikeWatcher_.Stop();
+#endif
     if (settingsLoaded_) SyncRuntimeState();
     if (settingsLoaded_) {
         userdata::UserSettings latestSettings = userSettings_;
@@ -929,6 +936,9 @@ HRESULT TextService::OnSetFocus(BOOL foreground) {
 }
 
 HRESULT TextService::OnTestKeyDown(ITfContext* context, WPARAM wParam, LPARAM lParam, BOOL* eaten) {
+#if defined(TEKITO_JA_SPIKE)
+    spike::TraceKey(L"TestKeyDown", wParam, lParam);
+#endif
     if (!eaten) return E_INVALIDARG;
     SyncRuntimeState();
     if (IsReadOnly(context)) {
@@ -952,6 +962,9 @@ HRESULT TextService::OnTestKeyDown(ITfContext* context, WPARAM wParam, LPARAM lP
 }
 
 HRESULT TextService::OnKeyDown(ITfContext* context, WPARAM wParam, LPARAM lParam, BOOL* eaten) {
+#if defined(TEKITO_JA_SPIKE)
+    spike::TraceKey(L"KeyDown", wParam, lParam);
+#endif
     ScopedTraceDuration duration(L"Perf OnKeyDown");
     Trace(L"OnKeyDown");
     if (!context || !eaten) return E_INVALIDARG;
@@ -988,6 +1001,9 @@ HRESULT TextService::OnKeyUp(ITfContext*, WPARAM, LPARAM, BOOL* eaten) {
 HRESULT TextService::OnPreservedKey(ITfContext*, REFGUID guid, BOOL* eaten) {
     if (!eaten) return E_INVALIDARG;
     *eaten = FALSE;
+#if defined(TEKITO_JA_SPIKE)
+    Trace(guid == GUID_TekitoToggleKey ? L"Spike PreservedKey toggle" : L"Spike PreservedKey other");
+#endif
     if (guid != GUID_TekitoToggleKey) return S_OK;
     SyncRuntimeState();
     ChangeInputMode(state_.Mode() == InputMode::Convert ? InputMode::Direct
@@ -1006,6 +1022,9 @@ HRESULT TextService::OnPopContext(ITfContext* context) {
 }
 
 HRESULT TextService::OnSetFocus(ITfDocumentMgr* focus, ITfDocumentMgr*) {
+#if defined(TEKITO_JA_SPIKE)
+    if (focus) spike::TraceProfile(L"SetFocus");
+#endif
     ComPtr<ITfContext> top;
     if (focus && SUCCEEDED(focus->GetTop(top.Put())) && top) {
         AdviseContextSinks(top.Get());
@@ -1075,6 +1094,9 @@ HRESULT TextService::OnLayoutChange(ITfContext* context, TfLayoutCode code, ITfC
 }
 
 HRESULT TextService::OnChange(REFGUID compartment) {
+#if defined(TEKITO_JA_SPIKE)
+    spike::TraceCompartment(threadManager_, compartment);
+#endif
     if (compartment != GUID_COMPARTMENT_KEYBOARD_OPENCLOSE || updatingOpenClose_) return S_OK;
     auto openClose = OpenCloseCompartment(threadManager_);
     if (!openClose) return S_OK;

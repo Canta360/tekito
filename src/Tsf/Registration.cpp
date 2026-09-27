@@ -46,6 +46,31 @@ HRESULT RegisterComServer() {
                              L"ThreadingModel", L"Apartment");
 }
 
+#if defined(TEKITO_JA_SPIKE)
+// The probe takes a substitute keyboard layout for each profile from the
+// environment of the registering process, e.g. TEKITO_SPIKE_JA_HKL=04090409.
+HKL SpikeSubstituteLayout(const wchar_t* variable) {
+    wchar_t value[16]{};
+    const DWORD length = GetEnvironmentVariableW(variable, value, static_cast<DWORD>(std::size(value)));
+    if (length == 0 || length >= std::size(value)) return nullptr;
+    return reinterpret_cast<HKL>(static_cast<ULONG_PTR>(wcstoul(value, nullptr, 16)));
+}
+
+HRESULT RegisterJapaneseSpikeProfile(ITfInputProcessorProfileMgr* profiles,
+                                     ITfInputProcessorProfiles* legacyProfiles,
+                                     const wchar_t* modulePath) {
+    constexpr LANGID langid = MAKELANGID(LANG_JAPANESE, SUBLANG_JAPANESE_JAPAN);
+    constexpr wchar_t description[] = L"TEKITO";
+    HRESULT hr = profiles->RegisterProfile(CLSID_TekitoTextService, langid, GUID_TekitoJapaneseProfile,
+                                           description, static_cast<ULONG>(std::size(description) - 1),
+                                           modulePath, static_cast<ULONG>(wcslen(modulePath)), 0,
+                                           SpikeSubstituteLayout(L"TEKITO_SPIKE_JA_HKL"), 0, TRUE, 0);
+    if (FAILED(hr)) return hr;
+    return legacyProfiles->EnableLanguageProfile(CLSID_TekitoTextService, langid,
+                                                 GUID_TekitoJapaneseProfile, TRUE);
+}
+#endif
+
 HRESULT RegisterTsfProfile() {
     constexpr LANGID langid = MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US);
     constexpr wchar_t description[] = L"TEKITO English";
@@ -67,7 +92,11 @@ HRESULT RegisterTsfProfile() {
                                    modulePath,
                                    static_cast<ULONG>(wcslen(modulePath)),
                                    0,
+#if defined(TEKITO_JA_SPIKE)
+                                   SpikeSubstituteLayout(L"TEKITO_SPIKE_EN_HKL"),
+#else
                                    nullptr,
+#endif
                                    0,
                                    TRUE,
                                    0);
@@ -83,6 +112,10 @@ HRESULT RegisterTsfProfile() {
                                                GUID_TekitoEnglishProfile,
                                                TRUE);
     if (FAILED(hr)) return hr;
+#if defined(TEKITO_JA_SPIKE)
+    hr = RegisterJapaneseSpikeProfile(profiles.Get(), legacyProfiles.Get(), modulePath);
+    if (FAILED(hr)) return hr;
+#endif
 
     tekito::tsf::ComPtr<ITfCategoryMgr> categories;
     hr = CoCreateInstance(CLSID_TF_CategoryMgr, nullptr, CLSCTX_INPROC_SERVER,
@@ -136,6 +169,11 @@ HRESULT UnregisterTsfProfile() {
                                                           langid,
                                                           GUID_TekitoEnglishProfile,
                                                           0));
+#if defined(TEKITO_JA_SPIKE)
+        rememberFailure(profileManager->UnregisterProfile(
+            CLSID_TekitoTextService, MAKELANGID(LANG_JAPANESE, SUBLANG_JAPANESE_JAPAN),
+            GUID_TekitoJapaneseProfile, 0));
+#endif
     } else {
         rememberFailure(hr);
     }

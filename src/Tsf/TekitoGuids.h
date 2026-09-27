@@ -11,5 +11,8 @@ extern const GUID GUID_TekitoEnglishProfile;
 // {F3477C3B-E3D3-43F6-A5D7-9E64E2D7037B}
 extern const GUID GUID_TekitoDisplayAttribute;
 
+// {2876747C-FA52-4CCC-B308-F406190F8CDE}
+extern const GUID GUID_TekitoJapaneseProfile;
+
 // {3B1E7A52-9C4D-4E0B-8F21-6A5D2C9E4B17}
 extern const GUID GUID_TekitoToggleKey;
