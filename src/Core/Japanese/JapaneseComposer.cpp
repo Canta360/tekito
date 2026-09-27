@@ -3,9 +3,12 @@
 #include "Core/Japanese/JapaneseLearning.h"
 #include "Core/Japanese/KanaText.h"
 #include "Core/Japanese/RomajiTable.h"
+#include "Core/TypoModel.h"
 
 #include <algorithm>
 #include <cwctype>
+#include <limits>
+#include <set>
 
 namespace tekito::japanese {
 namespace {
@@ -30,6 +33,25 @@ std::wstring ChangeCase(std::wstring text, int letterCase) {
         break;
     }
     return text;
+}
+
+// Letters the romaji table left as they were (shown full-width).
+std::size_t LeftoverLetters(std::wstring_view reading) {
+    return static_cast<std::size_t>(std::count_if(reading.begin(), reading.end(), [](wchar_t c) {
+        return (c >= L'\xFF21' && c <= L'\xFF3A') || (c >= L'\xFF41' && c <= L'\xFF5A');
+    }));
+}
+
+std::int64_t FirstChoiceCost(const std::vector<Phrase>& phrases) {
+    std::int64_t cost = 0;
+    for (const auto& phrase : phrases) {
+        if (phrase.candidates.empty() ||
+            phrase.candidates.front().kind != PhraseCandidate::Kind::Dictionary) {
+            return std::numeric_limits<std::int64_t>::max();
+        }
+        cost += phrase.candidates.front().cost;
+    }
+    return cost;
 }
 
 bool IsAlphanumeric(KanaForm form) {
@@ -223,12 +245,22 @@ void JapaneseComposer::BuildPhrases(bool convert) {
     // Back from a conversion, typing goes on at the end.
     caret_ = units_.size();
     const std::wstring reading = Reading();
+    conversionReading_ = reading;
     phrases_.clear();
     focus_ = 0;
     listOpen_ = false;
     if (reading.empty()) return;
-    if (convert && converter_) AddPhrases(converter_->Convert(reading), reading);
-    if (convert) AddEnglish(reading);
+    bool corrected = false;
+    if (convert && converter_) {
+        if (auto correction = CorrectRomaji()) {
+            conversionReading_ = std::move(correction->reading);
+            AddPhrases(std::move(correction->phrases), conversionReading_);
+            corrected = true;
+        } else {
+            AddPhrases(converter_->Convert(reading), reading);
+        }
+    }
+    if (convert) AddEnglish(reading, corrected);
     if (phrases_.empty()) {
         phrases_.push_back({0, reading.size(),
                             convert ? KanaCandidates(reading) : std::vector<PhraseCandidate>{}});
@@ -243,7 +275,82 @@ void JapaneseComposer::AddPhrases(std::vector<Phrase> phrases, const std::wstrin
     }
 }
 
-void JapaneseComposer::AddEnglish(const std::wstring& reading) {
+std::wstring JapaneseComposer::ReadingOf(std::wstring_view keys, bool& complete) const {
+    JapaneseComposer typing(table_);
+    typing.SetPunctuationStyle(punctuation_);
+    for (const wchar_t key : keys) typing.Feed(key);
+    typing.FlushAll();
+    const std::wstring reading = typing.Reading();
+    complete = LeftoverLetters(reading) == 0;
+    return reading;
+}
+
+std::optional<JapaneseComposer::RomajiCorrection> JapaneseComposer::CorrectRomaji() const {
+    if (!converter_ || !table_) return std::nullopt;
+    const std::wstring keys = Keys(false);
+    // A letter or two the table could not read, in a long enough run of
+    // keys, is a slip; more than that is English (handled by AddEnglish).
+    std::size_t leftovers = 0;
+    std::size_t firstLeftover = keys.size();
+    std::size_t at = 0;
+    for (const auto& unit : units_) {
+        if (LeftoverLetters(ToFullWidthAscii(unit.kana)) > 0) {
+            ++leftovers;
+            firstLeftover = std::min(firstLeftover, at);
+        }
+        at += unit.keys.size();
+    }
+    if (leftovers == 0 || leftovers > 2 || leftovers * 4 > keys.size()) return std::nullopt;
+    if (!std::all_of(keys.begin(), keys.end(), [](wchar_t c) { return c < 0x80 && std::iswlower(c); })) {
+        return std::nullopt;
+    }
+
+    // One edit near the first unreadable key: a neighboring key, a key
+    // dropped, doubled, swapped, or a vowel left out.
+    std::set<std::wstring> variants;
+    const std::size_t from = firstLeftover > 2 ? firstLeftover - 2 : 0;
+    const std::size_t to = std::min(keys.size(), firstLeftover + 3);
+    for (std::size_t i = from; i <= to; ++i) {
+        for (const wchar_t vowel : std::wstring_view(L"aiueo")) {
+            std::wstring inserted = keys;
+            inserted.insert(i, 1, vowel);
+            variants.insert(std::move(inserted));
+        }
+        if (i >= keys.size()) continue;
+        std::wstring removed = keys;
+        removed.erase(i, 1);
+        variants.insert(std::move(removed));
+        for (wchar_t letter = L'a'; letter <= L'z'; ++letter) {
+            if (!AreQwertyNeighbors(keys[i], letter)) continue;
+            std::wstring replaced = keys;
+            replaced[i] = letter;
+            variants.insert(std::move(replaced));
+        }
+        if (i + 1 < keys.size()) {
+            std::wstring swapped = keys;
+            std::swap(swapped[i], swapped[i + 1]);
+            variants.insert(std::move(swapped));
+        }
+    }
+
+    std::optional<RomajiCorrection> best;
+    std::int64_t bestCost = std::numeric_limits<std::int64_t>::max();
+    for (const auto& variant : variants) {
+        if (variant.empty() || variant == keys) continue;
+        bool complete = false;
+        std::wstring reading = ReadingOf(variant, complete);
+        if (!complete || reading.empty()) continue;
+        auto phrases = converter_->Convert(reading);
+        const std::int64_t cost = FirstChoiceCost(phrases);
+        if (cost < bestCost) {
+            bestCost = cost;
+            best = RomajiCorrection{std::move(reading), std::move(phrases)};
+        }
+    }
+    return best;
+}
+
+void JapaneseComposer::AddEnglish(const std::wstring& reading, bool romajiCorrected) {
     if (!english_) return;
     const std::wstring keys = Keys(false);
     // A word: letters, and the apostrophe and hyphen inside words.
@@ -252,9 +359,9 @@ void JapaneseComposer::AddEnglish(const std::wstring& reading) {
                      [](wchar_t c) { return c < 0x80 && (std::iswalpha(c) || c == L'\'' || c == L'-'); })) {
         return;
     }
-    // Letters the table could not turn into kana mean English was meant.
-    const bool english = std::any_of(reading.begin(), reading.end(),
-                                     [](wchar_t c) { return c >= L'\xFF21' && c <= L'\xFF5A'; });
+    // Letters the table could not turn into kana mean English was meant,
+    // unless they were a romaji slip that was corrected.
+    const bool english = !romajiCorrected && LeftoverLetters(reading) > 0;
     if (!english && phrases_.size() > 1) return;
 
     std::vector<PhraseCandidate> words;
@@ -296,7 +403,9 @@ void JapaneseComposer::NextCandidate() {
         return;
     }
     auto& phrase = phrases_[focus_];
-    if (phrase.candidates.empty()) phrase.candidates = KanaCandidates(Reading().substr(phrase.begin, phrase.length));
+    if (phrase.candidates.empty()) {
+        phrase.candidates = KanaCandidates(conversionReading_.substr(phrase.begin, phrase.length));
+    }
     if (!phrase.form) phrase.selected = (phrase.selected + 1) % phrase.candidates.size();
     phrase.form.reset();
     listOpen_ = true;
@@ -308,7 +417,9 @@ void JapaneseComposer::PreviousCandidate() {
         return;
     }
     auto& phrase = phrases_[focus_];
-    if (phrase.candidates.empty()) phrase.candidates = KanaCandidates(Reading().substr(phrase.begin, phrase.length));
+    if (phrase.candidates.empty()) {
+        phrase.candidates = KanaCandidates(conversionReading_.substr(phrase.begin, phrase.length));
+    }
     const std::size_t count = phrase.candidates.size();
     if (!phrase.form) phrase.selected = (phrase.selected + count - 1) % count;
     phrase.form.reset();
@@ -333,7 +444,7 @@ void JapaneseComposer::MoveFocus(int delta) {
 
 void JapaneseComposer::ResizeFocus(int delta) {
     if (!IsConverted() || !converter_) return;
-    const std::wstring reading = Reading();
+    const std::wstring reading = conversionReading_;
     const auto& focused = phrases_[focus_];
     const auto length = static_cast<long long>(focused.length) + delta;
     if (length < 1 || focused.begin + static_cast<std::size_t>(length) > reading.size()) return;
@@ -420,7 +531,7 @@ std::wstring JapaneseComposer::RenderTyping(bool includePending) const {
 
 std::wstring JapaneseComposer::FormText(KanaForm form, std::size_t begin, std::size_t length,
                                         int letterCase) const {
-    const std::wstring reading = Reading().substr(begin, length);
+    const std::wstring reading = conversionReading_.substr(begin, length);
     switch (form) {
     case KanaForm::Hiragana: return ToHiragana(reading);
     case KanaForm::Katakana: return ToKatakana(reading);
@@ -436,7 +547,7 @@ std::wstring JapaneseComposer::FormText(KanaForm form, std::size_t begin, std::s
 std::wstring JapaneseComposer::PhraseText(const PhraseState& phrase) const {
     if (phrase.form) return FormText(*phrase.form, phrase.begin, phrase.length, phrase.letterCase);
     if (phrase.selected < phrase.candidates.size()) return phrase.candidates[phrase.selected].text;
-    return Reading().substr(phrase.begin, phrase.length);
+    return conversionReading_.substr(phrase.begin, phrase.length);
 }
 
 std::wstring JapaneseComposer::Preedit() const {
@@ -470,7 +581,7 @@ std::size_t JapaneseComposer::FocusedSelection() const noexcept {
 std::wstring JapaneseComposer::Commit() {
     FlushAll();
     if (learning_ && IsConverted()) {
-        const std::wstring reading = Reading();
+        const std::wstring& reading = conversionReading_;
         for (const auto& phrase : phrases_) {
             const std::wstring chosen = PhraseText(phrase);
             const std::wstring first = phrase.candidates.empty() ? chosen : phrase.candidates.front().text;
@@ -484,6 +595,7 @@ std::wstring JapaneseComposer::Commit() {
 
 void JapaneseComposer::Clear() noexcept {
     units_.clear();
+    conversionReading_.clear();
     caret_ = 0;
     pending_.clear();
     phrases_.clear();

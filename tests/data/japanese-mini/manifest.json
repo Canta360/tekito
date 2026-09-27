@@ -8,10 +8,10 @@
   "format": "ja-dict-v1+ja-matrix-v1",
   "file": "dictionary.bin",
   "index_file": "connection.bin",
-  "entry_count": 2146,
+  "entry_count": 2400,
   "sha256": {
-    "file": "7207B99BEF41E77077C1D0A486FA983B5008C17E0B7742AE1D5F9643B7F92160",
-    "index": "A240B3217C6A89DC961692DF7A0AB38CF32563BAD4D7DBE95C69CC86D7E127A6"
+    "file": "1AD6DAE7825DAF67419B1ADBC249D5B119B3AAB7EF7AD65E6E184E679353E20E",
+    "index": "DDEBE662D8B9B436F406E99D34A3B5E924765D5E017A3293627AC9C0DC4625A0"
   },
   "license": "IPAdic + BSD-3-Clause (Mozc)",
   "source": "https://github.com/google/mozc/tree/b9c3fcbd6d76b19649ef572324fa9da2559bc18e/src/data",

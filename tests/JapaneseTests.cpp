@@ -484,6 +484,36 @@ void TestEnglishInJapanese(const RomajiTable& table, const MiniPack& pack) {
             "a sentence of several phrases gets no English words");
 }
 
+void TestRomajiCorrection(const RomajiTable& table, const MiniPack& pack) {
+    const tekito::japanese::JapaneseConverter converter(pack.dictionary, pack.matrix);
+    JapaneseComposer composer(&table);
+    composer.SetConverter(&converter);
+    composer.SetEnglishCandidates([](std::wstring_view) { return std::vector<std::wstring>{L"english"}; });
+
+    RequireText(Type(composer, L"arigatpu"), L"ありがｔぷ", "a slipped key leaves a letter");
+    composer.Convert();
+    const auto fixed = composer.Preedit();
+    Require(fixed.find(L'ｔ') == std::wstring::npos && fixed.find(L"ありがと") != std::wstring::npos,
+            "Space converts the corrected reading ありがとう");
+    composer.Cancel();
+    RequireText(composer.Preedit(), L"ありがｔぷ", "Esc goes back to what was typed");
+    composer.Clear();
+
+    Type(composer, L"sjigoto");
+    composer.Convert();
+    Require(composer.Preedit().find(L"仕事") != std::wstring::npos, "sjigoto converts as しごと");
+    composer.Clear();
+
+    Type(composer, L"thnaks");
+    composer.Convert();
+    RequireText(composer.Preedit(), L"english", "many unreadable letters are English, not a slip");
+    composer.Clear();
+
+    Type(composer, L"kikai");
+    composer.Convert();
+    Require(composer.Preedit().find(L"機") != std::wstring::npos, "correct romaji is not touched");
+}
+
 void TestComposerLearning(const RomajiTable& table, const MiniPack& pack) {
     const tekito::japanese::JapaneseConverter converter(pack.dictionary, pack.matrix);
     tekito::japanese::JapaneseLearningStore learning;
@@ -532,6 +562,7 @@ int main(int argc, char** argv) {
     TestLearningStore();
     TestComposerLearning(*table, *pack);
     TestEnglishInJapanese(*table, *pack);
+    TestRomajiCorrection(*table, *pack);
     if (argc > 1 && std::string_view(argv[1]) == "--dump") DumpConversions(*pack);
     std::cout << "All TEKITO Japanese tests passed.\n";
     return 0;

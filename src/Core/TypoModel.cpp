@@ -170,4 +170,8 @@ double TypoModel::WeightedCost(std::wstring_view input, std::wstring_view target
     return WeightedEditDistance(input, target);
 }
 
+bool AreQwertyNeighbors(wchar_t left, wchar_t right) noexcept {
+    return IsQwertyNeighbor(left, right);
+}
+
 }  // namespace tekito

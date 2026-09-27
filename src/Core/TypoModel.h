@@ -14,6 +14,10 @@ struct TypoEvidence {
     bool qwertyNeighbor{false};
 };
 
+// Whether two letters sit next to each other on a QWERTY keyboard (same
+// row, or the row above or below).
+[[nodiscard]] bool AreQwertyNeighbors(wchar_t left, wchar_t right) noexcept;
+
 // General typo evidence only. It does not contain misspelling->correction
 // rows and does not decide ranking or automatic application.
 class TypoModel final {
