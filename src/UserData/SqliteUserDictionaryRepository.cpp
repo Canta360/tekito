@@ -50,6 +50,14 @@ constexpr const char* kCreateSchema =
     "direct_event_mass REAL NOT NULL DEFAULT 0," 
     "PRIMARY KEY(trigger, candidate)"
     ");"
+    "CREATE TABLE IF NOT EXISTS japanese_learning ("
+    "reading TEXT NOT NULL,"
+    "surface TEXT NOT NULL,"
+    "selections REAL NOT NULL DEFAULT 0,"
+    "rejections REAL NOT NULL DEFAULT 0,"
+    "last_used INTEGER NOT NULL DEFAULT 0,"
+    "PRIMARY KEY (reading, surface)"
+    ");"
     "CREATE TABLE IF NOT EXISTS excluded_apps ("
     "name TEXT PRIMARY KEY NOT NULL COLLATE NOCASE"
     ");";
@@ -520,6 +528,75 @@ bool SqliteUserDictionaryRepository::SaveSocialLearning(
     const char* transaction = success ? "COMMIT;" : "ROLLBACK;";
     if (sqlite3_exec(database_, transaction, nullptr, nullptr, nullptr) != SQLITE_OK) success = false;
     return success;
+}
+
+bool SqliteUserDictionaryRepository::LoadJapaneseLearning(
+    japanese::JapaneseLearningStore& learning) const noexcept {
+    if (!database_) return false;
+    sqlite3_stmt* statement = nullptr;
+    constexpr const char* query =
+        "SELECT reading, surface, selections, rejections, last_used FROM japanese_learning;";
+    if (sqlite3_prepare_v2(database_, query, -1, &statement, nullptr) != SQLITE_OK) return false;
+    japanese::JapaneseLearningStore loaded;
+    bool success = true;
+    int stepResult = SQLITE_OK;
+    try {
+        while ((stepResult = sqlite3_step(statement)) == SQLITE_ROW) {
+            const auto* reading = static_cast<const wchar_t*>(sqlite3_column_text16(statement, 0));
+            const auto* surface = static_cast<const wchar_t*>(sqlite3_column_text16(statement, 1));
+            if (!reading || !surface ||
+                !loaded.Add({reading, surface, sqlite3_column_double(statement, 2),
+                             sqlite3_column_double(statement, 3),
+                             static_cast<std::uint64_t>(sqlite3_column_int64(statement, 4))})) {
+                success = false;
+                break;
+            }
+        }
+    } catch (...) {
+        success = false;
+    }
+    success = success && stepResult == SQLITE_DONE;
+    sqlite3_finalize(statement);
+    if (success) learning = std::move(loaded);
+    return success;
+}
+
+bool SqliteUserDictionaryRepository::SaveJapaneseLearning(
+    const japanese::JapaneseLearningStore& learning) noexcept {
+    if (!database_) return false;
+    if (sqlite3_exec(database_, "BEGIN IMMEDIATE;", nullptr, nullptr, nullptr) != SQLITE_OK) return false;
+    bool success =
+        sqlite3_exec(database_, "DELETE FROM japanese_learning;", nullptr, nullptr, nullptr) == SQLITE_OK;
+    sqlite3_stmt* statement = nullptr;
+    constexpr const char* query =
+        "INSERT INTO japanese_learning (reading, surface, selections, rejections, last_used) "
+        "VALUES (?, ?, ?, ?, ?);";
+    if (success && sqlite3_prepare_v2(database_, query, -1, &statement, nullptr) != SQLITE_OK) success = false;
+    try {
+        if (success) {
+            for (const auto& entry : learning.Entries()) {
+                success = BindText16(statement, 1, entry.reading) && BindText16(statement, 2, entry.surface) &&
+                          sqlite3_bind_double(statement, 3, entry.selections) == SQLITE_OK &&
+                          sqlite3_bind_double(statement, 4, entry.rejections) == SQLITE_OK &&
+                          sqlite3_bind_int64(statement, 5, static_cast<sqlite3_int64>(entry.lastUsed)) == SQLITE_OK &&
+                          sqlite3_step(statement) == SQLITE_DONE;
+                sqlite3_reset(statement);
+                sqlite3_clear_bindings(statement);
+                if (!success) break;
+            }
+        }
+    } catch (...) {
+        success = false;
+    }
+    if (statement) sqlite3_finalize(statement);
+    const char* transaction = success ? "COMMIT;" : "ROLLBACK;";
+    if (sqlite3_exec(database_, transaction, nullptr, nullptr, nullptr) != SQLITE_OK) success = false;
+    return success;
+}
+
+bool SqliteUserDictionaryRepository::ResetJapaneseLearning() noexcept {
+    return database_ &&
+           sqlite3_exec(database_, "DELETE FROM japanese_learning;", nullptr, nullptr, nullptr) == SQLITE_OK;
 }
 
 bool SqliteUserDictionaryRepository::ResetSocialLearning() noexcept {

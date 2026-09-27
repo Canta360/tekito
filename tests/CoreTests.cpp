@@ -1922,6 +1922,25 @@ void TestSqliteUserSettingsRepository() {
     Require(loadedSocial.Entries().size() == 1 && loadedSocial.Entries()[0].exposure == 1,
             "social learning roundtrip keeps local event data");
 
+    tekito::japanese::JapaneseLearningStore sourceJapanese;
+    sourceJapanese.RecordChoice(L"きかい", L"機械", L"機会");
+    {
+        tekito::userdata::SqliteUserDictionaryRepository repository(path);
+        Require(repository.Open(), "Japanese learning repository opens its database");
+        Require(repository.SaveJapaneseLearning(sourceJapanese), "Japanese learning saves");
+    }
+    tekito::japanese::JapaneseLearningStore loadedJapanese;
+    {
+        tekito::userdata::SqliteUserDictionaryRepository repository(path);
+        Require(repository.Open(), "Japanese learning repository reopens its database");
+        Require(repository.LoadJapaneseLearning(loadedJapanese), "Japanese learning loads");
+        Require(loadedJapanese.Preference(L"きかい", L"機械") == 1.0,
+                "Japanese learning keeps what was chosen");
+        Require(repository.ResetJapaneseLearning(), "Japanese learning resets");
+        Require(repository.LoadJapaneseLearning(loadedJapanese) && loadedJapanese.Empty(),
+                "resetting Japanese learning empties it");
+    }
+
     std::filesystem::remove(path, error);
 }
 
