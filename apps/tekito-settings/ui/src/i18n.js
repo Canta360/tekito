@@ -9,7 +9,8 @@ const en = {
   lang: "en",
   settings: "Settings",
   pages: {
-    general: { label: "General", description: "The input mode, how to switch it, and where TEKITO stays off." },
+    general: { label: "General", description: "The input mode, Japanese input, the language, and where TEKITO stays off." },
+    switching: { label: "Switching", description: "The keys that switch the mode, and what shows when it switches." },
     candidates: { label: "Candidate list", description: "The list of choices under what you type, in English and Japanese." },
     english: { label: "English", description: "What Auto does as you type English." },
     japanese: { label: "Japanese", description: "How romaji becomes Japanese." },
@@ -48,7 +49,7 @@ const en = {
   },
   modeIndicator: {
     title: "Show the mode when switching",
-    description: "The new mode's icon appears by the caret for a moment.",
+    description: "The new mode's icon appears by the caret for a moment, in the candidate list's style.",
   },
   japaneseInput: {
     title: "Japanese input",
@@ -223,7 +224,8 @@ const ja = {
   lang: "ja",
   settings: "設定",
   pages: {
-    general: { label: "一般", description: "入力モードと切り替え方、TEKITO をオフにするアプリを選びます。" },
+    general: { label: "一般", description: "入力モード、日本語入力、表示言語、TEKITO をオフにするアプリを選びます。" },
+    switching: { label: "切り替え", description: "モードを切り替えるキーと、切り替えたときの表示を選びます。" },
     candidates: { label: "候補一覧", description: "打っている文字の下に出る候補の一覧です。英語と日本語で共通です。" },
     english: { label: "英語入力", description: "Auto で英語を打つときに TEKITO がすることを選びます。" },
     japanese: { label: "日本語入力", description: "ローマ字から日本語にするときの動きを選びます。" },
@@ -262,7 +264,7 @@ const ja = {
   },
   modeIndicator: {
     title: "切り替えたときにモードを表示",
-    description: "切り替えた先のモードのアイコンを、キャレットの近くに一瞬出します。",
+    description: "切り替えた先のモードのアイコンを、キャレットの近くに一瞬出します。見た目は候補一覧のスタイルに合わせます。",
   },
   japaneseInput: {
     title: "日本語入力",
