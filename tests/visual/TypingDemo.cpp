@@ -217,6 +217,11 @@ int wmain(int argc, wchar_t** argv) {
 
     tekito::tsf::CandidateWindow window;
     if (!window.Initialize(instance, [](std::size_t) {})) return 1;
+    // TEKITO_PREVIEW_LANGUAGE=ja records the demo with the Japanese tags.
+    wchar_t language[8]{};
+    if (GetEnvironmentVariableW(L"TEKITO_PREVIEW_LANGUAGE", language, 8) > 0 && wcscmp(language, L"ja") == 0) {
+        window.SetJapanese(true);
+    }
 
     std::ofstream timing(outputFolder / L"frames.txt");
     int frameNumber = 0;
