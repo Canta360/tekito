@@ -60,10 +60,13 @@ public:
     // `fixedLengths` are phrase lengths from the start that must stay as
     // they are (after the user resized a phrase); the rest is split freely.
     // `context` is the right id of the word just before the reading (the
-    // text committed last), 0 for the start of a sentence.
+    // text committed last), 0 for the start of a sentence; `contextWords`
+    // are content words written just before, for the language model's
+    // sentence ties.
     [[nodiscard]] std::vector<Phrase> Convert(std::wstring_view reading,
                                               std::span<const std::size_t> fixedLengths = {},
-                                              std::uint16_t context = 0) const;
+                                              std::uint16_t context = 0,
+                                              std::span<const std::wstring> contextWords = {}) const;
 
     // Only the likeliest text for the whole reading and its cost, much
     // quicker than Convert (and without the language model); nothing when

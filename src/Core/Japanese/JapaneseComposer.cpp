@@ -63,6 +63,8 @@ constexpr std::int64_t kSlipLikelier = 2000;
 // Loanwords (AddLoanwords): the first candidates that may start in
 // katakana, how long the katakana must be, and the English words offered.
 constexpr std::size_t kLoanwordScan = 5;
+// Content words of the text committed lately kept for the language model.
+constexpr std::size_t kContextWords = 8;
 constexpr std::size_t kShortestLoanword = 2;
 constexpr std::size_t kLoanwords = 2;
 
@@ -321,12 +323,13 @@ void JapaneseComposer::BuildPhrases(bool convert) {
     if (convert && converter_) {
         // A slip in the keys: converted from the keys as meant. Esc still
         // goes back to what was typed.
-        if (auto conversion = keyConverter_ ? keyConverter_->Convert(Keys(false), context_) : std::nullopt) {
+        if (auto conversion = keyConverter_ ? keyConverter_->Convert(Keys(false), context_, contextWords_)
+                                            : std::nullopt) {
             conversionReading_ = ApplyPunctuation(std::move(conversion->reading));
             readingKeys_ = std::move(conversion->keyAt);
             AddPhrases(std::move(conversion->phrases), conversionReading_);
         } else {
-            AddPhrases(converter_->Convert(reading, {}, context_), reading);
+            AddPhrases(converter_->Convert(reading, {}, context_, contextWords_), reading);
         }
     }
     if (phrases_.empty()) {
@@ -647,7 +650,7 @@ void JapaneseComposer::ResizeFocus(int delta) {
     std::vector<PhraseState> kept(phrases_.begin(), phrases_.begin() + static_cast<long long>(focus_));
 
     phrases_.clear();
-    AddPhrases(converter_->Convert(reading, fixed, context_), reading);
+    AddPhrases(converter_->Convert(reading, fixed, context_, contextWords_), reading);
     if (phrases_.size() <= focus_) {
         BuildPhrases(true);
         return;
@@ -807,6 +810,7 @@ std::wstring JapaneseComposer::Commit() {
         if (learning_) learning_->RecordChoice(prediction.reading, prediction.text, prediction.text);
         // A prediction's part of speech is not known here.
         context_ = 0;
+        RememberWords(prediction.text);
         Clear();
         return prediction.text;
     }
@@ -814,6 +818,7 @@ std::wstring JapaneseComposer::Commit() {
         if (learning_) learning_->RecordChoice(whole->reading, whole->text, whole->text);
         auto text = whole->text;
         context_ = ContextAfter(text, whole->rightId);
+        RememberWords(text);
         Clear();
         return text;
     }
@@ -832,8 +837,29 @@ std::wstring JapaneseComposer::Commit() {
     }
     auto text = IsConverted() ? Preedit() : RenderTyping(false);
     context_ = ContextAfter(text, last);
+    RememberWords(text);
     Clear();
     return text;
+}
+
+void JapaneseComposer::RememberWords(std::wstring_view text) {
+    const auto content = [](wchar_t c) {
+        return (c >= 0x4E00 && c <= 0x9FFF) || c == 0x3005 || (c >= 0x30A1 && c <= 0x30FA) || c == 0x30FC;
+    };
+    for (std::size_t i = 0; i < text.size();) {
+        if (!content(text[i])) {
+            ++i;
+            continue;
+        }
+        std::size_t end = i;
+        while (end < text.size() && content(text[end])) ++end;
+        if (end - i >= 2) contextWords_.emplace_back(text.substr(i, end - i));
+        i = end;
+    }
+    if (contextWords_.size() > kContextWords) {
+        contextWords_.erase(contextWords_.begin(),
+                            contextWords_.end() - static_cast<std::ptrdiff_t>(kContextWords));
+    }
 }
 
 std::uint16_t JapaneseComposer::ContextAfter(std::wstring_view text, std::uint16_t rightId) noexcept {

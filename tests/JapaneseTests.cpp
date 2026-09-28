@@ -661,6 +661,22 @@ void TestLanguageModel(const MiniPack& pack) {
     for (const auto& phrase : phrases) first += phrase.candidates.front().text;
     RequireText(first, L"麻酔を注射する", "the sentence's other words pick 注射 over 駐車");
 
+    // Typed phrase by phrase: what was committed before counts too.
+    const auto table = LoadTable();
+    JapaneseComposer composer(table.get());
+    composer.SetConverter(&converter);
+    Type(composer, L"masuiwo");
+    composer.Convert();
+    RequireText(composer.Commit(), L"麻酔を", "the first phrase commits");
+    Type(composer, L"chuushasuru");
+    composer.Convert();
+    RequireText(composer.Preedit(), L"注射する", "the committed 麻酔 picks 注射 for the next phrase");
+    composer.Clear();
+    composer.ForgetContext();
+    Type(composer, L"chuushasuru");
+    composer.Convert();
+    Require(composer.FocusedCandidates() != nullptr, "without it the phrase still converts");
+
     LanguageModel damaged;
     Require(!damaged.Open(std::filesystem::path(TEKITO_TEST_DATA_DIR) / L"japanese-mini"),
             "a folder without the model opens nothing");

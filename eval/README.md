@@ -137,3 +137,6 @@ sentences go from 36.9% to 38.9% (cer 6.8% to 6.5%) and the Mozc and
 AJIMEE ones from 61.2% to 62.0% (cer 7.0% to 6.4%); conversion takes about
 twice as long, a few milliseconds.
 
+Typed phrase by phrase with the language model, the content words committed
+before count as the sentence's too: 63.0% of the Mozc and AJIMEE sentences
+and 37.7% of the JSUT ones come out right that way.

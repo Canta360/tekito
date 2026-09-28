@@ -141,7 +141,8 @@ struct PathEntry {
 
 std::vector<Phrase> JapaneseConverter::Convert(std::wstring_view reading,
                                                std::span<const std::size_t> fixedLengths,
-                                               std::uint16_t context) const {
+                                               std::uint16_t context,
+                                               std::span<const std::wstring> contextWords) const {
     const std::size_t n = reading.size();
     if (n == 0) return {};
     const ReadingCodes codes = dictionary_.Encode(reading);
@@ -217,6 +218,8 @@ std::vector<Phrase> JapaneseConverter::Convert(std::wstring_view reading,
     const bool topics = model_ && weights_.costPerTopic > 0;
     std::vector<std::pair<std::size_t, std::wstring>> sentenceWords;  // (span index, word)
     if (topics) {
+        // Words written just before belong to no phrase here.
+        for (const auto& word : contextWords) sentenceWords.emplace_back(spans.size(), word);
         for (std::size_t s = 0; s < spans.size(); ++s) {
             for (std::size_t k = spans[s].first; k < spans[s].second; ++k) {
                 if (!nodes[path[k]].known) continue;

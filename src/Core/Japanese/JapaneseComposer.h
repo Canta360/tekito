@@ -106,7 +106,12 @@ public:
     // next conversion starts from, so it reads as the sentence going on.
     // The text service forgets it when the caret is no longer right after
     // that text.
-    void ForgetContext() noexcept { context_ = 0; }
+    // The content words of what was committed lately (runs of kanji or
+    // katakana) go on as the sentence's other words for the language model.
+    void ForgetContext() noexcept {
+        context_ = 0;
+        contextWords_.clear();
+    }
     [[nodiscard]] std::uint16_t Context() const noexcept { return context_; }
     // Space and Henkan: converts, then steps through the candidates.
     void Convert();
@@ -215,6 +220,8 @@ private:
     [[nodiscard]] const PhraseCandidate* WholeChoice() const noexcept;
     // The context after committing `text` whose last word is `rightId`.
     [[nodiscard]] static std::uint16_t ContextAfter(std::wstring_view text, std::uint16_t rightId) noexcept;
+    // Keeps the content words of committed `text` for the next conversions.
+    void RememberWords(std::wstring_view text);
 
     const RomajiTable* table_{nullptr};
     const JapaneseConverter* converter_{nullptr};
@@ -236,6 +243,7 @@ private:
     // was read from, or npos inside a word or unit.
     std::vector<std::size_t> readingKeys_;
     std::uint16_t context_{0};
+    std::vector<std::wstring> contextWords_;
     std::size_t focus_{0};
     bool listOpen_{false};
     bool predictionEnabled_{false};
