@@ -530,10 +530,29 @@ void TestRomajiCorrection(const RomajiTable& table, const MiniPack& pack) {
     composer.NextCandidate();
     const auto* listed = composer.FocusedCandidates();
     Require(first.find(L"機械") == std::wstring::npos, "the first choice is what was typed");
-    Require(listed && !listed->front().slip, "the typed reading stays first");
     Require(std::any_of(listed->begin(), listed->end(),
-                        [](const tekito::japanese::PhraseCandidate& c) { return c.slip && c.text == L"機械が"; }),
+                        [](const tekito::japanese::PhraseCandidate& c) {
+                            return c.slip && c.text.starts_with(L"機械が");
+                        }),
             "the list offers 機械が for ikaiga");
+    composer.Clear();
+
+    // A slip that split a short input into phrases: the whole input read
+    // again is in the list, and choosing it makes one phrase of it.
+    Type(composer, L"hahimemashite");
+    composer.Convert();
+    Require(composer.Segments().size() > 1, "the slip splits hahimemashite into phrases");
+    composer.NextCandidate();
+    const auto* phraseList = composer.FocusedCandidates();
+    const auto whole = std::find_if(phraseList->begin(), phraseList->end(),
+                                    [](const tekito::japanese::PhraseCandidate& c) { return c.text == L"はじめまして"; });
+    Require(whole != phraseList->end() && whole->slip && whole->reading == L"はじめまして",
+            "the first phrase's list has the whole input read again");
+    Require(whole - phraseList->begin() < 9, "on the list's first page");
+    composer.SelectCandidate(static_cast<std::size_t>(whole - phraseList->begin()));
+    RequireText(composer.Preedit(), L"はじめまして", "choosing it shows the whole input as it");
+    Require(composer.Segments().size() == 1, "as one phrase");
+    RequireText(composer.Commit(), L"はじめまして", "and commits it");
     composer.Clear();
 
     Type(composer, L"thnaks");

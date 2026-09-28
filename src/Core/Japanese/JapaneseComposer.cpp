@@ -48,6 +48,10 @@ std::size_t LeftoverLetters(std::wstring_view reading) {
 // left out here: the first choice only undoes the likelier slips.
 constexpr std::wstring_view kSlipDroppedKeys = L"aiueonkgsztdhbpmyrwjfc";
 constexpr std::size_t kSlipPhraseKeys = 16;
+// A whole input up to this many keys gets this many whole-input readings.
+constexpr std::size_t kWholeSlipKeys = 20;
+constexpr std::size_t kWholeSlipCandidates = 2;
+constexpr std::size_t kWholeSlipExamined = 6;
 constexpr std::size_t kSlipCandidates = 4;
 // The likeliest readings get this many spellings each; the rest one.
 constexpr std::size_t kSlipSpelledReadings = 2;
@@ -385,41 +389,8 @@ void JapaneseComposer::Convert() {
     NextCandidate();
 }
 
-void JapaneseComposer::AddSlipCandidates(PhraseState& phrase) const {
-    if (phrase.slipsAdded) return;
-    phrase.slipsAdded = true;
-    // The keys the phrase was read from (when it starts and ends between
-    // units or words).
-    if (!converter_ || !table_ || phrase.begin + phrase.length >= readingKeys_.size()) return;
-    const std::size_t firstKey = readingKeys_[phrase.begin];
-    const std::size_t endKey = readingKeys_[phrase.begin + phrase.length];
-    if (firstKey == std::wstring::npos || endKey == std::wstring::npos || endKey <= firstKey) return;
-    const std::wstring keys = Keys(false).substr(firstKey, endKey - firstKey);
-    if (keys.size() < 2 || keys.size() > kSlipPhraseKeys ||
-        !std::all_of(keys.begin(), keys.end(), [](wchar_t c) { return c >= L'a' && c <= L'z'; })) {
-        return;
-    }
-
-    // The likeliest text of `kana`, all in known words, and its cost.
-    const auto asPhrase = [&](const std::wstring& kana) -> std::optional<PhraseCandidate> {
-        auto best = converter_->Best(kana);
-        if (!best || best->spellingCorrection) return std::nullopt;
-        return best;
-    };
-    // The kana as typed; when a slip was corrected for the first choice,
-    // they are not the phrase's reading, and what they convert to is
-    // offered right after it.
-    const std::wstring shown = conversionReading_.substr(phrase.begin, phrase.length);
-    std::wstring typedKana;
-    for (const auto& token : ParseRomaji(*table_, keys)) typedKana += token.kana;
-    typedKana = ApplyPunctuation(ToFullWidthAscii(typedKana));
-    auto typed = asPhrase(typedKana);
-    const std::int64_t typedCost = typed ? typed->cost : std::numeric_limits<std::int64_t>::max() / 4;
-    std::optional<PhraseCandidate> asTyped;
-    if (typedKana != shown) {
-        asTyped = typed ? std::move(typed) : std::optional<PhraseCandidate>{KanaCandidates(typedKana).back()};
-    }
-
+std::vector<std::pair<PhraseCandidate, std::wstring>> JapaneseComposer::SlipReadings(
+    const std::wstring& keys, std::set<std::wstring> skip, std::int64_t typedCost) const {
     // Every slip: a neighboring key, a key dropped (any letter), an extra
     // key, two keys swapped.
     std::vector<std::wstring> variants;
@@ -445,7 +416,6 @@ void JapaneseComposer::AddSlipCandidates(PhraseState& phrase) const {
             variants.push_back(std::move(swapped));
         }
     }
-    std::set<std::wstring> seen{typedKana, shown};
     std::vector<std::pair<PhraseCandidate, std::wstring>> found;  // with its kana
     for (const auto& variant : variants) {
         std::wstring kana;
@@ -456,55 +426,163 @@ void JapaneseComposer::AddSlipCandidates(PhraseState& phrase) const {
         }
         if (!readable) continue;
         kana = ApplyPunctuation(std::move(kana));
-        if (!seen.insert(kana).second) continue;
-        if (auto candidate = asPhrase(kana); candidate && candidate->cost <= typedCost + kSlipMargin) {
+        if (!skip.insert(kana).second) continue;
+        auto candidate = converter_->Best(kana);
+        if (candidate && !candidate->spellingCorrection && candidate->cost <= typedCost + kSlipMargin) {
             found.emplace_back(std::move(*candidate), std::move(kana));
         }
     }
     std::stable_sort(found.begin(), found.end(), [](const auto& a, const auto& b) { return a.first.cost < b.first.cost; });
+    return found;
+}
 
-    // The likeliest readings with a slip undone, each with its likeliest
-    // spellings (きかいが: 機会が, 機械が), then the next readings.
+void JapaneseComposer::AddSlipCandidates(PhraseState& phrase) const {
+    if (phrase.slipsAdded) return;
+    phrase.slipsAdded = true;
+    if (!converter_ || !table_) return;
+    const auto lettersOnly = [](const std::wstring& keys) {
+        return std::all_of(keys.begin(), keys.end(), [](wchar_t c) { return c >= L'a' && c <= L'z'; });
+    };
+    const auto typedKanaOf = [&](const std::wstring& keys) {
+        std::wstring kana;
+        for (const auto& token : ParseRomaji(*table_, keys)) kana += token.kana;
+        return ApplyPunctuation(ToFullWidthAscii(kana));
+    };
+    const auto costOf = [&](const std::optional<PhraseCandidate>& candidate) {
+        return candidate ? candidate->cost : std::numeric_limits<std::int64_t>::max() / 4;
+    };
+
     std::vector<PhraseCandidate> added;
+    bool likelier = false;
     const auto offer = [&](PhraseCandidate candidate) {
         const auto same = [&](const PhraseCandidate& c) { return c.text == candidate.text; };
-        if (added.size() >= kSlipCandidates || std::any_of(phrase.candidates.begin(), phrase.candidates.end(), same) ||
+        if (std::any_of(phrase.candidates.begin(), phrase.candidates.end(), same) ||
             std::any_of(added.begin(), added.end(), same)) {
-            return;
+            return false;
         }
         candidate.slip = true;
         added.push_back(std::move(candidate));
+        return true;
     };
-    for (std::size_t i = 0; i < found.size() && added.size() < kSlipCandidates; ++i) {
-        if (i >= kSlipSpelledReadings) {
-            offer(std::move(found[i].first));
-            continue;
-        }
-        const std::size_t whole[] = {found[i].second.size()};
-        const auto phrases = converter_->Convert(found[i].second, whole);
-        std::size_t spellings = 0;
-        for (std::size_t c = 0; phrases.size() == 1 && c < phrases.front().candidates.size() &&
-                                spellings < kSlipSpellings;
-             ++c) {
-            const auto& candidate = phrases.front().candidates[c];
-            if (candidate.kind != PhraseCandidate::Kind::Dictionary || candidate.spellingCorrection) continue;
-            offer(candidate);
-            ++spellings;
+
+    // A short input split into phrases: the whole input with a slip undone,
+    // when the slip is what made the phrases (はじめまして typed hahimemashite
+    // is は|秘めまして). A slip inside one phrase is left to that phrase's
+    // own list below. These go after the phrase's own candidates.
+    const std::wstring allKeys = Keys(false);
+    std::vector<PhraseCandidate> wholeInput;
+    if (phrases_.size() > 1 && allKeys.size() <= kWholeSlipKeys && lettersOnly(allKeys)) {
+        const std::wstring typedAll = typedKanaOf(allKeys);
+        const std::int64_t typedCost = costOf(converter_->Best(typedAll));
+        std::vector<std::size_t> starts;
+        for (const auto& p : phrases_) starts.push_back(p.begin);
+        std::size_t examined = 0;
+        for (auto& [candidate, kana] : SlipReadings(allKeys, {typedAll, conversionReading_}, typedCost)) {
+            if (wholeInput.size() >= kWholeSlipCandidates || examined++ >= kWholeSlipExamined) break;
+            if (SamePhrasing(conversionReading_, starts, kana)) continue;
+            candidate.reading = kana;
+            candidate.slip = true;
+            wholeInput.push_back(std::move(candidate));
         }
     }
-    // Right after the first choice when the slip reads much more likely (or
+
+    // The keys the phrase was read from (when it starts and ends between
+    // units or words).
+    if (phrase.begin + phrase.length >= readingKeys_.size()) return;
+    const std::size_t firstKey = readingKeys_[phrase.begin];
+    const std::size_t endKey = readingKeys_[phrase.begin + phrase.length];
+    std::optional<PhraseCandidate> asTyped;
+    const std::wstring keys = firstKey == std::wstring::npos || endKey == std::wstring::npos || endKey <= firstKey
+                                  ? std::wstring{}
+                                  : allKeys.substr(firstKey, endKey - firstKey);
+    if (keys.size() >= 2 && keys.size() <= kSlipPhraseKeys && lettersOnly(keys)) {
+        // The kana as typed; when a slip was corrected for the first choice,
+        // they are not the phrase's reading, and what they convert to is
+        // offered right after it.
+        const std::wstring shown = conversionReading_.substr(phrase.begin, phrase.length);
+        const std::wstring typedKana = typedKanaOf(keys);
+        auto typed = converter_->Best(typedKana);
+        if (typed && typed->spellingCorrection) typed.reset();
+        const std::int64_t typedCost = costOf(typed);
+        if (typedKana != shown) {
+            asTyped = typed ? std::move(typed) : std::optional<PhraseCandidate>{KanaCandidates(typedKana).back()};
+        }
+        // The likeliest readings with a slip undone, each with its likeliest
+        // spellings (きかいが: 機会が, 機械が), then the next readings.
+        const auto found = SlipReadings(keys, {typedKana, shown}, typedCost);
+        std::size_t offered = 0;
+        for (std::size_t i = 0; i < found.size() && offered < kSlipCandidates; ++i) {
+            likelier = likelier || (i == 0 && found[i].first.cost + kSlipLikelier < typedCost);
+            if (i >= kSlipSpelledReadings) {
+                if (offer(found[i].first)) ++offered;
+                continue;
+            }
+            const std::size_t whole[] = {found[i].second.size()};
+            const auto phrases = converter_->Convert(found[i].second, whole);
+            std::size_t spellings = 0;
+            for (std::size_t c = 0; phrases.size() == 1 && c < phrases.front().candidates.size() &&
+                                    spellings < kSlipSpellings && offered < kSlipCandidates;
+                 ++c) {
+                const auto& candidate = phrases.front().candidates[c];
+                if (candidate.kind != PhraseCandidate::Kind::Dictionary || candidate.spellingCorrection) continue;
+                if (offer(candidate)) ++offered;
+                ++spellings;
+            }
+        }
+    }
+    // Right after the first choice when a slip reads much more likely (or
     // the first choice is already a correction), otherwise after the first
     // few candidates.
-    const bool likelier = asTyped || (!added.empty() && added.front().cost + kSlipLikelier < typedCost);
     if (asTyped && std::none_of(phrase.candidates.begin(), phrase.candidates.end(),
                                 [&](const PhraseCandidate& c) { return c.text == asTyped->text; })) {
         added.insert(added.begin(), std::move(*asTyped));
+        likelier = true;
+    }
+    // Whole-input readings never come right after the first choice (the
+    // next Space would show them): after the phrase's own when those do,
+    // otherwise first at kSlipPosition, as the likelier sign of a slip.
+    std::erase_if(wholeInput, [&](const PhraseCandidate& candidate) {
+        const auto same = [&](const PhraseCandidate& c) { return c.text == candidate.text; };
+        return std::any_of(phrase.candidates.begin(), phrase.candidates.end(), same) ||
+               std::any_of(added.begin(), added.end(), same);
+    });
+    if (likelier) {
+        added.insert(added.end(), std::make_move_iterator(wholeInput.begin()), std::make_move_iterator(wholeInput.end()));
+    } else {
+        added.insert(added.begin(), std::make_move_iterator(wholeInput.begin()), std::make_move_iterator(wholeInput.end()));
     }
     if (added.empty()) return;
     const std::size_t at = std::min(phrase.candidates.size(), likelier ? std::size_t{1} : kSlipPosition);
     phrase.candidates.insert(phrase.candidates.begin() + static_cast<std::ptrdiff_t>(at),
                              std::make_move_iterator(added.begin()), std::make_move_iterator(added.end()));
     if (phrase.selected >= at) phrase.selected += added.size();
+}
+
+bool JapaneseComposer::SamePhrasing(const std::wstring& reading, const std::vector<std::size_t>& starts,
+                                    const std::wstring& corrected) const {
+    // Where the two readings differ, and the phrases the corrected one makes.
+    std::size_t prefix = 0;
+    while (prefix < reading.size() && prefix < corrected.size() && reading[prefix] == corrected[prefix]) ++prefix;
+    std::size_t suffix = 0;
+    while (suffix < reading.size() - prefix && suffix < corrected.size() - prefix &&
+           reading[reading.size() - 1 - suffix] == corrected[corrected.size() - 1 - suffix]) {
+        ++suffix;
+    }
+    std::vector<std::size_t> correctedStarts;
+    for (const auto& phrase : converter_->Convert(corrected)) correctedStarts.push_back(phrase.begin);
+    // Phrase starts outside the difference, in the reading's positions; one
+    // inside it is phrased differently.
+    const auto mapped = [&](const std::vector<std::size_t>& list, std::size_t size) {
+        std::vector<std::size_t> out;
+        for (const std::size_t start : list) {
+            if (start > prefix && start < size - suffix) return std::optional<std::vector<std::size_t>>{};
+            out.push_back(start <= prefix ? start : start - size + reading.size());
+        }
+        return std::optional<std::vector<std::size_t>>{out};
+    };
+    const auto before = mapped(starts, reading.size());
+    const auto after = mapped(correctedStarts, corrected.size());
+    return before && after && *before == *after;
 }
 
 void JapaneseComposer::NextCandidate() {
@@ -662,8 +740,17 @@ std::wstring JapaneseComposer::PhraseText(const PhraseState& phrase) const {
     return conversionReading_.substr(phrase.begin, phrase.length);
 }
 
+const PhraseCandidate* JapaneseComposer::WholeChoice() const noexcept {
+    if (!IsConverted()) return nullptr;
+    const auto& phrase = phrases_[focus_];
+    if (phrase.form || phrase.selected >= phrase.candidates.size()) return nullptr;
+    const auto& candidate = phrase.candidates[phrase.selected];
+    return candidate.reading.empty() ? nullptr : &candidate;
+}
+
 std::wstring JapaneseComposer::Preedit() const {
     if (!IsConverted()) return RenderTyping(true);
+    if (const auto* whole = WholeChoice()) return whole->text;
     std::wstring text;
     for (const auto& phrase : phrases_) text += PhraseText(phrase);
     return text;
@@ -674,6 +761,7 @@ std::vector<PreeditSegment> JapaneseComposer::Segments() const {
         if (!IsComposing()) return {};
         return {{RenderTyping(true), false, false}};
     }
+    if (const auto* whole = WholeChoice()) return {{whole->text, true, true}};
     std::vector<PreeditSegment> segments;
     for (std::size_t i = 0; i < phrases_.size(); ++i) {
         segments.push_back({PhraseText(phrases_[i]), true, i == focus_});
@@ -697,6 +785,21 @@ std::wstring JapaneseComposer::FocusedReading() const {
     return conversionReading_.substr(phrase.begin, phrase.length);
 }
 
+std::vector<std::wstring> JapaneseComposer::PhraseKeys() const {
+    std::vector<std::wstring> keys;
+    const std::wstring typed = Keys(false);
+    for (const auto& phrase : phrases_) {
+        const std::size_t end = phrase.begin + phrase.length;
+        if (end >= readingKeys_.size() || readingKeys_[phrase.begin] == std::wstring::npos ||
+            readingKeys_[end] == std::wstring::npos || readingKeys_[end] < readingKeys_[phrase.begin]) {
+            keys.emplace_back();
+            continue;
+        }
+        keys.push_back(typed.substr(readingKeys_[phrase.begin], readingKeys_[end] - readingKeys_[phrase.begin]));
+    }
+    return keys;
+}
+
 std::wstring JapaneseComposer::Commit() {
     FlushAll();
     if (chosenPrediction_ && *chosenPrediction_ < predictions_.size() && !IsConverted()) {
@@ -704,6 +807,12 @@ std::wstring JapaneseComposer::Commit() {
         if (learning_) learning_->RecordChoice(prediction.reading, prediction.text, prediction.text);
         Clear();
         return prediction.text;
+    }
+    if (const auto* whole = WholeChoice()) {
+        if (learning_) learning_->RecordChoice(whole->reading, whole->text, whole->text);
+        auto text = whole->text;
+        Clear();
+        return text;
     }
     if (learning_ && IsConverted()) {
         const std::wstring& reading = conversionReading_;

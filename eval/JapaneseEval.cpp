@@ -5,7 +5,7 @@
 //
 // tekito_ja_eval --pack <data/japanese-core> --corpus <japanese_eval.tsv> [--show-misses N]
 // tekito_ja_eval --pack <data/japanese-core> --keys-corpus <japanese_eval_keys.tsv>
-//                --romaji <data/japanese-romaji> [--typo N]
+//                --romaji <data/japanese-romaji> [--typo N] [--dump-phrases <path>]
 //
 // The second form types the romaji keys into the composer, as TEKITO does,
 // and converts with Space.
@@ -152,7 +152,8 @@ double Percentile(std::vector<double> values, double q) {
 
 int RunKeys(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary, const JapaneseConverter& converter,
             const std::filesystem::path& corpus, const std::filesystem::path& romaji,
-            tekito::japanese::KeyConverter::Costs costs, std::size_t showMisses) {
+            tekito::japanese::KeyConverter::Costs costs, std::size_t showMisses,
+            const std::filesystem::path& dumpPhrases) {
     const auto table = tekito::japanese::RomajiTable::Load(romaji);
     if (!table) {
         std::cerr << "could not open the romaji table\n";
@@ -170,6 +171,10 @@ int RunKeys(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary
     };
     std::map<std::string, KeyTotals> totals;
     std::size_t shown = 0;
+    // --dump-phrases: the phrases of sentences that convert right, one per
+    // row, as a keys file (for typing phrase by phrase).
+    std::ofstream phrases;
+    if (!dumpPhrases.empty()) phrases.open(dumpPhrases, std::ios::binary);
     // Keys files share the layout source, id, keys, expected...: LoadCorpus
     // reads keys where it reads readings.
     for (const auto& row : LoadCorpus(corpus)) {
@@ -185,6 +190,15 @@ int RunKeys(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary
             if (d < distance) {
                 distance = d;
                 length = expected.size();
+            }
+        }
+        if (phrases.is_open() && distance == 0) {
+            const auto segments = composer.Segments();
+            const auto keys = composer.PhraseKeys();
+            for (std::size_t p = 0; p < segments.size() && p < keys.size(); ++p) {
+                if (keys[p].empty()) continue;
+                phrases << "phrase-" << row.source << "\t" << row.id << "-" << p << "\t" << Narrow(keys[p]) << "\t"
+                        << Narrow(segments[p].text) << "\n";
             }
         }
         // One pick away: what was meant is a phrase's first nine candidates
@@ -205,9 +219,11 @@ int RunKeys(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary
             const auto* candidates = composer.FocusedCandidates();
             for (std::size_t j = 0; candidates && j < std::min<std::size_t>(9, candidates->size()) && !inList; ++j) {
                 std::wstring text;
-                for (std::size_t s = 0; s < segments.size(); ++s) {
+                // A whole-input candidate is the whole text.
+                for (std::size_t s = 0; s < segments.size() && (*candidates)[j].reading.empty(); ++s) {
                     text += s == f ? (*candidates)[j].text : segments[s].text;
                 }
+                if (!(*candidates)[j].reading.empty()) text = (*candidates)[j].text;
                 inList = std::find(row.expected.begin(), row.expected.end(), text) != row.expected.end();
             }
         }
@@ -244,7 +260,7 @@ int RunKeys(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary
 }  // namespace
 
 int main(int argc, char** argv) {
-    std::filesystem::path pack, corpus, keysCorpus, romaji;
+    std::filesystem::path pack, corpus, keysCorpus, romaji, dumpPhrases;
     std::size_t showMisses = 0;
     tekito::japanese::KeyConverter::Costs costs;
     for (int i = 1; i < argc; ++i) {
@@ -254,6 +270,7 @@ int main(int argc, char** argv) {
         else if (arg == "--keys-corpus" && i + 1 < argc) keysCorpus = argv[++i];
         else if (arg == "--romaji" && i + 1 < argc) romaji = argv[++i];
         else if (arg == "--typo" && i + 1 < argc) costs.typo = std::stoll(argv[++i]);
+        else if (arg == "--dump-phrases" && i + 1 < argc) dumpPhrases = argv[++i];
         else if (arg == "--show-misses" && i + 1 < argc) showMisses = std::stoul(argv[++i]);
     }
     if (!pack.empty() && !keysCorpus.empty()) {
@@ -267,7 +284,7 @@ int main(int argc, char** argv) {
             return 1;
         }
         const JapaneseConverter converter(dictionary, matrix);
-        return RunKeys(matrix, dictionary, converter, keysCorpus, romaji, costs, showMisses);
+        return RunKeys(matrix, dictionary, converter, keysCorpus, romaji, costs, showMisses, dumpPhrases);
     }
     if (pack.empty() || corpus.empty()) {
         std::cerr << "usage: tekito_ja_eval --pack <dir> --corpus <japanese_eval.tsv> [--show-misses N]\n";

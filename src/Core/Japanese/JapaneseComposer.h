@@ -5,8 +5,10 @@
 #include <cstdint>
 #include <functional>
 #include <optional>
+#include <set>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace tekito::japanese {
@@ -124,6 +126,9 @@ public:
     [[nodiscard]] std::size_t FocusedSelection() const noexcept;
     // The reading the focused phrase was converted from.
     [[nodiscard]] std::wstring FocusedReading() const;
+    // The keys each phrase was read from (empty for a phrase that starts or
+    // ends inside a romaji unit).
+    [[nodiscard]] std::vector<std::wstring> PhraseKeys() const;
     [[nodiscard]] bool IsCandidateListOpen() const noexcept { return listOpen_ && IsConverted(); }
 
     // Predictions for what is typed (empty once converted), and which one
@@ -186,8 +191,22 @@ private:
     // The English word after the first candidate that starts in katakana.
     void AddLoanwords(std::vector<PhraseCandidate>& candidates) const;
     // When the list opens: the phrase's keys with one slip undone, as more
-    // candidates, so a slip the first choice kept is one pick away.
+    // candidates, so a slip the first choice kept is one pick away; for a
+    // short input split into phrases, the whole input too ("hahimemashite":
+    // は|秘めまして, and はじめまして).
     void AddSlipCandidates(PhraseState& phrase) const;
+    // The readings of `keys` with one slip undone that read as known words
+    // at most kSlipMargin less likely than `typedCost`, likeliest first,
+    // each with its likeliest text; readings in `skip` are left out.
+    [[nodiscard]] std::vector<std::pair<PhraseCandidate, std::wstring>> SlipReadings(
+        const std::wstring& keys, std::set<std::wstring> skip, std::int64_t typedCost) const;
+    // Whether `corrected` splits into phrases where `reading` did (phrases
+    // starting at `starts`), apart from where the two differ.
+    [[nodiscard]] bool SamePhrasing(const std::wstring& reading, const std::vector<std::size_t>& starts,
+                                    const std::wstring& corrected) const;
+    // The focused phrase's chosen candidate when it is the whole input read
+    // again: it is then shown, and committed, in place of every phrase.
+    [[nodiscard]] const PhraseCandidate* WholeChoice() const noexcept;
 
     const RomajiTable* table_{nullptr};
     const JapaneseConverter* converter_{nullptr};
