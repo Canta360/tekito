@@ -97,7 +97,7 @@ export function Tile({ on, onPress, icon, image, imageDark, art, title, descript
   return (
     <button ref={ref} type="button" className={`tile ${on ? "is-on" : ""} ${className}`}
       aria-pressed={on} onClick={onPress} onPointerMove={onPointerMove} onPointerLeave={onPointerLeave} {...props}>
-      <span className="tile-light" />
+      <span className="tile-clip"><span className="tile-light" /></span>
       <span className="tile-glass">
         <span className="tile-top">
           {art || (image ? (
