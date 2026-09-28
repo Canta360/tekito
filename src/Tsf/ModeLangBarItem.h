@@ -40,6 +40,8 @@ public:
     HRESULT STDMETHODCALLTYPE UnadviseSink(DWORD cookie) override;
 
     void NotifyUpdate();
+    // Shows the icon for the taskbar's theme if that changed since.
+    void RefreshTheme();
 
 private:
     ~ModeLangBarItem();
@@ -51,6 +53,7 @@ private:
 
     std::atomic<ULONG> refCount_{1};
     HINSTANCE instance_{nullptr};
+    bool darkTaskbar_{false};
     ModeGetter getMode_;
     ModeSetter setMode_;
     ModeGetter toggledMode_;

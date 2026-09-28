@@ -1071,6 +1071,8 @@ HRESULT TextService::OnPopContext(ITfContext* context) {
 }
 
 HRESULT TextService::OnSetFocus(ITfDocumentMgr* focus, ITfDocumentMgr*) {
+    // Light or dark taskbar: the mode icon follows when focus moves.
+    if (modeLangBarItem_) modeLangBarItem_->RefreshTheme();
     ComPtr<ITfContext> top;
     if (focus && SUCCEEDED(focus->GetTop(top.Put())) && top) {
         AdviseContextSinks(top.Get());

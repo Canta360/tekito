@@ -3,4 +3,7 @@
 IDI_TEKITO ICON "icons/Tekito.ico"
 IDI_AUTO ICON "icons/A.ico"
 IDI_DIRECT ICON "icons/d.ico"
+IDI_DIRECT_DARK ICON "icons/direct-dark.ico"
+IDI_JAPANESE ICON "icons/japanese.ico"
+IDI_JAPANESE_DARK ICON "icons/japanese-dark.ico"
 IDR_FONT_MPLUS1 RCDATA "fonts/MPLUS1-wght.ttf"
