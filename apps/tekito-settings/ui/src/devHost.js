@@ -41,7 +41,7 @@ function initialState() {
       excludedApps: ["Code.exe"],
       builtInExcludedApps: ["WindowsTerminal.exe", "OpenConsole.exe", "conhost.exe", "cmd.exe", "powershell.exe", "pwsh.exe"],
     },
-    version: "0.1.1",
+    version: "0.2.0",
     mode: japaneseInstalled ? "japanese" : "auto",
     runtime: { tsf: "Loaded", dataPacks: "12 / 13", japaneseData: japaneseInstalled ? "6 / 6" : "0 / 6", japanese: japaneseInstalled },
     appearance: { accent: "#0078d4", systemLanguage: navigator.language.startsWith("ja") ? "ja" : "en" },

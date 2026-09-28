@@ -97,7 +97,8 @@ enum class Screen { Welcome, License, Options, Installing, Done, Failed };
 
 enum class Action {
     Install, Cancel, Options, ReadLicense, Agree, GetRuntime, CheckRuntime,
-    Back, AcceptLicense, Browse, Shortcut, Finish, Retry, Close,
+    Back, AcceptLicense, Browse, Shortcut, Finish, Retry, Close, Japanese, KeepEnglish,
+    WithoutJapanese,
 };
 
 enum class Kind { Primary, Secondary, Quiet, Checkbox, Toggle, Link };
@@ -152,6 +153,12 @@ struct Wizard {
     Screen screen{Screen::Welcome};
     std::filesystem::path installRoot;
     bool startMenuShortcut{true};
+    // Japanese input: its data is downloaded from the release on GitHub.
+    // On by default where Windows shows Japanese.
+    bool japanese{UseJapanese()};
+    // With Japanese: keep TEKITO in the English keyboard list too (the
+    // Japanese one has Auto and Direct for English).
+    bool keepEnglish{false};
     bool agreed{false};
     bool webViewReady{false};
     std::thread installThread;
@@ -393,13 +400,23 @@ std::filesystem::path MakeTempDirectory() {
     return {};
 }
 
+struct InstallChoices {
+    std::filesystem::path installRoot;
+    bool startMenuShortcut{true};
+    bool japanese{false};
+    bool keepEnglish{false};
+};
+
 int RunPowerShell(const std::filesystem::path& zipPath, const std::filesystem::path& packageRoot,
-                  const std::filesystem::path& installRoot, bool startMenuShortcut) {
+                  const InstallChoices& choices) {
     wchar_t systemDirectory[MAX_PATH]{};
     const auto length = GetSystemDirectoryW(systemDirectory, MAX_PATH);
     if (length == 0 || length >= MAX_PATH) return -1;
     const auto powershell = std::filesystem::path(systemDirectory) / LR"(WindowsPowerShell\v1.0\powershell.exe)";
-    // Unpack, verify the package against its manifest, then install.
+    // Unpack, verify the package against its manifest, then install;
+    // install.ps1's own exit codes (Japanese data not downloaded, ...) are
+    // passed on.
+    const auto flag = [](bool value) { return std::wstring(value ? L"$true" : L"$false"); };
     const auto command = L"-NoProfile -ExecutionPolicy Bypass -Command \"$ErrorActionPreference='Stop'; "
                          L"Expand-Archive -LiteralPath " + QuotePowerShell(zipPath.wstring()) +
                          L" -DestinationPath " + QuotePowerShell(packageRoot.wstring()) +
@@ -407,8 +424,11 @@ int RunPowerShell(const std::filesystem::path& zipPath, const std::filesystem::p
                          L" -PackageRoot " + QuotePowerShell(packageRoot.wstring()) +
                          L"; & " + QuotePowerShell((packageRoot / L"install.ps1").wstring()) +
                          L" -SourceRoot " + QuotePowerShell(packageRoot.wstring()) +
-                         L" -InstallRoot " + QuotePowerShell(installRoot.wstring()) +
-                         L" -StartMenuShortcut:$" + (startMenuShortcut ? L"true" : L"false") + L"\"";
+                         L" -InstallRoot " + QuotePowerShell(choices.installRoot.wstring()) +
+                         L" -StartMenuShortcut:" + flag(choices.startMenuShortcut) +
+                         L" -Japanese:" + flag(choices.japanese) +
+                         L" -KeepEnglishProfile:" + flag(choices.keepEnglish) +
+                         L"; exit $(if ($LASTEXITCODE) { $LASTEXITCODE } else { 0 })\"";
     std::vector<wchar_t> commandLine(command.begin(), command.end());
     commandLine.push_back(L'\0');
     STARTUPINFOW startup{};
@@ -428,8 +448,7 @@ int RunPowerShell(const std::filesystem::path& zipPath, const std::filesystem::p
     return static_cast<int>(exitCode);
 }
 
-int InstallEmbeddedPackage(const std::filesystem::path& self, const std::filesystem::path& installRoot,
-                           bool startMenuShortcut) {
+int InstallEmbeddedPackage(const std::filesystem::path& self, const InstallChoices& choices) {
     std::uint64_t payloadOffset = 0;
     std::uint64_t payloadSize = 0;
     if (!ReadPayloadBounds(self, payloadOffset, payloadSize)) return 2;
@@ -443,7 +462,7 @@ int InstallEmbeddedPackage(const std::filesystem::path& self, const std::filesys
         return 4;
     }
     std::filesystem::create_directory(packageRoot, cleanupError);
-    const auto exitCode = RunPowerShell(zipPath, packageRoot, installRoot, startMenuShortcut);
+    const auto exitCode = RunPowerShell(zipPath, packageRoot, choices);
     std::filesystem::remove_all(tempRoot, cleanupError);
     return exitCode == -1 ? 5 : exitCode;
 }
@@ -454,6 +473,8 @@ std::wstring FailureMessage(int code) {
     case 3: return Tr(L"Setup couldn't create a temporary folder. Make sure the drive has free space, then try again.", L"一時フォルダーを作成できませんでした。ドライブの空き容量を確認して、もう一度お試しください。");
     case 4: return Tr(L"Setup couldn't unpack its files. Make sure the drive has free space, then try again.", L"ファイルを展開できませんでした。ドライブの空き容量を確認して、もう一度お試しください。");
     case 5: return Tr(L"Setup couldn't start Windows PowerShell, which it needs to install TEKITO.", L"インストールに必要な Windows PowerShell を起動できませんでした。");
+    case 20: return Tr(L"Setup couldn't download the Japanese data. Check the internet connection and try again, or install without Japanese.", L"日本語のデータをダウンロードできませんでした。インターネットの接続を確かめてもう一度お試しいただくか、日本語なしでインストールしてください。");
+    case 21: return Tr(L"The downloaded Japanese data was not the file this installer expects. Try again, or download the latest TEKITO.", L"ダウンロードした日本語のデータが、このインストーラーの想定と違いました。もう一度お試しいただくか、最新の TEKITO をダウンロードしてください。");
     default:
         if (UseJapanese()) {
             return L"インストールがエラー " + std::to_wstring(code) +
@@ -477,11 +498,11 @@ void StartInstall(Wizard& wizard) {
     SetTimer(wizard.window, kAnimationTimer, 16, nullptr);
     const HWND window = wizard.window;
     const auto self = wizard.self;
-    const auto installRoot = wizard.installRoot;
-    const bool shortcut = wizard.startMenuShortcut;
+    const InstallChoices choices{wizard.installRoot, wizard.startMenuShortcut, wizard.japanese,
+                                 wizard.japanese && wizard.keepEnglish};
     try {
-        wizard.installThread = std::thread([&wizard, window, self, installRoot, shortcut] {
-            wizard.installExitCode.store(InstallEmbeddedPackage(self, installRoot, shortcut));
+        wizard.installThread = std::thread([&wizard, window, self, choices] {
+            wizard.installExitCode.store(InstallEmbeddedPackage(self, choices));
             PostMessageW(window, kWizardInstallComplete, 0, 0);
         });
     } catch (...) {
@@ -513,6 +534,11 @@ D2D1_RECT_F FooterButton(int slotFromRight, float width = 116.0f) {
 constexpr D2D1_RECT_F kWebViewCard{kMargin, 226.0f, kWidth - kMargin, 326.0f};
 constexpr D2D1_RECT_F kLicenseCard{kMargin, 100.0f, kWidth - kMargin, 384.0f};
 constexpr D2D1_RECT_F kOptionsCard{kMargin, 92.0f, kWidth - kMargin, 252.0f};
+// With Japanese, the options card has a third row.
+constexpr D2D1_RECT_F kOptionsCardJapanese{kMargin, 92.0f, kWidth - kMargin, 318.0f};
+// Welcome: the Japanese choice, and the license agreement under it.
+float JapaneseRow(const Wizard& wizard) { return wizard.webViewReady ? 238.0f : 334.0f; }
+float AgreeRow(const Wizard& wizard) { return wizard.webViewReady ? 336.0f : 366.0f; }
 
 std::vector<Control> Controls(const Wizard& wizard) {
     std::vector<Control> controls;
@@ -523,9 +549,15 @@ std::vector<Control> Controls(const Wizard& wizard) {
             controls.push_back({Action::GetRuntime, Kind::Secondary, D2D1::RectF(58.0f, y, 188.0f, y + 32.0f), Tr(L"Get WebView2", L"WebView2 を入手")});
             controls.push_back({Action::CheckRuntime, Kind::Quiet, D2D1::RectF(196.0f, y, 306.0f, y + 32.0f), Tr(L"Check again", L"もう一度確認")});
         }
+        const std::wstring japanese = Tr(L"Add Japanese input", L"日本語入力を追加する");
+        const float japaneseRow = JapaneseRow(wizard);
+        controls.push_back({Action::Japanese, Kind::Checkbox,
+                            D2D1::RectF(kMargin, japaneseRow, kMargin + 30.0f + TextWidth(wizard, wizard.body.Get(), japanese),
+                                        japaneseRow + 24.0f),
+                            japanese, true, wizard.japanese});
         const std::wstring agree = Tr(L"I agree to the license terms", L"使用許諾契約に同意する");
         const float agreeWidth = TextWidth(wizard, wizard.body.Get(), agree);
-        const float row = wizard.webViewReady ? 336.0f : 350.0f;
+        const float row = AgreeRow(wizard);
         controls.push_back({Action::Agree, Kind::Checkbox, D2D1::RectF(kMargin, row, kMargin + 30.0f + agreeWidth, row + 24.0f),
                             agree, true, wizard.agreed});
         const float linkLeft = kMargin + 30.0f + agreeWidth + 12.0f;
@@ -546,6 +578,13 @@ std::vector<Control> Controls(const Wizard& wizard) {
         controls.push_back({Action::Shortcut, Kind::Toggle, D2D1::RectF(kOptionsCard.right - 66.0f, kOptionsCard.top + 104.0f,
                                                                        kOptionsCard.right - 18.0f, kOptionsCard.top + 132.0f),
                             Tr(L"Start menu shortcut", L"スタートメニューのショートカット"), true, wizard.startMenuShortcut});
+        if (wizard.japanese) {
+            controls.push_back({Action::KeepEnglish, Kind::Toggle,
+                                D2D1::RectF(kOptionsCard.right - 66.0f, kOptionsCard.top + 166.0f,
+                                            kOptionsCard.right - 18.0f, kOptionsCard.top + 194.0f),
+                                Tr(L"Keep TEKITO for English keyboards", L"英語のキーボードにも TEKITO を残す"), true,
+                                wizard.keepEnglish});
+        }
         controls.push_back({Action::Back, Kind::Primary, FooterButton(0), Tr(L"Done", L"完了")});
         break;
     case Screen::Installing:
@@ -553,10 +592,23 @@ std::vector<Control> Controls(const Wizard& wizard) {
     case Screen::Done:
         controls.push_back({Action::Finish, Kind::Primary, FooterButton(0), Tr(L"Finish", L"完了")});
         break;
-    case Screen::Failed:
-        controls.push_back({Action::Close, Kind::Secondary, FooterButton(1), Tr(L"Close", L"閉じる")});
+    case Screen::Failed: {
+        // Without the Japanese data, English can still be installed.
+        const int code = wizard.installExitCode.load();
+        if (code == 20 || code == 21) {
+            controls.push_back({Action::Close, Kind::Quiet, D2D1::RectF(22.0f, kFooterTop, 130.0f, kFooterTop + kButtonHeight),
+                                Tr(L"Close", L"閉じる")});
+            const std::wstring without = Tr(L"Install without Japanese", L"日本語なしでインストール");
+            const float width = TextWidth(wizard, wizard.body.Get(), without) + 40.0f;
+            const D2D1_RECT_F retry = FooterButton(0);
+            controls.push_back({Action::WithoutJapanese, Kind::Secondary,
+                                D2D1::RectF(retry.left - 12.0f - width, retry.top, retry.left - 12.0f, retry.bottom), without});
+        } else {
+            controls.push_back({Action::Close, Kind::Secondary, FooterButton(1), Tr(L"Close", L"閉じる")});
+        }
         controls.push_back({Action::Retry, Kind::Primary, FooterButton(0), Tr(L"Try again", L"再試行")});
         break;
+    }
     }
     return controls;
 }
@@ -868,14 +920,24 @@ void Paint(Wizard& wizard) {
     case Screen::Welcome:
         DrawLogo(wizard, kMargin, 42.0f, 60.0f);
         DrawWordmark(wizard, kMargin + 78.0f, 58.0f);
-        DrawText(wizard, Tr(L"English typing help for Windows", L"英語を楽に打つための入力方式"), wizard.title.Get(),
+        DrawText(wizard, Tr(L"Japanese and English input for Windows", L"日本語と英語を打つための入力方式"), wizard.title.Get(),
                  D2D1::RectF(kMargin, 128.0f, kWidth - kMargin, 164.0f), p.ink);
         DrawText(wizard,
-                 Tr(L"TEKITO fixes typos and suggests words as you type. Everything runs on this PC, and "
-                    L"nothing you type is ever sent anywhere.",
-                    L"TEKITO は打ち間違いを直し、打ちながら単語を提案します。処理はすべてこの PC の中で行われ、"
+                 Tr(L"TEKITO turns romaji into Japanese and fixes English typos as you type. Everything runs on "
+                    L"this PC, and nothing you type is ever sent anywhere.",
+                    L"TEKITO はローマ字を日本語にし、英語の打ち間違いを直します。処理はすべてこの PC の中で行われ、"
                     L"入力した内容がどこかに送られることはありません。"),
                  wizard.body.Get(), D2D1::RectF(kMargin, 170.0f, kMargin + bodyWidth, 214.0f), p.ink2);
+        if (wizard.webViewReady) {
+            DrawText(wizard,
+                     Tr(L"Downloads the Japanese dictionary and language data (about 45 MB) from TEKITO's release "
+                        L"on GitHub while installing.",
+                        L"インストール中に、日本語の辞書と言語データ（約 45 MB）を GitHub の TEKITO のリリースから"
+                        L"ダウンロードします。"),
+                     wizard.caption.Get(),
+                     D2D1::RectF(kMargin + 30.0f, JapaneseRow(wizard) + 28.0f, kWidth - kMargin, JapaneseRow(wizard) + 64.0f),
+                     p.ink2);
+        }
         if (!wizard.webViewReady) {
             DrawCard(wizard, kWebViewCard);
             DrawText(wizard, Tr(L"One more thing is needed first", L"先にもうひとつ必要なものがあります"), wizard.body.Get(),
@@ -922,7 +984,7 @@ void Paint(Wizard& wizard) {
     }
     case Screen::Options: {
         DrawText(wizard, Tr(L"Install options", L"インストールのオプション"), wizard.heading.Get(), D2D1::RectF(kMargin, 34.0f, kWidth - kMargin, 64.0f), p.ink);
-        DrawCard(wizard, kOptionsCard);
+        DrawCard(wizard, wizard.japanese ? kOptionsCardJapanese : kOptionsCard);
         const float left = kOptionsCard.left + 18.0f;
         DrawText(wizard, Tr(L"Install location", L"インストール先"), wizard.body.Get(),
                  D2D1::RectF(left, kOptionsCard.top + 16.0f, kOptionsCard.right - 130.0f, kOptionsCard.top + 36.0f), p.ink);
@@ -935,13 +997,29 @@ void Paint(Wizard& wizard) {
                  D2D1::RectF(left, kOptionsCard.top + 98.0f, kOptionsCard.right - 90.0f, kOptionsCard.top + 118.0f), p.ink);
         DrawText(wizard, Tr(L"Adds TEKITO Settings to the Start menu.", L"TEKITO の設定をスタートメニューに追加します。"), wizard.caption.Get(),
                  D2D1::RectF(left, kOptionsCard.top + 120.0f, kOptionsCard.right - 90.0f, kOptionsCard.top + 140.0f), p.ink2);
+        if (wizard.japanese) {
+            t->DrawLine(D2D1::Point2F(left, kOptionsCard.top + 150.0f),
+                        D2D1::Point2F(kOptionsCard.right - 18.0f, kOptionsCard.top + 150.0f), divider.Get(), 1.0f);
+            DrawText(wizard, Tr(L"Keep TEKITO for English keyboards", L"英語のキーボードにも TEKITO を残す"), wizard.body.Get(),
+                     D2D1::RectF(left, kOptionsCard.top + 160.0f, kOptionsCard.right - 90.0f, kOptionsCard.top + 180.0f), p.ink);
+            DrawText(wizard,
+                     Tr(L"TEKITO for Japanese types English too, so this is rarely needed.",
+                        L"日本語の TEKITO でも英語を打てるので、ふつうは不要です。"),
+                     wizard.caption.Get(),
+                     D2D1::RectF(left, kOptionsCard.top + 182.0f, kOptionsCard.right - 90.0f, kOptionsCard.top + 212.0f), p.ink2);
+        }
         break;
     }
     case Screen::Installing: {
         DrawLogo(wizard, kWidth / 2.0f - 30.0f, 96.0f, 60.0f);
         DrawText(wizard, Tr(L"Installing TEKITO", L"TEKITO をインストールしています"), wizard.headingCentered.Get(), D2D1::RectF(0.0f, 180.0f, kWidth, 212.0f), p.ink);
-        DrawText(wizard, Tr(L"This takes about a minute. Please keep this window open.", L"1 分ほどかかります。このウィンドウは開いたままにしてください。"), wizard.captionCentered.Get(),
-                 D2D1::RectF(0.0f, 216.0f, kWidth, 236.0f), p.ink2);
+        DrawText(wizard,
+                 wizard.japanese
+                     ? Tr(L"Downloading Japanese takes a few minutes. Please keep this window open.",
+                          L"日本語のダウンロードに数分かかります。このウィンドウは開いたままにしてください。")
+                     : Tr(L"This takes about a minute. Please keep this window open.",
+                          L"1 分ほどかかります。このウィンドウは開いたままにしてください。"),
+                 wizard.captionCentered.Get(), D2D1::RectF(0.0f, 216.0f, kWidth, 236.0f), p.ink2);
         // Indeterminate progress: a short segment of accent light sliding
         // along a recessed track.
         const auto track = D2D1::RectF(170.0f, 268.0f, 430.0f, 274.0f);
@@ -1055,11 +1133,17 @@ void Activate(Wizard& wizard, Action action) {
         break;
     }
     case Action::Shortcut: wizard.startMenuShortcut = !wizard.startMenuShortcut; break;
+    case Action::Japanese: wizard.japanese = !wizard.japanese; break;
+    case Action::KeepEnglish: wizard.keepEnglish = !wizard.keepEnglish; break;
     case Action::Finish:
         wizard.completed = true;
         DestroyWindow(wizard.window);
         return;
     case Action::Retry: StartInstall(wizard); break;
+    case Action::WithoutJapanese:
+        wizard.japanese = false;
+        StartInstall(wizard);
+        break;
     }
     InvalidateRect(wizard.window, nullptr, FALSE);
 }
@@ -1257,13 +1341,16 @@ LRESULT CALLBACK WizardProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
 #ifdef TEKITO_SETUP_PREVIEW
 // Preview build (tekito_setup_preview): opens one screen without elevation,
 // saves a screenshot of the window and exits.
-//   tekito_setup_preview.exe <screen> <out.bmp> [nowebview]
+//   tekito_setup_preview.exe <screen> <out.bmp> [nowebview] [unchecked] [nojapanese] [nodownload]
 // screen: welcome | license | options | installing | done | failed
 struct PreviewRequest {
     Screen screen{Screen::Welcome};
     std::wstring output;
     bool noWebView{false};
     bool agreed{true};
+    bool noJapanese{false};
+    // The failed screen after a Japanese download failure.
+    bool noDownload{false};
 };
 PreviewRequest g_preview;
 
@@ -1343,11 +1430,12 @@ bool ShowWizard(const std::filesystem::path& self) {
 #ifdef TEKITO_SETUP_PREVIEW
     wizard.webViewReady = !g_preview.noWebView;
     wizard.agreed = g_preview.agreed;
+    if (g_preview.noJapanese) wizard.japanese = false;
     if (g_preview.screen == Screen::Installing) {
         StartInstall(wizard);
         wizard.animation = 0.35f;
     } else {
-        if (g_preview.screen == Screen::Failed) wizard.installExitCode.store(4);
+        if (g_preview.screen == Screen::Failed) wizard.installExitCode.store(g_preview.noDownload ? 20 : 4);
         Go(wizard, g_preview.screen);
     }
 #endif
@@ -1403,6 +1491,8 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         for (int i = 3; i < argc; ++i) {
             if (std::wstring_view(argv[i]) == L"nowebview") g_preview.noWebView = true;
             if (std::wstring_view(argv[i]) == L"unchecked") g_preview.agreed = false;
+            if (std::wstring_view(argv[i]) == L"nojapanese") g_preview.noJapanese = true;
+            if (std::wstring_view(argv[i]) == L"nodownload") g_preview.noDownload = true;
         }
     }
     LocalFree(argv);

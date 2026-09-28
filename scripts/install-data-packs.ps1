@@ -45,19 +45,22 @@ try {
         [void](Require-ManifestValue $manifest "license")
         $noticeFile = Require-ManifestValue $manifest "notice_file"
         $dataFile = Require-ManifestValue $manifest "file"
-        $indexFile = Require-ManifestValue $manifest "index_file"
         $dataPath = Join-Path $pack.FullName $dataFile
-        $indexPath = Join-Path $pack.FullName $indexFile
         $noticePath = Join-Path $pack.FullName $noticeFile
-        if (-not (Test-Path $dataPath) -or -not (Test-Path $indexPath) -or -not (Test-Path $noticePath)) {
-            throw "Pack $packId is missing data, index, or NOTICE."
+        if (-not (Test-Path $dataPath) -or -not (Test-Path $noticePath)) {
+            throw "Pack $packId is missing data or NOTICE."
         }
         $expectedData = ([string]$manifest.sha256.file).ToUpperInvariant()
-        $expectedIndex = ([string]$manifest.sha256.index).ToUpperInvariant()
         $actualData = (Get-FileHash -LiteralPath $dataPath -Algorithm SHA256).Hash.ToUpperInvariant()
-        $actualIndex = (Get-FileHash -LiteralPath $indexPath -Algorithm SHA256).Hash.ToUpperInvariant()
-        if ($actualData -ne $expectedData -or $actualIndex -ne $expectedIndex) {
-            throw "Checksum mismatch in pack $packId."
+        if ($actualData -ne $expectedData) { throw "Checksum mismatch in pack $packId." }
+        # Packs read front to back (sorted-tsv, ja-lm) have no index file.
+        if ($manifest.PSObject.Properties.Name -contains "index_file") {
+            $indexPath = Join-Path $pack.FullName ([string]$manifest.index_file)
+            if (-not (Test-Path $indexPath)) { throw "Pack $packId is missing its index." }
+            $actualIndex = (Get-FileHash -LiteralPath $indexPath -Algorithm SHA256).Hash.ToUpperInvariant()
+            if ($actualIndex -ne ([string]$manifest.sha256.index).ToUpperInvariant()) {
+                throw "Checksum mismatch in pack $packId."
+            }
         }
 
         $stagingPack = Join-Path $stagingRoot $pack.Name
