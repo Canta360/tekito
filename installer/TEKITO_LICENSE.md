@@ -2,14 +2,14 @@
 
 Version 0.1 (preview) · Effective September 26, 2026
 
-This agreement is between you and Capitata (capitata.dev), which makes and distributes TEKITO. It covers TEKITO for Windows: the input method, TEKITO Settings, the setup program, the language data that comes with them, their documentation, and updates we provide for this version. By installing or using TEKITO you accept this agreement. If you do not accept it, do not install or use TEKITO.
+This agreement is between you and Capitata (capitata.dev), which makes and distributes TEKITO. It covers TEKITO for Windows: the input method, TEKITO Settings, the setup program, the language data that comes with them (including the Japanese data the setup program downloads), their documentation, and updates we provide for this version. By installing or using TEKITO you accept this agreement. If you do not accept it, do not install or use TEKITO.
 
 ## In short
 
 - You may install TEKITO on the computers you use and use it for anything, including work.
 - What you type is yours. TEKITO works on your PC and does not send your typing anywhere.
 - TEKITO is ours. Please do not resell it, redistribute it, or pass off modified copies as TEKITO.
-- Suggestions and corrections can be wrong. Check your text before you rely on it.
+- Suggestions, corrections, and conversions can be wrong. Check your text before you rely on it.
 - TEKITO is provided as is, and this is a preview release.
 
 The full terms below are what apply; this summary is only a guide.
@@ -37,7 +37,7 @@ The TEKITO source code is published separately under the Functional Source Licen
 
 You own the text you type and anything you create with TEKITO, including your dictionary entries and settings.
 
-TEKITO processes your typing on your computer to correct and suggest words. It stores your settings, your dictionary, and what it learns from your choices on your computer. It does not send your typing, your dictionary, or what it has learned over the network. Diagnostics you copy from TEKITO Settings never include what you type. You can clear learned data and remove your dictionary entries in TEKITO Settings at any time.
+TEKITO processes your typing on your computer to correct and suggest words and to convert romaji into Japanese. It stores your settings, your dictionary, and what it learns from your choices on your computer. It does not send your typing, your dictionary, or what it has learned over the network. Diagnostics you copy from TEKITO Settings never include what you type. You can clear learned data and remove your dictionary entries in TEKITO Settings at any time.
 
 Keep your own copy of anything you would not want to lose, such as an exported dictionary. Uninstalling TEKITO leaves your data in place unless you choose to remove it.
 

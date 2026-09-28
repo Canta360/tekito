@@ -122,11 +122,11 @@ void ModeLangBarItem::ShowContextMenu(POINT point) {
     const auto flags = [this](InputMode mode) {
         return MF_STRING | (Mode() == mode ? MF_CHECKED : 0);
     };
+    AppendMenuW(menu, flags(InputMode::Convert), kMenuAuto, L"Auto");
+    AppendMenuW(menu, flags(InputMode::Direct), kMenuDirect, L"Direct");
     if (JapaneseProfile()) {
         AppendMenuW(menu, flags(InputMode::Japanese), kMenuJapanese, Text(L"Japanese", L"日本語"));
     }
-    AppendMenuW(menu, flags(InputMode::Convert), kMenuAuto, L"Auto");
-    AppendMenuW(menu, flags(InputMode::Direct), kMenuDirect, L"Direct");
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(menu, MF_STRING, kMenuSettings, Text(L"Settings...", L"設定..."));
 
@@ -148,15 +148,14 @@ HRESULT ModeLangBarItem::InitMenu(ITfMenu* menu) {
     const auto checked = [mode](InputMode item) {
         return mode == item ? static_cast<DWORD>(TF_LBMENUF_RADIOCHECKED) : 0;
     };
-    HRESULT hr = S_OK;
+    HRESULT hr = addItem(kMenuAuto, checked(InputMode::Convert), L"Auto");
+    if (FAILED(hr)) return hr;
+    hr = addItem(kMenuDirect, checked(InputMode::Direct), L"Direct");
+    if (FAILED(hr)) return hr;
     if (JapaneseProfile()) {
         hr = addItem(kMenuJapanese, checked(InputMode::Japanese), Text(L"Japanese", L"日本語"));
         if (FAILED(hr)) return hr;
     }
-    hr = addItem(kMenuAuto, checked(InputMode::Convert), L"Auto");
-    if (FAILED(hr)) return hr;
-    hr = addItem(kMenuDirect, checked(InputMode::Direct), L"Direct");
-    if (FAILED(hr)) return hr;
     hr = addItem(0, TF_LBMENUF_SEPARATOR, nullptr);
     if (FAILED(hr)) return hr;
     return addItem(kMenuSettings, 0, Text(L"Settings...", L"設定..."));
