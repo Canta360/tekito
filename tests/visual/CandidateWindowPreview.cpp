@@ -5,6 +5,7 @@
 // see them.
 //
 //   tekito_candidate_window_preview.exe <out.bmp> [stripes|doc|paper|dusk] [short|long] [glide] [click]
+//                                       [badge-auto|badge-direct|badge-japanese]
 //
 // `stripes` puts saturated color bands behind the glass to show the blur;
 // `doc` is a plain page of text, the common case; `paper` is a soft light
@@ -13,6 +14,8 @@
 // candidates than fit on a page, which brings up the page indicator.
 // `glide` moves the selection two rows down and captures mid-animation.
 // `click` clicks row 4 and reports the index the host callback received.
+// `badge-*` shows the mode badge instead of candidates, then checks that it
+// fades out by itself (exit code 4 if it stays).
 //
 // TEKITO_PREVIEW_STYLE=simple renders the simple candidate window style;
 // TEKITO_PREVIEW_LANGUAGE=ja shows the Japanese tags.
@@ -262,7 +265,11 @@ int wmain(int argc, wchar_t** argv) {
     bool click = false;
     bool meaning = false;
     bool kanji = false;
+    int badge = 0;
     for (int i = 2; i < argc; ++i) {
+        if (wcscmp(argv[i], L"badge-auto") == 0) badge = 1;
+        if (wcscmp(argv[i], L"badge-direct") == 0) badge = 2;
+        if (wcscmp(argv[i], L"badge-japanese") == 0) badge = 3;
         if (wcscmp(argv[i], L"meaning") == 0) meaning = true;
         if (wcscmp(argv[i], L"kanji") == 0) kanji = meaning = true;
         if (wcscmp(argv[i], L"doc") == 0) g_documentBackdrop = true;
@@ -307,7 +314,13 @@ int wmain(int argc, wchar_t** argv) {
     LARGE_INTEGER shown{};
     QueryPerformanceFrequency(&frequency);
     QueryPerformanceCounter(&shown);
-    window.Show(caret, candidates, 1, 0, 5, detail);
+    if (badge) {
+        window.ShowModeBadge(caret, badge == 3 ? tekito::InputMode::Japanese
+                                    : badge == 2 ? tekito::InputMode::Direct
+                                                 : tekito::InputMode::Convert);
+    } else {
+        window.Show(caret, candidates, 1, 0, 5, detail);
+    }
     // Time until the UI thread has built its windows and presented the first
     // frame (composition init, device creation and effect compilation).
     for (int spin = 0; spin < 5000; ++spin) {
@@ -333,7 +346,7 @@ int wmain(int argc, wchar_t** argv) {
             Sleep(1);
         }
     };
-    pump(1500);
+    pump(badge ? 300 : 1500);
 
     HWND target = FindWindowW(L"TekitoCandidateWindow", nullptr);
     if (!target) {
@@ -360,6 +373,13 @@ int wmain(int argc, wchar_t** argv) {
         return 1;
     }
     wprintf(L"Saved %ls\n", outputPath);
+    if (badge) {
+        pump(1500);
+        if (IsWindowVisible(target)) {
+            fwprintf(stderr, L"The badge did not fade\n");
+            return 4;
+        }
+    }
     window.Hide();
     if (backdrop) DestroyWindow(backdrop);
     return 0;
