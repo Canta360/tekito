@@ -28,8 +28,9 @@ name and logo identify our builds; please do not use them for your own.
 
 ## Builds from Capitata
 
-The installer we publish includes the language data and is covered by the
-TEKITO License Agreement, which the setup program shows before installing. It
+The installer we publish includes the English language data, and the
+Japanese data it downloads from the same release is part of that build. Both
+are covered by the TEKITO License Agreement, which the setup program shows before installing. It
 lets anyone install TEKITO on their own computers for personal, educational or
 commercial use. It does not limit what `LICENSE.md` lets you do with the
 source code.

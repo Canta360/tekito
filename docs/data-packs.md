@@ -1,9 +1,12 @@
 # Data Packs
 
-Everything TEKITO knows about English comes from data packs: sorted,
-tab-separated files with a small byte-offset index beside them. TEKITO reads
-only the ranges a lookup needs; it never loads whole files into memory and
-never fetches anything over the network.
+Everything TEKITO knows about English and Japanese comes from data packs:
+mostly sorted, tab-separated files with a small byte-offset index beside
+them, and for Japanese conversion, binary files mapped into memory. TEKITO
+reads only what a lookup needs and never fetches anything over the network
+while it runs. The published installer carries the English packs; the
+Japanese ones (`japanese-*` apart from `japanese-phonetic`) are a separate
+download that setup fetches when Japanese is chosen.
 
 | Pack | Contents | Source | License |
 | --- | --- | --- | --- |

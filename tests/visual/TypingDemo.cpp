@@ -1,13 +1,24 @@
-// Records the README typing demo: a short line typed key by key into a plain
-// page, with the real engine producing the candidate list and the real
+// Records the README typing demos: a short line typed key by key into a
+// plain page, with the real engine producing the candidate list and the real
 // typing state machine deciding what Space and punctuation do. Each step is
 // captured as a BMP frame; scripts/make-demo-animation.py assembles them.
 //
-//   tekito_typing_demo.exe <output folder>
+//   tekito_typing_demo.exe <output folder> [--japanese]
+//
+// --japanese types romaji into the Japanese composer instead, converting with
+// Space and stepping into the list for a slip.
 //
 // Needs the Data Packs (TEKITO_DATA_PACK_DIR) and a visible desktop.
 #include "Core/ConversionEngine.h"
 #include "Core/InputStateMachine.h"
+#include "Core/Japanese/JapaneseComposer.h"
+#include "Core/Japanese/JapaneseConverter.h"
+#include "Core/Japanese/JapaneseDictionary.h"
+#include "Core/Japanese/KeyConverter.h"
+#include "Core/Japanese/LanguageModel.h"
+#include "Core/Japanese/Loanwords.h"
+#include "Core/Japanese/Meanings.h"
+#include "Core/Japanese/RomajiTable.h"
 #include "Core/UserDictionary.h"
 #include "Tsf/CandidateWindow.h"
 
@@ -22,26 +33,48 @@ namespace {
 
 constexpr int kWidth = 640;
 constexpr int kHeight = 300;
+// Room for nine candidates under the line.
+constexpr int kJapaneseHeight = 450;
 constexpr int kMargin = 28;
 constexpr int kLineTop = 34;
 
 struct Page {
     std::wstring committed;    // text before the word being typed
     std::wstring composition;  // the word being typed, underlined
+    // Japanese: the composition in phrases; converted ones are underlined
+    // solid, the focused one thicker.
+    std::vector<tekito::japanese::PreeditSegment> segments;
     bool caret{true};
 };
 
 Page g_page;
 HFONT g_font = nullptr;
 
-// Screen rectangle of the composition, where the candidate list anchors.
+int TextWidth(HDC dc, const std::wstring& text) {
+    SIZE size{};
+    GetTextExtentPoint32W(dc, text.c_str(), static_cast<int>(text.size()), &size);
+    return size.cx;
+}
+
+// The text of the segments before the focused one, and the focused one (the
+// whole composition when none is focused).
+std::pair<std::wstring, std::wstring> FocusedSplit() {
+    std::wstring before;
+    for (const auto& segment : g_page.segments) {
+        if (segment.focused) return {before, segment.text};
+        before += segment.text;
+    }
+    return {L"", g_page.composition};
+}
+
+// Screen rectangle of the composition (the focused phrase in Japanese),
+// where the candidate list anchors.
 RECT CompositionRect(HWND hwnd) {
     HDC dc = GetDC(hwnd);
     HGDIOBJ old = SelectObject(dc, g_font);
-    SIZE before{};
-    SIZE word{};
-    GetTextExtentPoint32W(dc, g_page.committed.c_str(), static_cast<int>(g_page.committed.size()), &before);
-    GetTextExtentPoint32W(dc, g_page.composition.c_str(), static_cast<int>(g_page.composition.size()), &word);
+    const auto [leading, focused] = FocusedSplit();
+    SIZE before{TextWidth(dc, g_page.committed + leading), 0};
+    SIZE word{TextWidth(dc, focused), 0};
     TEXTMETRICW metrics{};
     GetTextMetricsW(dc, &metrics);
     SelectObject(dc, old);
@@ -72,7 +105,19 @@ void PaintPage(HWND hwnd, HDC dc) {
     TEXTMETRICW metrics{};
     GetTextMetricsW(dc, &metrics);
     const int baseline = kLineTop + metrics.tmHeight + 1;
-    if (!g_page.composition.empty()) {
+    if (!g_page.segments.empty()) {
+        int x = kMargin + before.cx;
+        for (const auto& segment : g_page.segments) {
+            const int width = TextWidth(dc, segment.text);
+            HPEN pen = CreatePen(segment.converted ? PS_SOLID : PS_DOT, segment.focused ? 2 : 1, RGB(28, 30, 34));
+            HGDIOBJ oldPen = SelectObject(dc, pen);
+            MoveToEx(dc, x + 1, baseline, nullptr);
+            LineTo(dc, x + width - 1, baseline);
+            SelectObject(dc, oldPen);
+            DeleteObject(pen);
+            x += width;
+        }
+    } else if (!g_page.composition.empty()) {
         // Dotted underline, as TSF hosts draw TEKITO's composition.
         HPEN pen = CreatePen(PS_DOT, 1, RGB(28, 30, 34));
         HGDIOBJ oldPen = SelectObject(dc, pen);
@@ -142,32 +187,36 @@ bool SaveScreenRect(const RECT& rect, const std::filesystem::path& path) {
     return static_cast<bool>(output);
 }
 
+std::filesystem::path DataRoot() {
+    wchar_t value[MAX_PATH]{};
+    if (GetEnvironmentVariableW(L"TEKITO_DATA_PACK_DIR", value, MAX_PATH) > 0) return value;
+    return L"data";
+}
+
 }  // namespace
 
 int wmain(int argc, wchar_t** argv) {
     const std::filesystem::path outputFolder = argc > 1 ? argv[1] : L"typing-demo";
+    const bool japanese = argc > 2 && std::wstring_view(argv[2]) == L"--japanese";
     std::filesystem::create_directories(outputFolder);
 
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
     HINSTANCE instance = GetModuleHandleW(nullptr);
-    g_font = CreateFontW(-20, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
+    g_font = CreateFontW(japanese ? -21 : -20, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
                          OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH,
-                         L"Segoe UI");
+                         japanese ? L"Yu Gothic UI" : L"Segoe UI");
     WNDCLASSEXW windowClass{sizeof(windowClass)};
     windowClass.hInstance = instance;
     windowClass.lpfnWndProc = &PageProc;
     windowClass.lpszClassName = L"TekitoTypingDemoPage";
     RegisterClassExW(&windowClass);
     HWND page = CreateWindowExW(WS_EX_TOPMOST | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW,
-                                windowClass.lpszClassName, L"", WS_POPUP, 160, 200, kWidth, kHeight,
+                                windowClass.lpszClassName, L"", WS_POPUP, 160, 200, kWidth, japanese ? kJapaneseHeight : kHeight,
                                 nullptr, nullptr, instance, nullptr);
     ShowWindow(page, SW_SHOWNOACTIVATE);
 
     tekito::tsf::CandidateWindow window;
     if (!window.Initialize(instance, [](std::size_t) {})) return 1;
-    tekito::UserDictionary dictionary;
-    const auto engine = tekito::CreateDefaultConversionEngine(dictionary);
-    if (!engine) return 1;
 
     std::ofstream timing(outputFolder / L"frames.txt");
     int frameNumber = 0;
@@ -182,6 +231,113 @@ int wmain(int argc, wchar_t** argv) {
         SaveScreenRect(rect, outputFolder / name);
         timing << name << ' ' << milliseconds << '\n';
     };
+
+    if (japanese) {
+        namespace ja = tekito::japanese;
+        const auto root = DataRoot();
+        ja::JapaneseDictionary dictionary;
+        ja::ConnectionMatrix matrix;
+        if (!dictionary.Open(root / L"japanese-core" / L"dictionary.bin") ||
+            !matrix.Open(root / L"japanese-core" / L"connection.bin")) {
+            return 1;
+        }
+        const auto table = ja::RomajiTable::Load(root / L"japanese-romaji");
+        if (!table) return 1;
+        ja::JapaneseConverter converter(dictionary, matrix);
+        ja::LanguageModel model;
+        if (model.Open(root / L"japanese-lm")) converter.SetLanguageModel(&model);
+        const ja::KeyConverter keys(dictionary, matrix, converter, *table);
+        ja::Loanwords loanwords;
+        ja::MeaningDictionary meanings;
+        meanings.Open(root);
+        ja::JapaneseComposer composer(table.get());
+        composer.SetConverter(&converter);
+        composer.SetKeyConverter(&keys);
+        if (loanwords.Open(root / L"japanese-loanwords")) composer.SetLoanwords(&loanwords);
+        window.SetJapanese(true);
+
+        constexpr std::size_t kPage = 9;
+        const auto render = [&] {
+            g_page.segments = composer.Segments();
+            g_page.composition = composer.Preedit();
+            const auto* candidates = composer.FocusedCandidates();
+            if (!composer.IsCandidateListOpen() || !candidates || candidates->empty()) {
+                window.Hide();
+                return;
+            }
+            const std::size_t selected = std::min(composer.FocusedSelection(), candidates->size() - 1);
+            const std::size_t first = selected / kPage * kPage;
+            std::vector<tekito::Candidate> rows;
+            for (std::size_t i = 0; i < candidates->size(); ++i) {
+                tekito::Candidate row;
+                row.text = (*candidates)[i].text;
+                row.id = static_cast<std::uint32_t>(i % kPage + 1);
+                if ((*candidates)[i].slip || (*candidates)[i].spellingCorrection) {
+                    row.label = tekito::SemanticLabel::Suggestion;
+                }
+                if (i >= first && i < first + kPage) {
+                    row.hasMeaning = meanings.Lookup(row.text, composer.FocusedReading()).has_value();
+                }
+                rows.push_back(std::move(row));
+            }
+            tekito::tsf::CandidateDetail detail;
+            if (const auto meaning = meanings.Lookup((*candidates)[selected].text, composer.FocusedReading())) {
+                detail = {meaning->headword, meaning->senses};
+            }
+            window.Show(CompositionRect(page), rows, selected, first, std::min(kPage, rows.size() - first), detail);
+        };
+        const auto commit = [&](int milliseconds) {
+            window.Hide();
+            g_page.committed += composer.Commit();
+            g_page.segments.clear();
+            g_page.composition.clear();
+            capture(milliseconds);
+        };
+        const auto type = [&](std::wstring_view keysTyped) {
+            for (std::size_t i = 0; i < keysTyped.size(); ++i) {
+                composer.Insert(keysTyped[i]);
+                render();
+                capture(i + 1 == keysTyped.size() ? 500 : 110);
+            }
+        };
+        const auto space = [&](int milliseconds) {
+            composer.Convert();
+            render();
+            wprintf(L"Space -> [%ls]\n", composer.Preedit().c_str());
+            capture(milliseconds);
+        };
+
+        capture(700);
+        // A slip: "hahimemasite" for はじめまして. The first conversion is
+        // what was typed; the second Space opens the list, where what was
+        // meant waits, marked.
+        type(L"hahimemasite");
+        space(900);
+        space(1100);
+        const auto* candidates = composer.FocusedCandidates();
+        std::size_t slip = 0;
+        while (candidates && slip < candidates->size() && !(*candidates)[slip].slip) ++slip;
+        if (candidates && slip < candidates->size()) {
+            while (composer.FocusedSelection() < slip) {
+                composer.NextCandidate();
+                render();
+                capture(composer.FocusedSelection() == slip ? 1500 : 450);
+            }
+        }
+        commit(500);
+        composer.Insert(L'.');
+        commit(500);
+        type(L"kyouhaiitenkidesune.");
+        space(1100);
+        commit(2600);
+        window.Hide();
+        DestroyWindow(page);
+        return 0;
+    }
+
+    tekito::UserDictionary dictionary;
+    const auto engine = tekito::CreateDefaultConversionEngine(dictionary);
+    if (!engine) return 1;
     const auto show = [&](const tekito::InputStateMachine& state) {
         window.Show(CompositionRect(page), state.Candidates(), state.SelectedIndex(),
                     state.PageStart(), state.VisibleCount());
