@@ -321,7 +321,7 @@ function GeneralPage({ mode, japanese, japaneseInstalled, japaneseKeyboard, sett
   const languages = [[0, t.language.system], [1, "English"], [2, "日本語"]];
   const keyboards = [[0, t.keyboard.detect], [1, t.keyboard.japanese], [2, t.keyboard.us]];
   // Japanese is a mode only when it is installed.
-  const modes = japanese ? ["japanese", "auto", "direct"] : ["auto", "direct"];
+  const modes = japanese ? ["auto", "direct", "japanese"] : ["auto", "direct"];
   const switchKey = switchKeyCaps(settings.toggleKey, japaneseKeyboard);
   return (
     <>

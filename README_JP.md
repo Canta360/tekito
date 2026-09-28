@@ -6,8 +6,8 @@
 </p>
 
 <p align="center">
-  Windows で日本語と英語を打つための入力方式。<br>
-  ローマ字は文全体を見て日本語に、英語の打ち間違いは Space で直ります。<br>
+  Windows で英語と日本語を打つための入力方式。<br>
+  英語の打ち間違いは Space で直り、ローマ字は文全体を見て日本語になります。<br>
   打ったとおりでいいときは何もしません。
 </p>
 
@@ -19,10 +19,10 @@
 </p>
 
 <p align="center">
-  <img src="docs/images/japanese-demo-ja.png" alt="「はじめまして」のつもりで「hahimemasite」と打ち間違えた例。Space で打ったとおりに変換され、もう一度 Space を押すと候補に「もしかして」付きで「はじめまして」が出て、横に意味が表示される。続けて「kyouhaiitenkidesune.」が「今日はいい天気ですね。」になる" width="580">
+  <img src="docs/images/typing-demo-ja.png" alt="「thnaks for teh reveiw.」と打つと、単語ごとに候補リストが出て、Space で打ち間違いが直り、「thanks for the review.」になる様子" width="717">
 </p>
 
-TEKITO は IME（TSF のテキストサービス）なので、普通の Windows アプリでそのまま使えます。ひとつの入力方式で日本語と英語の両方を打てます。ローマ字はかなと漢字に、英語は打ちながらスペルを直します。処理はすべて PC の中で完結します。
+TEKITO は IME（TSF のテキストサービス）なので、普通の Windows アプリでそのまま使えます。ひとつの入力方式で英語と日本語の両方を打てます。英語は打ちながらスペルを直し、日本語を追加すればローマ字をかなと漢字にします。処理はすべて PC の中で完結します。
 
 > TEKITO はプレビュー版です。動作を確認しているのはメモ帳のみです。ほかのアプリの状況は[互換性メモ](docs/compatibility.md)にあります。
 
@@ -31,16 +31,6 @@ TEKITO は IME（TSF のテキストサービス）なので、普通の Windows
 タスクバーのボタンが今のモードを表しています。クリックで切り替え、右クリックでモードを選べます。
 
 <table>
-  <tr>
-    <td width="72" align="center">
-      <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="docs/images/mode-japanese-dark.png">
-        <img src="docs/images/mode-japanese-light.png" width="48" alt="">
-      </picture>
-    </td>
-    <td><b>日本語</b><br>ローマ字をかなと漢字にします。</td>
-    <td><img src="docs/images/taskbar-japanese.png" width="216" alt="日本語のときのタスクバー"></td>
-  </tr>
   <tr>
     <td align="center"><img src="docs/images/mode-auto.png" width="48" alt=""></td>
     <td><b>Auto</b><br>英語のスペルを直し、打ちながら単語を提案します。</td>
@@ -56,15 +46,46 @@ TEKITO は IME（TSF のテキストサービス）なので、普通の Windows
     <td><b>Direct</b><br>押したキーがそのまま入ります。</td>
     <td><img src="docs/images/taskbar-direct.png" width="216" alt="Direct のときのタスクバー"></td>
   </tr>
+  <tr>
+    <td width="72" align="center">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="docs/images/mode-japanese-dark.png">
+        <img src="docs/images/mode-japanese-light.png" width="48" alt="">
+      </picture>
+    </td>
+    <td><b>日本語</b><br>ローマ字をかなと漢字にします。</td>
+    <td><img src="docs/images/taskbar-japanese.png" width="216" alt="日本語のときのタスクバー"></td>
+  </tr>
 </table>
 
-切り替えキーは、日本語キーボードなら半角/全角、US キーボードなら Alt+` です（Ctrl+Space、Ctrl+Shift+Space、なしも選べます）。切り替えの順番は「日本語 ⇄ Auto」「日本語 ⇄ Direct」「日本語 → Auto → Direct」から設定で選べます。日本語キーボードでは、変換キーで日本語、無変換キーで英語、ひらがなキーでひらがなの日本語（Shift でカタカナ）になります。
+切り替えキーは、日本語キーボードなら半角/全角、US キーボードなら Alt+` です（Ctrl+Space、Ctrl+Shift+Space、なしも選べます）。日本語を追加すると、切り替えの順番を「日本語 ⇄ Auto」「日本語 ⇄ Direct」「日本語 → Auto → Direct」から設定で選べます。日本語キーボードでは、変換キーで日本語、無変換キーで英語、ひらがなキーでひらがなの日本語（Shift でカタカナ）になります。
 
 日本語入力は追加するかどうかを選べます。入れていないとき、または設定でオフにしたときは、Auto と Direct だけになります。ターミナル、管理者として実行中のアプリ、設定で追加したアプリでは、TEKITO はオフになります。
 
+## 英語を打つ
+
+Auto で普段どおりに打ちます。入力中の単語に下線が付き、その下に候補が出ます。
+
+| キー | 動作 |
+| --- | --- |
+| Space | 確信のある補正を適用してスペースを入れます。続けて押すと候補を順に送ります。 |
+| Shift+Space | ひとつ前の候補に戻ります。 |
+| Tab、↑、↓ | 確定せずに候補を移動します。 |
+| Backspace | 補正の直後なら、打ったとおりに戻します。 |
+| Esc | 打ったとおりにします。 |
+| Enter | 候補を選んでいるときはその候補で確定します。それ以外は普通の改行です。 |
+
+次の文字を打った時点で単語は確定するので、あとから取り消す操作はありません。知っている単語、「brb」のようなチャットの略語、自分で大文字にして打った語、コードらしい文字列、URL やアドレス、パスワード・数字・メール用の欄には手を出しません。
+
+![TEKITO の候補リスト。グラスとシンプル、ライトとダーク。選んでいる語の意味が横に出る](docs/images/candidate-list-ja.png)
+
 ## 日本語を打つ
 
-ローマ字で打つと、下線付きのひらがなになります。Space で行全体を一度に変換して文節に分け、もう一度 Space を押すと、選んでいる文節の候補一覧が開きます。
+日本語を追加すると、日本語モードでローマ字を打てます。打つと、下線付きのひらがなになります。Space で行全体を一度に変換して文節に分け、もう一度 Space を押すと、選んでいる文節の候補一覧が開きます。
+
+<p align="center">
+  <img src="docs/images/japanese-demo-ja.png" alt="「はじめまして」のつもりで「hahimemasite」と打ち間違えた例。Space で打ったとおりに変換され、もう一度 Space を押すと候補に「もしかして」付きで「はじめまして」が出て、横に意味が表示される。続けて「kyouhaiitenkidesune.」が「今日はいい天気ですね。」になる" width="580">
+</p>
 
 | キー | 動作 |
 | --- | --- |
@@ -84,27 +105,6 @@ TEKITO は IME（TSF のテキストサービス）なので、普通の Windows
 - **候補の横に意味。** 意味のある候補には小さな本のマークが付き、選んでいる候補の意味が一覧の横に出ます。「初め」と「始め」の違いもその場でわかります。
 - **カタカナには英語も。** 外来語には英単語も候補に出します（ミーティング → meeting）。
 - **書き方を覚えます。** 読みに対して選んだ変換が、次から先に出ます。
-
-## 英語を打つ
-
-Auto で普段どおりに打ちます。入力中の単語に下線が付き、その下に候補が出ます。
-
-<p align="center">
-  <img src="docs/images/typing-demo-ja.png" alt="「thnaks for teh reveiw.」と打つと、単語ごとに候補リストが出て、Space で打ち間違いが直り、「thanks for the review.」になる様子" width="717">
-</p>
-
-| キー | 動作 |
-| --- | --- |
-| Space | 確信のある補正を適用してスペースを入れます。続けて押すと候補を順に送ります。 |
-| Shift+Space | ひとつ前の候補に戻ります。 |
-| Tab、↑、↓ | 確定せずに候補を移動します。 |
-| Backspace | 補正の直後なら、打ったとおりに戻します。 |
-| Esc | 打ったとおりにします。 |
-| Enter | 候補を選んでいるときはその候補で確定します。それ以外は普通の改行です。 |
-
-次の文字を打った時点で単語は確定するので、あとから取り消す操作はありません。知っている単語、「brb」のようなチャットの略語、自分で大文字にして打った語、コードらしい文字列、URL やアドレス、パスワード・数字・メール用の欄には手を出しません。
-
-![TEKITO の候補リスト。グラスとシンプル、ライトとダーク。選んでいる語の意味が横に出る](docs/images/candidate-list-ja.png)
 
 ## 設定
 

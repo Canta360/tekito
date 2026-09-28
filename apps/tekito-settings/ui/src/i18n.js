@@ -188,7 +188,7 @@ const en = {
   },
 
   about: {
-    tagline: "Japanese and English input for Windows.",
+    tagline: "English and Japanese input for Windows.",
     version: "Version",
     inputMethod: "Input method",
     installed: "Installed and registered with Windows.",
@@ -398,7 +398,7 @@ const ja = {
   },
 
   about: {
-    tagline: "Windows で日本語と英語を打つための入力方式。",
+    tagline: "Windows で英語と日本語を打つための入力方式。",
     version: "バージョン",
     inputMethod: "入力方式",
     installed: "インストールされ、Windows に登録されています。",

@@ -6,8 +6,8 @@
 </p>
 
 <p align="center">
-  Japanese and English input for Windows.<br>
-  Romaji into Japanese that reads the whole sentence, English typos fixed on Space,<br>
+  English and Japanese input for Windows.<br>
+  English typos fixed on Space, romaji into Japanese that reads the whole sentence,<br>
   and nothing touched when you meant what you typed.
 </p>
 
@@ -19,13 +19,13 @@
 </p>
 
 <p align="center">
-  <img src="docs/images/japanese-demo.png" alt="Typing “hahimemasite”, a slip for はじめまして: Space converts what was typed, the second Space opens the list, where はじめまして waits marked もしかして with its meaning beside it; then “kyouhaiitenkidesune.” becomes 今日はいい天気ですね。" width="559">
+  <img src="docs/images/typing-demo.png" alt="Typing “thnaks for teh reveiw.” in a plain page: the candidate list appears under each word, Space fixes the typos, and the line ends up as “thanks for the review.”" width="717">
 </p>
 
 TEKITO is an input method (a TSF text service), so it works in ordinary
-Windows apps without plugins. One input method types both languages: romaji
-becomes kana and kanji, and English gets its spelling fixed as you go.
-Everything runs on your PC.
+Windows apps without plugins. One input method types both languages: English
+gets its spelling fixed as you go, and with Japanese added, romaji becomes
+kana and kanji. Everything runs on your PC.
 
 > TEKITO is a preview. It has been tested in Notepad; other apps are listed in
 > [the compatibility notes](docs/compatibility.md).
@@ -36,16 +36,6 @@ The button in the taskbar shows the mode. Click it to switch, or right-click
 to pick one.
 
 <table>
-  <tr>
-    <td width="72" align="center">
-      <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="docs/images/mode-japanese-dark.png">
-        <img src="docs/images/mode-japanese-light.png" width="48" alt="">
-      </picture>
-    </td>
-    <td><b>日本語</b><br>Turns romaji into kana and kanji.</td>
-    <td><img src="docs/images/taskbar-japanese.png" width="216" alt="The taskbar with TEKITO in Japanese"></td>
-  </tr>
   <tr>
     <td align="center"><img src="docs/images/mode-auto.png" width="48" alt=""></td>
     <td><b>Auto</b><br>Corrects English spelling and suggests words as you type.</td>
@@ -61,11 +51,22 @@ to pick one.
     <td><b>Direct</b><br>Types exactly the keys you press.</td>
     <td><img src="docs/images/taskbar-direct.png" width="216" alt="The taskbar with TEKITO in Direct"></td>
   </tr>
+  <tr>
+    <td width="72" align="center">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="docs/images/mode-japanese-dark.png">
+        <img src="docs/images/mode-japanese-light.png" width="48" alt="">
+      </picture>
+    </td>
+    <td><b>日本語</b><br>Turns romaji into kana and kanji.</td>
+    <td><img src="docs/images/taskbar-japanese.png" width="216" alt="The taskbar with TEKITO in Japanese"></td>
+  </tr>
 </table>
 
 The switch key is Hankaku/Zenkaku on a Japanese keyboard and Alt+` on a US
-one (or Ctrl+Space, Ctrl+Shift+Space, or none). It goes between Japanese and
-Auto, Japanese and Direct, or round all three, as you choose in Settings. On
+one (or Ctrl+Space, Ctrl+Shift+Space, or none). With Japanese, it goes
+between Japanese and Auto, Japanese and Direct, or round all three, as you
+choose in Settings. On
 a Japanese keyboard, Henkan switches to Japanese, Muhenkan to English, and
 Hiragana to Japanese in hiragana (katakana with Shift).
 
@@ -73,11 +74,37 @@ Japanese input is optional. Without it, or with it turned off in Settings,
 TEKITO has Auto and Direct only. It stays off in terminals, in apps running
 as administrator, and in any apps you list in Settings.
 
+## Typing English
+
+In Auto, type as usual. The word you are typing is underlined and a short
+list of choices appears under it.
+
+| Key | What it does |
+| --- | --- |
+| Space | Applies a confident correction and adds the space. Press again to step through the choices. |
+| Shift+Space | Goes back to the previous choice. |
+| Tab, ↑, ↓ | Moves through the list without committing. |
+| Backspace | Right after a correction, puts back what you typed. |
+| Esc | Keeps what you typed. |
+| Enter | Picks the highlighted choice when you are in the list; otherwise ends the line as usual. |
+
+Typing the next letter settles the word, so there is nothing to undo later.
+TEKITO leaves alone words it recognizes, chat abbreviations like “brb”,
+anything you capitalize yourself, anything that looks like code, URLs and
+addresses, and fields marked as passwords, numbers or email.
+
+![The TEKITO candidate list, glass and simple, in light and dark, with the meaning of the highlighted word beside it](docs/images/candidate-list.png)
+
 ## Typing Japanese
 
-Type romaji; it becomes hiragana as you type, underlined. Space converts the
+With Japanese added, type romaji in 日本語; it becomes hiragana as you
+type, underlined. Space converts the
 whole line at once, split into phrases, and a second Space opens the list
 for the phrase in focus.
+
+<p align="center">
+  <img src="docs/images/japanese-demo.png" alt="Typing “hahimemasite”, a slip for はじめまして: Space converts what was typed, the second Space opens the list, where はじめまして waits marked もしかして with its meaning beside it; then “kyouhaiitenkidesune.” becomes 今日はいい天気ですね。" width="559">
+</p>
 
 | Key | What it does |
 | --- | --- |
@@ -107,31 +134,6 @@ for the phrase in focus.
   (ミーティング → meeting).
 - **It learns your way of writing.** The conversion you pick for a reading
   comes first the next time.
-
-## Typing English
-
-In Auto, type as usual. The word you are typing is underlined and a short
-list of choices appears under it.
-
-<p align="center">
-  <img src="docs/images/typing-demo.png" alt="Typing “thnaks for teh reveiw.” in a plain page: the candidate list appears under each word, Space fixes the typos, and the line ends up as “thanks for the review.”" width="717">
-</p>
-
-| Key | What it does |
-| --- | --- |
-| Space | Applies a confident correction and adds the space. Press again to step through the choices. |
-| Shift+Space | Goes back to the previous choice. |
-| Tab, ↑, ↓ | Moves through the list without committing. |
-| Backspace | Right after a correction, puts back what you typed. |
-| Esc | Keeps what you typed. |
-| Enter | Picks the highlighted choice when you are in the list; otherwise ends the line as usual. |
-
-Typing the next letter settles the word, so there is nothing to undo later.
-TEKITO leaves alone words it recognizes, chat abbreviations like “brb”,
-anything you capitalize yourself, anything that looks like code, URLs and
-addresses, and fields marked as passwords, numbers or email.
-
-![The TEKITO candidate list, glass and simple, in light and dark, with the meaning of the highlighted word beside it](docs/images/candidate-list.png)
 
 ## Settings
 

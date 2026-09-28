@@ -920,12 +920,12 @@ void Paint(Wizard& wizard) {
     case Screen::Welcome:
         DrawLogo(wizard, kMargin, 42.0f, 60.0f);
         DrawWordmark(wizard, kMargin + 78.0f, 58.0f);
-        DrawText(wizard, Tr(L"Japanese and English input for Windows", L"日本語と英語を打つための入力方式"), wizard.title.Get(),
+        DrawText(wizard, Tr(L"English and Japanese input for Windows", L"英語と日本語を打つための入力方式"), wizard.title.Get(),
                  D2D1::RectF(kMargin, 128.0f, kWidth - kMargin, 164.0f), p.ink);
         DrawText(wizard,
-                 Tr(L"TEKITO turns romaji into Japanese and fixes English typos as you type. Everything runs on "
+                 Tr(L"TEKITO fixes English typos as you type, and turns romaji into Japanese. Everything runs on "
                     L"this PC, and nothing you type is ever sent anywhere.",
-                    L"TEKITO はローマ字を日本語にし、英語の打ち間違いを直します。処理はすべてこの PC の中で行われ、"
+                    L"TEKITO は英語の打ち間違いを直し、ローマ字を日本語にします。処理はすべてこの PC の中で行われ、"
                     L"入力した内容がどこかに送られることはありません。"),
                  wizard.body.Get(), D2D1::RectF(kMargin, 170.0f, kMargin + bodyWidth, 214.0f), p.ink2);
         if (wizard.webViewReady) {
