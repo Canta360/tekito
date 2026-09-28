@@ -16,62 +16,15 @@ constexpr UINT kMenuDirect = 2;
 constexpr UINT kMenuSettings = 3;
 constexpr UINT kMenuJapanese = 4;
 
-// A stand-in for the Japanese mode icon until the designed one arrives: a
-// white あ on a dark rounded square, readable on light and dark taskbars.
-HICON CreateJapaneseModeIcon(int size) {
-    BITMAPINFO info{};
-    info.bmiHeader.biSize = sizeof(info.bmiHeader);
-    info.bmiHeader.biWidth = size;
-    info.bmiHeader.biHeight = -size;  // top-down
-    info.bmiHeader.biPlanes = 1;
-    info.bmiHeader.biBitCount = 32;
-    info.bmiHeader.biCompression = BI_RGB;
-
-    HDC screen = GetDC(nullptr);
-    HDC dc = CreateCompatibleDC(screen);
-    void* bits = nullptr;
-    HBITMAP color = CreateDIBSection(dc, &info, DIB_RGB_COLORS, &bits, nullptr, 0);
-    HBITMAP mask = CreateBitmap(size, size, 1, 1, nullptr);
-    HICON icon = nullptr;
-    if (dc && color && mask && bits) {
-        auto* pixels = static_cast<DWORD*>(bits);
-        const float radius = size / 4.0f;
-        const auto inside = [&](int x, int y) {
-            const float cx = x + 0.5f, cy = y + 0.5f;
-            const float dx = cx < radius ? radius - cx : cx > size - radius ? cx - (size - radius) : 0;
-            const float dy = cy < radius ? radius - cy : cy > size - radius ? cy - (size - radius) : 0;
-            return dx * dx + dy * dy <= radius * radius;
-        };
-        for (int y = 0; y < size; ++y) {
-            for (int x = 0; x < size; ++x) pixels[y * size + x] = inside(x, y) ? 0xFF303030 : 0;
-        }
-        const HGDIOBJ oldBitmap = SelectObject(dc, color);
-        HFONT font = CreateFontW(-(size * 7 / 8), 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,
-                                 SHIFTJIS_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
-                                 CLEARTYPE_QUALITY, DEFAULT_PITCH, L"Yu Gothic UI");
-        const HGDIOBJ oldFont = font ? SelectObject(dc, font) : nullptr;
-        SetBkMode(dc, TRANSPARENT);
-        SetTextColor(dc, RGB(255, 255, 255));
-        RECT rect{0, 0, size, size};
-        DrawTextW(dc, L"あ", 1, &rect, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
-        GdiFlush();
-        // GDI clears the alpha of what it draws; the square is opaque.
-        for (int y = 0; y < size; ++y) {
-            for (int x = 0; x < size; ++x) {
-                if (inside(x, y)) pixels[y * size + x] |= 0xFF000000;
-            }
-        }
-        if (oldFont) SelectObject(dc, oldFont);
-        if (font) DeleteObject(font);
-        SelectObject(dc, oldBitmap);
-        ICONINFO iconInfo{TRUE, 0, 0, mask, color};
-        icon = CreateIconIndirect(&iconInfo);
-    }
-    if (mask) DeleteObject(mask);
-    if (color) DeleteObject(color);
-    if (dc) DeleteDC(dc);
-    if (screen) ReleaseDC(nullptr, screen);
-    return icon;
+// Whether the taskbar, where the mode icon shows, is dark (Settings >
+// Personalization > Colors > "Choose your default Windows mode").
+bool TaskbarIsDark() {
+    DWORD value = 1;
+    DWORD size = sizeof(value);
+    const auto result =
+        RegGetValueW(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
+                     L"SystemUsesLightTheme", RRF_RT_REG_DWORD, nullptr, &value, &size);
+    return result == ERROR_SUCCESS && value == 0;
 }
 
 }  // namespace
@@ -231,13 +184,14 @@ HRESULT ModeLangBarItem::OnMenuSelect(UINT id) {
 HRESULT ModeLangBarItem::GetIcon(HICON* icon) {
     if (!icon) return E_INVALIDARG;
     const auto mode = Mode();
-    if (mode == InputMode::Japanese) {
-        *icon = CreateJapaneseModeIcon(GetSystemMetrics(SM_CXSMICON));
-    } else {
-        const int resourceId = mode == InputMode::Direct ? IDI_DIRECT : IDI_AUTO;
-        *icon = static_cast<HICON>(LoadImageW(instance_, MAKEINTRESOURCEW(resourceId), IMAGE_ICON,
-                                              16, 16, LR_DEFAULTCOLOR));
-    }
+    // Auto's icon reads on either taskbar; the others have a dark version.
+    darkTaskbar_ = TaskbarIsDark();
+    const int resourceId = mode == InputMode::Japanese ? (darkTaskbar_ ? IDI_JAPANESE_DARK : IDI_JAPANESE)
+                           : mode == InputMode::Direct ? (darkTaskbar_ ? IDI_DIRECT_DARK : IDI_DIRECT)
+                                                       : IDI_AUTO;
+    const int size = GetSystemMetrics(SM_CXSMICON);
+    *icon = static_cast<HICON>(
+        LoadImageW(instance_, MAKEINTRESOURCEW(resourceId), IMAGE_ICON, size, size, LR_DEFAULTCOLOR));
     Trace(*icon ? L"ModeLangBarItem GetIcon succeeded" : L"ModeLangBarItem GetIcon failed");
     return *icon ? S_OK : E_FAIL;
 }
@@ -269,6 +223,10 @@ HRESULT ModeLangBarItem::UnadviseSink(DWORD cookie) {
     sink_->Release();
     sink_ = nullptr;
     return S_OK;
+}
+
+void ModeLangBarItem::RefreshTheme() {
+    if (TaskbarIsDark() != darkTaskbar_) NotifyUpdate();
 }
 
 void ModeLangBarItem::NotifyUpdate() {
