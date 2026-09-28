@@ -53,7 +53,8 @@ function initialState() {
     learning: { enabled: true, count: 128 },
     japaneseWords: [
       { reading: "てきとう", surface: "TEKITO", kind: "proper-noun" },
-      { reading: "かんた", surface: "カンタ", kind: "given-name" },
+      { reading: "かんた", surface: "カンタ", kind: "given-name", action: "suggest" },
+      { reading: "きしゃ", surface: "汽車", kind: "noun", action: "suppress" },
     ],
     dictionary: [
       { id: 1, raw: "tekito", candidate: "tekito", type: "Word", policy: "Protect original" },
@@ -106,7 +107,7 @@ export function installMockHost() {
           const code = c.charCodeAt(0);
           return code >= 0x30A1 && code <= 0x30F6 ? String.fromCharCode(code - 0x60) : c;
         }).join("");
-        state.japaneseWords = [...words, { reading, surface: message.surface, kind: message.kind }];
+        state.japaneseWords = [...words, { reading, surface: message.surface, kind: message.kind, action: message.action || "first" }];
       } else if (type === "japaneseWords.delete") {
         state.japaneseWords = state.japaneseWords.filter((w) => !(w.reading === message.reading && w.surface === message.surface));
       } else if (type === "settings.set") {

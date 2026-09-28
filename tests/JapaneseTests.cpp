@@ -651,6 +651,27 @@ void TestUserWords(const RomajiTable& table, const MiniPack& pack) {
     const auto predicted = converter.Predict(L"てき", 5, &user);
     Require(!predicted.empty() && predicted.front().text == L"TEKITO", "the user's words are predicted first");
 
+    // Offered, not first; and never offered.
+    const auto dictionaryFirst = plain.front().candidates.front().text;
+    JapaneseUserDictionary offered;
+    offered.Set({{L"なかの", L"中埜", UserWordKind::Surname, tekito::japanese::UserWordAction::Suggest}}, parts);
+    const auto withOffer = converter.Convert(L"なかの", {}, 0, {}, &offered);
+    Require(withOffer.front().candidates.size() > 1 && withOffer.front().candidates[0].text == dictionaryFirst &&
+                withOffer.front().candidates[1].text == L"中埜",
+            "a word only to offer comes second and the conversion stays");
+    const auto offeredPredictions = converter.Predict(L"なか", 5, &offered);
+    Require(std::any_of(offeredPredictions.begin(), offeredPredictions.end(),
+                        [](const tekito::japanese::Prediction& p) { return p.text == L"中埜"; }),
+            "a word only to offer is predicted too");
+
+    JapaneseUserDictionary hidden;
+    hidden.Set({{L"なかの", dictionaryFirst, UserWordKind::Noun, tekito::japanese::UserWordAction::Suppress}}, parts);
+    const auto withHidden = converter.Convert(L"なかの", {}, 0, {}, &hidden);
+    Require(!withHidden.empty() && !HasCandidate(withHidden.front(), dictionaryFirst, 40),
+            "a suppressed word is never offered for its reading");
+    const auto hiddenBest = converter.Best(L"なかの", 0, &hidden);
+    Require(!hiddenBest || hiddenBest->text != dictionaryFirst, "nor chosen as the likeliest");
+
     JapaneseComposer composer(&table);
     composer.SetConverter(&converter);
     composer.SetUserDictionary(&user);

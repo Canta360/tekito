@@ -78,6 +78,10 @@ Lattice BuildLattice(const JapaneseDictionary& dictionary, const ReadingCodes& c
                                       [&](std::size_t length, std::uint32_t record) {
             if (crosses(i, i + length)) return;
             dictionary.ForEachWord(record, [&](const DictionaryWord& word) {
+                if (user && user->HasSuppressed()) {
+                    const auto part = reading.substr(i, length);
+                    if (user->Suppresses(part, dictionary.Surface(word, part))) return;
+                }
                 Node node;
                 node.begin = static_cast<std::uint32_t>(i);
                 node.end = static_cast<std::uint32_t>(i + length);
@@ -414,6 +418,26 @@ std::vector<Phrase> JapaneseConverter::Convert(std::wstring_view reading,
                                      std::make_move_iterator(userFirst.end()));
         }
 
+        // The words only to offer come second (moved there if the
+        // dictionary has them further down), after the first choice.
+        if (const auto* words = user ? user->Suggested(phraseReading) : nullptr) {
+            std::size_t at = std::min<std::size_t>(1, phrase.candidates.size());
+            for (const auto& word : *words) {
+                const auto found = std::find_if(phrase.candidates.begin(), phrase.candidates.end(),
+                                                [&](const PhraseCandidate& c) { return c.text == word.surface; });
+                const auto index = static_cast<std::size_t>(found - phrase.candidates.begin());
+                if (found != phrase.candidates.end() && index < at) continue;  // already first
+                PhraseCandidate candidate{word.surface,
+                                          matrix_.Cost(leftContext, word.left) + word.cost +
+                                              matrix_.Cost(word.right, rightContext),
+                                          PhraseCandidate::Kind::Dictionary, false};
+                candidate.rightId = word.right;
+                if (found != phrase.candidates.end()) phrase.candidates.erase(found);
+                phrase.candidates.insert(phrase.candidates.begin() + static_cast<std::ptrdiff_t>(at++),
+                                         std::move(candidate));
+            }
+        }
+
         const std::wstring hiragana(phraseReading);
         const std::wstring katakana = ToKatakana(phraseReading);
         if (!has(hiragana)) {
@@ -421,6 +445,15 @@ std::vector<Phrase> JapaneseConverter::Convert(std::wstring_view reading,
         }
         if (!has(katakana)) {
             phrase.candidates.push_back({katakana, kTransliterationCost, PhraseCandidate::Kind::Katakana, false});
+        }
+        // What the user never wants for this reading goes; the kana stay if
+        // nothing else would.
+        if (user && user->HasSuppressed()) {
+            std::erase_if(phrase.candidates,
+                          [&](const PhraseCandidate& c) { return user->Suppresses(phraseReading, c.text); });
+            if (phrase.candidates.empty()) {
+                phrase.candidates.push_back({hiragana, kTransliterationCost, PhraseCandidate::Kind::Hiragana, false});
+            }
         }
         phrases.push_back(std::move(phrase));
     }
@@ -477,6 +510,8 @@ std::optional<PhraseCandidate> JapaneseConverter::Best(std::wstring_view reading
                                  : dictionary_.Surface(node.word, reading.substr(node.begin, node.end - node.begin));
         result.spellingCorrection = result.spellingCorrection || node.word.spellingCorrection;
     }
+    // A text the user never wants for this reading is not the likeliest.
+    if (user && user->Suppresses(reading, result.text)) return std::nullopt;
     return result;
 }
 
@@ -488,13 +523,14 @@ std::vector<Prediction> JapaneseConverter::Predict(std::wstring_view reading, st
     if (reading.empty() || limit == 0) return predictions;
     if (user) {
         for (const auto* entry : user->StartingWith(reading)) {
-            if (predictions.size() >= limit) return predictions;
+            if (predictions.size() >= limit) break;
             predictions.push_back({entry->reading, entry->surface, entry->cost});
         }
     }
     const ReadingCodes codes = dictionary_.Encode(reading);
-    const auto [first, end] = dictionary_.PrefixRange(codes);
-    if (first >= end || end - first > kMaxKeys) return predictions;
+    auto [first, end] = dictionary_.PrefixRange(codes);
+    // Too many to look through: the dictionary's words are left out.
+    if (end - first > kMaxKeys) end = first;
 
     struct Found {
         std::int64_t cost;
@@ -521,11 +557,25 @@ std::vector<Prediction> JapaneseConverter::Predict(std::wstring_view reading, st
         std::wstring key = dictionary_.KeyText(item.record);
         if (key.size() <= reading.size()) continue;
         std::wstring text = dictionary_.Surface(item.word, key);
+        if (user && user->Suppresses(key, text)) continue;
         const bool seen = std::any_of(predictions.begin(), predictions.end(),
                                       [&](const Prediction& p) { return p.text == text; });
         if (seen) continue;
         if (predictions.size() >= limit) break;
         predictions.push_back({std::move(key), std::move(text), item.cost});
+    }
+    // The words only to offer come second.
+    if (user) {
+        std::size_t at = std::min<std::size_t>(1, predictions.size());
+        for (const auto* entry : user->StartingWith(reading, true)) {
+            const auto existing = std::find_if(predictions.begin(), predictions.end(),
+                                               [&](const Prediction& p) { return p.text == entry->surface; });
+            if (existing != predictions.end() && static_cast<std::size_t>(existing - predictions.begin()) < at) continue;
+            if (existing != predictions.end()) predictions.erase(existing);
+            predictions.insert(predictions.begin() + static_cast<std::ptrdiff_t>(at++),
+                               {entry->reading, entry->surface, entry->cost});
+        }
+        if (predictions.size() > limit) predictions.resize(limit);
     }
     return predictions;
 }

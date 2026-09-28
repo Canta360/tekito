@@ -31,6 +31,9 @@ const en = {
   settingNotSaved: "The setting could not be saved.",
   modeNotSaved: "The input mode could not be saved.",
 
+  modeNames: { japanese: "Japanese", auto: "Auto", direct: "Direct" },
+  // Japanese keyboard keys, as English text names them.
+  keyNames: { hankaku: "Hankaku/Zenkaku", henkan: "Henkan", muhenkan: "Muhenkan", hiragana: "Hiragana" },
   modes: {
     japanese: "Turns romaji into kana and kanji.",
     auto: "Corrects spelling and suggests words as you type.",
@@ -193,11 +196,17 @@ const en = {
     addTitle: "Add a Japanese word",
     editTitle: "Edit the Japanese word",
     readingLabel: "Reading",
-    readingPlaceholder: "e.g. てきとう",
-    readingHelp: "In hiragana; katakana is turned into hiragana.",
+    readingPlaceholder: "The reading in kana",
+    readingHelp: "Type it in hiragana; katakana is turned into hiragana.",
     readingInvalid: "Use hiragana or katakana only.",
     surfaceLabel: "Word",
     surfacePlaceholder: "e.g. TEKITO",
+    actionLabel: "When converting",
+    actions: {
+      first: { label: "Put first", help: "Converting its reading gives this word first." },
+      suggest: { label: "Offer", help: "Shown in the list, second; the conversion is not changed." },
+      suppress: { label: "Never offer", help: "This way of writing never appears for this reading." },
+    },
     kindLabel: "Kind",
     kinds: {
       noun: "Noun",
@@ -207,7 +216,7 @@ const en = {
       "given-name": "Given name",
       place: "Place",
       organization: "Organization",
-      "suru-noun": "Noun that takes する",
+      "suru-noun": "Noun that takes 「する」",
       symbol: "Emoticon or symbol",
       interjection: "Interjection or greeting",
     },
@@ -277,6 +286,8 @@ const ja = {
   settingNotSaved: "設定を保存できませんでした。",
   modeNotSaved: "入力モードを保存できませんでした。",
 
+  modeNames: { japanese: "日本語", auto: "Auto", direct: "Direct" },
+  keyNames: { hankaku: "半角/全角", henkan: "変換", muhenkan: "無変換", hiragana: "ひらがな" },
   modes: {
     japanese: "ローマ字をかなと漢字にします。",
     auto: "打ちながらスペルを直し、単語を提案します。",
@@ -444,6 +455,12 @@ const ja = {
     readingInvalid: "ひらがなかカタカナだけで入れてください。",
     surfaceLabel: "単語",
     surfacePlaceholder: "例: TEKITO",
+    actionLabel: "変換したとき",
+    actions: {
+      first: { label: "最初に出す", help: "この読みを変換すると、この単語が最初に出ます。" },
+      suggest: { label: "候補に出す", help: "候補の一覧の 2 番目に出すだけで、変換結果は変えません。" },
+      suppress: { label: "候補に出さない", help: "この読みでは、この書き方を候補に一切出しません。" },
+    },
     kindLabel: "品詞",
     kinds: {
       noun: "名詞",
@@ -466,7 +483,7 @@ const ja = {
   actions: {
     replace: { label: "置き換える", help: "Space を押すと置き換えます。" },
     suggest: { label: "候補に出す", help: "候補として出すだけで、勝手には変えません。" },
-    keep: { label: "そのまま", help: "TEKITO はこの単語を直しません。" },
+    keep: { label: "直さない", help: "打ったとおりに残し、TEKITO はこの単語を直しません。ほかの候補は今までどおり出ます。" },
   },
 
   about: {

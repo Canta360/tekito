@@ -63,9 +63,9 @@ const candidateStyles = [{ value: 0, id: "glass" }, { value: 1, id: "simple" }];
 // The input modes and their icons (assets/icons), with the versions for a
 // dark background.
 const modeTiles = {
-  japanese: { title: "日本語", image: "./assets/japanese.ico", imageDark: "./assets/japanese-dark.ico" },
-  auto: { title: "Auto", image: "./assets/auto.ico" },
-  direct: { title: "Direct", image: "./assets/direct.ico", imageDark: "./assets/direct-dark.ico" },
+  japanese: { image: "./assets/japanese.ico", imageDark: "./assets/japanese-dark.ico" },
+  auto: { image: "./assets/auto.ico" },
+  direct: { image: "./assets/direct.ico", imageDark: "./assets/direct-dark.ico" },
 };
 
 // The six engine policies boil down to three behaviors a person can tell
@@ -295,11 +295,13 @@ function Wordmark({ large = false }) {
 
 // A mode's taskbar icon, small.
 function ModeIcon({ id }) {
+  const t = useText();
   const tile = modeTiles[id];
+  const name = t.modeNames[id];
   return (
-    <picture title={tile.title}>
+    <picture title={name}>
       {tile.imageDark && <source media="(prefers-color-scheme: dark)" srcSet={tile.imageDark} />}
-      <img className="mode-icon" src={tile.image} alt={tile.title} />
+      <img className="mode-icon" src={tile.image} alt={name} />
     </picture>
   );
 }
@@ -319,10 +321,12 @@ function ModeOrder({ ids, round }) {
   );
 }
 
-// The keyboard's own switch key (UserSettings::toggleKey 1).
-const ownSwitchKey = (japaneseKeyboard) => (japaneseKeyboard ? ["半角/全角"] : ["Alt", "`"]);
-const switchKeyCaps = (toggleKey, japaneseKeyboard) =>
-  toggleKey === 1 ? ownSwitchKey(japaneseKeyboard)
+// The keyboard's own switch key (UserSettings::toggleKey 1). Japanese key
+// names come from the language's text: printed in Japanese on the keys, in
+// letters in English.
+const ownSwitchKey = (japaneseKeyboard, t) => (japaneseKeyboard ? [t.keyNames.hankaku] : ["Alt", "`"]);
+const switchKeyCaps = (toggleKey, japaneseKeyboard, t) =>
+  toggleKey === 1 ? ownSwitchKey(japaneseKeyboard, t)
   : toggleKey === 2 ? ["Ctrl", "Space"]
   : toggleKey === 3 ? ["Ctrl", "Shift", "Space"]
   : null;
@@ -340,7 +344,7 @@ function GeneralPage({ mode, japanese, japaneseInstalled, settings, changeMode, 
       <div className={`tile-grid mode-grid ${japanese ? "three" : ""}`}>
         {modes.map((id) => (
           <Tile key={id} on={mode === id} image={modeTiles[id].image} imageDark={modeTiles[id].imageDark}
-            title={modeTiles[id].title} description={t.modes[id]} status={mode === id ? t.inUse : undefined}
+            title={t.modeNames[id]} description={t.modes[id]} status={mode === id ? t.inUse : undefined}
             onPress={() => changeMode(id)} />
         ))}
       </div>
@@ -369,14 +373,14 @@ function SwitchingPage({ japanese, japaneseKeyboard, settings, setSetting }) {
   // UserSettings::keyboardType, ::toggleKey and ::japaneseSwitchOrder. The
   // switch key choices follow the keyboard.
   const keyboards = [[0, t.keyboard.detect], [1, t.keyboard.japanese], [2, t.keyboard.us]];
-  const toggleKeys = [1, 2, 3].map((value) => [value, <Keycaps keys={switchKeyCaps(value, japaneseKeyboard)} />])
+  const toggleKeys = [1, 2, 3].map((value) => [value, <Keycaps keys={switchKeyCaps(value, japaneseKeyboard, t)} />])
     .concat([[0, t.switchKey.none]]);
   const orders = [
     [0, <ModeOrder ids={["japanese", "auto"]} />],
     [1, <ModeOrder ids={["japanese", "direct"]} />],
     [2, <ModeOrder ids={["japanese", "auto", "direct"]} round />],
   ];
-  const switchKey = switchKeyCaps(settings.toggleKey, japaneseKeyboard);
+  const switchKey = switchKeyCaps(settings.toggleKey, japaneseKeyboard, t);
   return (
     <>
       <Glass className="card">
@@ -401,9 +405,9 @@ function SwitchingPage({ japanese, japaneseKeyboard, settings, setSetting }) {
           {switchKey && <Key label={japanese ? t.modeKeys.switch : t.modeKeys.switchEnglish} keys={switchKey} />}
           {japanese && japaneseKeyboard && (
             <>
-              <Key label={t.modeKeys.henkan} keys={["変換"]} />
-              <Key label={t.modeKeys.muhenkan} keys={["無変換"]} />
-              <Key label={t.modeKeys.hiragana} keys={["ひらがな"]} />
+              <Key label={t.modeKeys.henkan} keys={[t.keyNames.henkan]} />
+              <Key label={t.modeKeys.muhenkan} keys={[t.keyNames.muhenkan]} />
+              <Key label={t.modeKeys.hiragana} keys={[t.keyNames.hiragana]} />
             </>
           )}
           <Key label={t.modeKeys.taskbar} keys={[t.modeKeys.taskbarButton]} />
@@ -688,7 +692,10 @@ function DictionaryPage({ japanese, japaneseWords, learning, settings, setSettin
                   <b>{word.reading}</b>
                   <Icon name="arrow" size={15} className="word-arrow" />
                   <span>{word.surface}</span>
-                  <span className="badge">{t.japaneseWords.kinds[word.kind] || word.kind}</span>
+                  {word.action !== "suppress" && <span className="badge">{t.japaneseWords.kinds[word.kind] || word.kind}</span>}
+                  {word.action && word.action !== "first" && (
+                    <span className={`badge ${word.action}`}>{t.japaneseWords.actions[word.action].label}</span>
+                  )}
                 </button>
                 <button type="button" className="icon-btn" aria-label={t.words.removeLabel(word.surface)} onClick={() => askDeleteJapanese(word)}>
                   <Icon name="trash" size={16} />
@@ -834,19 +841,23 @@ function DictionaryForm({ entry, onSave, onCancel }) {
 // the form lists them.
 const japaneseKinds = ["noun", "proper-noun", "person", "surname", "given-name", "place", "organization",
   "suru-noun", "symbol", "interjection"];
+// What converting does with the word (JapaneseUserDictionary.h), like the
+// English words' Replace / Suggest / Keep as typed.
+const japaneseActions = ["first", "suggest", "suppress"];
 // A reading: hiragana, or katakana (the host makes it hiragana).
 const readingPattern = /^[\u3041-\u3096\u30A1-\u30F6\u30FC\u309D\u309E]+$/;
 
 function JapaneseWordForm({ word, onSave, onCancel }) {
   const t = useText();
   const w = t.japaneseWords;
-  const [value, setValue] = useState({ reading: word.reading || "", surface: word.surface || "", kind: word.kind || "noun" });
+  const [value, setValue] = useState({ reading: word.reading || "", surface: word.surface || "", kind: word.kind || "noun",
+    action: word.action || "first" });
   const reading = value.reading.trim();
   const readingOk = readingPattern.test(reading);
   const valid = readingOk && value.surface.trim();
   const submit = (event) => {
     event.preventDefault();
-    if (valid) onSave({ reading, surface: value.surface.trim(), kind: value.kind });
+    if (valid) onSave({ reading, surface: value.surface.trim(), kind: value.kind, action: value.action });
   };
   return (
     <form className="form" onSubmit={submit}>
@@ -861,12 +872,20 @@ function JapaneseWordForm({ word, onSave, onCancel }) {
         <input value={value.surface} placeholder={w.surfacePlaceholder} lang="ja"
           onChange={(event) => setValue({ ...value, surface: event.target.value })} />
       </label>
-      <label className="field">
-        <span>{w.kindLabel}</span>
-        <select value={value.kind} onChange={(event) => setValue({ ...value, kind: event.target.value })}>
-          {japaneseKinds.map((kind) => <option key={kind} value={kind}>{w.kinds[kind]}</option>)}
-        </select>
-      </label>
+      <div className="field">
+        <span>{w.actionLabel}</span>
+        <Segmented label={w.actionLabel} value={value.action} options={japaneseActions.map((action) => [action, w.actions[action].label])}
+          onChange={(action) => setValue({ ...value, action })} />
+        <small className="field-help">{w.actions[value.action].help}</small>
+      </div>
+      {value.action !== "suppress" && (
+        <label className="field">
+          <span>{w.kindLabel}</span>
+          <select value={value.kind} onChange={(event) => setValue({ ...value, kind: event.target.value })}>
+            {japaneseKinds.map((kind) => <option key={kind} value={kind}>{w.kinds[kind]}</option>)}
+          </select>
+        </label>
+      )}
       <div className="dialog-actions">
         <Button onClick={onCancel}>{t.cancel}</Button>
         <Button type="submit" variant="primary" disabled={!valid}>{t.save}</Button>
