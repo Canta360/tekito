@@ -149,6 +149,9 @@ private:
     void ApplyModeKey(ITfContext* context, const ModeKey& key);
     // The mode the switch key (and a click on the mode button) goes to.
     InputMode ToggledMode() const noexcept;
+    // Whether Japanese is a mode here: the Japanese profile, with Japanese
+    // input turned on in Settings.
+    bool JapaneseModeAvailable() const noexcept { return japaneseProfile_ && userSettings_.japaneseEnabled; }
     bool TranslateJapaneseKey(WPARAM wParam, KeyInput& input);
     HRESULT HandleJapaneseKey(ITfContext* context, TfEditCookie editCookie, const KeyInput& input);
     HRESULT ShowJapanesePreedit(ITfContext* context, TfEditCookie editCookie);

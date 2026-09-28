@@ -684,6 +684,8 @@ void TextService::SyncRuntimeState() {
         if (settingsRepository_->LoadSettings(loadedSettings)) {
             userSettings_ = std::move(loadedSettings);
             ApplySettings();
+            // Japanese was turned off in Settings.
+            if (mode_ == InputMode::Japanese && !JapaneseModeAvailable()) ChangeInputMode(InputMode::Convert);
         }
         runtimeSettingsGeneration_ = settingsGeneration;
     }
@@ -775,8 +777,8 @@ bool TextService::ProcessPassesThrough() const noexcept {
 }
 
 void TextService::SetInputMode(InputMode mode) {
-    // Only the Japanese profile has a Japanese mode.
-    if (!japaneseProfile_ && mode == InputMode::Japanese) mode = InputMode::Convert;
+    // Only the Japanese profile has a Japanese mode, and only with Japanese on.
+    if (!JapaneseModeAvailable() && mode == InputMode::Japanese) mode = InputMode::Convert;
     englishSegment_ = false;
     const bool finishWord = (mode != InputMode::Convert && state_.IsActive()) ||
                             (mode != InputMode::Japanese && japanese_.IsComposing());
@@ -948,7 +950,7 @@ void TextService::RegisterLangBarItem() {
         [this]() { return mode_; },
         [this](InputMode mode) { ChangeInputMode(mode); },
         [this]() { return ToggledMode(); },
-        [this]() { return japaneseProfile_; },
+        [this]() { return JapaneseModeAvailable(); },
         [this]() { OpenSettings(); },
         [this]() { return userdata::UseJapaneseUi(userSettings_.uiLanguage); });
     if (!item) return;

@@ -15,6 +15,7 @@ const iconPaths = {
   completion: <><path d="M4 12h9" /><path d="m10 8 4 4-4 4" /><path d="M19 5v14" /></>,
   candidates: <><rect x="4" y="3.5" width="16" height="17" rx="5" /><rect x="7" y="9.5" width="10" height="5" rx="2.5" /><path d="M8 6.8h6M8 17.3h5" /></>,
   japanese: <text x="12" y="17.2" textAnchor="middle" fontSize="14" fontWeight="600" fill="currentColor" stroke="none">あ</text>,
+  english: <text x="12" y="17.4" textAnchor="middle" fontSize="15" fontWeight="600" fill="currentColor" stroke="none">A</text>,
   search: <><circle cx="11" cy="11" r="6" /><path d="m20 20-4.5-4.5" /></>,
   plus: <path d="M12 5v14M5 12h14" />,
   edit: <><path d="M4 20h4L19 9l-4-4L4 16z" /><path d="m13.5 6.5 4 4" /></>,
