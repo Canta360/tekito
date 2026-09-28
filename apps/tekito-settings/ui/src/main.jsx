@@ -3,7 +3,7 @@ import { createRoot } from "react-dom/client";
 import { CapitataLogo } from "./CapitataLogo.jsx";
 import { hostRequest, onHostStateChanged } from "./host.js";
 import { messages, resolveLanguage, TextContext, useText } from "./i18n.js";
-import { Backdrop, Button, Dialog, Glass, Icon, Row, Segmented, Tile, Toggle } from "./ui.jsx";
+import { Backdrop, Button, Dialog, Glass, Icon, Keycaps, Row, Segmented, Tile, Toggle } from "./ui.jsx";
 import "./styles.css";
 
 const pages = [
@@ -33,7 +33,7 @@ const initialSettings = {
   candidateWindowStyle: 0,
   candidateRows: 0,
   meaningsEnabled: true,
-  japaneseKeyCyclesModes: false,
+  japaneseSwitchOrder: 0,
   toggleKey: 1,
   keyboardType: 0,
   periodOnEnter: false,
@@ -203,7 +203,7 @@ function App() {
           <div className="brand">
             <img src="./assets/tekito.ico" alt="" />
             <span>
-              <img className="wordmark" src="./assets/tekito-wordmark-dark.svg" alt="TEKITO" />
+              <Wordmark />
               <small>{t.settings}</small>
             </span>
           </div>
@@ -231,7 +231,7 @@ function App() {
             </Glass>
           ) : (
             <div className="page" key={page}>
-              {page === "general" && <GeneralPage mode={mode} japanese={japanese} settings={settings} changeMode={changeMode} setSetting={setSetting} runAction={runAction} />}
+              {page === "general" && <GeneralPage mode={mode} japanese={japanese} japaneseKeyboard={Boolean(runtime.japaneseKeyboard)} settings={settings} changeMode={changeMode} setSetting={setSetting} runAction={runAction} />}
               {page === "candidates" && <CandidatesPage settings={settings} setSetting={setSetting} />}
               {page === "english" && <EnglishPage settings={settings} setSetting={setSetting} />}
               {page === "japanese" && <JapanesePage japanese={japanese} settings={settings} setSetting={setSetting} />}
@@ -258,16 +258,66 @@ function App() {
 }
 
 // General: which input mode is on, how to switch, and where TEKITO stays out.
-function GeneralPage({ mode, japanese, settings, changeMode, setSetting, runAction }) {
+// The TEKITO lettering, dark on light and light on dark.
+function Wordmark({ large = false }) {
+  return (
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcSet="./assets/tekito-wordmark-light.svg" />
+      <img className={`wordmark ${large ? "large" : ""}`} src="./assets/tekito-wordmark-dark.svg" alt="TEKITO" />
+    </picture>
+  );
+}
+
+// A mode's taskbar icon, small.
+function ModeIcon({ id }) {
+  const tile = modeTiles[id];
+  return (
+    <picture title={tile.title}>
+      {tile.imageDark && <source media="(prefers-color-scheme: dark)" srcSet={tile.imageDark} />}
+      <img className="mode-icon" src={tile.image} alt={tile.title} />
+    </picture>
+  );
+}
+
+// The modes the switch key goes through, as their icons.
+function ModeOrder({ ids, round }) {
+  return (
+    <span className="mode-order">
+      {ids.map((id, index) => (
+        <React.Fragment key={id}>
+          {index > 0 && <span className="mode-arrow" aria-hidden="true">{round ? "→" : "⇄"}</span>}
+          <ModeIcon id={id} />
+        </React.Fragment>
+      ))}
+      {round && <span className="mode-arrow" aria-hidden="true">↺</span>}
+    </span>
+  );
+}
+
+// The keyboard's own switch key (UserSettings::toggleKey 1).
+const ownSwitchKey = (japaneseKeyboard) => (japaneseKeyboard ? ["半角/全角"] : ["Alt", "`"]);
+const switchKeyCaps = (toggleKey, japaneseKeyboard) =>
+  toggleKey === 1 ? ownSwitchKey(japaneseKeyboard)
+  : toggleKey === 2 ? ["Ctrl", "Space"]
+  : toggleKey === 3 ? ["Ctrl", "Shift", "Space"]
+  : null;
+
+function GeneralPage({ mode, japanese, japaneseKeyboard, settings, changeMode, setSetting, runAction }) {
   const t = useText();
-  // UserSettings::toggleKey, ::uiLanguage, ::keyboardType and
-  // ::japaneseKeyCyclesModes.
-  const toggleKeys = [[1, "Alt+`"], [2, "Ctrl+Space"], [3, "Ctrl+Shift+Space"], [0, t.switchKey.none]];
+  // UserSettings::toggleKey, ::japaneseSwitchOrder, ::uiLanguage and
+  // ::keyboardType. The switch key choices follow the keyboard.
+  const toggleKeys = [1, 2, 3].map((value) => [value, <Keycaps keys={switchKeyCaps(value, japaneseKeyboard)} />])
+    .concat([[0, t.switchKey.none]]);
+  const orders = [
+    [0, <ModeOrder ids={["japanese", "auto"]} />],
+    [1, <ModeOrder ids={["japanese", "direct"]} />],
+    [2, <ModeOrder ids={["japanese", "auto", "direct"]} round />],
+  ];
   const languages = [[0, t.language.system], [1, "English"], [2, "日本語"]];
   const keyboards = [[0, t.keyboard.detect], [1, t.keyboard.japanese], [2, t.keyboard.us]];
-  const cycles = [[false, t.cycle.toggle], [true, t.cycle.round]];
   // Japanese is a mode only when it is installed.
   const modes = japanese ? ["japanese", "auto", "direct"] : ["auto", "direct"];
+  const switchKey = switchKeyCaps(settings.toggleKey, japaneseKeyboard);
   return (
     <>
       <div className={`tile-grid mode-grid ${japanese ? "three" : ""}`}>
@@ -278,23 +328,37 @@ function GeneralPage({ mode, japanese, settings, changeMode, setSetting, runActi
         ))}
       </div>
       <Glass className="card">
-        <Row title={t.restoreMode.title} description={japanese ? t.restoreMode.descriptionJapanese : t.restoreMode.description}>
-          <Toggle label={t.restoreMode.title} checked={settings.restoreLastInputMode} onChange={(value) => setSetting("restoreLastInputMode", value)} />
+        <Row title={t.keyboard.title} description={t.keyboard.description}>
+          <Segmented label={t.keyboard.title} value={settings.keyboardType} options={keyboards} onChange={(value) => setSetting("keyboardType", value)} />
         </Row>
-        {japanese && (
-          <Row title={t.cycle.title} description={t.cycle.description}>
-            <Segmented label={t.cycle.title} value={settings.japaneseKeyCyclesModes} options={cycles} onChange={(value) => setSetting("japaneseKeyCyclesModes", value)} />
-          </Row>
-        )}
         <Row title={t.switchKey.title} description={japanese ? t.switchKey.descriptionJapanese : t.switchKey.description}>
           <Segmented label={t.switchKey.title} value={settings.toggleKey} options={toggleKeys} onChange={(value) => setSetting("toggleKey", value)} />
         </Row>
-        <Row title={t.keyboard.title} description={t.keyboard.description}>
-          <Segmented label={t.keyboard.title} value={settings.keyboardType} options={keyboards} onChange={(value) => setSetting("keyboardType", value)} />
+        {japanese && (
+          <Row title={t.order.title} description={t.order.description}>
+            <Segmented label={t.order.title} value={settings.japaneseSwitchOrder} options={orders} onChange={(value) => setSetting("japaneseSwitchOrder", value)} />
+          </Row>
+        )}
+        <Row title={t.restoreMode.title} description={japanese ? t.restoreMode.descriptionJapanese : t.restoreMode.description}>
+          <Toggle label={t.restoreMode.title} checked={settings.restoreLastInputMode} onChange={(value) => setSetting("restoreLastInputMode", value)} />
         </Row>
         <Row title={t.language.title} description={t.language.description}>
           <Segmented label={t.language.title} value={settings.uiLanguage} options={languages} onChange={(value) => setSetting("uiLanguage", value)} />
         </Row>
+      </Glass>
+      <Glass className="card">
+        <h2 className="card-title">{t.keys.title}</h2>
+        <div className="keys">
+          {switchKey && <Key label={japanese ? t.modeKeys.switch : t.modeKeys.switchEnglish} keys={switchKey} />}
+          {japanese && japaneseKeyboard && (
+            <>
+              <Key label={t.modeKeys.henkan} keys={["変換"]} />
+              <Key label={t.modeKeys.muhenkan} keys={["無変換"]} />
+              <Key label={t.modeKeys.hiragana} keys={["ひらがな"]} />
+            </>
+          )}
+          <Key label={t.modeKeys.taskbar} keys={[t.modeKeys.taskbarButton]} />
+        </div>
       </Glass>
       <ExcludedApps settings={settings} runAction={runAction} />
     </>
@@ -466,7 +530,7 @@ function MiniList({ variant }) {
 }
 
 function Key({ label, keys }) {
-  return <div className="key"><span>{keys.map((key) => <kbd key={key}>{key}</kbd>)}</span><small>{label}</small></div>;
+  return <div className="key"><Keycaps keys={keys} /><small>{label}</small></div>;
 }
 
 // Dictionary and learning: your words, and what TEKITO learned from you.
@@ -594,7 +658,7 @@ function AboutPage({ version, runtime, packs, runAction }) {
       <Glass className="card about-hero">
         <img className="about-icon" src="./assets/tekito.ico" alt="" />
         <div>
-          <img className="wordmark large" src="./assets/tekito-wordmark-dark.svg" alt="TEKITO" />
+          <Wordmark large />
           <p>{t.about.tagline}</p>
         </div>
         <span className="version"><small>{t.about.version}</small><b>{version}</b></span>

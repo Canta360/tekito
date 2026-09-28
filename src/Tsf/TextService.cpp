@@ -6,6 +6,7 @@
 #include "Tsf/Diagnostics.h"
 #include "Tsf/Globals.h"
 #include "Tsf/TekitoGuids.h"
+#include "UserData/KeyboardLayout.h"
 #include "UserData/UiLanguage.h"
 
 #include <inputscope.h>
@@ -291,8 +292,7 @@ bool IsBuiltInPassThroughProcess(const std::wstring& name) {
 bool ToggleKeyFor(int key, TF_PRESERVEDKEY& preserved) {
     switch (key) {
     case 1:
-        // Alt+` is also Alt+Hankaku/Zenkaku on a Japanese keyboard, since
-        // the English layout maps that key to `.
+        // A US keyboard's stand-in for Hankaku/Zenkaku.
         preserved = {VK_OEM_3, TF_MOD_ALT};
         return true;
     case 2:
@@ -600,7 +600,7 @@ HRESULT TextService::ActivateEx(ITfThreadMgr* threadManager, TfClientId clientId
         return hr;
     }
 
-    UpdateToggleKey(userSettings_.toggleKey);
+    UpdateToggleKey(userdata::PreservedSwitchKey(userSettings_.toggleKey, userSettings_.keyboardType));
     AdviseThreadManagerSinks();
     SyncModeCompartments();
 
@@ -749,7 +749,9 @@ void TextService::ApplySettings() {
     if (!wasPassingThrough && ProcessPassesThrough() && state_.IsActive()) {
         FinishCompositionLater();
     }
-    if (threadManager_) UpdateToggleKey(userSettings_.toggleKey);
+    if (threadManager_) {
+        UpdateToggleKey(userdata::PreservedSwitchKey(userSettings_.toggleKey, userSettings_.keyboardType));
+    }
     japanese_.SetPunctuationStyle(
         static_cast<japanese::PunctuationStyle>(std::clamp(userSettings_.japanesePunctuation, 0, 3)));
     japanese_.SetLearning(userSettings_.learningEnabled ? &japaneseLearning_ : nullptr);

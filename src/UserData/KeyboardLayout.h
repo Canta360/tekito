@@ -12,6 +12,13 @@ inline bool UsesJapaneseKeyboard(int keyboardType) noexcept {
     return GetKeyboardType(0) == 7;  // 7 = Japanese keyboard
 }
 
+// The key TEKITO preserves for UserSettings::toggleKey. On a Japanese
+// keyboard the keyboard's own key is Hankaku/Zenkaku, which arrives as a
+// key of its own, so nothing is preserved for it.
+inline int PreservedSwitchKey(int toggleKey, int keyboardType) noexcept {
+    return toggleKey == 1 && UsesJapaneseKeyboard(keyboardType) ? 0 : toggleKey;
+}
+
 // The layout the English profile types with. On a Japanese keyboard it is
 // the Japanese layout, so every symbol comes out as printed on the key.
 inline HKL EnglishProfileLayout(int keyboardType) noexcept {

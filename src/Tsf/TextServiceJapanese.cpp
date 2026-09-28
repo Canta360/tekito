@@ -132,15 +132,17 @@ InputMode TextService::ToggledMode() const noexcept {
     if (!japaneseProfile_) {
         return mode_ == InputMode::Convert ? InputMode::Direct : InputMode::Convert;
     }
-    if (userSettings_.japaneseKeyCyclesModes) {
+    switch (userSettings_.japaneseSwitchOrder) {
+    case 2:
         // Japanese, Auto, Direct, and round again.
         return mode_ == InputMode::Japanese ? InputMode::Convert
                : mode_ == InputMode::Convert ? InputMode::Direct
                                              : InputMode::Japanese;
+    case 1:
+        return mode_ == InputMode::Japanese ? InputMode::Direct : InputMode::Japanese;
+    default:
+        return mode_ == InputMode::Japanese ? InputMode::Convert : InputMode::Japanese;
     }
-    if (mode_ != InputMode::Japanese) return InputMode::Japanese;
-    return userSettings_.japaneseProfileEnglishMode == InputMode::Direct ? InputMode::Direct
-                                                                         : InputMode::Convert;
 }
 
 void TextService::UpdateActiveProfile() {
@@ -263,7 +265,10 @@ bool TextService::TranslateModeKey(WPARAM wParam, ModeKey& key) const {
     case kVkHankakuZenkakuSbcs:
     case kVkHankakuZenkakuDbcs:
     case VK_KANJI:
+        // Hankaku/Zenkaku switches only when it is the switch key; otherwise
+        // it is taken and does nothing, so no other key is heard as one.
         key.mode = ToggledMode();
+        key.ignored = userSettings_.toggleKey != 1;
         return true;
     default:
         break;
@@ -311,6 +316,7 @@ bool TextService::TranslateModeKey(WPARAM wParam, ModeKey& key) const {
 }
 
 void TextService::ApplyModeKey(ITfContext* context, const ModeKey& key) {
+    if (key.ignored) return;
     // What is being typed is committed as it stands before the switch.
     if (context && (japanese_.IsComposing() || state_.IsActive())) {
         KeyInput commit{};

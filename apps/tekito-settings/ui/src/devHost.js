@@ -13,6 +13,7 @@ const japanesePackNames = [
 ];
 // "?japanese=0" shows Settings as without Japanese installed.
 const japaneseInstalled = new URLSearchParams(window.location.search).get("japanese") !== "0";
+const detectedJapaneseKeyboard = new URLSearchParams(window.location.search).get("keyboard") !== "us";
 
 function initialState() {
   return {
@@ -30,7 +31,7 @@ function initialState() {
       candidateWindowStyle: 0,
       candidateRows: 0,
       meaningsEnabled: true,
-      japaneseKeyCyclesModes: false,
+      japaneseSwitchOrder: 0,
       toggleKey: 1,
       keyboardType: 0,
       periodOnEnter: false,
@@ -43,7 +44,9 @@ function initialState() {
     },
     version: "0.2.0",
     mode: japaneseInstalled ? "japanese" : "auto",
-    runtime: { tsf: "Loaded", dataPacks: "12 / 13", japaneseData: japaneseInstalled ? "6 / 6" : "0 / 6", japanese: japaneseInstalled },
+    runtime: { tsf: "Loaded", dataPacks: "12 / 13", japaneseData: japaneseInstalled ? "6 / 6" : "0 / 6", japanese: japaneseInstalled,
+      // "?keyboard=us": Windows reports a US keyboard.
+      japaneseKeyboard: detectedJapaneseKeyboard },
     appearance: { accent: "#0078d4", systemLanguage: navigator.language.startsWith("ja") ? "ja" : "en" },
     learning: { enabled: true, count: 128 },
     dictionary: [
@@ -92,6 +95,9 @@ export function installMockHost() {
       if (type === "settings.set") {
         state.settings[message.key] = message.value;
         if (message.key === "learningEnabled") state.learning.enabled = message.value;
+        if (message.key === "keyboardType") {
+          state.runtime.japaneseKeyboard = message.value === 0 ? detectedJapaneseKeyboard : message.value === 1;
+        }
       } else if (type === "mode.set") {
         state.mode = message.value;
       } else if (type === "excludedApps.add") {
