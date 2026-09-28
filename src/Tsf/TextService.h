@@ -139,6 +139,9 @@ private:
         InputMode mode{InputMode::Direct};
         bool setsInputForm{false};
         japanese::KanaForm inputForm{japanese::KanaForm::Hiragana};
+        // Taken without doing anything (Hankaku/Zenkaku when it is not the
+        // switch key).
+        bool ignored{false};
     };
     // Keys that switch modes: Hankaku/Zenkaku, Henkan and Muhenkan outside
     // a composition, Hiragana/Katakana, IME On/Off.

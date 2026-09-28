@@ -37,8 +37,9 @@ struct UserSettings {
     // beside it (the japanese-wiktionary, japanese-wordnet and
     // dictionary-display packs).
     bool meaningsEnabled{true};
-    // Key that switches between Convert and Direct: 0 = none, 1 = Alt+`,
-    // 2 = Ctrl+Space, 3 = Ctrl+Shift+Space.
+    // Key that switches the mode: 0 = none, 1 = the keyboard's own
+    // (Hankaku/Zenkaku on a Japanese keyboard, Alt+` on a US one),
+    // 2 = Ctrl+Space, 3 = Ctrl+Shift+Space. Only this key switches.
     int toggleKey{1};
     // Enter adds a period to a line that ends without punctuation.
     bool periodOnEnter{false};
@@ -50,10 +51,9 @@ struct UserSettings {
     // Convert and Direct its switch key goes to from Japanese.
     InputMode lastJapaneseProfileMode{InputMode::Japanese};
     InputMode japaneseProfileEnglishMode{InputMode::Convert};
-    // What Hankaku/Zenkaku (and the switch key) does with Japanese on:
-    // false = Japanese and the English mode used last, true = round
-    // Japanese, Auto, Direct.
-    bool japaneseKeyCyclesModes{false};
+    // Where the switch key goes with Japanese on: 0 = Japanese and Auto,
+    // 1 = Japanese and Direct, 2 = round Japanese, Auto, Direct.
+    int japaneseSwitchOrder{0};
     // Space outside a composition in Japanese mode: 0 = full-width in
     // Japanese and half-width otherwise, 1 = always half-width, 2 = always
     // full-width. Shift+Space writes the other one.

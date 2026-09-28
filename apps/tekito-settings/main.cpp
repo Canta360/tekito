@@ -14,6 +14,7 @@
 #include "Core/ExternalLexiconProvider.h"
 #include "Dictionary/ExternalDictionaryProvider.h"
 #include "UserData/DataPackValidation.h"
+#include "UserData/KeyboardLayout.h"
 #include "UserData/RuntimeModeState.h"
 #include "UserData/UiLanguage.h"
 #include "UserData/UserDataRepository.h"
@@ -779,8 +780,7 @@ private:
         json += L",\"socialPersonalization\":" + std::to_wstring(settings_.socialPersonalization);
         json += L",\"candidateWindowStyle\":" + std::to_wstring(settings_.candidateWindowStyle);
         json += L",\"candidateRows\":" + std::to_wstring(settings_.candidateRows);
-        json += L",\"japaneseKeyCyclesModes\":";
-        json += settings_.japaneseKeyCyclesModes ? L"true" : L"false";
+        json += L",\"japaneseSwitchOrder\":" + std::to_wstring(settings_.japaneseSwitchOrder);
         json += L",\"meaningsEnabled\":";
         json += settings_.meaningsEnabled ? L"true" : L"false";
         json += L",\"toggleKey\":" + std::to_wstring(settings_.toggleKey);
@@ -799,7 +799,8 @@ private:
         json += L"},\"mode\":\"" + std::wstring(mode) + L"\",\"runtime\":{\"tsf\":\"" +
                 tsf + L"\",\"dataPacks\":\"" + dataPackSummary_ + L"\",\"japaneseData\":\"" +
                 japaneseDataSummary_ + L"\",\"japanese\":" + (japaneseAvailable_ ? L"true" : L"false") +
-                L"},\"learning\":{\"enabled\":";
+                L",\"japaneseKeyboard\":" +
+                (tekito::userdata::UsesJapaneseKeyboard(settings_.keyboardType) ? L"true" : L"false") + L"},\"learning\":{\"enabled\":";
         json += settings_.learningEnabled ? L"true" : L"false";
         json += L",\"count\":" + std::to_wstring(learning_.Entries().size() + learning_.PreferenceCount()) + L"},\"dictionary\":";
         json += DictionaryJson();
@@ -931,7 +932,9 @@ private:
             }
             else if (key == L"periodOnEnter") settings_.periodOnEnter = value;
             else if (key == L"meaningsEnabled") settings_.meaningsEnabled = value;
-            else if (key == L"japaneseKeyCyclesModes") settings_.japaneseKeyCyclesModes = value;
+            else if (key == L"japaneseSwitchOrder") {
+                settings_.japaneseSwitchOrder = std::clamp(integerValue, 0, 2);
+            }
             else if (key == L"japaneseSpaceWidth") {
                 settings_.japaneseSpaceWidth = std::clamp(integerValue, 0, 2);
             }

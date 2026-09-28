@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 // ---------------------------------------------------------------------------
 // Icons: 24px line icons drawn with currentColor.
@@ -130,8 +130,24 @@ export function Toggle({ checked, onChange, label, disabled = false }) {
 
 // Pill-shaped segmented control; the selected option sits in a recessed
 // pill that slides between segments.
+// Each choice is as wide as its label; the thumb is measured to sit under
+// the chosen one.
 export function Segmented({ value, options, onChange, label }) {
   const index = Math.max(0, options.findIndex(([optionValue]) => optionValue === value));
+  const ref = useRef(null);
+  const [thumb, setThumb] = useState(null);
+  useLayoutEffect(() => {
+    const group = ref.current;
+    if (!group) return undefined;
+    const measure = () => {
+      const chosen = group.querySelectorAll("button")[index];
+      if (chosen) setThumb({ left: chosen.offsetLeft, width: chosen.offsetWidth });
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(group);
+    return () => observer.disconnect();
+  }, [index, options.length]);
   const onKeyDown = (event) => {
     const delta = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
     if (!delta) return;
@@ -142,8 +158,8 @@ export function Segmented({ value, options, onChange, label }) {
     window.requestAnimationFrame(() => group.querySelector('[aria-checked="true"]')?.focus());
   };
   return (
-    <div className="segmented" role="radiogroup" aria-label={label} style={{ "--count": options.length, "--index": index }} onKeyDown={onKeyDown}>
-      <span className="segmented-thumb" />
+    <div ref={ref} className="segmented" role="radiogroup" aria-label={label} onKeyDown={onKeyDown}>
+      <span className={`segmented-thumb ${thumb ? "" : "is-unmeasured"}`} style={thumb ? { left: thumb.left, width: thumb.width } : undefined} />
       {options.map(([optionValue, optionLabel]) => (
         <button key={optionValue} type="button" role="radio" aria-checked={optionValue === value}
           tabIndex={optionValue === value ? 0 : -1} onClick={() => onChange(optionValue)}>
@@ -163,9 +179,15 @@ export function Button({ icon, children, variant = "", className = "", type = "b
   );
 }
 
-export function Row({ title, description, children }) {
+// Keys as keycaps, the same everywhere keys are shown.
+export function Keycaps({ keys }) {
+  return <span className="keycaps">{keys.map((key) => <kbd key={key}>{key}</kbd>)}</span>;
+}
+
+// `stacked` puts the control under the text, for wide controls.
+export function Row({ title, description, stacked = false, children }) {
   return (
-    <div className="row">
+    <div className={`row ${stacked ? "stacked" : ""}`}>
       <span className="row-text"><b>{title}</b>{description && <small>{description}</small>}</span>
       <span className="row-control">{children}</span>
     </div>
