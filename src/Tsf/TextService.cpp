@@ -1834,9 +1834,18 @@ HRESULT TextService::InsertAtSelection(ITfContext* context, TfEditCookie editCoo
     if (FAILED(hr)) return hr;
 
     ComPtr<ITfRange> insertedRange;
-    return insertAtSelection->InsertTextAtSelection(editCookie, 0, text.c_str(),
-                                                    static_cast<LONG>(text.size()),
-                                                    insertedRange.Put());
+    hr = insertAtSelection->InsertTextAtSelection(editCookie, 0, text.c_str(), static_cast<LONG>(text.size()),
+                                                  insertedRange.Put());
+    if (FAILED(hr) || !insertedRange) return hr;
+    // Some applications leave the caret before the inserted text; typing on
+    // must go after it (a space, then the next word).
+    if (FAILED(insertedRange->Collapse(editCookie, TF_ANCHOR_END))) return S_OK;
+    TF_SELECTION selection{};
+    selection.range = insertedRange.Get();
+    selection.style.ase = TF_AE_END;
+    selection.style.fInterimChar = FALSE;
+    (void)context->SetSelection(editCookie, 1, &selection);
+    return S_OK;
 }
 
 void TextService::RefreshCandidates(ITfContext* context, TfEditCookie editCookie) {
