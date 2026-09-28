@@ -181,12 +181,14 @@ nav { display: grid; gap: 4px; }
 .mode-grid.three .tile { aspect-ratio: 1.6; }
 .tile:hover { transform: translateY(-2px); }
 .tile:active { transform: translateY(0) scale(0.985); }
-/* The accent light lives behind the glass; the glass blurs it into a glow.
-   Its gradient fades out inside its own box, so it stays soft even for the
-   moment the glass does not blur (while a page fades in). */
+/* The accent light lives behind the glass. It is blurred itself rather than
+   left to the glass: WebView2's transparent window does not always blur
+   what is behind the glass. The clip keeps the blur inside the tile. */
+.tile-clip { position: absolute; inset: 0; border-radius: inherit; overflow: hidden; pointer-events: none; }
 .tile-light {
   position: absolute; inset: 18% 8% 0;
   border-radius: 45%;
+  filter: blur(18px);
   background: radial-gradient(ellipse 66% 90% at var(--lx, 50%) var(--ly, 72%), color-mix(in oklab, var(--accent) 85%, white) 0%, color-mix(in oklab, var(--accent) 45%, transparent) 42%, transparent 74%);
   opacity: 0; transform: scale(0.82);
   transition: opacity 0.45s var(--ease), transform 0.45s var(--ease);
