@@ -104,7 +104,8 @@ void SlipsAt(std::wstring_view typed, std::size_t at, std::vector<Slip>& slips) 
 
 }  // namespace
 
-std::optional<KeyConversion> KeyConverter::Convert(std::wstring_view keys, std::uint16_t context) const {
+std::optional<KeyConversion> KeyConverter::Convert(std::wstring_view keys, std::uint16_t context,
+                                                   std::span<const std::wstring> contextWords) const {
     const std::size_t n = keys.size();
     if (n < kShortestKeys || costs_.typo <= 0) return std::nullopt;
     const std::uint16_t unknown = dictionary_.UnknownId();
@@ -282,7 +283,7 @@ std::optional<KeyConversion> KeyConverter::Convert(std::wstring_view keys, std::
         offset += nodes[k].text.size();
         result.keyAt[offset] = nodes[k].end;
     }
-    result.phrases = converter_.Convert(result.reading, {}, context);
+    result.phrases = converter_.Convert(result.reading, {}, context, contextWords);
     return result;
 }
 

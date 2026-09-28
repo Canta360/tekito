@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -45,8 +46,9 @@ public:
     // The conversion when the likeliest reading has a corrected slip in it;
     // nothing when it is the keys as typed (the usual conversion handles
     // that) or when keys stay unreadable.
-    // `context`: as for JapaneseConverter::Convert.
-    [[nodiscard]] std::optional<KeyConversion> Convert(std::wstring_view keys, std::uint16_t context = 0) const;
+    // `context` and `contextWords`: as for JapaneseConverter::Convert.
+    [[nodiscard]] std::optional<KeyConversion> Convert(std::wstring_view keys, std::uint16_t context = 0,
+                                                       std::span<const std::wstring> contextWords = {}) const;
 
 private:
     const JapaneseDictionary& dictionary_;
