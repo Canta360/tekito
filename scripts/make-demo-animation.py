@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """Turns the frames written by tekito_typing_demo into an animated PNG.
 
-    python scripts/make-demo-animation.py <frames folder> docs/images/typing-demo.png
+    python scripts/make-demo-animation.py <frames folder> docs/images/typing-demo.png [--trim N]
+
+--trim N crops every frame to what differs from the white page in any frame,
+plus N pixels around it (the demo records on a page as large as the screen).
 
 Only the standard library is used. Each frame after the first stores just
 the rectangle that changed, which keeps the file small.
@@ -60,11 +63,33 @@ def changed_box(previous: list[bytes], current: list[bytes], width: int) -> tupl
     return left, top, right, bottom
 
 
+def drawn_box(frames: list, width: int, height: int) -> tuple[int, int, int, int]:
+    """What differs from the white page in any frame."""
+    left, top, right, bottom = width, height, 0, 0
+    for (_, _, rows), _ in frames:
+        for y, row in enumerate(rows):
+            start = len(row) - len(row.lstrip(b"\xff"))
+            if start == len(row):
+                continue
+            end = len(row.rstrip(b"\xff"))
+            left, right = min(left, start // 3), max(right, (end + 2) // 3)
+            top, bottom = min(top, y), max(bottom, y + 1)
+    return left, top, right, bottom
+
+
 def main() -> int:
     folder, output = Path(sys.argv[1]), Path(sys.argv[2])
+    trim = int(sys.argv[sys.argv.index("--trim") + 1]) if "--trim" in sys.argv else None
     timings = [line.split() for line in (folder / "frames.txt").read_text().splitlines() if line.strip()]
     frames = [(read_bmp(folder / name), int(milliseconds)) for name, milliseconds in timings]
     (width, height, _), _ = frames[0]
+    if trim is not None:
+        left, top, right, bottom = drawn_box(frames, width, height)
+        left, top = max(0, left - trim), max(0, top - trim)
+        right, bottom = min(width, right + trim), min(height, bottom + trim)
+        frames = [((right - left, bottom - top, [row[left * 3:right * 3] for row in rows[top:bottom]]), ms)
+                  for (_, _, rows), ms in frames]
+        width, height = right - left, bottom - top
 
     png = [b"\x89PNG\r\n\x1a\n",
            chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)),

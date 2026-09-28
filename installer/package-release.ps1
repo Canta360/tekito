@@ -32,8 +32,10 @@ if (-not $SourceDataRoot) { $SourceDataRoot = Join-Path $repoRoot "data" }
 $releaseRoot = Join-Path (Resolve-Path $BuildRoot).Path "Release"
 $SourceDataRoot = (Resolve-Path $SourceDataRoot).Path
 
-# Packs TEKITO cannot do without; the others are included when present.
-$requiredPacks = @("standard-english", "wikipedia-common-misspellings", "frequency",
+# Packs a release must carry; the others are included when present. phrase
+# is built locally (scripts\prepare-full-data-packs.ps1): TEKITO runs without
+# it, but English corrections lose their context ranking.
+$requiredPacks = @("standard-english", "wikipedia-common-misspellings", "frequency", "phrase",
                    "dictionary-display", "slang", "wiktionary-slang", "pronunciation", "emoji")
 # Japanese input, downloaded separately; the first two are required for it.
 $japanesePacks = @("japanese-core", "japanese-romaji", "japanese-lm", "japanese-loanwords",

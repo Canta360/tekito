@@ -19,7 +19,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/images/japanese-demo.png" alt="Typing “hahimemasite”, a slip for はじめまして: Space converts what was typed, the second Space opens the list, where はじめまして waits marked もしかして with its meaning beside it; then “kyouhaiitenkidesune.” becomes 今日はいい天気ですね。" width="640">
+  <img src="docs/images/japanese-demo.png" alt="Typing “hahimemasite”, a slip for はじめまして: Space converts what was typed, the second Space opens the list, where はじめまして waits marked もしかして with its meaning beside it; then “kyouhaiitenkidesune.” becomes 今日はいい天気ですね。" width="559">
 </p>
 
 TEKITO is an input method (a TSF text service), so it works in ordinary
@@ -114,7 +114,7 @@ In Auto, type as usual. The word you are typing is underlined and a short
 list of choices appears under it.
 
 <p align="center">
-  <img src="docs/images/typing-demo.png" alt="Typing “thnaks for teh reveiw.” in a plain page: the candidate list appears under each word, Space fixes the typos, and the line ends up as “thanks for the review.”" width="640">
+  <img src="docs/images/typing-demo.png" alt="Typing “thnaks for teh reveiw.” in a plain page: the candidate list appears under each word, Space fixes the typos, and the line ends up as “thanks for the review.”" width="717">
 </p>
 
 | Key | What it does |
@@ -131,7 +131,7 @@ TEKITO leaves alone words it recognizes, chat abbreviations like “brb”,
 anything you capitalize yourself, anything that looks like code, URLs and
 addresses, and fields marked as passwords, numbers or email.
 
-![The TEKITO candidate list: glass in light and dark, and the simple style](docs/images/candidate-list.png)
+![The TEKITO candidate list, glass and simple, in light and dark, with the meaning of the highlighted word beside it](docs/images/candidate-list.png)
 
 ## Settings
 
