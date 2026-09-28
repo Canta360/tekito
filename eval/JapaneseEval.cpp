@@ -6,9 +6,13 @@
 // tekito_ja_eval --pack <data/japanese-core> --corpus <japanese_eval.tsv> [--show-misses N]
 // tekito_ja_eval --pack <data/japanese-core> --keys-corpus <japanese_eval_keys.tsv>
 //                --romaji <data/japanese-romaji> [--typo N] [--dump-phrases <path>]
+//                [--by-phrase [--no-context]]
 //
 // The second form types the romaji keys into the composer, as TEKITO does,
-// and converts with Space.
+// and converts with Space. With --by-phrase each sentence is typed phrase
+// by phrase instead (the phrases its whole conversion makes), converting
+// and committing each, so what was committed leads into the next; with
+// --no-context each phrase starts afresh.
 //
 // Per source: sentences whose first conversion is acceptable, the character
 // error rate against the closest acceptable text, how often an acceptable
@@ -153,7 +157,7 @@ double Percentile(std::vector<double> values, double q) {
 int RunKeys(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary, const JapaneseConverter& converter,
             const std::filesystem::path& corpus, const std::filesystem::path& romaji,
             tekito::japanese::KeyConverter::Costs costs, std::size_t showMisses,
-            const std::filesystem::path& dumpPhrases) {
+            const std::filesystem::path& dumpPhrases, bool byPhrase, bool useContext) {
     const auto table = tekito::japanese::RomajiTable::Load(romaji);
     if (!table) {
         std::cerr << "could not open the romaji table\n";
@@ -183,7 +187,22 @@ int RunKeys(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary
         const auto start = Clock::now();
         composer.Convert();
         const double elapsed = std::chrono::duration<double, std::micro>(Clock::now() - start).count();
-        const std::wstring output = composer.Preedit();
+        std::wstring output = composer.Preedit();
+        if (byPhrase) {
+            const auto pieces = composer.PhraseKeys();
+            if (std::none_of(pieces.begin(), pieces.end(), [](const std::wstring& p) { return p.empty(); })) {
+                composer.Clear();
+                composer.ForgetContext();
+                output.clear();
+                for (const auto& piece : pieces) {
+                    if (!useContext) composer.ForgetContext();
+                    for (const wchar_t key : piece) composer.Insert(key);
+                    composer.Convert();
+                    output += composer.Commit();
+                }
+                composer.ForgetContext();
+            }
+        }
         std::size_t distance = SIZE_MAX, length = 0;
         for (const auto& expected : row.expected) {
             const std::size_t d = EditDistance(output, expected);
@@ -192,7 +211,7 @@ int RunKeys(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary
                 length = expected.size();
             }
         }
-        if (phrases.is_open() && distance == 0) {
+        if (phrases.is_open() && distance == 0 && !byPhrase) {
             const auto segments = composer.Segments();
             const auto keys = composer.PhraseKeys();
             for (std::size_t p = 0; p < segments.size() && p < keys.size(); ++p) {
@@ -209,7 +228,7 @@ int RunKeys(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary
         const double listElapsed = std::chrono::duration<double, std::micro>(Clock::now() - listStart).count();
         composer.PreviousCandidate();
         bool inList = distance == 0;
-        const std::size_t phraseCount = composer.Segments().size();
+        const std::size_t phraseCount = byPhrase ? 0 : composer.Segments().size();
         for (std::size_t f = 0; !inList && f < phraseCount; ++f) {
             composer.MoveFocus(-static_cast<int>(phraseCount));
             composer.MoveFocus(static_cast<int>(f));
@@ -261,6 +280,8 @@ int RunKeys(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary
 
 int main(int argc, char** argv) {
     std::filesystem::path pack, corpus, keysCorpus, romaji, dumpPhrases;
+    bool byPhrase = false;
+    bool useContext = true;
     std::size_t showMisses = 0;
     tekito::japanese::KeyConverter::Costs costs;
     for (int i = 1; i < argc; ++i) {
@@ -271,6 +292,8 @@ int main(int argc, char** argv) {
         else if (arg == "--romaji" && i + 1 < argc) romaji = argv[++i];
         else if (arg == "--typo" && i + 1 < argc) costs.typo = std::stoll(argv[++i]);
         else if (arg == "--dump-phrases" && i + 1 < argc) dumpPhrases = argv[++i];
+        else if (arg == "--by-phrase") byPhrase = true;
+        else if (arg == "--no-context") useContext = false;
         else if (arg == "--show-misses" && i + 1 < argc) showMisses = std::stoul(argv[++i]);
     }
     if (!pack.empty() && !keysCorpus.empty()) {
@@ -284,7 +307,8 @@ int main(int argc, char** argv) {
             return 1;
         }
         const JapaneseConverter converter(dictionary, matrix);
-        return RunKeys(matrix, dictionary, converter, keysCorpus, romaji, costs, showMisses, dumpPhrases);
+        return RunKeys(matrix, dictionary, converter, keysCorpus, romaji, costs, showMisses, dumpPhrases, byPhrase,
+                       useContext);
     }
     if (pack.empty() || corpus.empty()) {
         std::cerr << "usage: tekito_ja_eval --pack <dir> --corpus <japanese_eval.tsv> [--show-misses N]\n";

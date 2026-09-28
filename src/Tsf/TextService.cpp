@@ -1927,4 +1927,10 @@ RECT TextService::GetCandidateAnchor(ITfContext* context, TfEditCookie editCooki
     return rect;
 }
 
+void TextService::CheckJapaneseContext(ITfContext* context, TfEditCookie editCookie) {
+    if (lastJapaneseCommit_.empty() || !ReadSelectionContext(context, editCookie).ends_with(lastJapaneseCommit_)) {
+        japanese_.ForgetContext();
+    }
+}
+
 }  // namespace tekito::tsf

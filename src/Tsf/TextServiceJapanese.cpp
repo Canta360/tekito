@@ -542,6 +542,7 @@ HRESULT TextService::HandleJapaneseKey(ITfContext* context, TfEditCookie editCoo
             const HRESULT hr = CommitJapanese(context, editCookie);
             if (FAILED(hr)) return hr;
         }
+        if (!japanese_.IsComposing()) CheckJapaneseContext(context, editCookie);
         const HRESULT hr = EnsureComposition(context, editCookie);
         if (FAILED(hr)) return hr;
         japanese_.Insert(input.character);
@@ -777,6 +778,7 @@ HRESULT TextService::CommitJapanese(ITfContext* context, TfEditCookie editCookie
     candidateWindow_.Hide();
     if (!japanese_.IsComposing()) return EndComposition(editCookie);
     const std::wstring text = japanese_.Commit();
+    lastJapaneseCommit_ = text;
     if (!composition_) {
         return text.empty() ? S_OK : InsertAtSelection(context, editCookie, text);
     }

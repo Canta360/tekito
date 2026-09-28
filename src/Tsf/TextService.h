@@ -153,6 +153,9 @@ private:
     // what it is.
     HRESULT ReplaceJapaneseComposition(ITfContext* context, TfEditCookie editCookie);
     void ShowJapaneseCandidates(ITfContext* context, TfEditCookie editCookie);
+    // Before new Japanese typing: the composer goes on from what it
+    // committed last only when the caret is still right after that text.
+    void CheckJapaneseContext(ITfContext* context, TfEditCookie editCookie);
     // What the candidate means, for the pane beside the list; empty when
     // meanings are off or unknown.
     CandidateDetail MeaningFor(std::wstring_view text, std::wstring_view reading = {}) const;
@@ -223,6 +226,8 @@ private:
     // runs in Convert meanwhile.
     bool englishSegment_{false};
     japanese::JapaneseComposer japanese_;
+    // The text the composer committed last (see CheckJapaneseContext).
+    std::wstring lastJapaneseCommit_;
     japanese::JapaneseLearningStore japaneseLearning_;
     // Candidates per page of the Japanese list (UserSettings::candidateRows).
     std::size_t japanesePage_{9};

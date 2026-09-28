@@ -116,3 +116,9 @@ python scripts\prepare-japanese-eval.py --phrases   # writes japanese_eval_phras
 The phrases alone convert as in their sentence 97.3% of the time; with one
 slip, what was meant is the first choice for 55.9% and one pick away for
 91.2%.
+
+`--by-phrase` types each sentence of a keys file phrase by phrase instead,
+converting and committing each phrase, so the committed text leads into the
+next conversion; `--no-context` starts every phrase afresh. On
+`japanese_eval_keys.tsv`, 58.9% of the sentences come out right without the
+context and 61.3% with it (61.5% when converted whole).
