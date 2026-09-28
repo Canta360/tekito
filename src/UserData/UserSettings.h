@@ -50,6 +50,10 @@ struct UserSettings {
     // Convert and Direct its switch key goes to from Japanese.
     InputMode lastJapaneseProfileMode{InputMode::Japanese};
     InputMode japaneseProfileEnglishMode{InputMode::Convert};
+    // What Hankaku/Zenkaku (and the switch key) does with Japanese on:
+    // false = Japanese and the English mode used last, true = round
+    // Japanese, Auto, Direct.
+    bool japaneseKeyCyclesModes{false};
     // Space outside a composition in Japanese mode: 0 = full-width in
     // Japanese and half-width otherwise, 1 = always half-width, 2 = always
     // full-width. Shift+Space writes the other one.

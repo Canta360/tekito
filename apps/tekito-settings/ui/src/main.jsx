@@ -30,6 +30,7 @@ const initialSettings = {
   candidateWindowStyle: 0,
   candidateRows: 0,
   meaningsEnabled: true,
+  japaneseKeyCyclesModes: false,
   toggleKey: 1,
   keyboardType: 0,
   periodOnEnter: false,
@@ -321,6 +322,8 @@ function JapanesePage({ settings, setSetting, setConfirm, runAction }) {
   // UserSettings::japaneseSpaceWidth and ::japanesePunctuation.
   const spaces = [[0, j.space.follow], [1, j.space.half], [2, j.space.full]];
   const marks = [[0, "、。"], [1, "，．"], [2, "，。"], [3, "、．"]];
+  // UserSettings::japaneseKeyCyclesModes.
+  const cycles = [[false, j.cycle.toggle], [true, j.cycle.round]];
   const askForget = () => setConfirm({
     title: j.forget.confirmTitle,
     message: j.forget.confirmMessage,
@@ -330,6 +333,9 @@ function JapanesePage({ settings, setSetting, setConfirm, runAction }) {
   return (
     <>
       <Glass className="card">
+        <Row title={j.cycle.title} description={j.cycle.description}>
+          <Segmented label={j.cycle.title} value={settings.japaneseKeyCyclesModes} options={cycles} onChange={(value) => setSetting("japaneseKeyCyclesModes", value)} />
+        </Row>
         <Row title={j.space.title} description={j.space.description}>
           <Segmented label={j.space.title} value={settings.japaneseSpaceWidth} options={spaces} onChange={(value) => setSetting("japaneseSpaceWidth", value)} />
         </Row>

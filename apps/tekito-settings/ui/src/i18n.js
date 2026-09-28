@@ -88,6 +88,12 @@ const en = {
     description: "Show what the highlighted choice means beside the list, for English and Japanese words.",
   },
   japanese: {
+    cycle: {
+      title: "Hankaku/Zenkaku key",
+      description: "What the key switches to from each mode.",
+      toggle: "Japanese ⇄ English",
+      round: "Japanese → Auto → Direct",
+    },
     space: {
       title: "Space",
       description: "The space Space types when nothing is being converted. Shift+Space types the other one.",
@@ -264,6 +270,12 @@ const ja = {
     description: "選んでいる候補の意味を一覧の横に出します。英語と日本語の語に対応します。",
   },
   japanese: {
+    cycle: {
+      title: "半角/全角キー",
+      description: "キーを押したときに、どのモードへ切り替えるかを選びます。",
+      toggle: "日本語 ⇄ 英語",
+      round: "日本語 → オート → ダイレクト",
+    },
     space: {
       title: "スペース",
       description: "変換していないときに Space で入るスペースです。Shift+Space ではもう一方が入ります。",

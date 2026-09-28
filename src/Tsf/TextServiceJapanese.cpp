@@ -132,6 +132,12 @@ InputMode TextService::ToggledMode() const noexcept {
     if (!japaneseProfile_) {
         return mode_ == InputMode::Convert ? InputMode::Direct : InputMode::Convert;
     }
+    if (userSettings_.japaneseKeyCyclesModes) {
+        // Japanese, Auto, Direct, and round again.
+        return mode_ == InputMode::Japanese ? InputMode::Convert
+               : mode_ == InputMode::Convert ? InputMode::Direct
+                                             : InputMode::Japanese;
+    }
     if (mode_ != InputMode::Japanese) return InputMode::Japanese;
     return userSettings_.japaneseProfileEnglishMode == InputMode::Direct ? InputMode::Direct
                                                                          : InputMode::Convert;

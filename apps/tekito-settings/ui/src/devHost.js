@@ -24,6 +24,7 @@ function initialState() {
       candidateWindowStyle: 0,
       candidateRows: 0,
       meaningsEnabled: true,
+      japaneseKeyCyclesModes: false,
       toggleKey: 1,
       keyboardType: 0,
       periodOnEnter: false,
