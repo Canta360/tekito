@@ -19,8 +19,11 @@ MappedFile::~MappedFile() {
 
 bool MappedFile::Open(const std::filesystem::path& path) noexcept {
     Close();
-    HANDLE file = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING,
-                              FILE_ATTRIBUTE_NORMAL, nullptr);
+    // Every app with TEKITO loaded keeps the file mapped. Sharing delete
+    // lets an update rename it aside and put the new one in its place; the
+    // apps go on reading the old copy until they restart.
+    HANDLE file = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_DELETE, nullptr,
+                              OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
     if (file == INVALID_HANDLE_VALUE) return false;
     LARGE_INTEGER size{};
     if (!GetFileSizeEx(file, &size) || size.QuadPart <= 0 ||

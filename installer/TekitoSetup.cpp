@@ -479,11 +479,11 @@ std::wstring FailureMessage(int code) {
         if (UseJapanese()) {
             return L"インストールがエラー " + std::to_wstring(code) +
                    L" で止まりました。新しいインストールだった場合、何も残っていません。もう一度お試しください。"
-                   L"繰り返し起きる場合は、問い合わせのときにこのエラー番号をお伝えください。";
+                   L"繰り返し起きる場合は、%TEMP%\\TEKITO-install.log に詳しい記録があります。";
         }
         return L"The install step stopped with error " + std::to_wstring(code) +
-               L". If this was a new install, nothing was left behind. Try again, and if it keeps happening, "
-               L"copy this error number when you ask for help.";
+               L". If this was a new install, nothing was left behind. Try again; if it keeps happening, "
+               L"%TEMP%\\TEKITO-install.log says why.";
     }
 }
 
