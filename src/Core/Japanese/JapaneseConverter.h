@@ -12,6 +12,7 @@ namespace tekito::japanese {
 
 class ConnectionMatrix;
 class JapaneseDictionary;
+class LanguageModel;
 
 struct PhraseCandidate {
     enum class Kind : std::uint8_t { Dictionary, Hiragana, Katakana, English };
@@ -20,9 +21,9 @@ struct PhraseCandidate {
     // Lower is more likely, in the matrix's cost units.
     std::int64_t cost{0};
     Kind kind{Kind::Dictionary};
-    // Uses a word Mozc lists as a spelling correction ("もしかして").
+    // Uses a word Mozc lists as a spelling correction ("moshikashite").
     bool spellingCorrection{false};
-    // Read from the keys with a slip undone (offered in the list, "もしかして").
+    // Read from the keys with a slip undone (offered in the list, "moshikashite").
     bool slip{false};
     // Set when the candidate is the whole input read again (a slip across
     // phrases): choosing it makes this the reading, as one phrase.
@@ -65,7 +66,8 @@ public:
                                               std::uint16_t context = 0) const;
 
     // Only the likeliest text for the whole reading and its cost, much
-    // quicker than Convert; nothing when a character is in no word.
+    // quicker than Convert (and without the language model); nothing when
+    // a character is in no word.
     [[nodiscard]] std::optional<PhraseCandidate> Best(std::wstring_view reading, std::uint16_t context = 0) const;
 
     // Words whose reading starts with `reading` and is longer, likeliest
@@ -75,9 +77,35 @@ public:
 
     static constexpr std::size_t kMaxCandidates = 40;
 
+    // How much the language model (the japanese-lm pack) counts, in the
+    // connection matrix's units; tuned with tekito_ja_eval.
+    struct ModelWeights {
+        // Neighbors that go together make a reading likelier, and common
+        // words that never meet less likely: each pair's pointwise mutual
+        // information, in nats, times costPerNat when positive,
+        // penaltyPerNat when negative. Pairs only somewhat likelier than
+        // chance (under `threshold` nats) are left to the parts of speech,
+        // which already expect them.
+        std::int64_t costPerNat{200};
+        std::int64_t penaltyPerNat{200};
+        double threshold{1.0};
+        // A phrase's candidates are put in order again by how well their
+        // word keeps to the sentence's other words (costPerTopic per unit
+        // of LanguageModel::Topic), so "injection" comes before "parking"
+        // (both chuusha) after "anesthetic".
+        std::int64_t costPerTopic{300};
+    };
+    // nullptr turns the model off.
+    void SetLanguageModel(const LanguageModel* model, ModelWeights weights = {}) noexcept {
+        model_ = model;
+        weights_ = weights;
+    }
+
 private:
     const JapaneseDictionary& dictionary_;
     const ConnectionMatrix& matrix_;
+    const LanguageModel* model_{nullptr};
+    ModelWeights weights_;
 };
 
 }  // namespace tekito::japanese

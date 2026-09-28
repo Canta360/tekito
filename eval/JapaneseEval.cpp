@@ -7,6 +7,7 @@
 // tekito_ja_eval --pack <data/japanese-core> --keys-corpus <japanese_eval_keys.tsv>
 //                --romaji <data/japanese-romaji> [--typo N] [--dump-phrases <path>]
 //                [--by-phrase [--no-context]]
+//                [--lm <data/japanese-lm> [--lm-scale N] [--lm-penalty N] [--lm-threshold X] [--topic-scale N]]
 //
 // The second form types the romaji keys into the composer, as TEKITO does,
 // and converts with Space. With --by-phrase each sentence is typed phrase
@@ -22,6 +23,7 @@
 #include "Core/Japanese/JapaneseConverter.h"
 #include "Core/Japanese/JapaneseDictionary.h"
 #include "Core/Japanese/KeyConverter.h"
+#include "Core/Japanese/LanguageModel.h"
 #include "Core/Japanese/RomajiTable.h"
 
 #include <algorithm>
@@ -282,6 +284,8 @@ int main(int argc, char** argv) {
     std::filesystem::path pack, corpus, keysCorpus, romaji, dumpPhrases;
     bool byPhrase = false;
     bool useContext = true;
+    std::filesystem::path modelPack;
+    JapaneseConverter::ModelWeights weights;
     std::size_t showMisses = 0;
     tekito::japanese::KeyConverter::Costs costs;
     for (int i = 1; i < argc; ++i) {
@@ -293,8 +297,18 @@ int main(int argc, char** argv) {
         else if (arg == "--typo" && i + 1 < argc) costs.typo = std::stoll(argv[++i]);
         else if (arg == "--dump-phrases" && i + 1 < argc) dumpPhrases = argv[++i];
         else if (arg == "--by-phrase") byPhrase = true;
+        else if (arg == "--lm" && i + 1 < argc) modelPack = argv[++i];
+        else if (arg == "--lm-scale" && i + 1 < argc) weights.costPerNat = std::stoll(argv[++i]);
+        else if (arg == "--lm-penalty" && i + 1 < argc) weights.penaltyPerNat = std::stoll(argv[++i]);
+        else if (arg == "--lm-threshold" && i + 1 < argc) weights.threshold = std::stod(argv[++i]);
+        else if (arg == "--topic-scale" && i + 1 < argc) weights.costPerTopic = std::stoll(argv[++i]);
         else if (arg == "--no-context") useContext = false;
         else if (arg == "--show-misses" && i + 1 < argc) showMisses = std::stoul(argv[++i]);
+    }
+    tekito::japanese::LanguageModel model;
+    if (!modelPack.empty() && !model.Open(modelPack)) {
+        std::cerr << "could not open the language model at " << modelPack.string() << "\n";
+        return 1;
     }
     if (!pack.empty() && !keysCorpus.empty()) {
 #if defined(_WIN32)
@@ -306,7 +320,8 @@ int main(int argc, char** argv) {
             std::cerr << "could not open the japanese-core pack at " << pack.string() << "\n";
             return 1;
         }
-        const JapaneseConverter converter(dictionary, matrix);
+        JapaneseConverter converter(dictionary, matrix);
+        if (model.IsOpen()) converter.SetLanguageModel(&model, weights);
         return RunKeys(matrix, dictionary, converter, keysCorpus, romaji, costs, showMisses, dumpPhrases, byPhrase,
                        useContext);
     }
@@ -323,7 +338,8 @@ int main(int argc, char** argv) {
         std::cerr << "could not open the japanese-core pack at " << pack.string() << "\n";
         return 1;
     }
-    const JapaneseConverter converter(dictionary, matrix);
+    JapaneseConverter converter(dictionary, matrix);
+        if (model.IsOpen()) converter.SetLanguageModel(&model, weights);
     const auto rows = LoadCorpus(corpus);
     if (rows.empty()) {
         std::cerr << "no rows in " << corpus.string() << "\n";

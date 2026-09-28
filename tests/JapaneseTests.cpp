@@ -4,12 +4,14 @@
 #include "Core/Japanese/JapaneseDictionary.h"
 #include "Core/Japanese/JapaneseLearning.h"
 #include "Core/Japanese/KeyConverter.h"
+#include "Core/Japanese/LanguageModel.h"
 #include "Core/Japanese/Loanwords.h"
 #include "Core/Japanese/KanaText.h"
 #include "Core/Japanese/Meanings.h"
 #include "Core/Japanese/RomajiTable.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -623,13 +625,45 @@ void TestContext(const RomajiTable& table, const MiniPack& pack) {
     Require(candidates && !alone.empty() && !followed.empty() &&
                 candidates->front().cost == followed.front().candidates.front().cost,
             "the next phrase is converted as following it");
-    composer.Commit();
+    (void)composer.Commit();
     composer.ForgetContext();
     Require(composer.Context() == 0, "forgetting starts afresh");
     Type(composer, L"kikai.");
     composer.Convert();
-    composer.Commit();
+    (void)composer.Commit();
     Require(composer.Context() == 0, "a sentence that ended starts the next afresh");
+}
+
+void TestLanguageModel(const MiniPack& pack) {
+    using tekito::japanese::LanguageModel;
+    LanguageModel model;
+    Require(model.Open(std::filesystem::path(TEKITO_TEST_DATA_DIR) / L"japanese-lm-mini"), "the model opens");
+    // The builder's hashes and these meet (scripts/build-japanese-lm.py --mini).
+    const auto count = model.LogCount(L"麻酔");
+    Require(count && std::abs(*count - std::log(1000.0)) < 0.06, "word counts are read back");
+    Require(!model.LogCount(L"xyz"), "a word the model lacks has none");
+    const auto pmi = model.PairPmi(LanguageModel::PairStart(L"よろしく"), L"お願い");
+    Require(pmi && std::abs(*pmi - 5.0) < 0.06, "pairs are read back");
+    Require(!model.PairPmi(LanguageModel::PairStart(L"お願い"), L"よろしく"), "pairs have an order");
+    const auto tie = model.Topic(L"麻酔", L"注射");
+    Require(tie && std::abs(*tie - std::log(41.0)) < 0.06 && model.Topic(L"注射", L"麻酔") == tie,
+            "sentence ties are read back, either way round");
+    Require(!model.Topic(L"麻酔", L"駐車"), "words that do not share sentences have none");
+    Require(LanguageModel::IsContentWord(L"注射") && !LanguageModel::IsContentWord(L"を") &&
+                !LanguageModel::IsContentWord(L"する"),
+            "content words have kanji or katakana");
+
+    tekito::japanese::JapaneseConverter converter(pack.dictionary, pack.matrix);
+    converter.SetLanguageModel(&model);
+    const auto phrases = converter.Convert(L"ますいをちゅうしゃする");
+    Require(!phrases.empty(), "the sentence converts");
+    std::wstring first;
+    for (const auto& phrase : phrases) first += phrase.candidates.front().text;
+    RequireText(first, L"麻酔を注射する", "the sentence's other words pick 注射 over 駐車");
+
+    LanguageModel damaged;
+    Require(!damaged.Open(std::filesystem::path(TEKITO_TEST_DATA_DIR) / L"japanese-mini"),
+            "a folder without the model opens nothing");
 }
 
 void TestComposerLearning(const RomajiTable& table, const MiniPack& pack) {
@@ -706,6 +740,7 @@ int main(int argc, char** argv) {
     TestLearningStore();
     TestComposerLearning(*table, *pack);
     TestContext(*table, *pack);
+    TestLanguageModel(*pack);
     TestLoanwords(*table, *pack);
     TestRomajiCorrection(*table, *pack);
     TestPrediction(*table, *pack);
