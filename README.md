@@ -58,7 +58,7 @@ to pick one.
         <img src="docs/images/mode-japanese-light.png" width="48" alt="">
       </picture>
     </td>
-    <td><b>日本語</b><br>Turns romaji into kana and kanji.</td>
+    <td><b>Japanese</b><br>Turns romaji into kana and kanji.</td>
     <td><img src="docs/images/taskbar-japanese.png" width="216" alt="The taskbar with TEKITO in Japanese"></td>
   </tr>
 </table>
@@ -97,13 +97,13 @@ addresses, and fields marked as passwords, numbers or email.
 
 ## Typing Japanese
 
-With Japanese added, type romaji in 日本語; it becomes hiragana as you
+With Japanese added, type romaji in Japanese mode; it becomes hiragana as you
 type, underlined. Space converts the
 whole line at once, split into phrases, and a second Space opens the list
 for the phrase in focus.
 
 <p align="center">
-  <img src="docs/images/japanese-demo.png" alt="Typing “hahimemasite”, a slip for はじめまして: Space converts what was typed, the second Space opens the list, where はじめまして waits marked もしかして with its meaning beside it; then “kyouhaiitenkidesune.” becomes 今日はいい天気ですね。" width="559">
+  <img src="docs/images/japanese-demo.png" alt="Typing “hahimemasite”, a slip for はじめまして: Space converts what was typed, the second Space opens the list, where はじめまして waits marked TYPO with its meaning beside it; then “kyouhaiitenkidesune.” becomes 今日はいい天気ですね。" width="559">
 </p>
 
 | Key | What it does |
@@ -125,7 +125,7 @@ for the phrase in focus.
   part of the sentence.
 - **A slip is not a dead end.** When the keys look like a slip of the finger
   (a neighboring key, a key dropped or doubled, two swapped), what you meant
-  is offered in the list, marked もしかして. What you typed stays first; you
+  is offered in the list, marked TYPO. What you typed stays first; you
   never have to delete and retype.
 - **Meanings beside the list.** Candidates with a meaning carry a small book
   sign, and the highlighted one's meaning appears beside the list, so you

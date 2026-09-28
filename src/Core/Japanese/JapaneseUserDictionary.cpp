@@ -24,6 +24,12 @@ constexpr std::array<std::pair<UserWordKind, std::wstring_view>, 10> kKindNames{
     {UserWordKind::Interjection, L"interjection"},
 }};
 
+constexpr std::array<std::pair<UserWordAction, std::wstring_view>, 3> kActionNames{{
+    {UserWordAction::First, L"first"},
+    {UserWordAction::Suggest, L"suggest"},
+    {UserWordAction::Suppress, L"suppress"},
+}};
+
 template <typename Number>
 std::optional<Number> ParseNumber(std::string_view text) {
     Number value{};
@@ -55,6 +61,20 @@ std::wstring_view KindName(UserWordKind kind) noexcept {
 
 std::optional<UserWordKind> KindFromName(std::wstring_view name) noexcept {
     for (const auto& [value, known] : kKindNames) {
+        if (known == name) return value;
+    }
+    return std::nullopt;
+}
+
+std::wstring_view ActionName(UserWordAction action) noexcept {
+    for (const auto& [value, name] : kActionNames) {
+        if (value == action) return name;
+    }
+    return L"first";
+}
+
+std::optional<UserWordAction> ActionFromName(std::wstring_view name) noexcept {
+    for (const auto& [value, known] : kActionNames) {
         if (known == name) return value;
     }
     return std::nullopt;
@@ -99,12 +119,32 @@ std::optional<UserPartsOfSpeech::Entry> UserPartsOfSpeech::For(UserWordKind kind
 
 void JapaneseUserDictionary::Set(const std::vector<UserWord>& words, const UserPartsOfSpeech& parts) {
     byReading_.clear();
+    suggested_.clear();
+    suppressed_.clear();
     longest_ = 0;
     size_ = 0;
     for (const auto& word : words) {
         if (word.reading.empty() || word.surface.empty()) continue;
+        if (word.action == UserWordAction::Suppress) {
+            auto& surfaces = suppressed_[word.reading];
+            if (std::find(surfaces.begin(), surfaces.end(), word.surface) == surfaces.end()) {
+                surfaces.push_back(word.surface);
+                ++size_;
+            }
+            continue;
+        }
         const auto part = parts.For(word.kind);
         if (!part) continue;
+        if (word.action == UserWordAction::Suggest) {
+            auto& entries = suggested_[word.reading];
+            const bool duplicate = std::any_of(entries.begin(), entries.end(),
+                                               [&](const Entry& e) { return e.surface == word.surface; });
+            if (!duplicate) {
+                entries.push_back({word.reading, word.surface, part->left, part->right, part->cost});
+                ++size_;
+            }
+            continue;
+        }
         auto& entries = byReading_[word.reading];
         const bool duplicate = std::any_of(entries.begin(), entries.end(),
                                            [&](const Entry& e) { return e.surface == word.surface; });
@@ -120,10 +160,23 @@ const std::vector<JapaneseUserDictionary::Entry>* JapaneseUserDictionary::Exact(
     return found == byReading_.end() ? nullptr : &found->second;
 }
 
-std::vector<const JapaneseUserDictionary::Entry*> JapaneseUserDictionary::StartingWith(std::wstring_view prefix) const {
+const std::vector<JapaneseUserDictionary::Entry>* JapaneseUserDictionary::Suggested(std::wstring_view reading) const {
+    const auto found = suggested_.find(reading);
+    return found == suggested_.end() ? nullptr : &found->second;
+}
+
+bool JapaneseUserDictionary::Suppresses(std::wstring_view reading, std::wstring_view surface) const {
+    const auto found = suppressed_.find(reading);
+    if (found == suppressed_.end()) return false;
+    return std::find(found->second.begin(), found->second.end(), surface) != found->second.end();
+}
+
+std::vector<const JapaneseUserDictionary::Entry*> JapaneseUserDictionary::StartingWith(std::wstring_view prefix,
+                                                                                         bool suggested) const {
     std::vector<const Entry*> found;
     if (prefix.empty()) return found;
-    for (auto it = byReading_.lower_bound(prefix); it != byReading_.end(); ++it) {
+    const auto& words = suggested ? suggested_ : byReading_;
+    for (auto it = words.lower_bound(prefix); it != words.end(); ++it) {
         if (it->first.compare(0, prefix.size(), prefix) != 0) break;
         if (it->first.size() <= prefix.size()) continue;
         for (const auto& entry : it->second) found.push_back(&entry);

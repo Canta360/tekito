@@ -761,7 +761,8 @@ private:
         for (const auto& word : japaneseWords_) {
             if (json.size() > 1) json += L',';
             json += L"{\"reading\":\"" + JsonEscape(word.reading) + L"\",\"surface\":\"" + JsonEscape(word.surface) +
-                    L"\",\"kind\":\"" + JsonEscape(tekito::japanese::KindName(word.kind)) + L"\"}";
+                    L"\",\"kind\":\"" + JsonEscape(tekito::japanese::KindName(word.kind)) + L"\",\"action\":\"" +
+                    JsonEscape(tekito::japanese::ActionName(word.action)) + L"\"}";
         }
         return json + L']';
     }
@@ -786,6 +787,8 @@ private:
         const auto reading = HiraganaReading(message.String(L"reading"));
         const auto surface = message.String(L"surface");
         const auto kind = tekito::japanese::KindFromName(message.String(L"kind"));
+        const auto action = tekito::japanese::ActionFromName(message.String(L"action"))
+                                .value_or(tekito::japanese::UserWordAction::First);
         if (!reading) {
             error = Text(L"Enter the reading in hiragana.", L"読みはひらがなで入れてください。");
             return false;
@@ -801,7 +804,7 @@ private:
             return (word.reading == originalReading && word.surface == originalSurface) ||
                    (word.reading == *reading && word.surface == surface);
         });
-        words.push_back({*reading, surface, *kind});
+        words.push_back({*reading, surface, *kind, action});
         if (!repository_->SaveJapaneseUserWords(words)) {
             error = Text(L"The word could not be saved.", L"単語を保存できませんでした。");
             return false;

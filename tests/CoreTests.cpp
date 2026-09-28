@@ -18,6 +18,7 @@
 #include "UserData/SqliteUserDictionaryRepository.h"
 #include "UserData/UserDictionaryFile.h"
 #include "UserData/DataPackValidation.h"
+#include "sqlite3.h"
 #include "UserData/RuntimeModeState.h"
 
 #include <algorithm>
@@ -1928,7 +1929,8 @@ void TestSqliteUserSettingsRepository() {
     const std::vector<tekito::japanese::UserWord> sourceWords{
         {L"なかの", L"中埜", tekito::japanese::UserWordKind::Surname},
         {L"てきとう", L"TEKITO", tekito::japanese::UserWordKind::ProperNoun},
-        {L"かお", L"(^^)", tekito::japanese::UserWordKind::Symbol}};
+        {L"かお", L"(^^)", tekito::japanese::UserWordKind::Symbol, tekito::japanese::UserWordAction::Suggest},
+        {L"きしゃ", L"汽車", tekito::japanese::UserWordKind::Noun, tekito::japanese::UserWordAction::Suppress}};
     {
         tekito::userdata::SqliteUserDictionaryRepository repository(path);
         Require(repository.Open(), "Japanese user words repository opens its database");
@@ -1943,6 +1945,30 @@ void TestSqliteUserSettingsRepository() {
         Require(repository.SaveJapaneseUserWords({}) && repository.LoadJapaneseUserWords(loadedWords) &&
                     loadedWords.empty(),
                 "saving no words empties the table");
+    }
+    {
+        // A table from before the action column gets it, words given first.
+        const auto oldPath = std::filesystem::temp_directory_path() / L"tekito-old-japanese-words.db";
+        std::filesystem::remove(oldPath);
+        sqlite3* database = nullptr;
+        Require(sqlite3_open16(oldPath.c_str(), &database) == SQLITE_OK &&
+                    sqlite3_exec(database,
+                                 "CREATE TABLE japanese_user_words (reading TEXT NOT NULL, surface TEXT NOT NULL, "
+                                 "kind TEXT NOT NULL, PRIMARY KEY (reading, surface));"
+                                 "INSERT INTO japanese_user_words VALUES ('\xE3\x81\xAA', '\xE8\x8F\x9C', 'noun');",
+                                 nullptr, nullptr, nullptr) == SQLITE_OK,
+                "an old Japanese words table is made");
+        sqlite3_close(database);
+        std::vector<tekito::japanese::UserWord> migrated;
+        {
+            tekito::userdata::SqliteUserDictionaryRepository repository(oldPath);
+            Require(repository.Open() && repository.LoadJapaneseUserWords(migrated),
+                    "an old Japanese words table opens");
+        }
+        Require(migrated.size() == 1 && migrated.front().surface == L"菜" &&
+                    migrated.front().action == tekito::japanese::UserWordAction::First,
+                "its words are given first");
+        std::filesystem::remove(oldPath);
     }
 
     tekito::SocialLearningStore sourceSocial;

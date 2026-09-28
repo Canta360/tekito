@@ -65,6 +65,7 @@ constexpr const char* kCreateSchema =
     "reading TEXT NOT NULL,"
     "surface TEXT NOT NULL,"
     "kind TEXT NOT NULL,"
+    "action TEXT NOT NULL DEFAULT 'first',"
     "PRIMARY KEY (reading, surface)"
     ");"
     "CREATE TABLE IF NOT EXISTS excluded_apps ("
@@ -627,7 +628,7 @@ bool SqliteUserDictionaryRepository::SaveJapaneseLearning(
 bool SqliteUserDictionaryRepository::LoadJapaneseUserWords(std::vector<japanese::UserWord>& words) const noexcept {
     if (!database_) return false;
     sqlite3_stmt* statement = nullptr;
-    constexpr const char* query = "SELECT reading, surface, kind FROM japanese_user_words ORDER BY rowid;";
+    constexpr const char* query = "SELECT reading, surface, kind, action FROM japanese_user_words ORDER BY rowid;";
     if (sqlite3_prepare_v2(database_, query, -1, &statement, nullptr) != SQLITE_OK) return false;
     std::vector<japanese::UserWord> loaded;
     bool success = true;
@@ -637,10 +638,14 @@ bool SqliteUserDictionaryRepository::LoadJapaneseUserWords(std::vector<japanese:
             const auto* reading = static_cast<const wchar_t*>(sqlite3_column_text16(statement, 0));
             const auto* surface = static_cast<const wchar_t*>(sqlite3_column_text16(statement, 1));
             const auto* kindName = static_cast<const wchar_t*>(sqlite3_column_text16(statement, 2));
+            const auto* actionName = static_cast<const wchar_t*>(sqlite3_column_text16(statement, 3));
             if (!reading || !surface) continue;
-            // A kind this version does not know is kept as a plain noun.
+            // A kind or action this version does not know is kept as a plain
+            // noun given first.
             const auto kind = kindName ? japanese::KindFromName(kindName) : std::nullopt;
-            loaded.push_back({reading, surface, kind.value_or(japanese::UserWordKind::Noun)});
+            const auto action = actionName ? japanese::ActionFromName(actionName) : std::nullopt;
+            loaded.push_back({reading, surface, kind.value_or(japanese::UserWordKind::Noun),
+                              action.value_or(japanese::UserWordAction::First)});
         }
     } catch (...) {
         success = false;
@@ -658,13 +663,14 @@ bool SqliteUserDictionaryRepository::SaveJapaneseUserWords(const std::vector<jap
         sqlite3_exec(database_, "DELETE FROM japanese_user_words;", nullptr, nullptr, nullptr) == SQLITE_OK;
     sqlite3_stmt* statement = nullptr;
     constexpr const char* query =
-        "INSERT OR REPLACE INTO japanese_user_words (reading, surface, kind) VALUES (?, ?, ?);";
+        "INSERT OR REPLACE INTO japanese_user_words (reading, surface, kind, action) VALUES (?, ?, ?, ?);";
     if (success && sqlite3_prepare_v2(database_, query, -1, &statement, nullptr) != SQLITE_OK) success = false;
     try {
         if (success) {
             for (const auto& word : words) {
                 success = BindText16(statement, 1, word.reading) && BindText16(statement, 2, word.surface) &&
                           BindText16(statement, 3, std::wstring(japanese::KindName(word.kind))) &&
+                          BindText16(statement, 4, std::wstring(japanese::ActionName(word.action))) &&
                           sqlite3_step(statement) == SQLITE_DONE;
                 sqlite3_reset(statement);
                 sqlite3_clear_bindings(statement);
@@ -694,8 +700,21 @@ bool SqliteUserDictionaryRepository::IsOpen() const noexcept {
 }
 
 bool SqliteUserDictionaryRepository::EnsureSchema() noexcept {
-    return database_ &&
-           sqlite3_exec(database_, kCreateSchema, nullptr, nullptr, nullptr) == SQLITE_OK;
+    if (!database_ || sqlite3_exec(database_, kCreateSchema, nullptr, nullptr, nullptr) != SQLITE_OK) return false;
+    // Tables from before a column was added get it.
+    bool hasAction = false;
+    sqlite3_stmt* statement = nullptr;
+    if (sqlite3_prepare_v2(database_, "PRAGMA table_info(japanese_user_words);", -1, &statement, nullptr) ==
+        SQLITE_OK) {
+        while (sqlite3_step(statement) == SQLITE_ROW) {
+            const auto* name = reinterpret_cast<const char*>(sqlite3_column_text(statement, 1));
+            if (name && std::strcmp(name, "action") == 0) hasAction = true;
+        }
+        sqlite3_finalize(statement);
+    }
+    return hasAction || sqlite3_exec(database_,
+                                     "ALTER TABLE japanese_user_words ADD COLUMN action TEXT NOT NULL DEFAULT 'first';",
+                                     nullptr, nullptr, nullptr) == SQLITE_OK;
 }
 
 std::filesystem::path DefaultUserDatabasePath() {
