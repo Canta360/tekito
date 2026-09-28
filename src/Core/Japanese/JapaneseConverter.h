@@ -27,6 +27,9 @@ struct PhraseCandidate {
     // Set when the candidate is the whole input read again (a slip across
     // phrases): choosing it makes this the reading, as one phrase.
     std::wstring reading;
+    // The part of speech (right id) of its last word, for what is typed
+    // next; 0 when not known.
+    std::uint16_t rightId{0};
 };
 
 // A word that starts with what has been typed, for prediction.
@@ -55,12 +58,15 @@ public:
 
     // `fixedLengths` are phrase lengths from the start that must stay as
     // they are (after the user resized a phrase); the rest is split freely.
+    // `context` is the right id of the word just before the reading (the
+    // text committed last), 0 for the start of a sentence.
     [[nodiscard]] std::vector<Phrase> Convert(std::wstring_view reading,
-                                              std::span<const std::size_t> fixedLengths = {}) const;
+                                              std::span<const std::size_t> fixedLengths = {},
+                                              std::uint16_t context = 0) const;
 
     // Only the likeliest text for the whole reading and its cost, much
     // quicker than Convert; nothing when a character is in no word.
-    [[nodiscard]] std::optional<PhraseCandidate> Best(std::wstring_view reading) const;
+    [[nodiscard]] std::optional<PhraseCandidate> Best(std::wstring_view reading, std::uint16_t context = 0) const;
 
     // Words whose reading starts with `reading` and is longer, likeliest
     // first. Readings shared by too many words to look through quickly give

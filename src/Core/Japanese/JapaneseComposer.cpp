@@ -321,12 +321,12 @@ void JapaneseComposer::BuildPhrases(bool convert) {
     if (convert && converter_) {
         // A slip in the keys: converted from the keys as meant. Esc still
         // goes back to what was typed.
-        if (auto conversion = keyConverter_ ? keyConverter_->Convert(Keys(false)) : std::nullopt) {
+        if (auto conversion = keyConverter_ ? keyConverter_->Convert(Keys(false), context_) : std::nullopt) {
             conversionReading_ = ApplyPunctuation(std::move(conversion->reading));
             readingKeys_ = std::move(conversion->keyAt);
             AddPhrases(std::move(conversion->phrases), conversionReading_);
         } else {
-            AddPhrases(converter_->Convert(reading), reading);
+            AddPhrases(converter_->Convert(reading, {}, context_), reading);
         }
     }
     if (phrases_.empty()) {
@@ -647,7 +647,7 @@ void JapaneseComposer::ResizeFocus(int delta) {
     std::vector<PhraseState> kept(phrases_.begin(), phrases_.begin() + static_cast<long long>(focus_));
 
     phrases_.clear();
-    AddPhrases(converter_->Convert(reading, fixed), reading);
+    AddPhrases(converter_->Convert(reading, fixed, context_), reading);
     if (phrases_.size() <= focus_) {
         BuildPhrases(true);
         return;
@@ -805,12 +805,15 @@ std::wstring JapaneseComposer::Commit() {
     if (chosenPrediction_ && *chosenPrediction_ < predictions_.size() && !IsConverted()) {
         const auto prediction = predictions_[*chosenPrediction_];
         if (learning_) learning_->RecordChoice(prediction.reading, prediction.text, prediction.text);
+        // A prediction's part of speech is not known here.
+        context_ = 0;
         Clear();
         return prediction.text;
     }
     if (const auto* whole = WholeChoice()) {
         if (learning_) learning_->RecordChoice(whole->reading, whole->text, whole->text);
         auto text = whole->text;
+        context_ = ContextAfter(text, whole->rightId);
         Clear();
         return text;
     }
@@ -822,9 +825,21 @@ std::wstring JapaneseComposer::Commit() {
             learning_->RecordChoice(reading.substr(phrase.begin, phrase.length), chosen, first);
         }
     }
+    std::uint16_t last = 0;
+    if (IsConverted()) {
+        const auto& phrase = phrases_.back();
+        if (!phrase.form && phrase.selected < phrase.candidates.size()) last = phrase.candidates[phrase.selected].rightId;
+    }
     auto text = IsConverted() ? Preedit() : RenderTyping(false);
+    context_ = ContextAfter(text, last);
     Clear();
     return text;
+}
+
+std::uint16_t JapaneseComposer::ContextAfter(std::wstring_view text, std::uint16_t rightId) noexcept {
+    // A sentence that ended starts the next one afresh.
+    if (text.empty() || std::wstring_view(L"。．.！!？?\n").find(text.back()) != std::wstring_view::npos) return 0;
+    return rightId;
 }
 
 void JapaneseComposer::Clear() noexcept {

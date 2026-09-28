@@ -94,7 +94,8 @@ struct PathEntry {
 }  // namespace
 
 std::vector<Phrase> JapaneseConverter::Convert(std::wstring_view reading,
-                                               std::span<const std::size_t> fixedLengths) const {
+                                               std::span<const std::size_t> fixedLengths,
+                                               std::uint16_t context) const {
     const std::size_t n = reading.size();
     if (n == 0) return {};
     const ReadingCodes codes = dictionary_.Encode(reading);
@@ -116,7 +117,7 @@ std::vector<Phrase> JapaneseConverter::Convert(std::wstring_view reading,
         for (const int k : lattice.beginningAt[i]) {
             const Node& node = nodes[k];
             if (i == 0) {
-                best[k] = node.cost + matrix_.Cost(0, node.left);
+                best[k] = node.cost + matrix_.Cost(context, node.left);
                 continue;
             }
             for (const int p : lattice.endingAt[i]) {
@@ -169,7 +170,7 @@ std::vector<Phrase> JapaneseConverter::Convert(std::wstring_view reading,
     for (const auto& [first, end] : spans) {
         const std::uint32_t begin = nodes[path[first]].begin;
         const std::uint32_t finish = nodes[path[end - 1]].end;
-        const std::uint16_t leftContext = first == 0 ? 0 : nodes[path[first - 1]].right;
+        const std::uint16_t leftContext = first == 0 ? context : nodes[path[first - 1]].right;
         const std::uint16_t rightContext = end == path.size() ? 0 : nodes[path[end]].left;
 
         // The likeliest ways to write this phrase between its neighbors.
@@ -240,8 +241,9 @@ std::vector<Phrase> JapaneseConverter::Convert(std::wstring_view reading,
                 spelling = spelling || (nodes[*it].known && nodes[*it].word.spellingCorrection);
             }
             if (!has(text)) {
-                phrase.candidates.push_back({std::move(text), ending.cost,
-                                             PhraseCandidate::Kind::Dictionary, spelling});
+                PhraseCandidate candidate{std::move(text), ending.cost, PhraseCandidate::Kind::Dictionary, spelling};
+                candidate.rightId = nodes[ending.node].right;
+                phrase.candidates.push_back(std::move(candidate));
             }
         }
 
@@ -253,8 +255,10 @@ std::vector<Phrase> JapaneseConverter::Convert(std::wstring_view reading,
                 const std::int64_t cost = matrix_.Cost(leftContext, word.left) + word.cost +
                                           (word.spellingCorrection ? kSpellingCorrectionPenalty : 0) +
                                           matrix_.Cost(word.right, rightContext);
-                words.push_back({dictionary_.Surface(word, phraseReading), cost,
-                                 PhraseCandidate::Kind::Dictionary, word.spellingCorrection});
+                PhraseCandidate candidate{dictionary_.Surface(word, phraseReading), cost,
+                                          PhraseCandidate::Kind::Dictionary, word.spellingCorrection};
+                candidate.rightId = word.right;
+                words.push_back(std::move(candidate));
             });
             std::stable_sort(words.begin(), words.end(),
                              [](const PhraseCandidate& a, const PhraseCandidate& b) { return a.cost < b.cost; });
@@ -277,7 +281,7 @@ std::vector<Phrase> JapaneseConverter::Convert(std::wstring_view reading,
     return phrases;
 }
 
-std::optional<PhraseCandidate> JapaneseConverter::Best(std::wstring_view reading) const {
+std::optional<PhraseCandidate> JapaneseConverter::Best(std::wstring_view reading, std::uint16_t context) const {
     const std::size_t n = reading.size();
     if (n == 0) return std::nullopt;
     const ReadingCodes codes = dictionary_.Encode(reading);
@@ -291,7 +295,7 @@ std::optional<PhraseCandidate> JapaneseConverter::Best(std::wstring_view reading
             const Node& node = nodes[k];
             if (!node.known) continue;
             if (i == 0) {
-                best[k] = node.cost + matrix_.Cost(0, node.left);
+                best[k] = node.cost + matrix_.Cost(context, node.left);
                 continue;
             }
             for (const int p : lattice.endingAt[i]) {
@@ -318,6 +322,7 @@ std::optional<PhraseCandidate> JapaneseConverter::Best(std::wstring_view reading
     std::vector<int> path;
     for (int k = last; k >= 0; k = previous[k]) path.push_back(k);
     PhraseCandidate result{{}, lastCost, PhraseCandidate::Kind::Dictionary, false};
+    result.rightId = nodes[last].right;
     for (auto it = path.rbegin(); it != path.rend(); ++it) {
         const Node& node = nodes[*it];
         result.text += dictionary_.Surface(node.word, reading.substr(node.begin, node.end - node.begin));

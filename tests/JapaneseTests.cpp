@@ -605,6 +605,33 @@ void TestPrediction(const RomajiTable& table, const MiniPack& pack) {
     Require(composer.Predictions().empty(), "converting puts predictions away");
 }
 
+void TestContext(const RomajiTable& table, const MiniPack& pack) {
+    const tekito::japanese::JapaneseConverter converter(pack.dictionary, pack.matrix);
+    JapaneseComposer composer(&table);
+    composer.SetConverter(&converter);
+    Require(composer.Context() == 0, "typing starts at the start of a sentence");
+    Type(composer, L"watashino");
+    composer.Convert();
+    RequireText(composer.Commit(), L"私の", "the first phrase commits");
+    Require(composer.Context() != 0, "what was committed is where the next conversion starts");
+    const auto after = composer.Context();
+    Type(composer, L"namaeha");
+    composer.Convert();
+    const auto* candidates = composer.FocusedCandidates();
+    const auto alone = converter.Convert(L"なまえは");
+    const auto followed = converter.Convert(L"なまえは", {}, after);
+    Require(candidates && !alone.empty() && !followed.empty() &&
+                candidates->front().cost == followed.front().candidates.front().cost,
+            "the next phrase is converted as following it");
+    composer.Commit();
+    composer.ForgetContext();
+    Require(composer.Context() == 0, "forgetting starts afresh");
+    Type(composer, L"kikai.");
+    composer.Convert();
+    composer.Commit();
+    Require(composer.Context() == 0, "a sentence that ended starts the next afresh");
+}
+
 void TestComposerLearning(const RomajiTable& table, const MiniPack& pack) {
     const tekito::japanese::JapaneseConverter converter(pack.dictionary, pack.matrix);
     tekito::japanese::JapaneseLearningStore learning;
@@ -678,6 +705,7 @@ int main(int argc, char** argv) {
     TestComposerConversion(*table, *pack);
     TestLearningStore();
     TestComposerLearning(*table, *pack);
+    TestContext(*table, *pack);
     TestLoanwords(*table, *pack);
     TestRomajiCorrection(*table, *pack);
     TestPrediction(*table, *pack);
