@@ -736,6 +736,8 @@ private:
         json += L",\"socialPersonalization\":" + std::to_wstring(settings_.socialPersonalization);
         json += L",\"candidateWindowStyle\":" + std::to_wstring(settings_.candidateWindowStyle);
         json += L",\"candidateRows\":" + std::to_wstring(settings_.candidateRows);
+        json += L",\"japaneseKeyCyclesModes\":";
+        json += settings_.japaneseKeyCyclesModes ? L"true" : L"false";
         json += L",\"meaningsEnabled\":";
         json += settings_.meaningsEnabled ? L"true" : L"false";
         json += L",\"toggleKey\":" + std::to_wstring(settings_.toggleKey);
@@ -885,6 +887,7 @@ private:
             }
             else if (key == L"periodOnEnter") settings_.periodOnEnter = value;
             else if (key == L"meaningsEnabled") settings_.meaningsEnabled = value;
+            else if (key == L"japaneseKeyCyclesModes") settings_.japaneseKeyCyclesModes = value;
             else if (key == L"japaneseSpaceWidth") {
                 settings_.japaneseSpaceWidth = std::clamp(integerValue, 0, 2);
             }
