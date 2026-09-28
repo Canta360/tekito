@@ -638,6 +638,7 @@ HRESULT TextService::Deactivate() {
         settingsLoaded_ = false;
     }
     candidateWindow_.Hide();
+    modeIndicator_.Shutdown();
     state_.Reset();
     rawText_.clear();
     japanese_.Clear();
@@ -948,7 +949,10 @@ void TextService::RegisterLangBarItem() {
     auto* item = new (std::nothrow) ModeLangBarItem(
         g_moduleInstance,
         [this]() { return mode_; },
-        [this](InputMode mode) { ChangeInputMode(mode); },
+        [this](InputMode mode) {
+            ChangeInputMode(mode);
+            ShowModeIndicator(nullptr);
+        },
         [this]() { return ToggledMode(); },
         [this]() { return JapaneseModeAvailable(); },
         [this]() { OpenSettings(); },
@@ -1366,6 +1370,10 @@ HRESULT TextService::HandleKeyInEditSessionCore(ITfContext* context, TfEditCooki
                                                 const KeyInput& input) {
     Trace(L"HandleKeyInEditSession");
     if (!context) return E_INVALIDARG;
+    if (input.type == KeyInput::Type::ShowModeIndicator) {
+        modeIndicator_.Show(g_moduleInstance, CaretAnchor(context, editCookie), mode_);
+        return S_OK;
+    }
     if (input.type == KeyInput::Type::Reposition) {
         if (!composition_ || !candidateWindow_.IsShown()) return S_OK;
         // Japanese conversion candidates and predictions follow the text too.
@@ -1905,6 +1913,50 @@ void TextService::ShowCandidates(ITfContext* context, TfEditCookie editCookie) {
             }
         }
     }
+}
+
+RECT TextService::CaretAnchor(ITfContext* context, TfEditCookie editCookie) const {
+    if (context && !composition_) {
+        TF_SELECTION selection{};
+        ULONG fetched = 0;
+        if (SUCCEEDED(context->GetSelection(editCookie, TF_DEFAULT_SELECTION, 1, &selection, &fetched)) &&
+            fetched == 1 && selection.range) {
+            ComPtr<ITfContextView> view;
+            RECT rect{};
+            BOOL clipped = FALSE;
+            const bool found = SUCCEEDED(context->GetActiveView(view.Put())) &&
+                               SUCCEEDED(view->GetTextExt(editCookie, selection.range, &rect, &clipped)) &&
+                               rect.bottom > rect.top;
+            selection.range->Release();
+            if (found) return rect;
+        }
+    }
+    return GetCandidateAnchor(composition_ ? context : nullptr, editCookie);
+}
+
+void TextService::ShowModeIndicator(ITfContext* context) {
+    if (!userSettings_.modeIndicatorEnabled || ProcessPassesThrough()) return;
+    ComPtr<ITfContext> focused;
+    if (!context && threadManager_) {
+        ComPtr<ITfDocumentMgr> document;
+        if (SUCCEEDED(threadManager_->GetFocus(document.Put())) && document) {
+            (void)document->GetTop(focused.Put());
+        }
+        context = focused.Get();
+    }
+    if (context) {
+        KeyInput input{};
+        input.type = KeyInput::Type::ShowModeIndicator;
+        if (auto* session = new (std::nothrow) KeyEditSession(this, context, input)) {
+            HRESULT sessionResult = E_FAIL;
+            const HRESULT hr = context->RequestEditSession(clientId_, session, TF_ES_ASYNCDONTCARE | TF_ES_READ,
+                                                           &sessionResult);
+            session->Release();
+            if (SUCCEEDED(hr)) return;
+        }
+    }
+    // No document to ask: the system caret, or the pointer.
+    modeIndicator_.Show(g_moduleInstance, GetCandidateAnchor(nullptr, 0), mode_);
 }
 
 RECT TextService::GetCandidateAnchor(ITfContext* context, TfEditCookie editCookie) const {

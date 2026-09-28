@@ -57,6 +57,8 @@ struct KeyInput {
         JapaneseCommit,
         // Types `character` outside a composition (a full-width space).
         InsertCharacter,
+        // Not a key: show the mode by the caret (the user switched modes).
+        ShowModeIndicator,
     } type;
     wchar_t character{0};
     japanese::KanaForm kanaForm{japanese::KanaForm::Hiragana};

@@ -334,6 +334,7 @@ void TextService::ApplyModeKey(ITfContext* context, const ModeKey& key) {
         SyncModeCompartments();
         if (modeLangBarItem_) modeLangBarItem_->NotifyUpdate();
     }
+    ShowModeIndicator(context);
 }
 
 // The character a key types with the current layout and modifiers, or 0.

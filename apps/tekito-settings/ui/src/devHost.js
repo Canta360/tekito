@@ -33,6 +33,7 @@ function initialState() {
       meaningsEnabled: true,
       japaneseSwitchOrder: 0,
       japaneseEnabled: true,
+      modeIndicatorEnabled: true,
       toggleKey: 1,
       keyboardType: 0,
       periodOnEnter: false,

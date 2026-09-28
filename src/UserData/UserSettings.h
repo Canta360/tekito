@@ -51,6 +51,9 @@ struct UserSettings {
     // Convert and Direct its switch key goes to from Japanese.
     InputMode lastJapaneseProfileMode{InputMode::Japanese};
     InputMode japaneseProfileEnglishMode{InputMode::Convert};
+    // After the user switches modes, the new mode's icon shows by the caret
+    // for a moment.
+    bool modeIndicatorEnabled{true};
     // Japanese input, when its data is installed. Off, the Japanese profile
     // has only Auto and Direct, like the English one.
     bool japaneseEnabled{true};

@@ -95,6 +95,7 @@ add_library(Tekito.Tsf SHARED
     src/Tsf/DllMain.cpp
     src/Tsf/EditSession.cpp
     src/Tsf/TextServiceJapanese.cpp
+    src/Tsf/ModeIndicator.cpp
     src/Tsf/ModeLangBarItem.cpp
     src/Tsf/Registration.cpp
     src/Tsf/TekitoGuids.cpp
@@ -193,6 +194,18 @@ if(TEKITO_BUILD_TESTS)
     target_compile_options(tekito_candidate_window_preview PRIVATE ${TEKITO_WARNINGS})
     target_link_libraries(tekito_candidate_window_preview PRIVATE
         ole32 oleaut32 advapi32 user32 gdi32 ${TEKITO_CANDIDATE_WINDOW_LIBS})
+
+    # Shows the mode indicator for each mode and screenshots it.
+    add_executable(tekito_mode_indicator_preview
+        tests/visual/ModeIndicatorPreview.cpp
+        src/Tsf/ModeIndicator.cpp
+        assets/tekito_tsf.rc
+    )
+    target_include_directories(tekito_mode_indicator_preview PRIVATE src ${CMAKE_SOURCE_DIR})
+    target_compile_definitions(tekito_mode_indicator_preview PRIVATE
+        ${TEKITO_WINDOWS_DEFINES} TEKITO_CANDIDATE_WINDOW_PREVIEW)
+    target_compile_options(tekito_mode_indicator_preview PRIVATE ${TEKITO_WARNINGS})
+    target_link_libraries(tekito_mode_indicator_preview PRIVATE user32 gdi32 advapi32 d2d1)
 
     # Records the frames of the README typing demo with the real engine.
     add_executable(tekito_typing_demo
