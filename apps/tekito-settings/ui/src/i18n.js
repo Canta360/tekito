@@ -49,7 +49,6 @@ const en = {
   japaneseInput: {
     title: "Japanese input",
     description: "Type Japanese from romaji. Off, TEKITO has only Auto and Direct.",
-    off: "Off: TEKITO has only Auto and Direct. The settings below apply once it is on.",
     missing: "Not installed. Run the TEKITO installer again and choose Japanese to add it.",
   },
   order: {
@@ -122,10 +121,6 @@ const en = {
     description: "Show what the highlighted choice means beside the list, for English and Japanese words.",
   },
   japanese: {
-    missing: {
-      title: "Japanese is not installed",
-      description: "Run the TEKITO installer again and choose Japanese to add it. English works as before.",
-    },
     space: {
       title: "Space",
       description: "The space Space types when nothing is being converted. Shift+Space types the other one.",
@@ -264,7 +259,6 @@ const ja = {
   japaneseInput: {
     title: "日本語入力",
     description: "ローマ字から日本語を打てるようにします。オフにすると、Auto と Direct だけになります。",
-    off: "オフです。Auto と Direct だけになっています。下の設定は、オンにすると使われます。",
     missing: "インストールされていません。TEKITO のインストーラーで日本語を選ぶと追加できます。",
   },
   order: {
@@ -337,10 +331,6 @@ const ja = {
     description: "選んでいる候補の意味を一覧の横に出します。英語と日本語の語に対応します。",
   },
   japanese: {
-    missing: {
-      title: "日本語が入っていません",
-      description: "TEKITO のインストーラーをもう一度実行し、日本語を選ぶと追加できます。英語はこれまでどおり使えます。",
-    },
     space: {
       title: "スペース",
       description: "変換していないときに Space で入るスペースです。Shift+Space ではもう一方が入ります。",
