@@ -140,8 +140,12 @@ nav { display: grid; gap: 4px; }
 .page-header { margin-bottom: 24px; }
 .page-header h1 { font: 600 30px/1.15 var(--font-display); letter-spacing: -0.01em; }
 .page-header p { margin-top: 6px; color: var(--ink-2); }
-.page { display: grid; gap: 16px; animation: page-in 0.35s var(--ease); }
-@keyframes page-in { from { opacity: 0; transform: translateY(6px); } }
+/* A page is kept on its own layer from the start and only slides in, with
+   no fade: WebView2 blurs what is behind the glass only while that layer
+   exists, and not at all under a fading (translucent) parent, so a page
+   that faded in looked one way while moving and another once still. */
+.page { display: grid; gap: 16px; will-change: transform; animation: page-in 0.35s var(--ease); }
+@keyframes page-in { from { transform: translateY(6px); } }
 
 .card { padding: 6px 22px; }
 .card:has(> .card-title), .card:has(> .card-head), .card:has(> .status-line) { padding-top: 16px; padding-bottom: 16px; }
