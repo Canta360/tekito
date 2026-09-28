@@ -181,22 +181,27 @@ nav { display: grid; gap: 4px; }
 .mode-grid.three .tile { aspect-ratio: 1.6; }
 .tile:hover { transform: translateY(-2px); }
 .tile:active { transform: translateY(0) scale(0.985); }
-/* The accent light lives behind the glass. It is blurred itself rather than
-   left to the glass: WebView2's transparent window does not always blur
-   what is behind the glass. The clip keeps the blur inside the tile. */
+/* The accent light lives behind the glass. It is a gradient soft in itself,
+   with no blur to wait for: WebView2's transparent window does not always
+   blur what is behind the glass, and a blur filter can show a frame late.
+   It is drawn in a box larger than the tile (x -20%..120%, y -30%..140% of
+   it) and fades out well inside that box, so the only edge it meets is the
+   tile's own, where the clip cuts it. --lx / --ly are in the box's terms
+   (Tile maps the pointer); 50% 60% is the tile's 50% 72%. */
 .tile-clip { position: absolute; inset: 0; border-radius: inherit; overflow: hidden; pointer-events: none; }
 .tile-light {
-  position: absolute; inset: 18% 8% 0;
-  border-radius: 45%;
-  filter: blur(18px);
-  background: radial-gradient(ellipse 66% 90% at var(--lx, 50%) var(--ly, 72%), color-mix(in oklab, var(--accent) 85%, white) 0%, color-mix(in oklab, var(--accent) 45%, transparent) 42%, transparent 74%);
+  position: absolute; inset: -30% -20% -40%;
+  background: radial-gradient(ellipse 30% 36% at var(--lx, 50%) var(--ly, 60%),
+    color-mix(in oklab, var(--accent) 85%, white) 0%,
+    color-mix(in oklab, var(--accent) 45%, transparent) 40%,
+    color-mix(in oklab, var(--accent) 15%, transparent) 70%,
+    transparent 100%);
   opacity: 0; transform: scale(0.82);
   transition: opacity 0.45s var(--ease), transform 0.45s var(--ease);
 }
 .tile.is-on .tile-light {
   opacity: var(--light); transform: scale(1);
-  /* Clear first, then the color comes up through the blur: shown at full
-     strength at once, the first frames can come before the blur. */
+  /* Clear first, then the color comes up. */
   animation: tile-light-in 0.5s var(--ease) 0.1s both;
 }
 @keyframes tile-light-in { from { opacity: 0; } }

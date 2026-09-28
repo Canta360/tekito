@@ -87,8 +87,11 @@ export function Tile({ on, onPress, icon, image, imageDark, art, title, descript
   const onPointerMove = (event) => {
     const rect = ref.current?.getBoundingClientRect();
     if (!rect) return;
-    ref.current.style.setProperty("--lx", `${((event.clientX - rect.left) / rect.width) * 100}%`);
-    ref.current.style.setProperty("--ly", `${((event.clientY - rect.top) / rect.height) * 100}%`);
+    // In the terms of the light's box, which reaches past the tile (styles.css).
+    const x = ((event.clientX - rect.left) / rect.width) * 100;
+    const y = ((event.clientY - rect.top) / rect.height) * 100;
+    ref.current.style.setProperty("--lx", `${(x + 20) / 1.4}%`);
+    ref.current.style.setProperty("--ly", `${(y + 30) / 1.7}%`);
   };
   const onPointerLeave = () => {
     ref.current?.style.removeProperty("--lx");
