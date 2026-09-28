@@ -1,0 +1,17 @@
+{
+  "pack_id": "japanese-lm",
+  "display_name": "Japanese Word Pairs",
+  "schema_version": 1,
+  "version": "2026.09",
+  "language": "ja-JP",
+  "type": "japanese-lm",
+  "format": "ja-lm-v3",
+  "file": "lm.bin",
+  "entry_count": 1,
+  "sha256": {
+    "file": "5D4DCDF560803352388280577EC562F0AA4C1593F45A5D5D6991F51AB413DB37"
+  },
+  "license": "CC-BY-4.0",
+  "source": "Leipzig Corpora Collection: a few hand-written counts for the unit tests",
+  "notice_file": "NOTICE"
+}

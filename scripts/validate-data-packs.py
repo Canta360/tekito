@@ -194,9 +194,30 @@ def validate_sorted_tsv(pack: Path, manifest: dict) -> list[str]:
     return errors
 
 
+def validate_language_model(pack: Path, manifest: dict) -> list[str]:
+    """The japanese-lm pack (scripts/build-japanese-lm.py): one binary file,
+    mapped and checked by its reader; here it must be what the manifest
+    says."""
+    pack_id = pack.name
+    errors = [f"{pack_id}: manifest missing {field}" for field in ("file", "notice_file", "sha256", "license")
+              if field not in manifest]
+    if errors:
+        return errors
+    data_path = relative_to_pack(pack, manifest["file"])
+    if not data_path.is_file() or not relative_to_pack(pack, manifest["notice_file"]).is_file():
+        return [f"{pack_id}: missing files"]
+    if data_path.read_bytes()[:4] != b"TKLM":
+        errors.append(f"{pack_id}: {data_path.name} is not a ja-lm file")
+    if digest(data_path) != manifest["sha256"].get("file"):
+        errors.append(f"{pack_id}: data checksum mismatch")
+    return errors
+
+
 def validate_pack(pack: Path, manifest: dict) -> list[str]:
     if manifest.get("format") == "sorted-tsv-v1":
         return validate_sorted_tsv(pack, manifest)
+    if str(manifest.get("format", "")).startswith("ja-lm-"):
+        return validate_language_model(pack, manifest)
     errors: list[str] = []
     pack_id = pack.name
     for field in ("pack_id", "version", "language", "type", "license", "file",

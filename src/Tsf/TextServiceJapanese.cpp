@@ -8,6 +8,7 @@
 #include "Core/Japanese/JapaneseDictionary.h"
 #include "Core/Japanese/Meanings.h"
 #include "Core/Japanese/KeyConverter.h"
+#include "Core/Japanese/LanguageModel.h"
 #include "Core/Japanese/Loanwords.h"
 #include "Core/Japanese/RomajiTable.h"
 #include "Tsf/Compartments.h"
@@ -63,14 +64,16 @@ const japanese::RomajiTable* ProcessRomajiTable() {
     return table.get();
 }
 
-// The japanese-core pack (and the loanwords for katakana), mapped once per
-// process: mapping takes well under a millisecond and the pages are shared
-// with every other process. Without japanese-core, Japanese still types
-// kana, and Space switches kana; without the loanwords, katakana has no
-// English candidates.
+// The japanese-core pack (and the language model and the loanwords for
+// katakana), mapped once per process: mapping takes well under a
+// millisecond and the pages are shared with every other process. Without
+// japanese-core, Japanese still types kana, and Space switches kana;
+// without the language model, conversion goes by the parts of speech alone;
+// without the loanwords, katakana has no English candidates.
 struct JapaneseData {
     japanese::JapaneseDictionary dictionary;
     japanese::ConnectionMatrix matrix;
+    japanese::LanguageModel model;
     japanese::Loanwords loanwords;
     std::unique_ptr<japanese::JapaneseConverter> converter;
     std::unique_ptr<japanese::KeyConverter> keys;
@@ -86,6 +89,11 @@ const JapaneseData* ProcessJapaneseData() {
             return std::unique_ptr<JapaneseData>{};
         }
         loaded->converter = std::make_unique<japanese::JapaneseConverter>(loaded->dictionary, loaded->matrix);
+        if (loaded->model.Open(root / L"japanese-lm")) {
+            loaded->converter->SetLanguageModel(&loaded->model);
+        } else {
+            Trace(L"Japanese language model unavailable");
+        }
         if (const auto* table = ProcessRomajiTable()) {
             loaded->keys = std::make_unique<japanese::KeyConverter>(loaded->dictionary, loaded->matrix,
                                                                     *loaded->converter, *table);

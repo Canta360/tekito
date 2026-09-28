@@ -122,3 +122,18 @@ converting and committing each phrase, so the committed text leads into the
 next conversion; `--no-context` starts every phrase afresh. On
 `japanese_eval_keys.tsv`, 58.9% of the sentences come out right without the
 context and 61.3% with it (61.5% when converted whole).
+
+For a larger set, `scripts/prepare-japanese-jsut-eval.py` writes
+`japanese_eval_jsut.tsv` (and `_keys`): about 4,000 of the 5,000 JSUT
+basic5000 sentences, their typed readings recovered from the spoken ones
+through the Mozc dictionary (the text is CC BY-SA / CC BY and is not
+committed). Only one writing counts as right there, so `cer` says more than
+`top1`.
+
+`--lm data\japanese-lm` adds the language model, with `--lm-scale`,
+`--lm-penalty`, `--lm-threshold` and `--topic-scale` to tune it
+(JapaneseConverter::ModelWeights has the defaults). With it the JSUT
+sentences go from 36.9% to 38.9% (cer 6.8% to 6.5%) and the Mozc and
+AJIMEE ones from 61.2% to 62.0% (cer 7.0% to 6.4%); conversion takes about
+twice as long, a few milliseconds.
+
