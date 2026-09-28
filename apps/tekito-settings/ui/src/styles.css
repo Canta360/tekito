@@ -193,7 +193,13 @@ nav { display: grid; gap: 4px; }
   opacity: 0; transform: scale(0.82);
   transition: opacity 0.45s var(--ease), transform 0.45s var(--ease);
 }
-.tile.is-on .tile-light { opacity: var(--light); transform: scale(1); }
+.tile.is-on .tile-light {
+  opacity: var(--light); transform: scale(1);
+  /* Clear first, then the color comes up through the blur: shown at full
+     strength at once, the first frames can come before the blur. */
+  animation: tile-light-in 0.5s var(--ease) 0.1s both;
+}
+@keyframes tile-light-in { from { opacity: 0; } }
 .tile-glass {
   position: absolute; inset: 0;
   display: flex; flex-direction: column; justify-content: space-between;
