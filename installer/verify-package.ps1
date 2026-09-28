@@ -69,14 +69,19 @@ if ($packs.Count -ne [int]$manifest.data_packs) {
 foreach ($pack in $packs) {
     $packManifest = Get-Content (Join-Path $pack.FullName "manifest.json") -Raw | ConvertFrom-Json
     $dataPath = Resolve-ChildPath $pack.FullName ([string]$packManifest.file)
-    $indexPath = Resolve-ChildPath $pack.FullName ([string]$packManifest.index_file)
     $noticePath = Resolve-ChildPath $pack.FullName ([string]$packManifest.notice_file)
-    if (-not (Test-Path $dataPath) -or -not (Test-Path $indexPath) -or -not (Test-Path $noticePath)) {
+    if (-not (Test-Path $dataPath) -or -not (Test-Path $noticePath)) {
         throw "Data Pack $($pack.Name) is incomplete."
     }
-    if ((Get-Sha256 $dataPath) -ne ([string]$packManifest.sha256.file).ToUpperInvariant() -or
-        (Get-Sha256 $indexPath) -ne ([string]$packManifest.sha256.index).ToUpperInvariant()) {
+    if ((Get-Sha256 $dataPath) -ne ([string]$packManifest.sha256.file).ToUpperInvariant()) {
         throw "Data Pack $($pack.Name) failed its checksum."
+    }
+    if ($packManifest.PSObject.Properties.Name -contains "index_file") {
+        $indexPath = Resolve-ChildPath $pack.FullName ([string]$packManifest.index_file)
+        if (-not (Test-Path $indexPath) -or
+            (Get-Sha256 $indexPath) -ne ([string]$packManifest.sha256.index).ToUpperInvariant()) {
+            throw "Data Pack $($pack.Name) failed its checksum."
+        }
     }
 }
 

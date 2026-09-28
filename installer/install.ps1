@@ -5,11 +5,21 @@
 # a Start menu shortcut to Settings. Needs an administrator PowerShell unless
 # -SkipRegistration is given. The user's dictionary, learning and settings in
 # %LOCALAPPDATA%\TEKITO are never touched.
+#
+# -Japanese adds Japanese input: it downloads the Japanese Data Packs named in
+# package-manifest.json (or takes them from -JapaneseDataPath), checks their
+# SHA-256, and adds TEKITO to the Japanese keyboard list in place of the
+# English one; TEKITO for Japanese has Auto and Direct for English. Pass
+# -KeepEnglishProfile to keep both. Exit code 20: the download failed;
+# 21: the downloaded file did not match.
 [CmdletBinding()]
 param(
     [string]$SourceRoot = $PSScriptRoot,
     [string]$InstallRoot = (Join-Path $env:LOCALAPPDATA "Programs\TEKITO"),
     [bool]$StartMenuShortcut = $true,
+    [bool]$Japanese = $false,
+    [string]$JapaneseDataPath,
+    [bool]$KeepEnglishProfile = $false,
     [switch]$SkipDataPacks,
     [switch]$SkipRegistration,
     [switch]$SkipPrerequisiteCheck
@@ -19,6 +29,7 @@ $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
 $tip = "0409:{6F67E5C8-A873-4B69-8EC3-26DF00F642F1}{8D99240A-5C9C-4ED8-8DE4-85F21DF23763}"
+$japaneseTip = "0411:{6F67E5C8-A873-4B69-8EC3-26DF00F642F1}{2876747C-FA52-4CCC-B308-F406190F8CDE}"
 $regsvr32 = Join-Path $env:WINDIR "System32\regsvr32.exe"
 $startMenu = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\TEKITO"
 
@@ -44,16 +55,65 @@ function Remove-InstalledFiles([string]$Root) {
         ForEach-Object { Remove-Item -LiteralPath $_.FullName -Force -ErrorAction SilentlyContinue }
 }
 
-function Remove-InputMethodTip {
+function Remove-InputMethodTip([string[]]$Tips) {
     $languages = Get-WinUserLanguageList
     $changed = $false
     foreach ($language in $languages) {
-        if ($language.InputMethodTips -contains $tip) {
-            [void]$language.InputMethodTips.Remove($tip)
-            $changed = $true
+        foreach ($oneTip in $Tips) {
+            if ($language.InputMethodTips -contains $oneTip) {
+                [void]$language.InputMethodTips.Remove($oneTip)
+                $changed = $true
+            }
         }
     }
     if ($changed) { Set-WinUserLanguageList $languages -Force }
+}
+
+# Puts TEKITO in a language's keyboard list, adding the language if needed.
+# Returns whether it changed anything.
+function Add-InputMethodTip($Languages, [string]$LanguageTag, [string]$Tip) {
+    $language = $Languages | Where-Object { $_.LanguageTag -eq $LanguageTag } | Select-Object -First 1
+    if (-not $language) {
+        $language = (New-WinUserLanguageList $LanguageTag)[0]
+        $Languages.Add($language)
+    }
+    if ($language.InputMethodTips -contains $Tip) { return $false }
+    $language.InputMethodTips.Add($Tip)
+    return $true
+}
+
+# The Japanese Data Packs, downloaded (or copied) and checked, unpacked into
+# a new folder. Exits with 20 or 21 when they cannot be had.
+function Get-JapaneseData($Manifest, [string]$LocalZip) {
+    $info = if ($Manifest -and ($Manifest.PSObject.Properties.Name -contains "japanese_data")) { $Manifest.japanese_data } else { $null }
+    if (-not $info -and -not $LocalZip) { throw "This package does not say where its Japanese data is." }
+    $root = Join-Path ([IO.Path]::GetTempPath()) ("tekito-japanese-" + [guid]::NewGuid().ToString("N"))
+    New-Item -ItemType Directory -Path $root -Force | Out-Null
+    $zip = Join-Path $root "japanese-data.zip"
+    try {
+        if ($LocalZip) {
+            Copy-Item -LiteralPath $LocalZip $zip
+        } else {
+            Write-Host "Downloading $($info.url)"
+            [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor
+                [Net.SecurityProtocolType]::Tls12
+            $ProgressPreference = "SilentlyContinue"
+            Invoke-WebRequest -Uri ([string]$info.url) -OutFile $zip -UseBasicParsing
+        }
+    } catch {
+        Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue
+        Write-Host "The Japanese data could not be downloaded: $($_.Exception.Message)"
+        exit 20
+    }
+    if ($info -and (Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToUpperInvariant() -ne
+        ([string]$info.sha256).ToUpperInvariant()) {
+        Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue
+        Write-Host "The Japanese data does not match this package."
+        exit 21
+    }
+    $packs = Join-Path $root "packs"
+    Expand-Archive -LiteralPath $zip -DestinationPath $packs -Force
+    return $packs
 }
 
 $SourceRoot = (Resolve-Path $SourceRoot).Path
@@ -84,12 +144,20 @@ if (-not $SkipRegistration -and -not $principal.IsInRole([Security.Principal.Win
     throw "Run this from an administrator PowerShell, or pass -SkipRegistration for a copy that is not registered."
 }
 
+# Fetch the Japanese data before anything changes, so a failed download
+# leaves the current installation as it was.
+$japaneseData = $null
+if ($JapaneseDataPath) { $Japanese = $true }
+if ($Japanese -and -not $SkipDataPacks) {
+    $japaneseData = Get-JapaneseData $packageManifest $JapaneseDataPath
+}
+
 # Stage the new files first so a failure leaves the old installation alone.
 $stagingRoot = Join-Path ([IO.Path]::GetTempPath()) ("tekito-install-" + [guid]::NewGuid().ToString("N"))
 New-Item -ItemType Directory -Path $stagingRoot -Force | Out-Null
 $installedDll = Join-Path $installRoot "Tekito.Tsf.dll"
 $installedApp = Join-Path $installRoot "TEKITO.exe"
-$addedInputTip = $false
+$addedTips = @()
 $registeredNewDll = $false
 try {
     Copy-Item -LiteralPath (Join-Path $SourceRoot "TEKITO.exe") $stagingRoot
@@ -112,6 +180,11 @@ try {
         & (Join-Path $SourceRoot "scripts\install-data-packs.ps1") `
             -SourceRoot (Join-Path $SourceRoot "data") `
             -DestinationRoot (Join-Path $env:LOCALAPPDATA "TEKITO\data")
+        if ($japaneseData) {
+            & (Join-Path $SourceRoot "scripts\install-data-packs.ps1") `
+                -SourceRoot $japaneseData `
+                -DestinationRoot (Join-Path $env:LOCALAPPDATA "TEKITO\data")
+        }
     }
 
     if (-not $SkipRegistration) {
@@ -119,17 +192,24 @@ try {
         if ($code -ne 0) { throw "Registering the input method failed (regsvr32 returned $code)." }
         $registeredNewDll = $true
 
+        # With Japanese, one TEKITO is enough: the Japanese one also types
+        # English in Auto and Direct.
         $languages = Get-WinUserLanguageList
-        $english = $languages | Where-Object { $_.LanguageTag -eq "en-US" } | Select-Object -First 1
-        if (-not $english) {
-            $english = (New-WinUserLanguageList en-US)[0]
-            $languages.Add($english)
+        $changed = $false
+        if ($Japanese) {
+            if (Add-InputMethodTip $languages "ja-JP" $japaneseTip) { $addedTips += $japaneseTip; $changed = $true }
         }
-        if ($english.InputMethodTips -notcontains $tip) {
-            $english.InputMethodTips.Add($tip)
-            Set-WinUserLanguageList $languages -Force
-            $addedInputTip = $true
+        if (-not $Japanese -or $KeepEnglishProfile) {
+            if (Add-InputMethodTip $languages "en-US" $tip) { $addedTips += $tip; $changed = $true }
+        } else {
+            foreach ($language in $languages) {
+                if ($language.InputMethodTips -contains $tip) {
+                    [void]$language.InputMethodTips.Remove($tip)
+                    $changed = $true
+                }
+            }
         }
+        if ($changed) { Set-WinUserLanguageList $languages -Force }
     }
 
     $shortcutPath = Join-Path $startMenu "TEKITO Settings.lnk"
@@ -153,6 +233,7 @@ try {
         tsf_dll = $installedDll
         data_root = Join-Path $env:LOCALAPPDATA "TEKITO\data"
         start_menu_shortcut = $StartMenuShortcut
+        japanese = $Japanese
     } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $installRoot "install-manifest.json") -Encoding UTF8
 
     Write-Host "TEKITO is installed in $installRoot."
@@ -162,7 +243,7 @@ catch {
     # Undo a first-time install that did not finish.
     if (-not $hadExistingInstall -and (Test-Path -LiteralPath $installRoot) -and
         -not (Test-Path -LiteralPath (Join-Path $installRoot "install-manifest.json"))) {
-        if ($addedInputTip) { Remove-InputMethodTip }
+        if ($addedTips.Count -gt 0) { Remove-InputMethodTip $addedTips }
         if ($registeredNewDll) { [void](Invoke-Regsvr32 @('/u', '/s', $installedDll)) }
         Remove-Item -LiteralPath $startMenu -Recurse -Force -ErrorAction SilentlyContinue
         Remove-Item -LiteralPath $installRoot -Recurse -Force -ErrorAction SilentlyContinue
@@ -173,4 +254,8 @@ finally {
     if ($stagingRoot -and (Test-Path -LiteralPath $stagingRoot)) {
         Remove-Item -LiteralPath $stagingRoot -Recurse -Force
     }
+    if ($japaneseData) {
+        Remove-Item -LiteralPath (Split-Path $japaneseData -Parent) -Recurse -Force -ErrorAction SilentlyContinue
+    }
 }
+exit 0

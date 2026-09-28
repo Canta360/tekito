@@ -2,6 +2,10 @@
 #   artifacts\TEKITO-<version>-full\            the package, ready to zip
 #   artifacts\TEKITO-<version>-full.zip          the package as a ZIP
 #   artifacts\TEKITO-<version>-full-installer.exe  setup program + ZIP in one file
+#   artifacts\TEKITO-<version>-japanese-data.zip  the Japanese Data Packs
+# The Japanese data is too large to carry in the installer. Attach its ZIP to
+# the GitHub release v<version>; the installer downloads it when Japanese is
+# chosen and checks it against the SHA-256 recorded here.
 # -ValidateOnly checks the inputs without writing anything.
 [CmdletBinding()]
 param(
@@ -9,6 +13,7 @@ param(
     [string]$SourceDataRoot,
     [string]$OutputRoot,
     [string]$ArchivePath,
+    [string]$JapaneseDataBaseUrl = "https://github.com/Canta360/tekito/releases/download",
     [switch]$ValidateOnly
 )
 
@@ -30,6 +35,9 @@ $SourceDataRoot = (Resolve-Path $SourceDataRoot).Path
 # Packs TEKITO cannot do without; the others are included when present.
 $requiredPacks = @("standard-english", "wikipedia-common-misspellings", "frequency",
                    "dictionary-display", "slang", "wiktionary-slang", "pronunciation", "emoji")
+# Japanese input, downloaded separately; the first two are required for it.
+$japanesePacks = @("japanese-core", "japanese-romaji", "japanese-lm", "japanese-loanwords",
+                   "japanese-wiktionary", "japanese-wordnet")
 
 function Get-RelativeUnixPath([string]$BasePath, [string]$TargetPath) {
     $base = (Resolve-Path -LiteralPath $BasePath).Path.TrimEnd('\') + '\'
@@ -84,29 +92,43 @@ if (-not (Test-Path -LiteralPath (Join-Path $releaseRoot "settings-ui\index.html
     throw "The Settings page was not built. Run npm run build in apps\tekito-settings\ui, then rebuild."
 }
 
-$packs = @(Get-ChildItem -LiteralPath $SourceDataRoot -Directory |
+$allPacks = @(Get-ChildItem -LiteralPath $SourceDataRoot -Directory |
     Where-Object { Test-Path (Join-Path $_.FullName "manifest.json") })
+$packs = @($allPacks | Where-Object { $japanesePacks -notcontains $_.Name })
+$japaneseSources = @($allPacks | Where-Object { $japanesePacks -contains $_.Name })
 foreach ($required in $requiredPacks) {
     if ($packs.Name -notcontains $required) { throw "Required Data Pack is missing: $required" }
 }
-foreach ($pack in $packs) {
+foreach ($required in $japanesePacks[0..1]) {
+    if ($japaneseSources.Name -notcontains $required) {
+        throw "Japanese Data Pack is missing: $required. Run scripts\prepare-japanese-packs.ps1."
+    }
+}
+foreach ($pack in $allPacks) {
     $manifest = Get-Content (Join-Path $pack.FullName "manifest.json") -Raw | ConvertFrom-Json
-    foreach ($field in @("file", "index_file", "notice_file", "sha256")) {
+    foreach ($field in @("file", "notice_file", "sha256")) {
         if ($null -eq $manifest.$field) { throw "Pack $($pack.Name) is missing manifest field $field." }
     }
     $dataPath = Resolve-ChildPath $pack.FullName ([string]$manifest.file)
-    $indexPath = Resolve-ChildPath $pack.FullName ([string]$manifest.index_file)
     $noticePath = Resolve-ChildPath $pack.FullName ([string]$manifest.notice_file)
-    if (-not (Test-Path $dataPath) -or -not (Test-Path $indexPath) -or -not (Test-Path $noticePath)) {
-        throw "Pack $($pack.Name) is missing its data, index or NOTICE."
+    if (-not (Test-Path $dataPath) -or -not (Test-Path $noticePath)) {
+        throw "Pack $($pack.Name) is missing its data or NOTICE."
     }
-    if ((Get-Sha256 $dataPath) -ne ([string]$manifest.sha256.file).ToUpperInvariant() -or
-        (Get-Sha256 $indexPath) -ne ([string]$manifest.sha256.index).ToUpperInvariant()) {
+    if ((Get-Sha256 $dataPath) -ne ([string]$manifest.sha256.file).ToUpperInvariant()) {
         throw "Pack $($pack.Name) failed checksum validation."
+    }
+    # Packs read front to back have no index file.
+    if ($manifest.PSObject.Properties.Name -contains "index_file") {
+        $indexPath = Resolve-ChildPath $pack.FullName ([string]$manifest.index_file)
+        if (-not (Test-Path $indexPath) -or
+            (Get-Sha256 $indexPath) -ne ([string]$manifest.sha256.index).ToUpperInvariant()) {
+            throw "Pack $($pack.Name) failed checksum validation."
+        }
     }
 }
 if ($ValidateOnly) {
-    Write-Host "Inputs are complete: $($binaries.Count) binaries, the setup program, the Settings page and $($packs.Count) Data Packs."
+    Write-Host ("Inputs are complete: $($binaries.Count) binaries, the setup program, the Settings page, " +
+        "$($packs.Count) Data Packs and $($japaneseSources.Count) Japanese Data Packs.")
     exit 0
 }
 
@@ -153,6 +175,23 @@ foreach ($pack in $packs) {
         license = [string]$manifest.license
     }
 }
+
+# The Japanese data, for the release page.
+$japaneseName = "TEKITO-$version-japanese-data.zip"
+$japaneseArchive = Join-Path (Split-Path ([IO.Path]::GetFullPath($ArchivePath)) -Parent) $japaneseName
+$japaneseStaging = Join-Path ([IO.Path]::GetTempPath()) ("tekito-japanese-" + [guid]::NewGuid().ToString("N"))
+try {
+    New-Item -ItemType Directory -Path $japaneseStaging -Force | Out-Null
+    foreach ($pack in $japaneseSources) { Copy-Item -LiteralPath $pack.FullName $japaneseStaging -Recurse -Force }
+    if (Test-Path -LiteralPath $japaneseArchive) { Remove-Item -LiteralPath $japaneseArchive -Force }
+    Compress-Archive -Path (Join-Path $japaneseStaging "*") -DestinationPath $japaneseArchive -CompressionLevel Optimal
+} finally {
+    Remove-Item -LiteralPath $japaneseStaging -Recurse -Force -ErrorAction SilentlyContinue
+}
+$japaneseHash = Get-Sha256 $japaneseArchive
+"$japaneseHash  $japaneseName" | Set-Content -LiteralPath "$japaneseArchive.sha256" -Encoding ASCII
+Write-Host "Japanese data: $japaneseArchive (attach it to the v$version release)"
+
 $installerName = "TEKITO-$version-full-installer.exe"
 [ordered]@{
     product = "TEKITO"
@@ -163,6 +202,14 @@ $installerName = "TEKITO-$version-full-installer.exe"
     requires_webview2_runtime = $true
     data_packs = $packs.Count
     data_pack_manifests = $packManifests
+    # Downloaded by install.ps1 -Japanese; nothing else is fetched.
+    japanese_data = [ordered]@{
+        file = $japaneseName
+        url = "$($JapaneseDataBaseUrl.TrimEnd('/'))/v$version/$japaneseName"
+        sha256 = $japaneseHash
+        size = (Get-Item -LiteralPath $japaneseArchive).Length
+        packs = @($japaneseSources.Name)
+    }
     files = $hashes
 } | ConvertTo-Json -Depth 6 | Set-Content (Join-Path $OutputRoot "package-manifest.json") -Encoding UTF8
 & (Join-Path $OutputRoot "verify-package.ps1") -PackageRoot $OutputRoot

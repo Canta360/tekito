@@ -53,13 +53,17 @@ if (-not $SkipRegistration) {
         if ($process.ExitCode -ne 0) { Write-Warning "Unregistering $($dll.Name) returned $($process.ExitCode)." }
     }
 
-    $tip = "0409:{6F67E5C8-A873-4B69-8EC3-26DF00F642F1}{8D99240A-5C9C-4ED8-8DE4-85F21DF23763}"
+    # TEKITO for English and TEKITO for Japanese.
+    $tips = @("0409:{6F67E5C8-A873-4B69-8EC3-26DF00F642F1}{8D99240A-5C9C-4ED8-8DE4-85F21DF23763}",
+              "0411:{6F67E5C8-A873-4B69-8EC3-26DF00F642F1}{2876747C-FA52-4CCC-B308-F406190F8CDE}")
     $languages = Get-WinUserLanguageList
     $changed = $false
     foreach ($language in $languages) {
-        if ($language.InputMethodTips -contains $tip) {
-            [void]$language.InputMethodTips.Remove($tip)
-            $changed = $true
+        foreach ($tip in $tips) {
+            if ($language.InputMethodTips -contains $tip) {
+                [void]$language.InputMethodTips.Remove($tip)
+                $changed = $true
+            }
         }
     }
     if ($changed) { Set-WinUserLanguageList $languages -Force }
