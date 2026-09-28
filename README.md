@@ -19,7 +19,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/images/typing-demo-ja.png" alt="Typing “hahimemasite”, a slip for はじめまして: Space converts what was typed, the second Space opens the list, where はじめまして waits marked もしかして with its meaning beside it; then “kyouhaiitenkidesune.” becomes 今日はいい天気ですね。" width="640">
+  <img src="docs/images/japanese-demo.png" alt="Typing “hahimemasite”, a slip for はじめまして: Space converts what was typed, the second Space opens the list, where はじめまして waits marked もしかして with its meaning beside it; then “kyouhaiitenkidesune.” becomes 今日はいい天気ですね。" width="640">
 </p>
 
 TEKITO is an input method (a TSF text service), so it works in ordinary
