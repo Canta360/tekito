@@ -781,6 +781,8 @@ private:
         json += L",\"candidateWindowStyle\":" + std::to_wstring(settings_.candidateWindowStyle);
         json += L",\"candidateRows\":" + std::to_wstring(settings_.candidateRows);
         json += L",\"japaneseSwitchOrder\":" + std::to_wstring(settings_.japaneseSwitchOrder);
+        json += L",\"modeIndicatorEnabled\":";
+        json += settings_.modeIndicatorEnabled ? L"true" : L"false";
         json += L",\"japaneseEnabled\":";
         json += settings_.japaneseEnabled ? L"true" : L"false";
         json += L",\"meaningsEnabled\":";
@@ -935,6 +937,7 @@ private:
             else if (key == L"periodOnEnter") settings_.periodOnEnter = value;
             else if (key == L"meaningsEnabled") settings_.meaningsEnabled = value;
             else if (key == L"japaneseEnabled") settings_.japaneseEnabled = value;
+            else if (key == L"modeIndicatorEnabled") settings_.modeIndicatorEnabled = value;
             else if (key == L"japaneseSwitchOrder") {
                 settings_.japaneseSwitchOrder = std::clamp(integerValue, 0, 2);
             }

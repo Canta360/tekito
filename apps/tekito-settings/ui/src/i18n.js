@@ -46,6 +46,10 @@ const en = {
     descriptionJapanese: "Switches the input mode from any app, in the order below. Only this key switches.",
     none: "None",
   },
+  modeIndicator: {
+    title: "Show the mode when switching",
+    description: "The new mode's icon appears by the caret for a moment.",
+  },
   japaneseInput: {
     title: "Japanese input",
     description: "Type Japanese from romaji. Off, TEKITO has only Auto and Direct.",
@@ -255,6 +259,10 @@ const ja = {
     description: "どのアプリでも Auto と Direct を切り替えます。切り替えはこのキーだけで行います。",
     descriptionJapanese: "どのアプリでも、下の順番で入力モードを切り替えます。切り替えはこのキーだけで行います。",
     none: "なし",
+  },
+  modeIndicator: {
+    title: "切り替えたときにモードを表示",
+    description: "切り替えた先のモードのアイコンを、キャレットの近くに一瞬出します。",
   },
   japaneseInput: {
     title: "日本語入力",

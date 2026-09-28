@@ -7,6 +7,7 @@
 #include "Tsf/ComPtr.h"
 #include "Tsf/EditSession.h"
 #include "Tsf/TekitoGuids.h"
+#include "Tsf/ModeIndicator.h"
 #include "Tsf/ModeLangBarItem.h"
 #include "UserData/UserDataRepository.h"
 #include "UserData/RuntimeModeState.h"
@@ -117,6 +118,12 @@ private:
     void RefreshCandidates(ITfContext* context, TfEditCookie editCookie);
     void ShowCandidates(ITfContext* context, TfEditCookie editCookie);
     RECT GetCandidateAnchor(ITfContext* context, TfEditCookie editCookie) const;
+    // The caret (or the selection) outside a composition, the composition
+    // inside one.
+    RECT CaretAnchor(ITfContext* context, TfEditCookie editCookie) const;
+    // After the user switched modes: the new mode by the caret, if Settings
+    // shows it. `context` may be null (the taskbar button).
+    void ShowModeIndicator(ITfContext* context);
     HRESULT RequestKeyEditSession(ITfContext* context, const KeyInput& input);
     void OnCandidateSelected(std::size_t index);
     void SyncRuntimeState();
@@ -244,6 +251,7 @@ private:
     std::size_t japanesePage_{9};
     RECT candidateAnchor_{};
     CandidateWindow candidateWindow_;
+    ModeIndicator modeIndicator_;
     ComPtr<ITfLangBarItemMgr> langBarItemMgr_;
     ComPtr<ModeLangBarItem> modeLangBarItem_;
 };

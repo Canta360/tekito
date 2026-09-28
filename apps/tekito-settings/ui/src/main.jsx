@@ -35,6 +35,7 @@ const initialSettings = {
   meaningsEnabled: true,
   japaneseSwitchOrder: 0,
   japaneseEnabled: true,
+  modeIndicatorEnabled: true,
   toggleKey: 1,
   keyboardType: 0,
   periodOnEnter: false,
@@ -351,6 +352,9 @@ function GeneralPage({ mode, japanese, japaneseInstalled, japaneseKeyboard, sett
         )}
         <Row title={t.restoreMode.title} description={japanese ? t.restoreMode.descriptionJapanese : t.restoreMode.description}>
           <Toggle label={t.restoreMode.title} checked={settings.restoreLastInputMode} onChange={(value) => setSetting("restoreLastInputMode", value)} />
+        </Row>
+        <Row title={t.modeIndicator.title} description={t.modeIndicator.description}>
+          <Toggle label={t.modeIndicator.title} checked={settings.modeIndicatorEnabled} onChange={(value) => setSetting("modeIndicatorEnabled", value)} />
         </Row>
         <Row title={t.language.title} description={t.language.description}>
           <Segmented label={t.language.title} value={settings.uiLanguage} options={languages} onChange={(value) => setSetting("uiLanguage", value)} />
