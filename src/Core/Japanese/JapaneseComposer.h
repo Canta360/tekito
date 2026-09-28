@@ -15,6 +15,7 @@ namespace tekito::japanese {
 
 class JapaneseLearningStore;
 class KeyConverter;
+class JapaneseUserDictionary;
 class Loanwords;
 class RomajiTable;
 
@@ -71,6 +72,8 @@ public:
     // English words for katakana candidates (ミーティング -> meeting), offered
     // right after them; nullptr offers none.
     void SetLoanwords(const Loanwords* loanwords) noexcept { loanwords_ = loanwords; }
+    // The user's words, for conversion and predictions; null for none.
+    void SetUserDictionary(const JapaneseUserDictionary* user) noexcept { userDictionary_ = user; }
     // How the romaji table reads `keys` from the start, unit by unit.
     [[nodiscard]] static std::vector<RomajiToken> ParseRomaji(const RomajiTable& table, std::wstring_view keys);
     // What the user chose before puts candidates first; each commit is
@@ -227,6 +230,7 @@ private:
     const JapaneseConverter* converter_{nullptr};
     const KeyConverter* keyConverter_{nullptr};
     const Loanwords* loanwords_{nullptr};
+    const JapaneseUserDictionary* userDictionary_{nullptr};
     JapaneseLearningStore* learning_{nullptr};
     std::vector<Unit> units_;
     // Units before the caret; pending keys belong at the caret.

@@ -48,7 +48,8 @@ public:
     // that) or when keys stay unreadable.
     // `context` and `contextWords`: as for JapaneseConverter::Convert.
     [[nodiscard]] std::optional<KeyConversion> Convert(std::wstring_view keys, std::uint16_t context = 0,
-                                                       std::span<const std::wstring> contextWords = {}) const;
+                                                       std::span<const std::wstring> contextWords = {},
+                                                       const JapaneseUserDictionary* user = nullptr) const;
 
 private:
     const JapaneseDictionary& dictionary_;

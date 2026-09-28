@@ -1,6 +1,7 @@
 #include "Core/Japanese/JapaneseConverter.h"
 
 #include "Core/Japanese/JapaneseDictionary.h"
+#include "Core/Japanese/JapaneseUserDictionary.h"
 #include "Core/Japanese/KanaText.h"
 #include "Core/Japanese/LanguageModel.h"
 
@@ -36,6 +37,9 @@ struct Node {
     std::int64_t cost{0};
     bool known{false};
     DictionaryWord word;
+    // A word the user added, and how it is written.
+    bool user{false};
+    std::wstring text;
     // For the language model, when it has the word: ln(count), the pair
     // hash the word starts, and its text to end a pair.
     std::optional<double> logCount;
@@ -51,7 +55,7 @@ struct Lattice {
 
 Lattice BuildLattice(const JapaneseDictionary& dictionary, const ReadingCodes& codes,
                      const std::vector<bool>& fixedBoundary, std::wstring_view reading,
-                     const LanguageModel* model) {
+                     const LanguageModel* model, const JapaneseUserDictionary* user) {
     const std::size_t n = codes.size();
     Lattice lattice;
     lattice.beginningAt.resize(n + 1);
@@ -93,6 +97,27 @@ Lattice BuildLattice(const JapaneseDictionary& dictionary, const ReadingCodes& c
                 add(std::move(node));
             });
         });
+        if (user) {
+            user->ForEachPrefixOf(reading.substr(i), [&](std::size_t length, const JapaneseUserDictionary::Entry& entry) {
+                if (crosses(i, i + length)) return;
+                Node node;
+                node.begin = static_cast<std::uint32_t>(i);
+                node.end = static_cast<std::uint32_t>(i + length);
+                node.left = entry.left;
+                node.right = entry.right;
+                node.cost = entry.cost;
+                node.user = true;
+                node.text = entry.surface;
+                if (model) {
+                    node.logCount = model->LogCount(entry.surface);
+                    if (node.logCount) {
+                        node.pairStart = LanguageModel::PairStart(entry.surface);
+                        node.surface = entry.surface;
+                    }
+                }
+                add(std::move(node));
+            });
+        }
         Node single;
         single.begin = static_cast<std::uint32_t>(i);
         single.end = static_cast<std::uint32_t>(i + 1);
@@ -142,7 +167,8 @@ struct PathEntry {
 std::vector<Phrase> JapaneseConverter::Convert(std::wstring_view reading,
                                                std::span<const std::size_t> fixedLengths,
                                                std::uint16_t context,
-                                               std::span<const std::wstring> contextWords) const {
+                                               std::span<const std::wstring> contextWords,
+                                               const JapaneseUserDictionary* user) const {
     const std::size_t n = reading.size();
     if (n == 0) return {};
     const ReadingCodes codes = dictionary_.Encode(reading);
@@ -155,7 +181,7 @@ std::vector<Phrase> JapaneseConverter::Convert(std::wstring_view reading,
         fixedBoundary[fixedEnd] = true;
     }
     const bool pairs = model_ && (weights_.costPerNat > 0 || weights_.penaltyPerNat > 0);
-    const Lattice lattice = BuildLattice(dictionary_, codes, fixedBoundary, reading, pairs ? model_ : nullptr);
+    const Lattice lattice = BuildLattice(dictionary_, codes, fixedBoundary, reading, pairs ? model_ : nullptr, user);
     const auto& nodes = lattice.nodes;
 
     // The most likely words for the whole reading.
@@ -211,7 +237,7 @@ std::vector<Phrase> JapaneseConverter::Convert(std::wstring_view reading,
 
     const auto textOf = [&](const Node& node) {
         const auto part = reading.substr(node.begin, node.end - node.begin);
-        return node.known ? dictionary_.Surface(node.word, part) : std::wstring(part);
+        return node.user ? node.text : node.known ? dictionary_.Surface(node.word, part) : std::wstring(part);
     };
     // The content words of the likeliest reading, by phrase, for the
     // sentence model: each phrase's candidates meet the others' words.
@@ -222,7 +248,7 @@ std::vector<Phrase> JapaneseConverter::Convert(std::wstring_view reading,
         for (const auto& word : contextWords) sentenceWords.emplace_back(spans.size(), word);
         for (std::size_t s = 0; s < spans.size(); ++s) {
             for (std::size_t k = spans[s].first; k < spans[s].second; ++k) {
-                if (!nodes[path[k]].known) continue;
+                if (!nodes[path[k]].known && !nodes[path[k]].user) continue;
                 auto word = textOf(nodes[path[k]]);
                 if (LanguageModel::IsContentWord(word)) sentenceWords.emplace_back(s, std::move(word));
             }
@@ -308,7 +334,8 @@ std::vector<Phrase> JapaneseConverter::Convert(std::wstring_view reading,
             }
             for (auto it = parts.rbegin(); it != parts.rend(); ++it) {
                 auto part = textOf(nodes[*it]);
-                if (topics && nodes[*it].known && part.size() > head.size() && LanguageModel::IsContentWord(part)) {
+                if (topics && (nodes[*it].known || nodes[*it].user) && part.size() > head.size() &&
+                    LanguageModel::IsContentWord(part)) {
                     head = part;
                 }
                 text += part;
@@ -367,6 +394,26 @@ std::vector<Phrase> JapaneseConverter::Convert(std::wstring_view reading,
             for (std::size_t r = 0; r < ranked.size(); ++r) phrase.candidates[places[r]] = std::move(ranked[r].second);
         }
 
+        // The user's words read like the phrase come first.
+        if (const auto* words = user ? user->Exact(phraseReading) : nullptr) {
+            std::vector<PhraseCandidate> userFirst;
+            for (const auto& word : *words) {
+                PhraseCandidate candidate{word.surface,
+                                          matrix_.Cost(leftContext, word.left) + word.cost +
+                                              matrix_.Cost(word.right, rightContext),
+                                          PhraseCandidate::Kind::Dictionary, false};
+                candidate.rightId = word.right;
+                userFirst.push_back(std::move(candidate));
+            }
+            std::stable_sort(userFirst.begin(), userFirst.end(),
+                             [](const PhraseCandidate& a, const PhraseCandidate& b) { return a.cost < b.cost; });
+            std::erase_if(phrase.candidates, [&](const PhraseCandidate& c) {
+                return std::any_of(userFirst.begin(), userFirst.end(), [&](const PhraseCandidate& f) { return f.text == c.text; });
+            });
+            phrase.candidates.insert(phrase.candidates.begin(), std::make_move_iterator(userFirst.begin()),
+                                     std::make_move_iterator(userFirst.end()));
+        }
+
         const std::wstring hiragana(phraseReading);
         const std::wstring katakana = ToKatakana(phraseReading);
         if (!has(hiragana)) {
@@ -380,20 +427,21 @@ std::vector<Phrase> JapaneseConverter::Convert(std::wstring_view reading,
     return phrases;
 }
 
-std::optional<PhraseCandidate> JapaneseConverter::Best(std::wstring_view reading, std::uint16_t context) const {
+std::optional<PhraseCandidate> JapaneseConverter::Best(std::wstring_view reading, std::uint16_t context,
+                                                      const JapaneseUserDictionary* user) const {
     const std::size_t n = reading.size();
     if (n == 0) return std::nullopt;
     const ReadingCodes codes = dictionary_.Encode(reading);
     const std::vector<bool> noBoundary(n + 1, false);
     // Quick on purpose: the language model is left out.
-    const Lattice lattice = BuildLattice(dictionary_, codes, noBoundary, reading, nullptr);
+    const Lattice lattice = BuildLattice(dictionary_, codes, noBoundary, reading, nullptr, user);
     const auto& nodes = lattice.nodes;
     std::vector<std::int64_t> best(nodes.size(), kInfinity);
     std::vector<int> previous(nodes.size(), -1);
     for (std::size_t i = 0; i < n; ++i) {
         for (const int k : lattice.beginningAt[i]) {
             const Node& node = nodes[k];
-            if (!node.known) continue;
+            if (!node.known && !node.user) continue;
             if (i == 0) {
                 best[k] = node.cost + matrix_.Cost(context, node.left);
                 continue;
@@ -425,17 +473,25 @@ std::optional<PhraseCandidate> JapaneseConverter::Best(std::wstring_view reading
     result.rightId = nodes[last].right;
     for (auto it = path.rbegin(); it != path.rend(); ++it) {
         const Node& node = nodes[*it];
-        result.text += dictionary_.Surface(node.word, reading.substr(node.begin, node.end - node.begin));
+        result.text += node.user ? node.text
+                                 : dictionary_.Surface(node.word, reading.substr(node.begin, node.end - node.begin));
         result.spellingCorrection = result.spellingCorrection || node.word.spellingCorrection;
     }
     return result;
 }
 
-std::vector<Prediction> JapaneseConverter::Predict(std::wstring_view reading, std::size_t limit) const {
+std::vector<Prediction> JapaneseConverter::Predict(std::wstring_view reading, std::size_t limit,
+                                                  const JapaneseUserDictionary* user) const {
     // Going through more keys than this would take too long per keystroke.
     constexpr std::uint32_t kMaxKeys = 2000;
     std::vector<Prediction> predictions;
     if (reading.empty() || limit == 0) return predictions;
+    if (user) {
+        for (const auto* entry : user->StartingWith(reading)) {
+            if (predictions.size() >= limit) return predictions;
+            predictions.push_back({entry->reading, entry->surface, entry->cost});
+        }
+    }
     const ReadingCodes codes = dictionary_.Encode(reading);
     const auto [first, end] = dictionary_.PrefixRange(codes);
     if (first >= end || end - first > kMaxKeys) return predictions;
@@ -468,8 +524,8 @@ std::vector<Prediction> JapaneseConverter::Predict(std::wstring_view reading, st
         const bool seen = std::any_of(predictions.begin(), predictions.end(),
                                       [&](const Prediction& p) { return p.text == text; });
         if (seen) continue;
-        predictions.push_back({std::move(key), std::move(text), item.cost});
         if (predictions.size() >= limit) break;
+        predictions.push_back({std::move(key), std::move(text), item.cost});
     }
     return predictions;
 }

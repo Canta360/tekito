@@ -545,6 +545,9 @@ HRESULT TextService::ActivateEx(ITfThreadMgr* threadManager, TfClientId clientId
             if (!settingsRepository_->LoadJapaneseLearning(japaneseLearning_)) {
                 Trace(L"ActivateEx JapaneseLearning load skipped");
             }
+            if (!settingsRepository_->LoadJapaneseUserWords(japaneseUserWords_)) {
+                Trace(L"ActivateEx Japanese user words load skipped");
+            }
             Trace(L"ActivateEx UserDictionary loaded");
         } else {
             Trace(L"ActivateEx UserDictionary load skipped");
@@ -700,6 +703,11 @@ void TextService::SyncRuntimeState() {
             // Pack and stalls typing for seconds).
             userDictionary_ = std::move(loadedDictionary);
             if (candidateEngine_) candidateEngine_->RefreshUserDictionary();
+        }
+        std::vector<japanese::UserWord> loadedWords;
+        if (settingsRepository_->LoadJapaneseUserWords(loadedWords)) {
+            japaneseUserWords_ = std::move(loadedWords);
+            if (japaneseProfile_) RefreshJapaneseUserWords();
         }
         runtimeDictionaryGeneration_ = dictionaryGeneration;
     }

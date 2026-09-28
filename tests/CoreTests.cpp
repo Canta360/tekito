@@ -1925,6 +1925,26 @@ void TestSqliteUserSettingsRepository() {
                 loaded.excludedApps[1] == L"game.exe",
             "settings repository keeps excluded apps once each, ignoring case");
 
+    const std::vector<tekito::japanese::UserWord> sourceWords{
+        {L"なかの", L"中埜", tekito::japanese::UserWordKind::Surname},
+        {L"てきとう", L"TEKITO", tekito::japanese::UserWordKind::ProperNoun},
+        {L"かお", L"(^^)", tekito::japanese::UserWordKind::Symbol}};
+    {
+        tekito::userdata::SqliteUserDictionaryRepository repository(path);
+        Require(repository.Open(), "Japanese user words repository opens its database");
+        Require(repository.SaveJapaneseUserWords(sourceWords), "Japanese user words are saved");
+    }
+    {
+        tekito::userdata::SqliteUserDictionaryRepository repository(path);
+        std::vector<tekito::japanese::UserWord> loadedWords;
+        Require(repository.Open() && repository.LoadJapaneseUserWords(loadedWords),
+                "Japanese user words load");
+        Require(loadedWords == sourceWords, "Japanese user words come back as saved, in order");
+        Require(repository.SaveJapaneseUserWords({}) && repository.LoadJapaneseUserWords(loadedWords) &&
+                    loadedWords.empty(),
+                "saving no words empties the table");
+    }
+
     tekito::SocialLearningStore sourceSocial;
     sourceSocial.RecordExposure(L"lol", L"😂");
     sourceSocial.RecordSelection(L"lol", L"😂");

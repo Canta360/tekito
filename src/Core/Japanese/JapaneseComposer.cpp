@@ -109,7 +109,7 @@ void JapaneseComposer::UpdatePredictions() {
         }
     }
     if (converter_) {
-        for (auto& prediction : converter_->Predict(reading, kPredictions)) {
+        for (auto& prediction : converter_->Predict(reading, kPredictions, userDictionary_)) {
             if (predictions_.size() >= kPredictions) break;
             const bool seen = std::any_of(predictions_.begin(), predictions_.end(),
                                           [&](const Prediction& p) { return p.text == prediction.text; });
@@ -323,13 +323,13 @@ void JapaneseComposer::BuildPhrases(bool convert) {
     if (convert && converter_) {
         // A slip in the keys: converted from the keys as meant. Esc still
         // goes back to what was typed.
-        if (auto conversion = keyConverter_ ? keyConverter_->Convert(Keys(false), context_, contextWords_)
+        if (auto conversion = keyConverter_ ? keyConverter_->Convert(Keys(false), context_, contextWords_, userDictionary_)
                                             : std::nullopt) {
             conversionReading_ = ApplyPunctuation(std::move(conversion->reading));
             readingKeys_ = std::move(conversion->keyAt);
             AddPhrases(std::move(conversion->phrases), conversionReading_);
         } else {
-            AddPhrases(converter_->Convert(reading, {}, context_, contextWords_), reading);
+            AddPhrases(converter_->Convert(reading, {}, context_, contextWords_, userDictionary_), reading);
         }
     }
     if (phrases_.empty()) {
@@ -430,7 +430,7 @@ std::vector<std::pair<PhraseCandidate, std::wstring>> JapaneseComposer::SlipRead
         if (!readable) continue;
         kana = ApplyPunctuation(std::move(kana));
         if (!skip.insert(kana).second) continue;
-        auto candidate = converter_->Best(kana);
+        auto candidate = converter_->Best(kana, 0, userDictionary_);
         if (candidate && !candidate->spellingCorrection && candidate->cost <= typedCost + kSlipMargin) {
             found.emplace_back(std::move(*candidate), std::move(kana));
         }
@@ -476,7 +476,7 @@ void JapaneseComposer::AddSlipCandidates(PhraseState& phrase) const {
     std::vector<PhraseCandidate> wholeInput;
     if (phrases_.size() > 1 && allKeys.size() <= kWholeSlipKeys && lettersOnly(allKeys)) {
         const std::wstring typedAll = typedKanaOf(allKeys);
-        const std::int64_t typedCost = costOf(converter_->Best(typedAll));
+        const std::int64_t typedCost = costOf(converter_->Best(typedAll, 0, userDictionary_));
         std::vector<std::size_t> starts;
         for (const auto& p : phrases_) starts.push_back(p.begin);
         std::size_t examined = 0;
@@ -504,7 +504,7 @@ void JapaneseComposer::AddSlipCandidates(PhraseState& phrase) const {
         // offered right after it.
         const std::wstring shown = conversionReading_.substr(phrase.begin, phrase.length);
         const std::wstring typedKana = typedKanaOf(keys);
-        auto typed = converter_->Best(typedKana);
+        auto typed = converter_->Best(typedKana, 0, userDictionary_);
         if (typed && typed->spellingCorrection) typed.reset();
         const std::int64_t typedCost = costOf(typed);
         if (typedKana != shown) {
@@ -521,7 +521,7 @@ void JapaneseComposer::AddSlipCandidates(PhraseState& phrase) const {
                 continue;
             }
             const std::size_t whole[] = {found[i].second.size()};
-            const auto phrases = converter_->Convert(found[i].second, whole);
+            const auto phrases = converter_->Convert(found[i].second, whole, 0, {}, userDictionary_);
             std::size_t spellings = 0;
             for (std::size_t c = 0; phrases.size() == 1 && c < phrases.front().candidates.size() &&
                                     spellings < kSlipSpellings && offered < kSlipCandidates;
@@ -572,7 +572,7 @@ bool JapaneseComposer::SamePhrasing(const std::wstring& reading, const std::vect
         ++suffix;
     }
     std::vector<std::size_t> correctedStarts;
-    for (const auto& phrase : converter_->Convert(corrected)) correctedStarts.push_back(phrase.begin);
+    for (const auto& phrase : converter_->Convert(corrected, {}, 0, {}, userDictionary_)) correctedStarts.push_back(phrase.begin);
     // Phrase starts outside the difference, in the reading's positions; one
     // inside it is phrased differently.
     const auto mapped = [&](const std::vector<std::size_t>& list, std::size_t size) {
@@ -650,7 +650,7 @@ void JapaneseComposer::ResizeFocus(int delta) {
     std::vector<PhraseState> kept(phrases_.begin(), phrases_.begin() + static_cast<long long>(focus_));
 
     phrases_.clear();
-    AddPhrases(converter_->Convert(reading, fixed, context_, contextWords_), reading);
+    AddPhrases(converter_->Convert(reading, fixed, context_, contextWords_, userDictionary_), reading);
     if (phrases_.size() <= focus_) {
         BuildPhrases(true);
         return;

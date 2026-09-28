@@ -75,6 +75,8 @@ struct JapaneseData {
     japanese::ConnectionMatrix matrix;
     japanese::LanguageModel model;
     japanese::Loanwords loanwords;
+    // The parts of speech of the user's words (japanese-core/pos.tsv).
+    japanese::UserPartsOfSpeech userParts;
     std::unique_ptr<japanese::JapaneseConverter> converter;
     std::unique_ptr<japanese::KeyConverter> keys;
 };
@@ -99,6 +101,8 @@ const JapaneseData* ProcessJapaneseData() {
                                                                     *loaded->converter, *table);
         }
         if (!loaded->loanwords.Open(root / L"japanese-loanwords")) Trace(L"Japanese loanwords unavailable");
+        loaded->userParts = japanese::UserPartsOfSpeech::Load(root / L"japanese-core" / L"pos.tsv");
+        if (loaded->userParts.Empty()) Trace(L"Japanese user word parts of speech unavailable");
         return loaded;
     }();
     return data.get();
@@ -164,7 +168,18 @@ void TextService::UpdateActiveProfile() {
     if (japanese) {
         japanese_.SetTable(ProcessRomajiTable());
         AttachJapaneseData(japanese_);
+        RefreshJapaneseUserWords();
     }
+}
+
+void TextService::RefreshJapaneseUserWords() {
+    const auto* data = ProcessJapaneseData();
+    if (!data) {
+        japanese_.SetUserDictionary(nullptr);
+        return;
+    }
+    japaneseUserDictionary_.Set(japaneseUserWords_, data->userParts);
+    japanese_.SetUserDictionary(japaneseUserDictionary_.Empty() ? nullptr : &japaneseUserDictionary_);
 }
 
 void TextService::SetJapaneseProfile(bool japanese) {
@@ -176,6 +191,7 @@ void TextService::SetJapaneseProfile(bool japanese) {
     if (japanese) {
         japanese_.SetTable(ProcessRomajiTable());
         AttachJapaneseData(japanese_);
+        RefreshJapaneseUserWords();
     }
     SetInputMode(SharedMode());
 }

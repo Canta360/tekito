@@ -183,6 +183,8 @@ private:
     // The mode shared for the active profile.
     InputMode SharedMode() const noexcept;
     void UpdateActiveProfile();
+    // Puts japaneseUserWords_ into the composer's user dictionary.
+    void RefreshJapaneseUserWords();
     void SetJapaneseProfile(bool japanese);
     bool ProcessPassesThrough() const noexcept;
     bool LetsKeyThrough(const KeyInput& input) const noexcept;
@@ -247,6 +249,9 @@ private:
     // The text the composer committed last (see CheckJapaneseContext).
     std::wstring lastJapaneseCommit_;
     japanese::JapaneseLearningStore japaneseLearning_;
+    // The words the user added for Japanese, as stored and as looked up.
+    std::vector<japanese::UserWord> japaneseUserWords_;
+    japanese::JapaneseUserDictionary japaneseUserDictionary_;
     // Candidates per page of the Japanese list (UserSettings::candidateRows).
     std::size_t japanesePage_{9};
     RECT candidateAnchor_{};

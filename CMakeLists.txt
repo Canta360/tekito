@@ -38,6 +38,7 @@ add_library(tekito_core STATIC
     src/Core/Japanese/JapaneseConverter.cpp
     src/Core/Japanese/JapaneseDictionary.cpp
     src/Core/Japanese/JapaneseLearning.cpp
+    src/Core/Japanese/JapaneseUserDictionary.cpp
     src/Core/Japanese/KanaText.cpp
     src/Core/Japanese/KeyConverter.cpp
     src/Core/Japanese/LanguageModel.cpp

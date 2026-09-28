@@ -51,6 +51,10 @@ function initialState() {
       japaneseKeyboard: detectedJapaneseKeyboard },
     appearance: { accent: "#0078d4", systemLanguage: navigator.language.startsWith("ja") ? "ja" : "en" },
     learning: { enabled: true, count: 128 },
+    japaneseWords: [
+      { reading: "てきとう", surface: "TEKITO", kind: "proper-noun" },
+      { reading: "かんた", surface: "カンタ", kind: "given-name" },
+    ],
     dictionary: [
       { id: 1, raw: "tekito", candidate: "tekito", type: "Word", policy: "Protect original" },
       { id: 2, raw: "brb", candidate: "be right back", type: "Word", policy: "Expand abbreviation" },
@@ -94,7 +98,18 @@ export function installMockHost() {
     postMessage: (raw) => {
       const message = JSON.parse(raw);
       const { type, requestId } = message;
-      if (type === "settings.set") {
+      if (type === "japaneseWords.save") {
+        const words = state.japaneseWords.filter((w) =>
+          !(w.reading === message.originalReading && w.surface === message.originalSurface) &&
+          !(w.reading === message.reading && w.surface === message.surface));
+        const reading = [...message.reading].map((c) => {
+          const code = c.charCodeAt(0);
+          return code >= 0x30A1 && code <= 0x30F6 ? String.fromCharCode(code - 0x60) : c;
+        }).join("");
+        state.japaneseWords = [...words, { reading, surface: message.surface, kind: message.kind }];
+      } else if (type === "japaneseWords.delete") {
+        state.japaneseWords = state.japaneseWords.filter((w) => !(w.reading === message.reading && w.surface === message.surface));
+      } else if (type === "settings.set") {
         state.settings[message.key] = message.value;
         if (message.key === "learningEnabled") state.learning.enabled = message.value;
         if (message.key === "japaneseEnabled" && japaneseInstalled) state.mode = message.value ? "japanese" : "auto";
