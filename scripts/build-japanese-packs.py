@@ -31,6 +31,10 @@ connection.bin (ja-matrix-v1): how words join
                when a new phrase (bunsetsu) starts between the two words
                (Mozc's segmenter.def rules; id 0 is the start and end)
 
+pos.tsv: the part of speech a word the user adds takes, by the kind Settings
+offers (JapaneseUserDictionary.h): kind, left id, right id, cost. Comment
+lines start with #.
+
 Usage:
   python scripts/build-japanese-packs.py --mozc <Mozc src/data> --commit <sha> --out data/japanese-core
   python scripts/build-japanese-packs.py --mozc ... --commit ... --out tests/data/japanese-mini \\
@@ -60,6 +64,22 @@ SURFACE_POOL, SURFACE_READING, SURFACE_KATAKANA = 0, 1, 2
 FLAG_SPELLING_CORRECTION = 1 << 2
 FLAG_SAME_IDS = 1 << 3
 COST_SCALE = 64
+
+# The kinds of words users add, and the Mozc part of speech of each.
+USER_POS = (
+    ("noun", "名詞,一般,*,*,*,*,*"),
+    ("proper-noun", "名詞,固有名詞,一般,*,*,*,*"),
+    ("person", "名詞,固有名詞,人名,一般,*,*,*"),
+    ("surname", "名詞,固有名詞,人名,姓,*,*,*"),
+    ("given-name", "名詞,固有名詞,人名,名,*,*,*"),
+    ("place", "名詞,固有名詞,地域,一般,*,*,*"),
+    ("organization", "名詞,固有名詞,組織,*,*,*,*"),
+    ("suru-noun", "名詞,サ変接続,*,*,*,*,*"),
+    ("symbol", "記号,一般,*,*,*,*,*"),
+    ("interjection", "感動詞,*,*,*,*,*,*"),
+)
+# Cheaper than 95 % of Mozc's words: the user's words win their readings.
+USER_WORD_COST = 4000
 
 
 def katakana(text: str) -> str:
@@ -256,13 +276,20 @@ def build_matrix(size: int, costs: list[int], boundary: list[int], out: Path) ->
             "max_cost": max(costs)}
 
 
-def keep_for_sentences(entries, sentences: list[str], unknown_id: int):
+def keep_for_sentences(entries, sentences: list[str], unknown_id: int, keep_ids: list[int]):
     """Only the words whose reading occurs in the given readings, with the
-    part-of-speech ids they use renumbered from 1 (0 stays the start/end)."""
+    part-of-speech ids they use (and `keep_ids`) renumbered from 1 (0 stays
+    the start/end)."""
     wanted = [e for e in entries if any(e[0] in s for s in sentences)]
-    used = sorted({0, unknown_id} | {e[1] for e in wanted} | {e[2] for e in wanted})
+    used = sorted({0, unknown_id} | set(keep_ids) | {e[1] for e in wanted} | {e[2] for e in wanted})
     remap = {old: new for new, old in enumerate(used)}
     return [(r, remap[l], remap[rt], c, s, sp) for r, l, rt, c, s, sp in wanted], used
+
+
+def write_user_pos(ids: list[int], out: Path) -> None:
+    lines = ["# kind\tleft id\tright id\tcost (scripts/build-japanese-packs.py)"]
+    lines += [f"{kind}\t{pos}\t{pos}\t{USER_WORD_COST}" for (kind, _), pos in zip(USER_POS, ids)]
+    out.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
 
 
 def write_notice(mozc: Path, out: Path, commit: str) -> None:
@@ -292,19 +319,22 @@ def main() -> None:
     if size != len(pos_names):
         raise ValueError("id.def and the connection matrix disagree on the id count")
     unknown_id = pos_names.index(UNKNOWN_POS)
+    user_ids = [pos_names.index(name) for _, name in USER_POS]
     if args.sentences:
         sentences = [line.strip() for line in args.sentences.read_text(encoding="utf-8").splitlines()
                      if line.strip() and not line.startswith("#")]
-        entries, used = keep_for_sentences(entries, sentences, unknown_id)
+        entries, used = keep_for_sentences(entries, sentences, unknown_id, user_ids)
         costs = [costs[r * size + l] for r in used for l in used]
         pos_names = [pos_names[i] for i in used]
         unknown_id = used.index(unknown_id)
+        user_ids = [used.index(i) for i in user_ids]
         size = len(used)
     boundary = boundary_rows(args.mozc, pos_names)
 
     args.out.mkdir(parents=True, exist_ok=True)
     dictionary = build_dictionary(entries, unknown_id, args.out / "dictionary.bin")
     matrix = build_matrix(size, costs, boundary, args.out / "connection.bin")
+    write_user_pos(user_ids, args.out / "pos.tsv")
     write_notice(args.mozc, args.out / "NOTICE", args.commit)
     manifest = {
         "pack_id": "japanese-core",
@@ -316,9 +346,11 @@ def main() -> None:
         "format": "ja-dict-v1+ja-matrix-v1",
         "file": "dictionary.bin",
         "index_file": "connection.bin",
+        "pos_file": "pos.tsv",
         "entry_count": dictionary["words"],
         "sha256": {"file": sha256(args.out / "dictionary.bin"),
-                   "index": sha256(args.out / "connection.bin")},
+                   "index": sha256(args.out / "connection.bin"),
+                   "pos": sha256(args.out / "pos.tsv")},
         "license": "IPAdic + BSD-3-Clause (Mozc)",
         "source": f"https://github.com/google/mozc/tree/{args.commit}/src/data",
         "notice_file": "NOTICE",

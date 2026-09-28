@@ -93,6 +93,7 @@ function App() {
   const [runtime, setRuntime] = useState({ tsf: "Unavailable", dataPacks: "Unavailable", japaneseData: "", japanese: false });
   const [learning, setLearning] = useState({ enabled: true, count: 0 });
   const [dictionary, setDictionary] = useState([]);
+  const [japaneseWords, setJapaneseWords] = useState([]);
   const [packs, setPacks] = useState([]);
   const [version, setVersion] = useState("");
   const [appearance, setAppearance] = useState({ accent: "#0078d4", systemLanguage: navigator.language.startsWith("ja") ? "ja" : "en" });
@@ -112,6 +113,7 @@ function App() {
     setRuntime((value) => ({ ...value, ...(state.runtime || {}) }));
     setLearning((value) => ({ ...value, ...(state.learning || {}) }));
     setDictionary(state.dictionary || []);
+    setJapaneseWords(state.japaneseWords || []);
     setPacks(state.packs || []);
     if (state.version) setVersion(state.version);
     if (state.appearance) setAppearance((value) => ({ ...value, ...state.appearance }));
@@ -189,6 +191,18 @@ function App() {
     return response;
   };
 
+  // A Japanese word, new or replacing the one the dialog was opened with.
+  const saveJapaneseWord = async (word) => {
+    const original = modal?.word || {};
+    const response = await runAction("japaneseWords.save", {
+      ...word,
+      originalReading: original.reading || "",
+      originalSurface: original.surface || "",
+    }, modal?.mode === "edit" ? t.japaneseWords.updated : t.japaneseWords.added);
+    if (response.ok) setModal(null);
+    return response.ok;
+  };
+
   const saveDictionary = async (entry, update) => {
     const response = await runAction(update ? "dictionary.update" : "dictionary.create", {
       ...entry,
@@ -243,14 +257,17 @@ function App() {
               {current.id === "candidates" && <CandidatesPage settings={settings} setSetting={setSetting} />}
               {current.id === "english" && <EnglishPage settings={settings} setSetting={setSetting} />}
               {current.id === "japanese" && <JapanesePage settings={settings} setSetting={setSetting} />}
-              {current.id === "dictionary" && <DictionaryPage japanese={japaneseInstalled} learning={learning} settings={settings} setSetting={setSetting} dictionary={dictionary} setModal={setModal} setConfirm={setConfirm} runAction={runAction} />}
+              {current.id === "dictionary" && <DictionaryPage japanese={japaneseInstalled} japaneseWords={japaneseWords} learning={learning} settings={settings} setSetting={setSetting} dictionary={dictionary} setModal={setModal} setConfirm={setConfirm} runAction={runAction} />}
               {current.id === "about" && <AboutPage version={version} runtime={runtime} packs={packs} runAction={runAction} />}
             </div>
           )}
         </main>
 
-        <Dialog open={Boolean(modal)} title={modal?.mode === "edit" ? t.words.editTitle : t.words.addTitle} onClose={() => setModal(null)}>
+        <Dialog open={Boolean(modal) && !modal.japanese} title={modal?.mode === "edit" ? t.words.editTitle : t.words.addTitle} onClose={() => setModal(null)}>
           <DictionaryForm entry={modal?.entry || {}} onCancel={() => setModal(null)} onSave={(entry) => saveDictionary(entry, modal?.mode === "edit")} />
+        </Dialog>
+        <Dialog open={Boolean(modal?.japanese)} title={modal?.mode === "edit" ? t.japaneseWords.editTitle : t.japaneseWords.addTitle} onClose={() => setModal(null)}>
+          {modal?.japanese && <JapaneseWordForm word={modal.word || {}} onCancel={() => setModal(null)} onSave={saveJapaneseWord} />}
         </Dialog>
         <Dialog open={Boolean(confirm)} title={confirm?.title} onClose={() => setConfirm(null)}>
           <p className="dialog-message">{confirm?.message}</p>
@@ -558,7 +575,7 @@ function Key({ label, keys }) {
 }
 
 // Dictionary and learning: your words, and what TEKITO learned from you.
-function DictionaryPage({ japanese, learning, settings, setSetting, dictionary, setModal, setConfirm, runAction }) {
+function DictionaryPage({ japanese, japaneseWords, learning, settings, setSetting, dictionary, setModal, setConfirm, runAction }) {
   const t = useText();
   const [query, setQuery] = useState("");
   const filtered = useMemo(() => {
@@ -584,6 +601,12 @@ function DictionaryPage({ japanese, learning, settings, setSetting, dictionary, 
     message: t.learning.confirmMessage,
     confirmLabel: t.learning.forget,
     action: () => runAction("learning.clear", {}, t.learning.cleared),
+  });
+  const askDeleteJapanese = (word) => setConfirm({
+    title: t.japaneseWords.removeTitle,
+    message: t.japaneseWords.removeMessage(word.surface),
+    confirmLabel: t.words.remove,
+    action: () => runAction("japaneseWords.delete", { reading: word.reading, surface: word.surface }, t.japaneseWords.removed),
   });
   const askForgetJapanese = () => setConfirm({
     title: t.learning.japaneseConfirmTitle,
@@ -648,6 +671,34 @@ function DictionaryPage({ japanese, learning, settings, setSetting, dictionary, 
           <Button variant="quiet" icon="export" onClick={() => runAction("dictionary.export", {}, t.words.exported)}>{t.words.export}</Button>
         </div>
       </Glass>
+
+      {japanese && (
+        <Glass className="card">
+          <div className="card-head">
+            <div>
+              <h2 className="card-title">{t.japaneseWords.title}</h2>
+              <p className="muted">{t.japaneseWords.description}</p>
+            </div>
+            <Button variant="primary" icon="plus" onClick={() => setModal({ japanese: true, mode: "new", word: {} })}>{t.add}</Button>
+          </div>
+          <ul className="word-list" aria-label={t.japaneseWords.title}>
+            {japaneseWords.map((word) => (
+              <li key={`${word.reading}\u0001${word.surface}`} className="word">
+                <button type="button" className="word-main" onClick={() => setModal({ japanese: true, mode: "edit", word })}>
+                  <b>{word.reading}</b>
+                  <Icon name="arrow" size={15} className="word-arrow" />
+                  <span>{word.surface}</span>
+                  <span className="badge">{t.japaneseWords.kinds[word.kind] || word.kind}</span>
+                </button>
+                <button type="button" className="icon-btn" aria-label={t.words.removeLabel(word.surface)} onClick={() => askDeleteJapanese(word)}>
+                  <Icon name="trash" size={16} />
+                </button>
+              </li>
+            ))}
+          </ul>
+          {japaneseWords.length === 0 && <div className="empty">{t.japaneseWords.empty}</div>}
+        </Glass>
+      )}
     </>
   );
 }
@@ -771,6 +822,51 @@ function DictionaryForm({ entry, onSave, onCancel }) {
         <small className="field-help">{t.actions[value.action].help}</small>
       </div>
       {!keep && <label className="field"><span>{t.words.changeToLabel}</span><input value={value.candidate} placeholder={t.words.changeToPlaceholder} onChange={(event) => setValue({ ...value, candidate: event.target.value })} /></label>}
+      <div className="dialog-actions">
+        <Button onClick={onCancel}>{t.cancel}</Button>
+        <Button type="submit" variant="primary" disabled={!valid}>{t.save}</Button>
+      </div>
+    </form>
+  );
+}
+
+// The kinds a Japanese word can be (JapaneseUserDictionary.h), in the order
+// the form lists them.
+const japaneseKinds = ["noun", "proper-noun", "person", "surname", "given-name", "place", "organization",
+  "suru-noun", "symbol", "interjection"];
+// A reading: hiragana, or katakana (the host makes it hiragana).
+const readingPattern = /^[\u3041-\u3096\u30A1-\u30F6\u30FC\u309D\u309E]+$/;
+
+function JapaneseWordForm({ word, onSave, onCancel }) {
+  const t = useText();
+  const w = t.japaneseWords;
+  const [value, setValue] = useState({ reading: word.reading || "", surface: word.surface || "", kind: word.kind || "noun" });
+  const reading = value.reading.trim();
+  const readingOk = readingPattern.test(reading);
+  const valid = readingOk && value.surface.trim();
+  const submit = (event) => {
+    event.preventDefault();
+    if (valid) onSave({ reading, surface: value.surface.trim(), kind: value.kind });
+  };
+  return (
+    <form className="form" onSubmit={submit}>
+      <label className="field">
+        <span>{w.readingLabel}</span>
+        <input autoFocus value={value.reading} placeholder={w.readingPlaceholder} lang="ja"
+          onChange={(event) => setValue({ ...value, reading: event.target.value })} />
+        <small className="field-help">{reading && !readingOk ? w.readingInvalid : w.readingHelp}</small>
+      </label>
+      <label className="field">
+        <span>{w.surfaceLabel}</span>
+        <input value={value.surface} placeholder={w.surfacePlaceholder} lang="ja"
+          onChange={(event) => setValue({ ...value, surface: event.target.value })} />
+      </label>
+      <label className="field">
+        <span>{w.kindLabel}</span>
+        <select value={value.kind} onChange={(event) => setValue({ ...value, kind: event.target.value })}>
+          {japaneseKinds.map((kind) => <option key={kind} value={kind}>{w.kinds[kind]}</option>)}
+        </select>
+      </label>
       <div className="dialog-actions">
         <Button onClick={onCancel}>{t.cancel}</Button>
         <Button type="submit" variant="primary" disabled={!valid}>{t.save}</Button>

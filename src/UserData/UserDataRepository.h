@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Core/Japanese/JapaneseLearning.h"
+#include "Core/Japanese/JapaneseUserDictionary.h"
 #include "Core/UserDictionary.h"
 #include "Core/UserLearning.h"
 #include "UserData/UserSettings.h"
@@ -29,6 +30,10 @@ public:
     [[nodiscard]] virtual bool LoadJapaneseLearning(japanese::JapaneseLearningStore& learning) const noexcept = 0;
     [[nodiscard]] virtual bool SaveJapaneseLearning(const japanese::JapaneseLearningStore& learning) noexcept = 0;
     [[nodiscard]] virtual bool ResetJapaneseLearning() noexcept = 0;
+    // The words the user added for Japanese (reading, surface, kind),
+    // separate from the English user dictionary.
+    [[nodiscard]] virtual bool LoadJapaneseUserWords(std::vector<japanese::UserWord>& words) const noexcept = 0;
+    [[nodiscard]] virtual bool SaveJapaneseUserWords(const std::vector<japanese::UserWord>& words) noexcept = 0;
     [[nodiscard]] virtual bool IsOpen() const noexcept = 0;
 };
 

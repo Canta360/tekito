@@ -379,6 +379,7 @@ public:
         repository_ = tekito::userdata::CreateDefaultUserDataRepository();
         if (!repository_ || !repository_->Open()) return false;
         (void)repository_->Load(dictionary_);
+        (void)repository_->LoadJapaneseUserWords(japaneseWords_);
         (void)repository_->LoadSettings(settings_);
         (void)repository_->LoadLearning(learning_);
         const auto startupMode = settings_.restoreLastInputMode
@@ -755,6 +756,61 @@ private:
         return json + L']';
     }
 
+    std::wstring JapaneseWordsJson() const {
+        std::wstring json = L"[";
+        for (const auto& word : japaneseWords_) {
+            if (json.size() > 1) json += L',';
+            json += L"{\"reading\":\"" + JsonEscape(word.reading) + L"\",\"surface\":\"" + JsonEscape(word.surface) +
+                    L"\",\"kind\":\"" + JsonEscape(tekito::japanese::KindName(word.kind)) + L"\"}";
+        }
+        return json + L']';
+    }
+
+    // A reading in hiragana: katakana becomes hiragana; anything else is
+    // not a reading.
+    static std::optional<std::wstring> HiraganaReading(std::wstring_view text) {
+        std::wstring reading;
+        for (wchar_t c : text) {
+            if (c >= 0x30A1 && c <= 0x30F6) c = static_cast<wchar_t>(c - 0x60);
+            const bool kana = (c >= 0x3041 && c <= 0x3096) || c == 0x30FC || c == 0x309D || c == 0x309E;
+            if (!kana) return std::nullopt;
+            reading.push_back(c);
+        }
+        if (reading.empty()) return std::nullopt;
+        return reading;
+    }
+
+    // Adds a word, or replaces the one named by originalReading and
+    // originalSurface.
+    bool SaveJapaneseWordFromMessage(const WebMessage& message, std::wstring& error) {
+        const auto reading = HiraganaReading(message.String(L"reading"));
+        const auto surface = message.String(L"surface");
+        const auto kind = tekito::japanese::KindFromName(message.String(L"kind"));
+        if (!reading) {
+            error = Text(L"Enter the reading in hiragana.", L"読みはひらがなで入れてください。");
+            return false;
+        }
+        if (surface.empty() || !kind) {
+            error = Text(L"Enter the word.", L"単語を入れてください。");
+            return false;
+        }
+        const auto originalReading = message.String(L"originalReading");
+        const auto originalSurface = message.String(L"originalSurface");
+        auto words = japaneseWords_;
+        std::erase_if(words, [&](const tekito::japanese::UserWord& word) {
+            return (word.reading == originalReading && word.surface == originalSurface) ||
+                   (word.reading == *reading && word.surface == surface);
+        });
+        words.push_back({*reading, surface, *kind});
+        if (!repository_->SaveJapaneseUserWords(words)) {
+            error = Text(L"The word could not be saved.", L"単語を保存できませんでした。");
+            return false;
+        }
+        japaneseWords_ = std::move(words);
+        runtime_->NotifyDictionaryChanged();
+        return true;
+    }
+
     std::wstring SettingsStateJson() {
         const auto mode = CurrentModeName();
         const auto registeredDll = RegisteredTsfDll();
@@ -808,6 +864,7 @@ private:
         json += settings_.learningEnabled ? L"true" : L"false";
         json += L",\"count\":" + std::to_wstring(learning_.Entries().size() + learning_.PreferenceCount()) + L"},\"dictionary\":";
         json += DictionaryJson();
+        json += L",\"japaneseWords\":" + JapaneseWordsJson();
         json += L",\"packs\":" + packs;
         json += L",\"appearance\":{\"accent\":\"" + AccentColorHex() + L"\",\"systemLanguage\":\"" +
                 std::wstring(tekito::userdata::UseJapaneseUi(0) ? L"ja" : L"en") + L"\"}}";
@@ -1036,6 +1093,24 @@ private:
             std::wstring error;
             const bool saved = SaveDictionaryFromMessage(message, type == L"dictionary.update", error);
             Reply(requestId, saved, error);
+        } else if (type == L"japaneseWords.save") {
+            std::wstring error;
+            const bool saved = SaveJapaneseWordFromMessage(message, error);
+            Reply(requestId, saved, error);
+        } else if (type == L"japaneseWords.delete") {
+            auto words = japaneseWords_;
+            const auto reading = message.String(L"reading");
+            const auto surface = message.String(L"surface");
+            std::erase_if(words, [&](const tekito::japanese::UserWord& word) {
+                return word.reading == reading && word.surface == surface;
+            });
+            if (!repository_->SaveJapaneseUserWords(words)) {
+                Reply(requestId, false, Text(L"The word could not be deleted.", L"単語を削除できませんでした。"));
+            } else {
+                japaneseWords_ = std::move(words);
+                runtime_->NotifyDictionaryChanged();
+                Reply(requestId, true);
+            }
         } else if (type == L"dictionary.delete") {
             const auto previous = dictionary_;
             if (!dictionary_.Remove(static_cast<std::uint64_t>(message.Number(L"id"))) || !repository_->Save(dictionary_)) {
@@ -1283,6 +1358,7 @@ private:
     std::unique_ptr<tekito::userdata::IUserDataRepository> repository_;
     std::unique_ptr<tekito::userdata::RuntimeModeState> runtime_;
     tekito::UserDictionary dictionary_;
+    std::vector<tekito::japanese::UserWord> japaneseWords_;
     tekito::UserLearningStore learning_;
     tekito::userdata::UserSettings settings_{};
     ComPtr<ICoreWebView2Controller> controller_;

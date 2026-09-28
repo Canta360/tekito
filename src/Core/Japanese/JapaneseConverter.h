@@ -52,6 +52,8 @@ struct Phrase {
 // words for the reading (Viterbi over the dictionary lattice with the
 // connection costs), split into phrases by Mozc's segmentation rules, with
 // the likeliest alternatives for each phrase.
+class JapaneseUserDictionary;
+
 class JapaneseConverter final {
 public:
     JapaneseConverter(const JapaneseDictionary& dictionary, const ConnectionMatrix& matrix) noexcept
@@ -63,20 +65,26 @@ public:
     // text committed last), 0 for the start of a sentence; `contextWords`
     // are content words written just before, for the language model's
     // sentence ties.
+    // `user` adds the user's words; the phrase read exactly like one of
+    // them offers it first.
     [[nodiscard]] std::vector<Phrase> Convert(std::wstring_view reading,
                                               std::span<const std::size_t> fixedLengths = {},
                                               std::uint16_t context = 0,
-                                              std::span<const std::wstring> contextWords = {}) const;
+                                              std::span<const std::wstring> contextWords = {},
+                                              const JapaneseUserDictionary* user = nullptr) const;
 
     // Only the likeliest text for the whole reading and its cost, much
     // quicker than Convert (and without the language model); nothing when
     // a character is in no word.
-    [[nodiscard]] std::optional<PhraseCandidate> Best(std::wstring_view reading, std::uint16_t context = 0) const;
+    [[nodiscard]] std::optional<PhraseCandidate> Best(std::wstring_view reading, std::uint16_t context = 0,
+                                                      const JapaneseUserDictionary* user = nullptr) const;
 
     // Words whose reading starts with `reading` and is longer, likeliest
     // first. Readings shared by too many words to look through quickly give
     // nothing; typing on narrows them.
-    [[nodiscard]] std::vector<Prediction> Predict(std::wstring_view reading, std::size_t limit) const;
+    // The user's words come first.
+    [[nodiscard]] std::vector<Prediction> Predict(std::wstring_view reading, std::size_t limit,
+                                                  const JapaneseUserDictionary* user = nullptr) const;
 
     static constexpr std::size_t kMaxCandidates = 40;
 

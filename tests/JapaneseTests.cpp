@@ -3,6 +3,7 @@
 #include "Core/Japanese/JapaneseConverter.h"
 #include "Core/Japanese/JapaneseDictionary.h"
 #include "Core/Japanese/JapaneseLearning.h"
+#include "Core/Japanese/JapaneseUserDictionary.h"
 #include "Core/Japanese/KeyConverter.h"
 #include "Core/Japanese/LanguageModel.h"
 #include "Core/Japanese/Loanwords.h"
@@ -607,6 +608,62 @@ void TestPrediction(const RomajiTable& table, const MiniPack& pack) {
     Require(composer.Predictions().empty(), "converting puts predictions away");
 }
 
+void TestUserWords(const RomajiTable& table, const MiniPack& pack) {
+    using tekito::japanese::JapaneseUserDictionary;
+    using tekito::japanese::UserPartsOfSpeech;
+    using tekito::japanese::UserWordKind;
+
+    const auto parsed = UserPartsOfSpeech::Parse("# kind\tleft\tright\tcost\nnoun\t12\t13\t4000\r\nbogus\t1\t1\t1\nplace\tx\t1\t1\n");
+    Require(parsed.For(UserWordKind::Noun).has_value() && parsed.For(UserWordKind::Noun)->left == 12 &&
+                parsed.For(UserWordKind::Noun)->right == 13 && !parsed.For(UserWordKind::Place),
+            "pos.tsv rows are read; unknown kinds and bad numbers are skipped");
+    Require(tekito::japanese::KindFromName(tekito::japanese::KindName(UserWordKind::GivenName)) ==
+                UserWordKind::GivenName,
+            "a kind's name reads back as the kind");
+
+    const auto parts = UserPartsOfSpeech::Load(std::filesystem::path(TEKITO_TEST_DATA_DIR) / L"japanese-mini" / L"pos.tsv");
+    Require(parts.For(UserWordKind::Surname).has_value() && parts.For(UserWordKind::Symbol).has_value(),
+            "the test pack has a part of speech for each kind");
+
+    JapaneseUserDictionary none;
+    none.Set({{L"なかの", L"中埜", UserWordKind::Surname}}, UserPartsOfSpeech{});
+    Require(none.Empty(), "without parts of speech no user word is used");
+
+    JapaneseUserDictionary user;
+    user.Set({{L"なかの", L"中埜", UserWordKind::Surname},
+              {L"てきとう", L"TEKITO", UserWordKind::ProperNoun},
+              {L"てきとう", L"TEKITO", UserWordKind::ProperNoun}},
+             parts);
+    Require(user.Size() == 2, "a word added twice is kept once");
+
+    const tekito::japanese::JapaneseConverter converter(pack.dictionary, pack.matrix);
+    const auto plain = converter.Convert(L"なかの");
+    Require(!plain.empty() && plain.front().candidates.front().text != L"中埜",
+            "without the user's word なかの converts as the dictionary has it");
+    const auto withUser = converter.Convert(L"なかの", {}, 0, {}, &user);
+    Require(withUser.size() == 1, "なかの stays one phrase");
+    RequireText(withUser.front().candidates.front().text, L"中埜", "the user's word comes first for its reading");
+    Require(HasCandidate(withUser.front(), plain.front().candidates.front().text, 8),
+            "the dictionary's words are still offered");
+
+    const auto best = converter.Best(L"てきとう", 0, &user);
+    Require(best && best->text == L"TEKITO", "a word the dictionary lacks converts from the user's words");
+    const auto predicted = converter.Predict(L"てき", 5, &user);
+    Require(!predicted.empty() && predicted.front().text == L"TEKITO", "the user's words are predicted first");
+
+    JapaneseComposer composer(&table);
+    composer.SetConverter(&converter);
+    composer.SetUserDictionary(&user);
+    Type(composer, L"tekitou");
+    composer.Convert();
+    RequireText(composer.Preedit(), L"TEKITO", "the composer converts to the user's word");
+    composer.Clear();
+    composer.SetUserDictionary(nullptr);
+    Type(composer, L"nakano");
+    composer.Convert();
+    Require(composer.Preedit() != L"中埜", "without the user dictionary the word is gone");
+}
+
 void TestContext(const RomajiTable& table, const MiniPack& pack) {
     const tekito::japanese::JapaneseConverter converter(pack.dictionary, pack.matrix);
     JapaneseComposer composer(&table);
@@ -760,6 +817,7 @@ int main(int argc, char** argv) {
     TestLoanwords(*table, *pack);
     TestRomajiCorrection(*table, *pack);
     TestPrediction(*table, *pack);
+    TestUserWords(*table, *pack);
     TestMeanings();
     if (argc > 1 && std::string_view(argv[1]) == "--dump") DumpConversions(*pack);
     std::cout << "All TEKITO Japanese tests passed.\n";
