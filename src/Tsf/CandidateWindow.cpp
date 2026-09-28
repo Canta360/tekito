@@ -97,6 +97,12 @@ constexpr float kFontCandidate = 15.0f;
 constexpr float kFontNumber = 12.5f;
 constexpr float kFontTag = 9.5f;
 constexpr float kFontDetail = 12.5f;
+// The dictionary sign on rows with a meaning: the open book ("ReadingMode")
+// of the Windows icon font, which reads as a book even this small.
+constexpr float kFontIcon = 13.0f;
+constexpr int kIconWidth = 14;
+constexpr int kIconGap = 6;
+constexpr wchar_t kDictionaryGlyph[] = L"\xE736";
 constexpr float kFontDetailHead = 15.0f;
 
 // Floating shadow: a tight contact shadow for edge definition plus a soft
@@ -301,6 +307,7 @@ struct Row {
     std::wstring number;
     std::wstring text;
     std::wstring label;
+    bool meaning{false};
 };
 
 constexpr std::size_t kNoRow = static_cast<std::size_t>(-1);
@@ -508,6 +515,7 @@ struct TextFormats {
     winrt::com_ptr<IDWriteTextFormat> number;
     winrt::com_ptr<IDWriteTextFormat> tag;
     winrt::com_ptr<IDWriteTextFormat> detail;
+    winrt::com_ptr<IDWriteTextFormat> icon;
 };
 
 struct Layout {
@@ -527,6 +535,8 @@ struct Layout {
     float tagHeight{0.0f};
     float tagTracking{0.0f};
     float rowRight{0.0f};
+    float iconWidth{0.0f};
+    float iconGap{0.0f};
     // The list part; the rest of the width is the meaning pane.
     float listWidth{0.0f};
     float listHeight{0.0f};
@@ -630,6 +640,19 @@ winrt::com_ptr<IDWriteTextFormat> CreateFormat(IDWriteFactory* factory, IDWriteF
         }
     }
     return format;
+}
+
+// The Windows icon font: Segoe Fluent Icons (Windows 11), else Segoe MDL2
+// Assets (Windows 10); nullptr when neither is installed.
+const wchar_t* IconFontFamily(IDWriteFactory* factory) {
+    winrt::com_ptr<IDWriteFontCollection> fonts;
+    if (!factory || FAILED(factory->GetSystemFontCollection(fonts.put(), FALSE))) return nullptr;
+    for (const wchar_t* family : {L"Segoe Fluent Icons", L"Segoe MDL2 Assets"}) {
+        UINT32 index = 0;
+        BOOL exists = FALSE;
+        if (SUCCEEDED(fonts->FindFamilyName(family, &index, &exists)) && exists) return family;
+    }
+    return nullptr;
 }
 
 float MeasureTextWidth(IDWriteFactory* factory, IDWriteTextFormat* format, const std::wstring& text) {
@@ -886,6 +909,13 @@ void DrawRows(ID2D1RenderTarget* target, IDWriteFactory* factory, const TextForm
                                        tag.get(), mutedBrush.get(), D2D1_DRAW_TEXT_OPTIONS_NONE);
                 textRect.right = tagRect.left - layout.tagGap;
             }
+        }
+        if (row.meaning && formats.icon) {
+            const D2D1_RECT_F iconRect =
+                D2D1::RectF(textRect.right - layout.iconWidth, rect.top, textRect.right, rect.bottom);
+            target->DrawText(kDictionaryGlyph, 1, formats.icon.get(), iconRect, mutedBrush.get(),
+                             D2D1_DRAW_TEXT_OPTIONS_NONE);
+            textRect.right = iconRect.left - layout.iconGap;
         }
         if (textFormat) {
             target->DrawText(row.text.c_str(), static_cast<UINT32>(row.text.size()), textFormat,
@@ -1301,6 +1331,8 @@ private:
         l.tagPaddingX = static_cast<float>(ScaleForWindow(panel_, kTagPaddingX));
         l.tagHeight = static_cast<float>(ScaleForWindow(panel_, kTagHeight));
         l.tagTracking = kTagTracking * l.scale;
+        l.iconWidth = static_cast<float>(ScaleForWindow(panel_, kIconWidth));
+        l.iconGap = static_cast<float>(ScaleForWindow(panel_, kIconGap));
         l.indicator = frame.totalCount > frame.rows.size();
         l.indicatorWidth = static_cast<float>(ScaleForWindow(panel_, kIndicatorWidth));
         l.indicatorInset = static_cast<float>(ScaleForWindow(panel_, kIndicatorInset));
@@ -1318,6 +1350,7 @@ private:
                                            l.tagTracking);
                 content += l.tagGap + LayoutWidth(tag.get()) + 2.0f * l.tagPaddingX;
             }
+            if (row.meaning && formats_.icon) content += l.iconGap + l.iconWidth;
             widest = std::max(widest, content);
         }
         const int gutter = l.indicator ? ScaleForWindow(panel_, kIndicatorGutter) : 0;
@@ -1395,6 +1428,16 @@ private:
         if (formats_.detail) {
             formats_.detail->SetWordWrapping(DWRITE_WORD_WRAPPING_WRAP);
             formats_.detail->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_NEAR);
+        }
+        formats_.icon = nullptr;
+        if (const wchar_t* family = IconFontFamily(f)) {
+            if (SUCCEEDED(f->CreateTextFormat(family, nullptr, DWRITE_FONT_WEIGHT_NORMAL, DWRITE_FONT_STYLE_NORMAL,
+                                              DWRITE_FONT_STRETCH_NORMAL, kFontIcon * scale, L"",
+                                              formats_.icon.put()))) {
+                formats_.icon->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
+                formats_.icon->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
+                formats_.icon->SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP);
+            }
         }
     }
 
@@ -2108,7 +2151,8 @@ void CandidateWindow::Show(const RECT& caretRect,
         const auto index = pageStart_ + row;
         const auto& candidate = candidates_[index];
         const auto displayId = candidate.id == 0 ? index + 1 : candidate.id;
-        frame.rows.push_back({std::to_wstring(displayId), candidate.text, LabelText(candidate, japanese_)});
+        frame.rows.push_back(
+            {std::to_wstring(displayId), candidate.text, LabelText(candidate, japanese_), candidate.hasMeaning});
     }
     if (selectedIndex_ >= pageStart_ && selectedIndex_ - pageStart_ < visibleCount_) {
         frame.selectedRow = selectedIndex_ - pageStart_;

@@ -295,7 +295,11 @@ int wmain(int argc, wchar_t** argv) {
     if (GetEnvironmentVariableW(L"TEKITO_PREVIEW_LANGUAGE", language, 8) > 0 && wcscmp(language, L"ja") == 0) {
         window.SetJapanese(true);
     }
-    const auto candidates = kanji ? SampleKanjiCandidates() : SampleCandidates(longList);
+    auto candidates = kanji ? SampleKanjiCandidates() : SampleCandidates(longList);
+    if (meaning) {
+        // Rows with a meaning show the dictionary sign.
+        for (std::size_t i = 0; i < candidates.size(); ++i) candidates[i].hasMeaning = i != 0 && i != 3;
+    }
     const auto detail = meaning ? SampleDetail(kanji) : tekito::tsf::CandidateDetail{};
     // Caret under "wrold" on the document's third line.
     RECT caret{232, 280, 234, 302};

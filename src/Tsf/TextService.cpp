@@ -1370,8 +1370,8 @@ HRESULT TextService::HandleKeyInEditSessionCore(ITfContext* context, TfEditCooki
         const RECT anchor = GetCandidateAnchor(context, editCookie);
         if (!EqualRect(&anchor, &candidateAnchor_)) {
             candidateAnchor_ = anchor;
-            candidateWindow_.Show(anchor, state_.Candidates(), state_.SelectedIndex(),
-                                  state_.PageStart(), state_.VisibleCount(), SelectedEnglishMeaning());
+            candidateWindow_.Show(anchor, EnglishRows(), state_.SelectedIndex(), state_.PageStart(),
+                                  state_.VisibleCount(), SelectedEnglishMeaning());
         }
         return S_OK;
     }
@@ -1888,8 +1888,8 @@ void TextService::ShowCandidates(ITfContext* context, TfEditCookie editCookie) {
     candidateAnchor_ = anchor;
     candidateWindow_.SetStyle(userSettings_.candidateWindowStyle);
     candidateWindow_.SetJapanese(userdata::UseJapaneseUi(userSettings_.uiLanguage));
-    candidateWindow_.Show(anchor, state_.Candidates(), state_.SelectedIndex(),
-                          state_.PageStart(), state_.VisibleCount(), SelectedEnglishMeaning());
+    candidateWindow_.Show(anchor, EnglishRows(), state_.SelectedIndex(), state_.PageStart(), state_.VisibleCount(),
+                          SelectedEnglishMeaning());
     if (userSettings_.socialPersonalization > 0) {
         const auto trigger = rawText_.starts_with(L':') ? std::wstring_view(rawText_).substr(1)
                                                         : std::wstring_view(rawText_);
