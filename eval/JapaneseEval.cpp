@@ -223,7 +223,7 @@ int RunKeys(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary
         if (distance != 0 && shown < showMisses) {
             ++shown;
             std::cout << "miss " << row.source << ":" << row.id << "  " << Narrow(output) << "  (want "
-                      << Narrow(row.expected.front()) << ")\n";
+                      << Narrow(row.expected.front()) << (inList ? ", in the list" : "") << ")\n";
         }
     }
     std::cout << std::fixed << std::setprecision(1);
