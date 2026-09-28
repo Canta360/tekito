@@ -24,6 +24,25 @@ if ($packDirectories.Count -eq 0) {
     throw "No Data Pack manifests were found under $SourceRoot."
 }
 
+# Puts one file in place. Apps with TEKITO loaded keep Data Pack files open:
+# the English ones can be overwritten, the Japanese ones (mapped into
+# memory) only renamed. A file that cannot be overwritten is moved aside as
+# "<name>.old-<id>", which the next install removes.
+function Install-PackFile([string]$Source, [string]$Target) {
+    try {
+        Copy-Item -LiteralPath $Source $Target -Force -ErrorAction Stop
+        return
+    } catch {
+        if (-not (Test-Path -LiteralPath $Target)) { throw }
+    }
+    try {
+        Rename-Item -LiteralPath $Target ("{0}.old-{1}" -f (Split-Path $Target -Leaf), [guid]::NewGuid().ToString("N")) -ErrorAction Stop
+    } catch {
+        throw "$Target is in use. Close the apps you type in (or sign out and back in), then install again."
+    }
+    Copy-Item -LiteralPath $Source $Target -Force -ErrorAction Stop
+}
+
 function Require-ManifestValue($Manifest, [string]$Name) {
     $value = $Manifest.$Name
     if ($null -eq $value -or [string]::IsNullOrWhiteSpace([string]$value)) {
@@ -73,7 +92,14 @@ try {
         $stagingPack = Join-Path $stagingRoot $pack.Name
         $destinationPack = Join-Path $DestinationRoot $pack.Name
         New-Item -ItemType Directory -Path $destinationPack -Force | Out-Null
-        Copy-Item -Path (Join-Path $stagingPack "*") -Destination $destinationPack -Recurse -Force
+        # Copies moved aside by an earlier install, once nothing uses them.
+        Get-ChildItem -LiteralPath $destinationPack -Filter "*.old-*" -File -Recurse -ErrorAction SilentlyContinue |
+            ForEach-Object { Remove-Item -LiteralPath $_.FullName -Force -ErrorAction SilentlyContinue }
+        foreach ($file in @(Get-ChildItem -LiteralPath $stagingPack -File -Recurse)) {
+            $target = Join-Path $destinationPack $file.FullName.Substring($stagingPack.Length + 1)
+            New-Item -ItemType Directory -Path (Split-Path $target -Parent) -Force | Out-Null
+            Install-PackFile $file.FullName $target
+        }
     }
     Write-Host "TEKITO offline Data Packs installed at $DestinationRoot"
     Write-Host "User Dictionary, User Learning, and Settings remain in UserData and are not modified."

@@ -116,6 +116,10 @@ function Get-JapaneseData($Manifest, [string]$LocalZip) {
     return $packs
 }
 
+# What the install did, for when it stops: %TEMP%\TEKITO-install.log.
+$log = Join-Path ([IO.Path]::GetTempPath()) "TEKITO-install.log"
+try { Start-Transcript -LiteralPath $log -Force | Out-Null } catch { }
+
 $SourceRoot = (Resolve-Path $SourceRoot).Path
 $packageManifestPath = Join-Path $SourceRoot "package-manifest.json"
 $packageManifest = if (Test-Path -LiteralPath $packageManifestPath) {
@@ -133,7 +137,10 @@ $userRoot = [IO.Path]::GetFullPath($env:USERPROFILE).TrimEnd('\') + '\'
 if (-not $installRoot.StartsWith($userRoot, [StringComparison]::OrdinalIgnoreCase)) {
     throw "InstallRoot must be a folder inside your user profile."
 }
-$hadExistingInstall = Test-Path -LiteralPath (Join-Path $installRoot "install-manifest.json") -PathType Leaf
+# An install that stopped half way leaves the program without its manifest;
+# it is still TEKITO's folder.
+$hadExistingInstall = (Test-Path -LiteralPath (Join-Path $installRoot "install-manifest.json") -PathType Leaf) -or
+    (Test-Path -LiteralPath (Join-Path $installRoot "TEKITO.exe") -PathType Leaf)
 if ((Test-Path -LiteralPath $installRoot) -and -not $hadExistingInstall -and
     @(Get-ChildItem -LiteralPath $installRoot -Force).Count -gt 0) {
     throw "InstallRoot must be empty or an existing TEKITO installation."
@@ -164,6 +171,19 @@ try {
     Copy-Item -LiteralPath (Join-Path $SourceRoot "Tekito.Tsf.dll") $stagingRoot
     Copy-Item -LiteralPath (Join-Path $SourceRoot "settings-ui") $stagingRoot -Recurse
 
+    # Data Packs first: if one cannot be replaced, the installed program is
+    # left as it was.
+    if (-not $SkipDataPacks) {
+        & (Join-Path $SourceRoot "scripts\install-data-packs.ps1") `
+            -SourceRoot (Join-Path $SourceRoot "data") `
+            -DestinationRoot (Join-Path $env:LOCALAPPDATA "TEKITO\data")
+        if ($japaneseData) {
+            & (Join-Path $SourceRoot "scripts\install-data-packs.ps1") `
+                -SourceRoot $japaneseData `
+                -DestinationRoot (Join-Path $env:LOCALAPPDATA "TEKITO\data")
+        }
+    }
+
     Get-Process -Name TEKITO -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
     if (-not $SkipRegistration) {
         # Older versions kept the DLL in a subfolder; unregister wherever it is.
@@ -175,17 +195,6 @@ try {
     Remove-InstalledFiles $installRoot
     New-Item -ItemType Directory -Path $installRoot -Force | Out-Null
     Copy-Item -Path (Join-Path $stagingRoot "*") -Destination $installRoot -Recurse -Force
-
-    if (-not $SkipDataPacks) {
-        & (Join-Path $SourceRoot "scripts\install-data-packs.ps1") `
-            -SourceRoot (Join-Path $SourceRoot "data") `
-            -DestinationRoot (Join-Path $env:LOCALAPPDATA "TEKITO\data")
-        if ($japaneseData) {
-            & (Join-Path $SourceRoot "scripts\install-data-packs.ps1") `
-                -SourceRoot $japaneseData `
-                -DestinationRoot (Join-Path $env:LOCALAPPDATA "TEKITO\data")
-        }
-    }
 
     if (-not $SkipRegistration) {
         $code = Invoke-Regsvr32 @('/s', $installedDll)
@@ -240,6 +249,7 @@ try {
     Write-Host "Sign out and back in, or restart your apps, then pick TEKITO with Win+Space."
 }
 catch {
+    Write-Host "The install stopped: $($_.Exception.Message)"
     # Undo a first-time install that did not finish.
     if (-not $hadExistingInstall -and (Test-Path -LiteralPath $installRoot) -and
         -not (Test-Path -LiteralPath (Join-Path $installRoot "install-manifest.json"))) {
@@ -257,5 +267,6 @@ finally {
     if ($japaneseData) {
         Remove-Item -LiteralPath (Split-Path $japaneseData -Parent) -Recurse -Force -ErrorAction SilentlyContinue
     }
+    try { Stop-Transcript | Out-Null } catch { }
 }
 exit 0
