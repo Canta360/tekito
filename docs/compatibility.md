@@ -21,7 +21,11 @@ untouched and shows nothing.
 
 ## What to check in an app
 
-- TEKITO can be selected with Win+Space, and Alt+` switches Auto and Direct.
+- TEKITO can be selected with Win+Space, and the switch key (Hankaku/Zenkaku
+  on a Japanese keyboard, Alt+` on a US one) goes through the modes.
+- In Japanese, the underlined kana converts on Space, the list opens under
+  the phrase in focus and follows it as the focus moves, and Enter commits
+  without reaching the app.
 - The first letter underlines the word and shows the list under it.
 - The list follows the word when the window scrolls or moves, stays on
   screen near the edges, and scales with the display.

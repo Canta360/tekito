@@ -55,9 +55,11 @@ texts.
 
 ## Language data
 
-The data packs in `data/` (and in the installer) come from SCOWL, Wikipedia,
-the Leipzig Corpora Collection, WordNet, GeoNames, Wiktionary, the CMU
-Pronouncing Dictionary and Unicode CLDR, plus data written for TEKITO. Each
+The data packs in `data/` (and in the installer, or the Japanese data it
+downloads) come from SCOWL, Wikipedia, the Leipzig Corpora Collection,
+WordNet, GeoNames, Wiktionary, the CMU Pronouncing Dictionary, Unicode CLDR,
+the Mozc OSS dictionary (IPAdic, BSD 3-Clause) and the Japanese WordNet
+(NICT), plus data written for TEKITO. Each
 pack's `NOTICE` and `manifest.json` give its source, version and license, and
 carry the attribution that license asks for; they are the authoritative
 notices for the data. [docs/data-packs.md](docs/data-packs.md) lists them
