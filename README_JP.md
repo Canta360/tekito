@@ -19,7 +19,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/images/japanese-demo.png" alt="「はじめまして」のつもりで「hahimemasite」と打ち間違えた例。Space で打ったとおりに変換され、もう一度 Space を押すと候補に「もしかして」付きで「はじめまして」が出て、横に意味が表示される。続けて「kyouhaiitenkidesune.」が「今日はいい天気ですね。」になる" width="640">
+  <img src="docs/images/japanese-demo-ja.png" alt="「はじめまして」のつもりで「hahimemasite」と打ち間違えた例。Space で打ったとおりに変換され、もう一度 Space を押すと候補に「もしかして」付きで「はじめまして」が出て、横に意味が表示される。続けて「kyouhaiitenkidesune.」が「今日はいい天気ですね。」になる" width="580">
 </p>
 
 TEKITO は IME（TSF のテキストサービス）なので、普通の Windows アプリでそのまま使えます。ひとつの入力方式で日本語と英語の両方を打てます。ローマ字はかなと漢字に、英語は打ちながらスペルを直します。処理はすべて PC の中で完結します。
@@ -90,7 +90,7 @@ TEKITO は IME（TSF のテキストサービス）なので、普通の Windows
 Auto で普段どおりに打ちます。入力中の単語に下線が付き、その下に候補が出ます。
 
 <p align="center">
-  <img src="docs/images/typing-demo-ja.png" alt="「thnaks for teh reveiw.」と打つと、単語ごとに候補リストが出て、Space で打ち間違いが直り、「thanks for the review.」になる様子" width="640">
+  <img src="docs/images/typing-demo-ja.png" alt="「thnaks for teh reveiw.」と打つと、単語ごとに候補リストが出て、Space で打ち間違いが直り、「thanks for the review.」になる様子" width="717">
 </p>
 
 | キー | 動作 |
@@ -104,7 +104,7 @@ Auto で普段どおりに打ちます。入力中の単語に下線が付き、
 
 次の文字を打った時点で単語は確定するので、あとから取り消す操作はありません。知っている単語、「brb」のようなチャットの略語、自分で大文字にして打った語、コードらしい文字列、URL やアドレス、パスワード・数字・メール用の欄には手を出しません。
 
-![TEKITO の候補リスト。ライトとダークのグラス、シンプル表示](docs/images/candidate-list-ja.png)
+![TEKITO の候補リスト。グラスとシンプル、ライトとダーク。選んでいる語の意味が横に出る](docs/images/candidate-list-ja.png)
 
 ## 設定
 

@@ -6,7 +6,8 @@
 //   tekito_typing_demo.exe <output folder> [--japanese]
 //
 // --japanese types romaji into the Japanese composer instead, converting with
-// Space and stepping into the list for a slip.
+// Space and stepping into the list for a slip. TEKITO_PREVIEW_LANGUAGE=ja
+// shows the Japanese tags.
 //
 // Needs the Data Packs (TEKITO_DATA_PACK_DIR) and a visible desktop.
 #include "Core/ConversionEngine.h"
@@ -31,10 +32,8 @@
 
 namespace {
 
-constexpr int kWidth = 640;
-constexpr int kHeight = 300;
-// Room for nine candidates under the line.
-constexpr int kJapaneseHeight = 450;
+// The page covers the screen, so the list and its meaning pane never run
+// past it; make-demo-animation.py --trim crops the frames to what was drawn.
 constexpr int kMargin = 28;
 constexpr int kLineTop = 34;
 
@@ -210,8 +209,11 @@ int wmain(int argc, wchar_t** argv) {
     windowClass.lpfnWndProc = &PageProc;
     windowClass.lpszClassName = L"TekitoTypingDemoPage";
     RegisterClassExW(&windowClass);
+    RECT work{};
+    SystemParametersInfoW(SPI_GETWORKAREA, 0, &work, 0);
     HWND page = CreateWindowExW(WS_EX_TOPMOST | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW,
-                                windowClass.lpszClassName, L"", WS_POPUP, 160, 200, kWidth, japanese ? kJapaneseHeight : kHeight,
+                                windowClass.lpszClassName, L"", WS_POPUP, work.left, work.top,
+                                work.right - work.left, work.bottom - work.top,
                                 nullptr, nullptr, instance, nullptr);
     ShowWindow(page, SW_SHOWNOACTIVATE);
 
@@ -225,6 +227,7 @@ int wmain(int argc, wchar_t** argv) {
 
     std::ofstream timing(outputFolder / L"frames.txt");
     int frameNumber = 0;
+    int clipped = 0;
     const auto capture = [&](int milliseconds) {
         InvalidateRect(page, nullptr, FALSE);
         UpdateWindow(page);
@@ -235,6 +238,15 @@ int wmain(int argc, wchar_t** argv) {
         sprintf_s(name, "frame%03d.bmp", frameNumber++);
         SaveScreenRect(rect, outputFolder / name);
         timing << name << ' ' << milliseconds << '\n';
+        // The list (with its shadow) must sit inside the page, or the frame
+        // shows it cut off.
+        RECT list{};
+        HWND panel = FindWindowW(L"TekitoCandidateWindow", nullptr);
+        if (panel && IsWindowVisible(panel) && GetWindowRect(panel, &list) &&
+            (list.left < rect.left || list.top < rect.top || list.right > rect.right || list.bottom > rect.bottom)) {
+            fprintf(stderr, "%s: the list runs past the page\n", name);
+            ++clipped;
+        }
     };
 
     if (japanese) {
@@ -259,7 +271,6 @@ int wmain(int argc, wchar_t** argv) {
         composer.SetConverter(&converter);
         composer.SetKeyConverter(&keys);
         if (loanwords.Open(root / L"japanese-loanwords")) composer.SetLoanwords(&loanwords);
-        window.SetJapanese(true);
 
         constexpr std::size_t kPage = 9;
         const auto render = [&] {
@@ -337,15 +348,29 @@ int wmain(int argc, wchar_t** argv) {
         commit(2600);
         window.Hide();
         DestroyWindow(page);
-        return 0;
+        return clipped ? 3 : 0;
     }
 
     tekito::UserDictionary dictionary;
     const auto engine = tekito::CreateDefaultConversionEngine(dictionary);
     if (!engine) return 1;
+    // Rows with a meaning carry the book sign, and the highlighted one's
+    // meaning shows beside the list, as the TSF does.
+    tekito::japanese::MeaningDictionary meanings;
+    meanings.Open(DataRoot());
     const auto show = [&](const tekito::InputStateMachine& state) {
-        window.Show(CompositionRect(page), state.Candidates(), state.SelectedIndex(),
-                    state.PageStart(), state.VisibleCount());
+        auto rows = state.Candidates();
+        for (std::size_t i = state.PageStart(); i < rows.size() && i < state.PageStart() + state.VisibleCount(); ++i) {
+            rows[i].hasMeaning = meanings.Lookup(rows[i].text).has_value();
+        }
+        tekito::tsf::CandidateDetail detail;
+        if (state.SelectedIndex() < rows.size()) {
+            if (const auto meaning = meanings.Lookup(rows[state.SelectedIndex()].text)) {
+                detail = {meaning->headword, meaning->senses};
+            }
+        }
+        window.Show(CompositionRect(page), rows, state.SelectedIndex(), state.PageStart(), state.VisibleCount(),
+                    detail);
     };
 
     g_page.committed = L"Hi Sam, ";
@@ -373,5 +398,5 @@ int wmain(int argc, wchar_t** argv) {
     }
     window.Hide();
     DestroyWindow(page);
-    return 0;
+    return clipped ? 3 : 0;
 }
