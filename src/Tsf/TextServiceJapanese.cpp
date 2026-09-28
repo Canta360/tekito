@@ -125,11 +125,13 @@ void AttachJapaneseData(japanese::JapaneseComposer& composer) {
 
 InputMode TextService::SharedMode() const noexcept {
     if (!runtimeMode_) return mode_;
-    return japaneseProfile_ ? runtimeMode_->JapaneseMode() : runtimeMode_->Mode();
+    if (!japaneseProfile_) return runtimeMode_->Mode();
+    const auto mode = runtimeMode_->JapaneseMode();
+    return mode == InputMode::Japanese && !JapaneseModeAvailable() ? InputMode::Convert : mode;
 }
 
 InputMode TextService::ToggledMode() const noexcept {
-    if (!japaneseProfile_) {
+    if (!JapaneseModeAvailable()) {
         return mode_ == InputMode::Convert ? InputMode::Direct : InputMode::Convert;
     }
     switch (userSettings_.japaneseSwitchOrder) {
@@ -222,7 +224,7 @@ HRESULT TextService::OnChange(REFGUID compartment) {
                          open)) {
         return S_OK;
     }
-    if (!japaneseProfile_) {
+    if (!JapaneseModeAvailable()) {
         if (!openCloseChanged) return S_OK;
         const auto mode = open != 0 ? InputMode::Convert : InputMode::Direct;
         if (mode != mode_) ChangeInputMode(mode);
@@ -273,7 +275,7 @@ bool TextService::TranslateModeKey(WPARAM wParam, ModeKey& key) const {
     default:
         break;
     }
-    if (!japaneseProfile_) {
+    if (!JapaneseModeAvailable()) {
         if (wParam == kVkImeOn || wParam == kVkImeOff) {
             key.mode = wParam == kVkImeOn ? InputMode::Convert : InputMode::Direct;
             return true;

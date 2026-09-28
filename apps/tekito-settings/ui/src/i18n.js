@@ -46,6 +46,12 @@ const en = {
     descriptionJapanese: "Switches the input mode from any app, in the order below. Only this key switches.",
     none: "None",
   },
+  japaneseInput: {
+    title: "Japanese input",
+    description: "Type Japanese from romaji. Off, TEKITO has only Auto and Direct.",
+    off: "Off: TEKITO has only Auto and Direct. The settings below apply once it is on.",
+    missing: "Not installed. Run the TEKITO installer again and choose Japanese to add it.",
+  },
   order: {
     title: "Switch order",
     description: "The modes the switch key and the taskbar button go through: Japanese and Auto, Japanese and Direct, or all three in turn.",
@@ -254,6 +260,12 @@ const ja = {
     description: "どのアプリでも Auto と Direct を切り替えます。切り替えはこのキーだけで行います。",
     descriptionJapanese: "どのアプリでも、下の順番で入力モードを切り替えます。切り替えはこのキーだけで行います。",
     none: "なし",
+  },
+  japaneseInput: {
+    title: "日本語入力",
+    description: "ローマ字から日本語を打てるようにします。オフにすると、Auto と Direct だけになります。",
+    off: "オフです。Auto と Direct だけになっています。下の設定は、オンにすると使われます。",
+    missing: "インストールされていません。TEKITO のインストーラーで日本語を選ぶと追加できます。",
   },
   order: {
     title: "切り替えの順番",

@@ -9,7 +9,7 @@ import "./styles.css";
 const pages = [
   { id: "general", icon: "general" },
   { id: "candidates", icon: "candidates" },
-  { id: "english", icon: "typing" },
+  { id: "english", icon: "english" },
   { id: "japanese", icon: "japanese" },
   { id: "dictionary", icon: "dictionary" },
   { id: "about", icon: "about" },
@@ -34,6 +34,7 @@ const initialSettings = {
   candidateRows: 0,
   meaningsEnabled: true,
   japaneseSwitchOrder: 0,
+  japaneseEnabled: true,
   toggleKey: 1,
   keyboardType: 0,
   periodOnEnter: false,
@@ -98,7 +99,9 @@ function App() {
   const [notice, setNotice] = useState(null);
 
   const t = messages[resolveLanguage(settings.uiLanguage, appearance.systemLanguage)];
-  const japanese = Boolean(runtime.japanese);
+  // Japanese is installed, and turned on in Settings.
+  const japaneseInstalled = Boolean(runtime.japanese);
+  const japanese = japaneseInstalled && settings.japaneseEnabled !== false;
 
   const applyState = useCallback((state) => {
     if (!state) return;
@@ -231,11 +234,11 @@ function App() {
             </Glass>
           ) : (
             <div className="page" key={page}>
-              {page === "general" && <GeneralPage mode={mode} japanese={japanese} japaneseKeyboard={Boolean(runtime.japaneseKeyboard)} settings={settings} changeMode={changeMode} setSetting={setSetting} runAction={runAction} />}
+              {page === "general" && <GeneralPage mode={mode} japanese={japanese} japaneseInstalled={japaneseInstalled} japaneseKeyboard={Boolean(runtime.japaneseKeyboard)} settings={settings} changeMode={changeMode} setSetting={setSetting} runAction={runAction} />}
               {page === "candidates" && <CandidatesPage settings={settings} setSetting={setSetting} />}
               {page === "english" && <EnglishPage settings={settings} setSetting={setSetting} />}
-              {page === "japanese" && <JapanesePage japanese={japanese} settings={settings} setSetting={setSetting} />}
-              {page === "dictionary" && <DictionaryPage japanese={japanese} learning={learning} settings={settings} setSetting={setSetting} dictionary={dictionary} setModal={setModal} setConfirm={setConfirm} runAction={runAction} />}
+              {page === "japanese" && <JapanesePage installed={japaneseInstalled} settings={settings} setSetting={setSetting} />}
+              {page === "dictionary" && <DictionaryPage japanese={japaneseInstalled} learning={learning} settings={settings} setSetting={setSetting} dictionary={dictionary} setModal={setModal} setConfirm={setConfirm} runAction={runAction} />}
               {page === "about" && <AboutPage version={version} runtime={runtime} packs={packs} runAction={runAction} />}
             </div>
           )}
@@ -302,7 +305,7 @@ const switchKeyCaps = (toggleKey, japaneseKeyboard) =>
   : toggleKey === 3 ? ["Ctrl", "Shift", "Space"]
   : null;
 
-function GeneralPage({ mode, japanese, japaneseKeyboard, settings, changeMode, setSetting, runAction }) {
+function GeneralPage({ mode, japanese, japaneseInstalled, japaneseKeyboard, settings, changeMode, setSetting, runAction }) {
   const t = useText();
   // UserSettings::toggleKey, ::japaneseSwitchOrder, ::uiLanguage and
   // ::keyboardType. The switch key choices follow the keyboard.
@@ -328,6 +331,11 @@ function GeneralPage({ mode, japanese, japaneseKeyboard, settings, changeMode, s
         ))}
       </div>
       <Glass className="card">
+        <Row title={t.japaneseInput.title}
+          description={japaneseInstalled ? t.japaneseInput.description : t.japaneseInput.missing}>
+          <Toggle label={t.japaneseInput.title} checked={japanese} disabled={!japaneseInstalled}
+            onChange={(value) => setSetting("japaneseEnabled", value)} />
+        </Row>
         <Row title={t.keyboard.title} description={t.keyboard.description}>
           <Segmented label={t.keyboard.title} value={settings.keyboardType} options={keyboards} onChange={(value) => setSetting("keyboardType", value)} />
         </Row>
@@ -476,10 +484,10 @@ function EnglishPage({ settings, setSetting }) {
 }
 
 // Japanese: how romaji becomes Japanese, when Japanese is installed.
-function JapanesePage({ japanese, settings, setSetting }) {
+function JapanesePage({ installed, settings, setSetting }) {
   const t = useText();
   const j = t.japanese;
-  if (!japanese) {
+  if (!installed) {
     return (
       <Glass className="card state-card">
         <h2>{j.missing.title}</h2>
@@ -487,11 +495,17 @@ function JapanesePage({ japanese, settings, setSetting }) {
       </Glass>
     );
   }
+  const on = settings.japaneseEnabled !== false;
   // UserSettings::japaneseSpaceWidth and ::japanesePunctuation.
   const spaces = [[0, j.space.follow], [1, j.space.half], [2, j.space.full]];
   const marks = [[0, "、。"], [1, "，．"], [2, "，。"], [3, "、．"]];
   return (
     <>
+      <Glass className="card">
+        <Row title={t.japaneseInput.title} description={on ? t.japaneseInput.description : t.japaneseInput.off}>
+          <Toggle label={t.japaneseInput.title} checked={on} onChange={(value) => setSetting("japaneseEnabled", value)} />
+        </Row>
+      </Glass>
       <Glass className="card">
         <Row title={j.space.title} description={j.space.description}>
           <Segmented label={j.space.title} value={settings.japaneseSpaceWidth} options={spaces} onChange={(value) => setSetting("japaneseSpaceWidth", value)} />

@@ -32,6 +32,7 @@ function initialState() {
       candidateRows: 0,
       meaningsEnabled: true,
       japaneseSwitchOrder: 0,
+      japaneseEnabled: true,
       toggleKey: 1,
       keyboardType: 0,
       periodOnEnter: false,
@@ -95,6 +96,7 @@ export function installMockHost() {
       if (type === "settings.set") {
         state.settings[message.key] = message.value;
         if (message.key === "learningEnabled") state.learning.enabled = message.value;
+        if (message.key === "japaneseEnabled" && japaneseInstalled) state.mode = message.value ? "japanese" : "auto";
         if (message.key === "keyboardType") {
           state.runtime.japaneseKeyboard = message.value === 0 ? detectedJapaneseKeyboard : message.value === 1;
         }

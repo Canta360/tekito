@@ -243,6 +243,8 @@ bool SqliteUserDictionaryRepository::LoadSettings(UserSettings& settings) const 
             loaded.socialPersonalization = std::clamp(value, 0, 2);
         } else if (std::strcmp(key, "candidate_window_style") == 0) {
             loaded.candidateWindowStyle = std::clamp(value, 0, 1);
+        } else if (std::strcmp(key, "japanese_enabled") == 0) {
+            loaded.japaneseEnabled = value != 0;
         } else if (std::strcmp(key, "japanese_switch_order") == 0) {
             loaded.japaneseSwitchOrder = std::clamp(value, 0, 2);
         } else if (std::strcmp(key, "candidate_rows") == 0) {
@@ -336,6 +338,7 @@ bool SqliteUserDictionaryRepository::SaveSettings(const UserSettings& settings) 
     saveValue("social_personalization", std::clamp(settings.socialPersonalization, 0, 2));
     saveValue("candidate_window_style", std::clamp(settings.candidateWindowStyle, 0, 1));
     saveValue("candidate_rows", settings.candidateRows);
+    saveValue("japanese_enabled", settings.japaneseEnabled ? 1 : 0);
     saveValue("japanese_switch_order", std::clamp(settings.japaneseSwitchOrder, 0, 2));
     saveValue("meanings_enabled", settings.meaningsEnabled ? 1 : 0);
     saveValue("toggle_key", std::clamp(settings.toggleKey, 0, 3));

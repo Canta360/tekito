@@ -736,7 +736,7 @@ private:
         if (!runtime_) return L"auto";
         if (japaneseAvailable_) {
             const auto mode = runtime_->JapaneseMode();
-            return mode == tekito::InputMode::Japanese ? L"japanese"
+            return mode == tekito::InputMode::Japanese ? (settings_.japaneseEnabled ? L"japanese" : L"auto")
                    : mode == tekito::InputMode::Direct ? L"direct"
                                                        : L"auto";
         }
@@ -781,6 +781,8 @@ private:
         json += L",\"candidateWindowStyle\":" + std::to_wstring(settings_.candidateWindowStyle);
         json += L",\"candidateRows\":" + std::to_wstring(settings_.candidateRows);
         json += L",\"japaneseSwitchOrder\":" + std::to_wstring(settings_.japaneseSwitchOrder);
+        json += L",\"japaneseEnabled\":";
+        json += settings_.japaneseEnabled ? L"true" : L"false";
         json += L",\"meaningsEnabled\":";
         json += settings_.meaningsEnabled ? L"true" : L"false";
         json += L",\"toggleKey\":" + std::to_wstring(settings_.toggleKey);
@@ -932,6 +934,7 @@ private:
             }
             else if (key == L"periodOnEnter") settings_.periodOnEnter = value;
             else if (key == L"meaningsEnabled") settings_.meaningsEnabled = value;
+            else if (key == L"japaneseEnabled") settings_.japaneseEnabled = value;
             else if (key == L"japaneseSwitchOrder") {
                 settings_.japaneseSwitchOrder = std::clamp(integerValue, 0, 2);
             }
@@ -963,6 +966,15 @@ private:
                 if (key == L"keyboardType" && settings_.keyboardType != previous.keyboardType) {
                     ReregisterInputMethod();
                 }
+                // Turning Japanese on starts typing Japanese; turning it off
+                // leaves Japanese for the English mode used last.
+                if (key == L"japaneseEnabled" && japaneseAvailable_ &&
+                    settings_.japaneseEnabled != previous.japaneseEnabled) {
+                    std::wstring ignored;
+                    (void)SetCurrentJapaneseMode(settings_.japaneseEnabled ? tekito::InputMode::Japanese
+                                                                           : settings_.japaneseProfileEnglishMode,
+                                                 ignored);
+                }
                 Reply(requestId, true);
             }
         } else if (type == L"mode.set") {
@@ -972,7 +984,8 @@ private:
                               : value == L"japanese" ? tekito::InputMode::Japanese
                                                      : tekito::InputMode::Convert;
             (void)DataPacksJson();
-            const bool saved = japaneseAvailable_ ? SetCurrentJapaneseMode(mode, error)
+            const bool saved = mode == tekito::InputMode::Japanese && !settings_.japaneseEnabled ? false
+                               : japaneseAvailable_ ? SetCurrentJapaneseMode(mode, error)
                                : mode == tekito::InputMode::Japanese ? false
                                                                      : SetCurrentMode(mode, error);
             Reply(requestId, saved, error);
