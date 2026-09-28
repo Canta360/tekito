@@ -8,6 +8,7 @@ import "./styles.css";
 
 const pages = [
   { id: "general", icon: "general" },
+  { id: "switching", icon: "switching" },
   { id: "candidates", icon: "candidates" },
   { id: "english", icon: "english" },
   { id: "japanese", icon: "japanese" },
@@ -237,7 +238,8 @@ function App() {
             </Glass>
           ) : (
             <div className="page" key={current.id}>
-              {current.id === "general" && <GeneralPage mode={mode} japanese={japanese} japaneseInstalled={japaneseInstalled} japaneseKeyboard={Boolean(runtime.japaneseKeyboard)} settings={settings} changeMode={changeMode} setSetting={setSetting} runAction={runAction} />}
+              {current.id === "general" && <GeneralPage mode={mode} japanese={japanese} japaneseInstalled={japaneseInstalled} settings={settings} changeMode={changeMode} setSetting={setSetting} runAction={runAction} />}
+              {current.id === "switching" && <SwitchingPage japanese={japanese} japaneseKeyboard={Boolean(runtime.japaneseKeyboard)} settings={settings} setSetting={setSetting} />}
               {current.id === "candidates" && <CandidatesPage settings={settings} setSetting={setSetting} />}
               {current.id === "english" && <EnglishPage settings={settings} setSetting={setSetting} />}
               {current.id === "japanese" && <JapanesePage settings={settings} setSetting={setSetting} />}
@@ -308,22 +310,14 @@ const switchKeyCaps = (toggleKey, japaneseKeyboard) =>
   : toggleKey === 3 ? ["Ctrl", "Shift", "Space"]
   : null;
 
-function GeneralPage({ mode, japanese, japaneseInstalled, japaneseKeyboard, settings, changeMode, setSetting, runAction }) {
+// What TEKITO is doing overall: the mode, Japanese, the language, and the
+// apps where it stays off.
+function GeneralPage({ mode, japanese, japaneseInstalled, settings, changeMode, setSetting, runAction }) {
   const t = useText();
-  // UserSettings::toggleKey, ::japaneseSwitchOrder, ::uiLanguage and
-  // ::keyboardType. The switch key choices follow the keyboard.
-  const toggleKeys = [1, 2, 3].map((value) => [value, <Keycaps keys={switchKeyCaps(value, japaneseKeyboard)} />])
-    .concat([[0, t.switchKey.none]]);
-  const orders = [
-    [0, <ModeOrder ids={["japanese", "auto"]} />],
-    [1, <ModeOrder ids={["japanese", "direct"]} />],
-    [2, <ModeOrder ids={["japanese", "auto", "direct"]} round />],
-  ];
+  // UserSettings::uiLanguage.
   const languages = [[0, t.language.system], [1, "English"], [2, "日本語"]];
-  const keyboards = [[0, t.keyboard.detect], [1, t.keyboard.japanese], [2, t.keyboard.us]];
   // Japanese is a mode only when it is installed.
   const modes = japanese ? ["auto", "direct", "japanese"] : ["auto", "direct"];
-  const switchKey = switchKeyCaps(settings.toggleKey, japaneseKeyboard);
   return (
     <>
       <div className={`tile-grid mode-grid ${japanese ? "three" : ""}`}>
@@ -339,6 +333,36 @@ function GeneralPage({ mode, japanese, japaneseInstalled, japaneseKeyboard, sett
           <Toggle label={t.japaneseInput.title} checked={japanese} disabled={!japaneseInstalled}
             onChange={(value) => setSetting("japaneseEnabled", value)} />
         </Row>
+        <Row title={t.restoreMode.title} description={japanese ? t.restoreMode.descriptionJapanese : t.restoreMode.description}>
+          <Toggle label={t.restoreMode.title} checked={settings.restoreLastInputMode} onChange={(value) => setSetting("restoreLastInputMode", value)} />
+        </Row>
+        <Row title={t.language.title} description={t.language.description}>
+          <Segmented label={t.language.title} value={settings.uiLanguage} options={languages} onChange={(value) => setSetting("uiLanguage", value)} />
+        </Row>
+      </Glass>
+      <ExcludedApps settings={settings} runAction={runAction} />
+    </>
+  );
+}
+
+// How the mode is switched: the keyboard, the switch key and its order, the
+// badge shown after a switch, and the keys for it.
+function SwitchingPage({ japanese, japaneseKeyboard, settings, setSetting }) {
+  const t = useText();
+  // UserSettings::keyboardType, ::toggleKey and ::japaneseSwitchOrder. The
+  // switch key choices follow the keyboard.
+  const keyboards = [[0, t.keyboard.detect], [1, t.keyboard.japanese], [2, t.keyboard.us]];
+  const toggleKeys = [1, 2, 3].map((value) => [value, <Keycaps keys={switchKeyCaps(value, japaneseKeyboard)} />])
+    .concat([[0, t.switchKey.none]]);
+  const orders = [
+    [0, <ModeOrder ids={["japanese", "auto"]} />],
+    [1, <ModeOrder ids={["japanese", "direct"]} />],
+    [2, <ModeOrder ids={["japanese", "auto", "direct"]} round />],
+  ];
+  const switchKey = switchKeyCaps(settings.toggleKey, japaneseKeyboard);
+  return (
+    <>
+      <Glass className="card">
         <Row title={t.keyboard.title} description={t.keyboard.description}>
           <Segmented label={t.keyboard.title} value={settings.keyboardType} options={keyboards} onChange={(value) => setSetting("keyboardType", value)} />
         </Row>
@@ -350,14 +374,8 @@ function GeneralPage({ mode, japanese, japaneseInstalled, japaneseKeyboard, sett
             <Segmented label={t.order.title} value={settings.japaneseSwitchOrder} options={orders} onChange={(value) => setSetting("japaneseSwitchOrder", value)} />
           </Row>
         )}
-        <Row title={t.restoreMode.title} description={japanese ? t.restoreMode.descriptionJapanese : t.restoreMode.description}>
-          <Toggle label={t.restoreMode.title} checked={settings.restoreLastInputMode} onChange={(value) => setSetting("restoreLastInputMode", value)} />
-        </Row>
         <Row title={t.modeIndicator.title} description={t.modeIndicator.description}>
           <Toggle label={t.modeIndicator.title} checked={settings.modeIndicatorEnabled} onChange={(value) => setSetting("modeIndicatorEnabled", value)} />
-        </Row>
-        <Row title={t.language.title} description={t.language.description}>
-          <Segmented label={t.language.title} value={settings.uiLanguage} options={languages} onChange={(value) => setSetting("uiLanguage", value)} />
         </Row>
       </Glass>
       <Glass className="card">
@@ -374,7 +392,6 @@ function GeneralPage({ mode, japanese, japaneseInstalled, japaneseKeyboard, sett
           <Key label={t.modeKeys.taskbar} keys={[t.modeKeys.taskbarButton]} />
         </div>
       </Glass>
-      <ExcludedApps settings={settings} runAction={runAction} />
     </>
   );
 }
