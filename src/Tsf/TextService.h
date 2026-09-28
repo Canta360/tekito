@@ -160,6 +160,11 @@ private:
     // meanings are off or unknown.
     CandidateDetail MeaningFor(std::wstring_view text, std::wstring_view reading = {}) const;
     CandidateDetail SelectedEnglishMeaning() const;
+    // Marks the candidates of the page shown that have a meaning (the
+    // dictionary sign), when meanings are on.
+    void MarkMeanings(std::vector<Candidate>& candidates, std::size_t first, std::size_t count,
+                      std::wstring_view reading = {}) const;
+    [[nodiscard]] std::vector<Candidate> EnglishRows() const;
     RECT JapaneseCandidateAnchor(ITfContext* context, TfEditCookie editCookie) const;
     HRESULT CommitJapanese(ITfContext* context, TfEditCookie editCookie);
     // The mode shared for the active profile.

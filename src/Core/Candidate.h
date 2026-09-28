@@ -81,6 +81,9 @@ struct Candidate {
     std::uint8_t socialRange{SocialRangeUnspecified};
     std::uint32_t id{0};
     TextSpan replaceSpan;
+    // The candidate window marks it with a dictionary sign: there is a
+    // meaning to show for it.
+    bool hasMeaning{false};
 
     bool operator==(const Candidate&) const = default;
 };

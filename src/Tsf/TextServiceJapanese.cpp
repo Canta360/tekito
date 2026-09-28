@@ -722,6 +722,21 @@ CandidateDetail TextService::MeaningFor(std::wstring_view text, std::wstring_vie
     return {meaning->headword, meaning->senses};
 }
 
+void TextService::MarkMeanings(std::vector<Candidate>& candidates, std::size_t first, std::size_t count,
+                               std::wstring_view reading) const {
+    if (!userSettings_.meaningsEnabled) return;
+    const auto& meanings = ProcessMeanings();
+    for (std::size_t i = first; i < candidates.size() && i < first + count; ++i) {
+        candidates[i].hasMeaning = meanings.Lookup(candidates[i].text, reading).has_value();
+    }
+}
+
+std::vector<Candidate> TextService::EnglishRows() const {
+    auto rows = state_.Candidates();
+    MarkMeanings(rows, state_.PageStart(), state_.VisibleCount());
+    return rows;
+}
+
 CandidateDetail TextService::SelectedEnglishMeaning() const {
     const auto& candidates = state_.Candidates();
     const std::size_t selected = state_.SelectedIndex();
@@ -743,6 +758,10 @@ void TextService::ShowJapaneseCandidates(ITfContext* context, TfEditCookie editC
             row.text = predictions[i].text;
             row.id = static_cast<std::uint32_t>(i + 1);
             rows.push_back(std::move(row));
+        }
+        for (std::size_t i = 0; i < rows.size(); ++i) {
+            rows[i].hasMeaning = userSettings_.meaningsEnabled &&
+                                 ProcessMeanings().Lookup(predictions[i].text, predictions[i].reading).has_value();
         }
         const auto chosen = japanese_.ChosenPrediction();
         const RECT anchor = GetCandidateAnchor(context, editCookie);
@@ -774,6 +793,7 @@ void TextService::ShowJapaneseCandidates(ITfContext* context, TfEditCookie editC
         if ((*candidates)[i].slip || (*candidates)[i].spellingCorrection) row.label = SemanticLabel::Suggestion;
         rows.push_back(std::move(row));
     }
+    MarkMeanings(rows, page, japanesePage_, japanese_.FocusedReading());
     const RECT anchor = JapaneseCandidateAnchor(context, editCookie);
     candidateAnchor_ = anchor;
     candidateWindow_.SetStyle(userSettings_.candidateWindowStyle);
