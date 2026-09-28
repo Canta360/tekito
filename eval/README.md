@@ -101,3 +101,18 @@ shows how many slips come out as meant (37.6% with the default, against
 meant among the first nine candidates of one phrase, as the second Space
 shows them with the slips undone there (64.3% of the typo set), and
 `list_us` is how long opening that list takes.
+
+Typing phrase by phrase (a word or a phrase, then Space) is measured with
+the phrases of the sentences that convert right:
+
+```powershell
+.\out\build\eval\Release\tekito_ja_eval.exe @keys --keys-corpus eval\generated\japanese_eval_keys.tsv `
+    --dump-phrases eval\generated\japanese_eval_phrase_keys.tsv
+python scripts\prepare-japanese-eval.py --phrases   # writes japanese_eval_phrase_typo_keys.tsv
+.\out\build\eval\Release\tekito_ja_eval.exe @keys --keys-corpus eval\generated\japanese_eval_phrase_keys.tsv
+.\out\build\eval\Release\tekito_ja_eval.exe @keys --keys-corpus eval\generated\japanese_eval_phrase_typo_keys.tsv
+```
+
+The phrases alone convert as in their sentence 97.3% of the time; with one
+slip, what was meant is the first choice for 55.9% and one pick away for
+91.2%.

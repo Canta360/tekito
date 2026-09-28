@@ -24,6 +24,9 @@ struct PhraseCandidate {
     bool spellingCorrection{false};
     // Read from the keys with a slip undone (offered in the list, "もしかして").
     bool slip{false};
+    // Set when the candidate is the whole input read again (a slip across
+    // phrases): choosing it makes this the reading, as one phrase.
+    std::wstring reading;
 };
 
 // A word that starts with what has been typed, for prediction.

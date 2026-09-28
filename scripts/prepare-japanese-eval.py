@@ -23,6 +23,12 @@ And eval/generated/japanese_eval_typo_keys.tsv: the same sentences with one
 slip in the keys (a neighboring key, a key dropped, an extra neighboring
 key, or two keys swapped), chosen deterministically; the expected text is
 what was meant.
+
+With --phrases, it reads eval/generated/japanese_eval_phrase_keys.tsv (the
+phrases of the sentences that convert right, written by
+`tekito_ja_eval --dump-phrases`) and writes
+eval/generated/japanese_eval_phrase_typo_keys.tsv: each phrase of four
+letters or more with one slip, for typing and converting phrase by phrase.
 """
 
 from __future__ import annotations
@@ -38,6 +44,8 @@ CACHE = ROOT / ".cache" / "tekito-data"
 OUTPUT = ROOT / "eval" / "generated" / "japanese_eval.tsv"
 KEYS_OUTPUT = ROOT / "eval" / "generated" / "japanese_eval_keys.tsv"
 TYPO_OUTPUT = ROOT / "eval" / "generated" / "japanese_eval_typo_keys.tsv"
+PHRASES = ROOT / "eval" / "generated" / "japanese_eval_phrase_keys.tsv"
+PHRASE_TYPO_OUTPUT = ROOT / "eval" / "generated" / "japanese_eval_phrase_typo_keys.tsv"
 QWERTY_ROWS = ["qwertyuiop", "asdfghjkl", "zxcvbnm"]
 DATA = ROOT / "data"
 
@@ -143,11 +151,11 @@ def qwerty_neighbors(key: str) -> str:
     return ""
 
 
-def typo(keys: str, seed: str) -> tuple[str, str] | None:
+def typo(keys: str, seed: str, shortest: int = 6) -> tuple[str, str] | None:
     """One slip in the keys, the same every run."""
     digest = hashlib.sha1(seed.encode("utf-8")).digest()
     letters = [i for i, c in enumerate(keys) if c.isalpha()]
-    if len(letters) < 6:
+    if len(letters) < shortest:
         return None
     at = letters[digest[0] % len(letters)]
     kind = ("neighbor", "neighbor", "dropped", "extra", "swapped")[digest[1] % 5]
@@ -163,10 +171,28 @@ def typo(keys: str, seed: str) -> tuple[str, str] | None:
     return None
 
 
+def write_phrase_typos() -> None:
+    count = 0
+    with PHRASE_TYPO_OUTPUT.open("w", encoding="utf-8", newline="\n") as out:
+        for line in PHRASES.read_text(encoding="utf-8").splitlines():
+            source, row_id, keys, text = line.split("\t")[:4]
+            slip = typo(keys, f"{source}:{row_id}", shortest=4)
+            if slip:
+                kind, slipped = slip
+                out.write(f"{source}-{kind}\t{row_id}\t{slipped}\t{text}\n")
+                count += 1
+    print(f"wrote {count} rows to {PHRASE_TYPO_OUTPUT}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--output", type=Path, default=OUTPUT)
+    parser.add_argument("--phrases", action="store_true",
+                        help="write the phrase typo set from japanese_eval_phrase_keys.tsv")
     args = parser.parse_args()
+    if args.phrases:
+        write_phrase_typos()
+        return
     args.output.parent.mkdir(parents=True, exist_ok=True)
     count = 0
     with args.output.open("w", encoding="utf-8", newline="\n") as out:
