@@ -79,7 +79,8 @@ export function Glass({ as: Tag = "section", className = "", children, ...props 
 
 // Square glass tile with a pool of accent light behind it. The light shows
 // only when the tile is on (or selected), and leans toward the pointer.
-export function Tile({ on, onPress, icon, image, art, title, description, status, className = "", ...props }) {
+// `imageDark`, when given, is the image for a dark background.
+export function Tile({ on, onPress, icon, image, imageDark, art, title, description, status, className = "", ...props }) {
   const ref = useRef(null);
   const onPointerMove = (event) => {
     const rect = ref.current?.getBoundingClientRect();
@@ -97,7 +98,12 @@ export function Tile({ on, onPress, icon, image, art, title, description, status
       <span className="tile-light" />
       <span className="tile-glass">
         <span className="tile-top">
-          {art || (image ? <img className="tile-image" src={image} alt="" /> : <Icon name={icon} size={24} className="tile-icon" />)}
+          {art || (image ? (
+            <picture>
+              {imageDark && <source media="(prefers-color-scheme: dark)" srcSet={imageDark} />}
+              <img className="tile-image" src={image} alt="" />
+            </picture>
+          ) : <Icon name={icon} size={24} className="tile-icon" />)}
           {status !== undefined && <span className="tile-status"><span className="dot" />{status}</span>}
         </span>
         <span className="tile-text">
