@@ -638,7 +638,6 @@ HRESULT TextService::Deactivate() {
         settingsLoaded_ = false;
     }
     candidateWindow_.Hide();
-    modeIndicator_.Shutdown();
     state_.Reset();
     rawText_.clear();
     japanese_.Clear();
@@ -1371,7 +1370,7 @@ HRESULT TextService::HandleKeyInEditSessionCore(ITfContext* context, TfEditCooki
     Trace(L"HandleKeyInEditSession");
     if (!context) return E_INVALIDARG;
     if (input.type == KeyInput::Type::ShowModeIndicator) {
-        modeIndicator_.Show(g_moduleInstance, CaretAnchor(context, editCookie), mode_);
+        ShowModeBadge(CaretAnchor(context, editCookie));
         return S_OK;
     }
     if (input.type == KeyInput::Type::Reposition) {
@@ -1956,7 +1955,12 @@ void TextService::ShowModeIndicator(ITfContext* context) {
         }
     }
     // No document to ask: the system caret, or the pointer.
-    modeIndicator_.Show(g_moduleInstance, GetCandidateAnchor(nullptr, 0), mode_);
+    ShowModeBadge(GetCandidateAnchor(nullptr, 0));
+}
+
+void TextService::ShowModeBadge(const RECT& caret) {
+    candidateWindow_.SetStyle(userSettings_.candidateWindowStyle);
+    candidateWindow_.ShowModeBadge(caret, mode_);
 }
 
 RECT TextService::GetCandidateAnchor(ITfContext* context, TfEditCookie editCookie) const {

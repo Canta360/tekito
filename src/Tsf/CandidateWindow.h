@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Core/Candidate.h"
+#include "Core/InputMode.h"
 
 #include <windows.h>
 #include <cstddef>
@@ -46,6 +47,10 @@ public:
               std::size_t visibleCount,
               const CandidateDetail& detail = {});
     void Hide() noexcept;
+    // The mode's icon alone, in the list's style, under the caret for a
+    // moment after the user switches modes; it fades by itself. The next
+    // Show replaces it.
+    void ShowModeBadge(const RECT& caretRect, InputMode mode);
     bool IsShown() const noexcept { return shown_; }
     // 0 = glass, 1 = simple (see UserSettings::candidateWindowStyle). Takes
     // effect from the next Show.

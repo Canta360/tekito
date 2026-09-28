@@ -7,7 +7,6 @@
 #include "Tsf/ComPtr.h"
 #include "Tsf/EditSession.h"
 #include "Tsf/TekitoGuids.h"
-#include "Tsf/ModeIndicator.h"
 #include "Tsf/ModeLangBarItem.h"
 #include "UserData/UserDataRepository.h"
 #include "UserData/RuntimeModeState.h"
@@ -124,6 +123,7 @@ private:
     // After the user switched modes: the new mode by the caret, if Settings
     // shows it. `context` may be null (the taskbar button).
     void ShowModeIndicator(ITfContext* context);
+    void ShowModeBadge(const RECT& caret);
     HRESULT RequestKeyEditSession(ITfContext* context, const KeyInput& input);
     void OnCandidateSelected(std::size_t index);
     void SyncRuntimeState();
@@ -251,7 +251,6 @@ private:
     std::size_t japanesePage_{9};
     RECT candidateAnchor_{};
     CandidateWindow candidateWindow_;
-    ModeIndicator modeIndicator_;
     ComPtr<ITfLangBarItemMgr> langBarItemMgr_;
     ComPtr<ModeLangBarItem> modeLangBarItem_;
 };

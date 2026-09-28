@@ -86,6 +86,13 @@ constexpr int kDetailWidth = 250;
 constexpr int kDetailPadding = 14;
 constexpr int kDetailMaxHeight = 300;
 constexpr int kCaretGap = 6;
+// The mode badge: a row's height square (a circle in glass), held, then
+// faded out.
+constexpr int kBadgeIcon = 24;
+constexpr UINT_PTR kBadgeTimer = 7;
+constexpr UINT kBadgeHoldMs = 850;
+constexpr UINT kBadgeFadeTickMs = 25;
+constexpr int kBadgeFadeSteps = 8;
 constexpr int kSelectionPad = 8;
 constexpr int kGlowDepth = 9;
 constexpr int kShadeDepth = 4;
@@ -323,6 +330,8 @@ struct Frame {
     int style{0};  // CandidateWindow::Style
     std::wstring detailHead;
     std::vector<std::wstring> detailSenses;
+    // A mode badge instead of rows: 0 none, else the mode.
+    int badge{0};
 };
 
 }  // namespace
@@ -955,6 +964,55 @@ void DrawIndicator(ID2D1RenderTarget* target, const Layout& layout, const Frame&
 
 // The meaning pane: a hairline between it and the list, then the headword
 // and its senses.
+constexpr int kBadgeAuto = 1;
+constexpr int kBadgeDirect = 2;
+constexpr int kBadgeJapanese = 3;
+
+// The badge's mode icon (the taskbar's, dark versions on dark), centered.
+void DrawBadge(ID2D1RenderTarget* target, const Layout& layout, int badge, HINSTANCE instance) {
+    const bool dark = IsDarkThemeActive() && !IsHighContrast();
+    const int resource = badge == kBadgeJapanese ? (dark ? IDI_JAPANESE_DARK : IDI_JAPANESE)
+                         : badge == kBadgeDirect ? (dark ? IDI_DIRECT_DARK : IDI_DIRECT)
+                                                 : IDI_AUTO;
+    const int side = static_cast<int>(std::lround(kBadgeIcon * layout.scale));
+    HICON icon = static_cast<HICON>(
+        LoadImageW(instance, MAKEINTRESOURCEW(resource), IMAGE_ICON, side, side, LR_DEFAULTCOLOR));
+    if (!icon) return;
+    ICONINFO info{};
+    std::vector<std::uint32_t> pixels(static_cast<std::size_t>(side) * side, 0);
+    bool read = false;
+    if (GetIconInfo(icon, &info)) {
+        if (info.hbmColor) {
+            BITMAPINFO bitmap{};
+            bitmap.bmiHeader = {sizeof(BITMAPINFOHEADER), side, -side, 1, 32, BI_RGB};
+            HDC screen = GetDC(nullptr);
+            read = GetDIBits(screen, info.hbmColor, 0, static_cast<UINT>(side), pixels.data(), &bitmap,
+                             DIB_RGB_COLORS) == side;
+            ReleaseDC(nullptr, screen);
+            DeleteObject(info.hbmColor);
+        }
+        if (info.hbmMask) DeleteObject(info.hbmMask);
+    }
+    DestroyIcon(icon);
+    if (!read) return;
+    // Straight alpha to premultiplied.
+    for (auto& pixel : pixels) {
+        const std::uint32_t alpha = pixel >> 24;
+        const auto channel = [&](int shift) { return ((pixel >> shift) & 0xFF) * alpha / 255; };
+        pixel = (alpha << 24) | (channel(16) << 16) | (channel(8) << 8) | channel(0);
+    }
+    winrt::com_ptr<ID2D1Bitmap> image;
+    const auto properties = D2D1::BitmapProperties(
+        D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED));
+    if (FAILED(target->CreateBitmap(D2D1::SizeU(side, side), pixels.data(), static_cast<UINT32>(side * 4),
+                                    &properties, image.put()))) {
+        return;
+    }
+    const float x = (static_cast<float>(layout.width) - side) / 2.0f;
+    const float y = (static_cast<float>(layout.height) - side) / 2.0f;
+    target->DrawBitmap(image.get(), D2D1::RectF(x, y, x + side, y + side));
+}
+
 void DrawDetail(ID2D1RenderTarget* target, const Layout& layout, const Style& style) {
     if (!layout.detailText) return;
     auto line = SolidBrush(target, style.palette.tagFill);
@@ -1196,6 +1254,12 @@ private:
         case WM_DPICHANGED:
             // Size and position are recomputed from the caret on every update.
             return 0;
+        case WM_TIMER:
+            if (hwnd == self->panel_ && wParam == kBadgeTimer) {
+                self->OnBadgeTimer();
+                return 0;
+            }
+            break;
         default:
             break;
         }
@@ -1248,6 +1312,8 @@ private:
 
     void Present(Frame frame) {
         if (!EnsureWindows()) return;
+        KillTimer(panel_, kBadgeTimer);
+        badgeFade_ = 0;
         if (!visible_ || frame.style != frame_.style) {
             style_ = ReadStyle(composition_ && hostBackdrop_, frame.style == 1);
         }
@@ -1298,9 +1364,33 @@ private:
             InvalidateRect(panel_, nullptr, FALSE);
         }
         visible_ = true;
+        if (frame_.badge) SetTimer(panel_, kBadgeTimer, kBadgeHoldMs, nullptr);
+    }
+
+    // The badge's first tick ends its hold; the rest fade it out.
+    void OnBadgeTimer() {
+        if (badgeFade_ == 0) SetTimer(panel_, kBadgeTimer, kBadgeFadeTickMs, nullptr);
+        ++badgeFade_;
+        if (badgeFade_ >= kBadgeFadeSteps || !composition_) {
+            HidePopup();
+            return;
+        }
+        const float opacity = 1.0f - static_cast<float>(badgeFade_) / kBadgeFadeSteps;
+        try {
+            if (root_) root_.Opacity(opacity);
+        } catch (...) {
+        }
+        if (shadow_ && shadowDc_) {
+            POINT source{0, 0};
+            SIZE size = shadowSize_;
+            BLENDFUNCTION blend{AC_SRC_OVER, 0, static_cast<BYTE>(std::lround(255.0f * opacity)), AC_SRC_ALPHA};
+            UpdateLayeredWindow(shadow_, nullptr, &shadowPosition_, &size, shadowDc_, &source, 0, &blend,
+                                ULW_ALPHA);
+        }
     }
 
     void HidePopup() noexcept {
+        if (panel_) KillTimer(panel_, kBadgeTimer);
         if (!visible_) return;
         visible_ = false;
         try {
@@ -1336,6 +1426,15 @@ private:
         l.indicator = frame.totalCount > frame.rows.size();
         l.indicatorWidth = static_cast<float>(ScaleForWindow(panel_, kIndicatorWidth));
         l.indicatorInset = static_cast<float>(ScaleForWindow(panel_, kIndicatorInset));
+        if (frame.badge) {
+            const int side = static_cast<int>(std::lround(2.0f * l.padding + l.rowHeight));
+            l.width = l.height = side;
+            l.indicator = false;
+            if (composition_ && frame.style != 1) l.radius = static_cast<float>(side) / 2.0f;
+            l.rowRight = static_cast<float>(side) - l.padding;
+            l.listWidth = l.listHeight = static_cast<float>(side);
+            return l;
+        }
 
         // Candidate length varies a lot (a single emoji vs. a long phrase), so
         // the panel is sized to the widest visible row. Measured in the
@@ -1774,6 +1873,10 @@ private:
 
         contentVisual_.Size({width, height});
         hr = PaintSurface(content_, layout_.width, layout_.height, [&](ID2D1RenderTarget* dc) {
+            if (frame_.badge) {
+                DrawBadge(dc, layout_, frame_.badge, channel_->instance);
+                return;
+            }
             DrawRows(dc, dwrite_.get(), formats_, layout_, frame_, style_, Ink::Normal, kNoRow, kNoRow);
             DrawIndicator(dc, layout_, frame_, style_);
             DrawDetail(dc, layout_, style_);
@@ -1897,6 +2000,7 @@ private:
         }
 
         POINT destination{panelPosition.x - marginX, panelPosition.y - marginTop};
+        shadowPosition_ = destination;
         SIZE windowSize = shadowSize_;
         POINT source{0, 0};
         BLENDFUNCTION blend{AC_SRC_OVER, 0, 255, AC_SRC_ALPHA};
@@ -1947,6 +2051,7 @@ private:
             }
             DrawIndicator(target, layout_, frame_, style_);
             DrawDetail(target, layout_, style_);
+            if (frame_.badge) DrawBadge(target, layout_, frame_.badge, channel_->instance);
             if (target->EndDraw() == D2DERR_RECREATE_TARGET) hwndTarget_ = nullptr;
         }
         EndPaint(panel_, &ps);
@@ -1961,6 +2066,8 @@ private:
     bool windowsFailed_{false};
     bool hostBackdrop_{false};
     bool visible_{false};
+    int badgeFade_{0};
+    POINT shadowPosition_{};
 
     Frame frame_;
     Layout layout_;
@@ -2162,6 +2269,29 @@ void CandidateWindow::Show(const RECT& caretRect,
         frame.detailSenses = detail.senses;
     }
 
+    {
+        std::lock_guard<std::mutex> lock(channel_->mutex);
+        channel_->pending = std::move(frame);
+        channel_->hasPending = true;
+    }
+    PostMessageW(channel_->controlHwnd, kMsgUpdate, 0, 0);
+    shown_ = true;
+}
+
+void CandidateWindow::ShowModeBadge(const RECT& caretRect, InputMode mode) {
+    if (!channel_) return;
+    candidates_.clear();
+    selectedIndex_ = 0;
+    pageStart_ = 0;
+    visibleCount_ = 0;
+    Frame frame;
+    frame.visible = true;
+    frame.caret = caretRect;
+    frame.generation = ++generation_;
+    frame.style = style_;
+    frame.badge = mode == InputMode::Japanese ? kBadgeJapanese
+                  : mode == InputMode::Direct ? kBadgeDirect
+                                              : kBadgeAuto;
     {
         std::lock_guard<std::mutex> lock(channel_->mutex);
         channel_->pending = std::move(frame);
