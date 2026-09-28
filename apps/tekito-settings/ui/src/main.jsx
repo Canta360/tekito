@@ -8,11 +8,14 @@ import "./styles.css";
 
 const pages = [
   { id: "general", icon: "general" },
-  { id: "typing", icon: "typing" },
+  { id: "candidates", icon: "candidates" },
+  { id: "english", icon: "typing" },
   { id: "japanese", icon: "japanese" },
   { id: "dictionary", icon: "dictionary" },
   { id: "about", icon: "about" },
 ];
+// Links from before the pages were rearranged.
+const pageAliases = { typing: "english" };
 
 // Mirrors the defaults in src/UserData/UserSettings.h; only shown
 // until the host's first reply arrives.
@@ -42,18 +45,25 @@ const initialSettings = {
   builtInExcludedApps: [],
 };
 
-// Only the switches a person would actually want to flip. Common
+// The switches a person would actually want to flip for English. Common
 // misspellings and context ranking stay on (they only make corrections
-// better) and are no longer shown.
-const features = [
+// better) and are not shown.
+const englishFeatures = [
   { key: "correctionEnabled", icon: "spelling" },
   { key: "completionEnabled", icon: "completion" },
-  { key: "candidateWindowEnabled", icon: "candidates" },
   { key: "japanesePhoneticSuggestionsEnabled", icon: "japanese" },
 ];
 
 // Candidate list look (UserSettings::candidateWindowStyle).
 const candidateStyles = [{ value: 0, id: "glass" }, { value: 1, id: "simple" }];
+
+// The input modes and their icons (assets/icons), with the versions for a
+// dark background.
+const modeTiles = {
+  japanese: { title: "日本語", image: "./assets/japanese.ico", imageDark: "./assets/japanese-dark.ico" },
+  auto: { title: "Auto", image: "./assets/auto.ico" },
+  direct: { title: "Direct", image: "./assets/direct.ico", imageDark: "./assets/direct-dark.ico" },
+};
 
 // The six engine policies boil down to three behaviors a person can tell
 // apart: replace on Space, only suggest, or never touch the word.
@@ -65,13 +75,19 @@ function actionOf(policy) {
   return "suggest";
 }
 
+function pageFromHash() {
+  const id = window.location.hash.slice(1);
+  const page = pageAliases[id] || id;
+  return pages.some((item) => item.id === page) ? page : "general";
+}
+
 function App() {
-  // "#typing" etc. opens a page directly.
-  const [page, setPage] = useState(() => pages.find((item) => `#${item.id}` === window.location.hash)?.id || "general");
+  // "#japanese" etc. opens a page directly.
+  const [page, setPage] = useState(pageFromHash);
   const [connection, setConnection] = useState({ status: "loading", error: "" });
   const [settings, setSettings] = useState(initialSettings);
   const [mode, setMode] = useState("auto");
-  const [runtime, setRuntime] = useState({ tsf: "Unavailable", dataPacks: "Unavailable" });
+  const [runtime, setRuntime] = useState({ tsf: "Unavailable", dataPacks: "Unavailable", japaneseData: "", japanese: false });
   const [learning, setLearning] = useState({ enabled: true, count: 0 });
   const [dictionary, setDictionary] = useState([]);
   const [packs, setPacks] = useState([]);
@@ -82,11 +98,12 @@ function App() {
   const [notice, setNotice] = useState(null);
 
   const t = messages[resolveLanguage(settings.uiLanguage, appearance.systemLanguage)];
+  const japanese = Boolean(runtime.japanese);
 
   const applyState = useCallback((state) => {
     if (!state) return;
     setSettings((value) => ({ ...value, ...(state.settings || {}) }));
-    setMode(state.mode === "direct" ? "direct" : "auto");
+    setMode(["japanese", "direct"].includes(state.mode) ? state.mode : "auto");
     setRuntime((value) => ({ ...value, ...(state.runtime || {}) }));
     setLearning((value) => ({ ...value, ...(state.learning || {}) }));
     setDictionary(state.dictionary || []);
@@ -214,10 +231,11 @@ function App() {
             </Glass>
           ) : (
             <div className="page" key={page}>
-              {page === "general" && <GeneralPage mode={mode} settings={settings} changeMode={changeMode} setSetting={setSetting} runAction={runAction} />}
-              {page === "typing" && <TypingPage settings={settings} setSetting={setSetting} />}
-              {page === "japanese" && <JapanesePage settings={settings} setSetting={setSetting} setConfirm={setConfirm} runAction={runAction} />}
-              {page === "dictionary" && <DictionaryPage learning={learning} settings={settings} setSetting={setSetting} dictionary={dictionary} setModal={setModal} setConfirm={setConfirm} runAction={runAction} />}
+              {page === "general" && <GeneralPage mode={mode} japanese={japanese} settings={settings} changeMode={changeMode} setSetting={setSetting} runAction={runAction} />}
+              {page === "candidates" && <CandidatesPage settings={settings} setSetting={setSetting} />}
+              {page === "english" && <EnglishPage settings={settings} setSetting={setSetting} />}
+              {page === "japanese" && <JapanesePage japanese={japanese} settings={settings} setSetting={setSetting} />}
+              {page === "dictionary" && <DictionaryPage japanese={japanese} learning={learning} settings={settings} setSetting={setSetting} dictionary={dictionary} setModal={setModal} setConfirm={setConfirm} runAction={runAction} />}
               {page === "about" && <AboutPage version={version} runtime={runtime} packs={packs} runAction={runAction} />}
             </div>
           )}
@@ -239,26 +257,36 @@ function App() {
   );
 }
 
-function GeneralPage({ mode, settings, changeMode, setSetting, runAction }) {
+// General: which input mode is on, how to switch, and where TEKITO stays out.
+function GeneralPage({ mode, japanese, settings, changeMode, setSetting, runAction }) {
   const t = useText();
-  // UserSettings::toggleKey and UserSettings::uiLanguage.
+  // UserSettings::toggleKey, ::uiLanguage, ::keyboardType and
+  // ::japaneseKeyCyclesModes.
   const toggleKeys = [[1, "Alt+`"], [2, "Ctrl+Space"], [3, "Ctrl+Shift+Space"], [0, t.switchKey.none]];
   const languages = [[0, t.language.system], [1, "English"], [2, "日本語"]];
-  // UserSettings::keyboardType.
   const keyboards = [[0, t.keyboard.detect], [1, t.keyboard.japanese], [2, t.keyboard.us]];
+  const cycles = [[false, t.cycle.toggle], [true, t.cycle.round]];
+  // Japanese is a mode only when it is installed.
+  const modes = japanese ? ["japanese", "auto", "direct"] : ["auto", "direct"];
   return (
     <>
-      <div className="tile-grid mode-grid">
-        <Tile on={mode === "auto"} image="./assets/auto.ico" title="Auto" status={mode === "auto" ? t.inUse : undefined}
-          description={t.modes.auto} onPress={() => changeMode("auto")} />
-        <Tile on={mode === "direct"} image="./assets/direct.ico" title="Direct" status={mode === "direct" ? t.inUse : undefined}
-          description={t.modes.direct} onPress={() => changeMode("direct")} />
+      <div className={`tile-grid mode-grid ${japanese ? "three" : ""}`}>
+        {modes.map((id) => (
+          <Tile key={id} on={mode === id} image={modeTiles[id].image} imageDark={modeTiles[id].imageDark}
+            title={modeTiles[id].title} description={t.modes[id]} status={mode === id ? t.inUse : undefined}
+            onPress={() => changeMode(id)} />
+        ))}
       </div>
       <Glass className="card">
-        <Row title={t.restoreMode.title} description={t.restoreMode.description}>
+        <Row title={t.restoreMode.title} description={japanese ? t.restoreMode.descriptionJapanese : t.restoreMode.description}>
           <Toggle label={t.restoreMode.title} checked={settings.restoreLastInputMode} onChange={(value) => setSetting("restoreLastInputMode", value)} />
         </Row>
-        <Row title={t.switchKey.title} description={t.switchKey.description}>
+        {japanese && (
+          <Row title={t.cycle.title} description={t.cycle.description}>
+            <Segmented label={t.cycle.title} value={settings.japaneseKeyCyclesModes} options={cycles} onChange={(value) => setSetting("japaneseKeyCyclesModes", value)} />
+          </Row>
+        )}
+        <Row title={t.switchKey.title} description={japanese ? t.switchKey.descriptionJapanese : t.switchKey.description}>
           <Segmented label={t.switchKey.title} value={settings.toggleKey} options={toggleKeys} onChange={(value) => setSetting("toggleKey", value)} />
         </Row>
         <Row title={t.keyboard.title} description={t.keyboard.description}>
@@ -316,71 +344,20 @@ function ExcludedApps({ settings, runAction }) {
   );
 }
 
-function JapanesePage({ settings, setSetting, setConfirm, runAction }) {
+// The candidate list, shared by English and Japanese.
+function CandidatesPage({ settings, setSetting }) {
   const t = useText();
-  const j = t.japanese;
-  // UserSettings::japaneseSpaceWidth and ::japanesePunctuation.
-  const spaces = [[0, j.space.follow], [1, j.space.half], [2, j.space.full]];
-  const marks = [[0, "、。"], [1, "，．"], [2, "，。"], [3, "、．"]];
-  // UserSettings::japaneseKeyCyclesModes.
-  const cycles = [[false, j.cycle.toggle], [true, j.cycle.round]];
-  const askForget = () => setConfirm({
-    title: j.forget.confirmTitle,
-    message: j.forget.confirmMessage,
-    confirmLabel: t.learning.forget,
-    action: () => runAction("japaneseLearning.clear", {}, t.learning.cleared),
-  });
-  return (
-    <>
-      <Glass className="card">
-        <Row title={j.cycle.title} description={j.cycle.description}>
-          <Segmented label={j.cycle.title} value={settings.japaneseKeyCyclesModes} options={cycles} onChange={(value) => setSetting("japaneseKeyCyclesModes", value)} />
-        </Row>
-        <Row title={j.space.title} description={j.space.description}>
-          <Segmented label={j.space.title} value={settings.japaneseSpaceWidth} options={spaces} onChange={(value) => setSetting("japaneseSpaceWidth", value)} />
-        </Row>
-        <Row title={j.punctuation.title} description={j.punctuation.description}>
-          <Segmented label={j.punctuation.title} value={settings.japanesePunctuation} options={marks} onChange={(value) => setSetting("japanesePunctuation", value)} />
-        </Row>
-        <Row title={j.prediction.title} description={j.prediction.description}>
-          <Toggle label={j.prediction.title} checked={settings.japanesePredictionEnabled} onChange={(value) => setSetting("japanesePredictionEnabled", value)} />
-        </Row>
-        <Row title={j.forget.title} description={j.forget.description}>
-          <Button variant="quiet" onClick={askForget}>{t.learning.forget}</Button>
-        </Row>
-      </Glass>
-      <Glass className="card">
-        <h2 className="card-title">{t.keys.title}</h2>
-        <div className="keys">
-          <Key label={j.keys.convert} keys={["Space"]} />
-          <Key label={j.keys.phrases} keys={["←", "→"]} />
-          <Key label={j.keys.resize} keys={["Shift", "←", "→"]} />
-          <Key label={j.keys.predictions} keys={["Tab", "↓"]} />
-          <Key label={j.keys.kana} keys={["F6", "F7", "F8"]} />
-          <Key label={j.keys.letters} keys={["F9", "F10"]} />
-          <Key label={j.keys.english} keys={["Shift", "A-Z"]} />
-          <Key label={j.keys.back} keys={["Esc"]} />
-        </div>
-      </Glass>
-    </>
-  );
-}
-
-function TypingPage({ settings, setSetting }) {
-  const t = useText();
-  const expressionRanges = t.casual.ranges.map((label, value) => [value, label]);
   // UserSettings::candidateRows.
   const rowCounts = [[0, t.rows.automatic], [5, "5"], [7, "7"], [9, "9"]];
+  const shown = settings.candidateWindowEnabled;
   return (
     <>
-      <div className="tile-grid feature-grid">
-        {features.map((feature) => (
-          <Tile key={feature.key} on={Boolean(settings[feature.key])} icon={feature.icon} title={t.features[feature.key].title}
-            description={t.features[feature.key].description} status={settings[feature.key] ? t.on : t.off}
-            onPress={() => setSetting(feature.key, !settings[feature.key])} />
-        ))}
-      </div>
-      <div className="tile-grid mode-grid">
+      <Glass className="card">
+        <Row title={t.candidateList.title} description={t.candidateList.description}>
+          <Toggle label={t.candidateList.title} checked={shown} onChange={(value) => setSetting("candidateWindowEnabled", value)} />
+        </Row>
+      </Glass>
+      <div className={`tile-grid mode-grid ${shown ? "" : "is-muted"}`}>
         {candidateStyles.map((style) => (
           <Tile key={style.value} on={settings.candidateWindowStyle === style.value} title={t.styles[style.id].title}
             description={t.styles[style.id].description} status={settings.candidateWindowStyle === style.value ? t.inUse : undefined}
@@ -394,6 +371,25 @@ function TypingPage({ settings, setSetting }) {
         <Row title={t.meanings.title} description={t.meanings.description}>
           <Toggle label={t.meanings.title} checked={settings.meaningsEnabled} onChange={(value) => setSetting("meaningsEnabled", value)} />
         </Row>
+      </Glass>
+    </>
+  );
+}
+
+// English: what Auto does as you type.
+function EnglishPage({ settings, setSetting }) {
+  const t = useText();
+  const expressionRanges = t.casual.ranges.map((label, value) => [value, label]);
+  return (
+    <>
+      <div className="tile-grid feature-grid three">
+        {englishFeatures.map((feature) => (
+          <Tile key={feature.key} on={Boolean(settings[feature.key])} icon={feature.icon} title={t.features[feature.key].title}
+            description={t.features[feature.key].description} status={settings[feature.key] ? t.on : t.off}
+            onPress={() => setSetting(feature.key, !settings[feature.key])} />
+        ))}
+      </div>
+      <Glass className="card">
         <Row title={t.casual.title} description={t.casual.description}>
           <Segmented label={t.casual.title} value={settings.socialExpressionRange} options={expressionRanges} onChange={(value) => setSetting("socialExpressionRange", value)} />
         </Row>
@@ -415,6 +411,51 @@ function TypingPage({ settings, setSetting }) {
   );
 }
 
+// Japanese: how romaji becomes Japanese, when Japanese is installed.
+function JapanesePage({ japanese, settings, setSetting }) {
+  const t = useText();
+  const j = t.japanese;
+  if (!japanese) {
+    return (
+      <Glass className="card state-card">
+        <h2>{j.missing.title}</h2>
+        <p>{j.missing.description}</p>
+      </Glass>
+    );
+  }
+  // UserSettings::japaneseSpaceWidth and ::japanesePunctuation.
+  const spaces = [[0, j.space.follow], [1, j.space.half], [2, j.space.full]];
+  const marks = [[0, "、。"], [1, "，．"], [2, "，。"], [3, "、．"]];
+  return (
+    <>
+      <Glass className="card">
+        <Row title={j.space.title} description={j.space.description}>
+          <Segmented label={j.space.title} value={settings.japaneseSpaceWidth} options={spaces} onChange={(value) => setSetting("japaneseSpaceWidth", value)} />
+        </Row>
+        <Row title={j.punctuation.title} description={j.punctuation.description}>
+          <Segmented label={j.punctuation.title} value={settings.japanesePunctuation} options={marks} onChange={(value) => setSetting("japanesePunctuation", value)} />
+        </Row>
+        <Row title={j.prediction.title} description={j.prediction.description}>
+          <Toggle label={j.prediction.title} checked={settings.japanesePredictionEnabled} onChange={(value) => setSetting("japanesePredictionEnabled", value)} />
+        </Row>
+      </Glass>
+      <Glass className="card">
+        <h2 className="card-title">{t.keys.title}</h2>
+        <div className="keys">
+          <Key label={j.keys.convert} keys={["Space"]} />
+          <Key label={j.keys.phrases} keys={["←", "→"]} />
+          <Key label={j.keys.resize} keys={["Shift", "←", "→"]} />
+          <Key label={j.keys.predictions} keys={["Tab", "↓"]} />
+          <Key label={j.keys.kana} keys={["F6", "F7", "F8"]} />
+          <Key label={j.keys.letters} keys={["F9", "F10"]} />
+          <Key label={j.keys.english} keys={["Shift", "A-Z"]} />
+          <Key label={j.keys.back} keys={["Esc"]} />
+        </div>
+      </Glass>
+    </>
+  );
+}
+
 // A tiny sketch of each candidate list style for the style picker.
 function MiniList({ variant }) {
   return (
@@ -428,7 +469,8 @@ function Key({ label, keys }) {
   return <div className="key"><span>{keys.map((key) => <kbd key={key}>{key}</kbd>)}</span><small>{label}</small></div>;
 }
 
-function DictionaryPage({ learning, settings, setSetting, dictionary, setModal, setConfirm, runAction }) {
+// Dictionary and learning: your words, and what TEKITO learned from you.
+function DictionaryPage({ japanese, learning, settings, setSetting, dictionary, setModal, setConfirm, runAction }) {
   const t = useText();
   const [query, setQuery] = useState("");
   const filtered = useMemo(() => {
@@ -455,6 +497,12 @@ function DictionaryPage({ learning, settings, setSetting, dictionary, setModal, 
     confirmLabel: t.learning.forget,
     action: () => runAction("learning.clear", {}, t.learning.cleared),
   });
+  const askForgetJapanese = () => setConfirm({
+    title: t.learning.japaneseConfirmTitle,
+    message: t.learning.japaneseConfirmMessage,
+    confirmLabel: t.learning.forget,
+    action: () => runAction("japaneseLearning.clear", {}, t.learning.cleared),
+  });
 
   return (
     <>
@@ -466,6 +514,11 @@ function DictionaryPage({ learning, settings, setSetting, dictionary, setModal, 
           <span className="muted">{learning.count ? t.learning.learned(learning.count) : t.learning.nothing}</span>
           <Button variant="quiet" disabled={!learning.count} onClick={askClear}>{t.learning.forget}</Button>
         </div>
+        {japanese && (
+          <Row title={t.learning.japaneseTitle} description={t.learning.japaneseDescription}>
+            <Button variant="quiet" onClick={askForgetJapanese}>{t.learning.forget}</Button>
+          </Row>
+        )}
       </Glass>
 
       <Glass className="card">
@@ -511,6 +564,16 @@ function DictionaryPage({ learning, settings, setSetting, dictionary, setModal, 
   );
 }
 
+// One line of the About status: what it is, how it stands.
+function StatusLine({ title, detail, state, stateLabel }) {
+  return (
+    <div className="status-line">
+      <span><b>{title}</b><small>{detail}</small></span>
+      <span className={`state ${state}`}><span className="dot" />{stateLabel}</span>
+    </div>
+  );
+}
+
 function AboutPage({ version, runtime, packs, runAction }) {
   const t = useText();
   const [license, setLicense] = useState(null);
@@ -518,7 +581,13 @@ function AboutPage({ version, runtime, packs, runAction }) {
     const response = await hostRequest("license.get");
     setLicense(response.ok ? response.text : t.about.licenseMissing);
   };
-  const problems = packs.filter((pack) => !pack.valid);
+  const english = packs.filter((pack) => pack.group !== "japanese");
+  const japanesePacks = packs.filter((pack) => pack.group === "japanese");
+  const englishProblems = english.filter((pack) => !pack.valid);
+  const japaneseValid = japanesePacks.filter((pack) => pack.valid);
+  // Japanese not installed at all is a choice, not a problem.
+  const japaneseInstalled = japaneseValid.length > 0;
+  const japaneseProblems = japaneseInstalled ? japanesePacks.filter((pack) => !pack.valid) : [];
   const installed = runtime.tsf === "Loaded";
   return (
     <>
@@ -532,15 +601,17 @@ function AboutPage({ version, runtime, packs, runAction }) {
       </Glass>
 
       <Glass className="card">
-        <div className="status-line">
-          <span><b>{t.about.inputMethod}</b><small>{installed ? t.about.installed : t.about.notInstalled}</small></span>
-          <span className={`state ${installed ? "" : "problem"}`}><span className="dot" />{installed ? t.about.ready : t.about.problem}</span>
-        </div>
-        <div className="status-line">
-          <span><b>{t.about.languageData}</b><small>{problems.length === 0 ? t.about.allPacks(packs.length) : t.about.somePacks(runtime.dataPacks)}</small></span>
-          <span className={`state ${problems.length ? "problem" : ""}`}><span className="dot" />{problems.length ? t.about.problem : t.about.ready}</span>
-        </div>
-        {problems.map((pack) => (
+        <StatusLine title={t.about.inputMethod} detail={installed ? t.about.installed : t.about.notInstalled}
+          state={installed ? "" : "problem"} stateLabel={installed ? t.about.ready : t.about.problem} />
+        <StatusLine title={t.about.englishData}
+          detail={englishProblems.length === 0 ? t.about.allPacks(english.length) : t.about.somePacks(runtime.dataPacks)}
+          state={englishProblems.length ? "problem" : ""} stateLabel={englishProblems.length ? t.about.problem : t.about.ready} />
+        <StatusLine title={t.about.japaneseData}
+          detail={!japaneseInstalled ? t.about.japaneseMissing
+            : japaneseProblems.length === 0 ? t.about.allPacks(japanesePacks.length) : t.about.somePacks(runtime.japaneseData)}
+          state={!japaneseInstalled ? "off" : japaneseProblems.length ? "problem" : ""}
+          stateLabel={!japaneseInstalled ? t.about.notInstalledState : japaneseProblems.length ? t.about.problem : t.about.ready} />
+        {[...englishProblems, ...japaneseProblems].map((pack) => (
           <div className="pack-problem" key={pack.packPath}><b>{pack.displayName}</b><span>{pack.reason || t.about.unavailable}</span></div>
         ))}
         <div className="card-foot">

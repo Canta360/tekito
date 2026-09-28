@@ -166,6 +166,9 @@ nav { display: grid; gap: 4px; }
 .tile-grid { display: grid; gap: 14px; }
 .feature-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .mode-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.tile-grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+/* Choices that do nothing while their switch is off. */
+.tile-grid.is-muted { opacity: 0.55; }
 
 .tile {
   position: relative; aspect-ratio: 1;
@@ -174,7 +177,9 @@ nav { display: grid; gap: 4px; }
   transition: transform 0.25s var(--ease);
 }
 .feature-grid .tile { aspect-ratio: 1.15; }
+.feature-grid.three .tile { aspect-ratio: 1.7; }
 .mode-grid .tile { aspect-ratio: 2.4; }
+.mode-grid.three .tile { aspect-ratio: 1.6; }
 .tile:hover { transform: translateY(-2px); }
 .tile:active { transform: translateY(0) scale(0.985); }
 /* The accent light lives behind the glass; the glass blurs it into a glow. */
@@ -199,9 +204,7 @@ nav { display: grid; gap: 4px; }
 .tile-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
 .tile-icon { color: var(--ink-3); transition: color 0.3s; }
 .tile.is-on .tile-icon { color: var(--ink); }
-.tile-image { width: 30px; height: 30px; }
-/* The mode icons are dark artwork; seat them on a light plate on dark glass. */
-@media (prefers-color-scheme: dark) { .tile-image { width: 34px; height: 34px; padding: 3px; border-radius: 10px; background: rgba(255, 255, 255, 0.9); } }
+.tile-image { width: 30px; height: 30px; object-fit: contain; }
 .tile-status {
   display: inline-flex; align-items: center; gap: 6px;
   padding: 3px 9px; border-radius: 999px;
@@ -412,7 +415,7 @@ kbd {
 @keyframes toast-in { from { opacity: 0; transform: translate(-50%, 10px); } }
 
 @media (max-width: 960px) {
-  .feature-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .feature-grid, .feature-grid.three { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .feature-grid .tile { aspect-ratio: 1.6; }
   .content { padding: 28px 24px 48px; }
 }

@@ -7,6 +7,12 @@ const packNames = [
   "Dictionary Display", "Proper Nouns", "Slang", "Extended Slang", "Pronunciation",
   "Emoji", "Social Expressions", "Japanese Phonetic Suggestions", "QWERTY Typo Evaluation",
 ];
+const japanesePackNames = [
+  "Japanese Dictionary", "Romaji Table", "Japanese Word Pairs", "Loanwords",
+  "Japanese Meanings (Wiktionary)", "Japanese Meanings (WordNet)",
+];
+// "?japanese=0" shows Settings as without Japanese installed.
+const japaneseInstalled = new URLSearchParams(window.location.search).get("japanese") !== "0";
 
 function initialState() {
   return {
@@ -36,8 +42,8 @@ function initialState() {
       builtInExcludedApps: ["WindowsTerminal.exe", "OpenConsole.exe", "conhost.exe", "cmd.exe", "powershell.exe", "pwsh.exe"],
     },
     version: "0.1.1",
-    mode: "auto",
-    runtime: { tsf: "Loaded", dataPacks: "12 / 13" },
+    mode: japaneseInstalled ? "japanese" : "auto",
+    runtime: { tsf: "Loaded", dataPacks: "12 / 13", japaneseData: japaneseInstalled ? "6 / 6" : "0 / 6", japanese: japaneseInstalled },
     appearance: { accent: "#0078d4", systemLanguage: navigator.language.startsWith("ja") ? "ja" : "en" },
     learning: { enabled: true, count: 128 },
     dictionary: [
@@ -45,8 +51,9 @@ function initialState() {
       { id: 2, raw: "brb", candidate: "be right back", type: "Word", policy: "Expand abbreviation" },
       { id: 3, raw: "omw", candidate: "on my way", type: "Word", policy: "Correct spelling" },
     ],
-    packs: packNames.map((name, index) => ({
+    packs: [...packNames.map((name, index) => ({
       displayName: name,
+      group: "english",
       valid: index !== 5,
       version: "2026.09",
       packPath: `C:\\ProgramData\\TEKITO\\data\\pack-${index}`,
@@ -54,7 +61,17 @@ function initialState() {
       source: "Bundled",
       license: "CC BY-SA 4.0",
       noticePath: `C:\\ProgramData\\TEKITO\\data\\pack-${index}\\NOTICE.txt`,
-    })),
+    })), ...japanesePackNames.map((name, index) => ({
+      displayName: name,
+      group: "japanese",
+      valid: japaneseInstalled,
+      version: "2026.09",
+      packPath: `C:\\ProgramData\\TEKITO\\data\\japanese-${index}`,
+      reason: japaneseInstalled ? "" : "manifest missing or empty",
+      source: "Bundled",
+      license: "",
+      noticePath: "",
+    }))],
   };
 }
 

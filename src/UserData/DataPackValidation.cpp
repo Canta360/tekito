@@ -120,15 +120,18 @@ bool ValidateDataPack(const std::filesystem::path& packPath,
         status.source = Wide(JsonString(manifest, "source"));
         status.license = Wide(JsonString(manifest, "license"));
         status.packPath = packPath;
+        // Packs read in place from one file (the Japanese meanings and
+        // language model) have no index.
+        const bool indexed = !indexFile.empty();
         if (packId.empty() || status.version.empty() || JsonString(manifest, "language").empty() ||
             JsonString(manifest, "type").empty() || JsonString(manifest, "license").empty() ||
-            notice.empty() || dataFile.empty() || indexFile.empty() || fileHash.empty() || indexHash.empty()) {
+            notice.empty() || dataFile.empty() || fileHash.empty() || (indexed && indexHash.empty())) {
             status.reason = L"required manifest metadata missing";
             return false;
         }
         const std::filesystem::path noticeRelative(notice);
         const std::filesystem::path dataRelative(dataFile);
-        const std::filesystem::path indexRelative(indexFile);
+        const std::filesystem::path indexRelative(indexed ? indexFile : dataFile);
         if (!IsPackRelativePath(packPath, noticeRelative) ||
             !IsPackRelativePath(packPath, dataRelative) ||
             !IsPackRelativePath(packPath, indexRelative)) {
@@ -145,7 +148,7 @@ bool ValidateDataPack(const std::filesystem::path& packPath,
             return false;
         }
         status.fileChecksumValid = Sha256(dataPath) == fileHash;
-        status.indexChecksumValid = Sha256(indexPath) == indexHash;
+        status.indexChecksumValid = !indexed || Sha256(indexPath) == indexHash;
         if (!status.fileChecksumValid || !status.indexChecksumValid) {
             status.reason = L"checksum mismatch";
             return false;

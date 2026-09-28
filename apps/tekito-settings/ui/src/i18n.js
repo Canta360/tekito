@@ -9,10 +9,11 @@ const en = {
   lang: "en",
   settings: "Settings",
   pages: {
-    general: { label: "General", description: "Choose how TEKITO handles your typing." },
-    typing: { label: "Typing", description: "Choose what Auto mode does for you." },
-    japanese: { label: "Japanese", description: "How TEKITO types Japanese." },
-    dictionary: { label: "Dictionary", description: "Your own words, and what TEKITO learns from your choices." },
+    general: { label: "General", description: "The input mode, how to switch it, and where TEKITO stays off." },
+    candidates: { label: "Candidate list", description: "The list of choices under what you type, in English and Japanese." },
+    english: { label: "English", description: "What Auto does as you type English." },
+    japanese: { label: "Japanese", description: "How romaji becomes Japanese." },
+    dictionary: { label: "Dictionary & learning", description: "Your own words, and what TEKITO learns from your choices." },
     about: { label: "About", description: "Version, language data and support." },
   },
   loading: { title: "Loading settings", body: "Connecting to TEKITO on this PC." },
@@ -30,11 +31,27 @@ const en = {
   modeNotSaved: "The input mode could not be saved.",
 
   modes: {
+    japanese: "Turns romaji into kana and kanji.",
     auto: "Corrects spelling and suggests words as you type.",
     direct: "Types exactly the keys you press.",
   },
-  restoreMode: { title: "Start in the last mode used", description: "Otherwise TEKITO always starts in Auto." },
-  switchKey: { title: "Switch key", description: "Toggles Auto and Direct from any app.", none: "None" },
+  restoreMode: {
+    title: "Start in the last mode used",
+    description: "Otherwise TEKITO always starts in Auto.",
+    descriptionJapanese: "Otherwise TEKITO always starts in Japanese.",
+  },
+  cycle: {
+    title: "Hankaku/Zenkaku key",
+    description: "What the key switches to from each mode. The switch key and the taskbar button do the same.",
+    toggle: "Japanese ⇄ English",
+    round: "Japanese → Auto → Direct",
+  },
+  switchKey: {
+    title: "Switch key",
+    description: "Toggles Auto and Direct from any app.",
+    descriptionJapanese: "Switches the input mode from any app, as the Hankaku/Zenkaku key does.",
+    none: "None",
+  },
   keyboard: {
     title: "Keyboard",
     description: "The keyboard you type on, so symbols come out as printed on the keys. Changing it asks for administrator permission.",
@@ -78,6 +95,10 @@ const en = {
     keep: "Keep what you typed",
   },
 
+  candidateList: {
+    title: "Show the candidate list",
+    description: "Choices appear under what you type. Without the list, Space still corrects and converts.",
+  },
   rows: {
     title: "Rows in the list",
     description: "How many choices the list shows at a time. Automatic shows 5 in English (10 once you page) and 9 in Japanese.",
@@ -88,11 +109,9 @@ const en = {
     description: "Show what the highlighted choice means beside the list, for English and Japanese words.",
   },
   japanese: {
-    cycle: {
-      title: "Hankaku/Zenkaku key",
-      description: "What the key switches to from each mode.",
-      toggle: "Japanese ⇄ English",
-      round: "Japanese → Auto → Direct",
+    missing: {
+      title: "Japanese is not installed",
+      description: "Run the TEKITO installer again and choose Japanese to add it. English works as before.",
     },
     space: {
       title: "Space",
@@ -103,12 +122,6 @@ const en = {
     },
     punctuation: { title: "Punctuation", description: "What the comma and period keys type." },
     prediction: { title: "Predict words", description: "Offers words that start with what you type. Tab picks one." },
-    forget: {
-      title: "Forget Japanese choices",
-      description: "Conversions go back to their usual order. English learning is kept.",
-      confirmTitle: "Forget your Japanese choices?",
-      confirmMessage: "Conversions will no longer put your earlier choices first. This cannot be undone.",
-    },
     keys: {
       convert: "Convert, then next candidate",
       phrases: "Move between phrases",
@@ -129,6 +142,10 @@ const en = {
     confirmTitle: "Forget what TEKITO learned?",
     confirmMessage: "Your choices so far will no longer affect suggestions. This cannot be undone.",
     cleared: "Learning data cleared",
+    japaneseTitle: "Japanese conversions",
+    japaneseDescription: "The conversions you chose come first next time. Forgetting them keeps what English learned.",
+    japaneseConfirmTitle: "Forget your Japanese choices?",
+    japaneseConfirmMessage: "Conversions will no longer put your earlier choices first. This cannot be undone.",
   },
   words: {
     title: "Your words",
@@ -163,14 +180,17 @@ const en = {
   },
 
   about: {
-    tagline: "English typing help for Windows keyboards.",
+    tagline: "Japanese and English input for Windows.",
     version: "Version",
     inputMethod: "Input method",
     installed: "Installed and registered with Windows.",
     notInstalled: "Not registered with Windows. Reinstall TEKITO.",
     ready: "Ready",
     problem: "Problem",
-    languageData: "Language data",
+    englishData: "English data",
+    japaneseData: "Japanese data",
+    japaneseMissing: "Not installed. Choose Japanese in the installer to add it.",
+    notInstalledState: "Not installed",
     allPacks: (n) => `All ${n} packs are installed and verified.`,
     somePacks: (summary) => `${summary} ready. Some suggestions may be missing.`,
     unavailable: "Unavailable",
@@ -191,10 +211,11 @@ const ja = {
   lang: "ja",
   settings: "設定",
   pages: {
-    general: { label: "一般", description: "TEKITO の動き方を選びます。" },
-    typing: { label: "入力", description: "Auto モードで TEKITO がすることを選びます。" },
-    japanese: { label: "日本語", description: "TEKITO で日本語を打つときの動きを選びます。" },
-    dictionary: { label: "辞書", description: "自分の単語と、TEKITO があなたの選択から学んだこと。" },
+    general: { label: "一般", description: "入力モードと切り替え方、TEKITO をオフにするアプリを選びます。" },
+    candidates: { label: "候補一覧", description: "打っている文字の下に出る候補の一覧です。英語と日本語で共通です。" },
+    english: { label: "英語入力", description: "Auto で英語を打つときに TEKITO がすることを選びます。" },
+    japanese: { label: "日本語入力", description: "ローマ字から日本語にするときの動きを選びます。" },
+    dictionary: { label: "辞書と学習", description: "自分の単語と、TEKITO があなたの選択から学んだこと。" },
     about: { label: "情報", description: "バージョン、言語データ、サポート。" },
   },
   loading: { title: "設定を読み込んでいます", body: "この PC の TEKITO に接続しています。" },
@@ -212,11 +233,27 @@ const ja = {
   modeNotSaved: "入力モードを保存できませんでした。",
 
   modes: {
+    japanese: "ローマ字をかなと漢字にします。",
     auto: "打ちながらスペルを直し、単語を提案します。",
     direct: "押したキーがそのまま入ります。",
   },
-  restoreMode: { title: "前回のモードで始める", description: "オフにすると、常に Auto で始まります。" },
-  switchKey: { title: "切り替えキー", description: "どのアプリでも Auto と Direct を切り替えます。", none: "なし" },
+  restoreMode: {
+    title: "前回のモードで始める",
+    description: "オフにすると、常に Auto で始まります。",
+    descriptionJapanese: "オフにすると、常に日本語で始まります。",
+  },
+  cycle: {
+    title: "半角/全角キー",
+    description: "キーを押したときに、どのモードへ切り替えるかを選びます。切り替えキーとタスクバーのボタンも同じ順になります。",
+    toggle: "日本語 ⇄ 英語",
+    round: "日本語 → オート → ダイレクト",
+  },
+  switchKey: {
+    title: "切り替えキー",
+    description: "どのアプリでも Auto と Direct を切り替えます。",
+    descriptionJapanese: "どのアプリでも、半角/全角キーと同じように入力モードを切り替えます。",
+    none: "なし",
+  },
   keyboard: {
     title: "キーボード",
     description: "使っているキーボードです。記号がキーの刻印どおりに入るようにします。変えると管理者の確認が出ます。",
@@ -260,6 +297,10 @@ const ja = {
     keep: "打ったとおりにする",
   },
 
+  candidateList: {
+    title: "候補一覧を出す",
+    description: "打っている文字の下に候補を出します。出さなくても、Space で補正や変換はできます。",
+  },
   rows: {
     title: "候補の行数",
     description: "一覧に一度に出す候補の数です。自動では、英語は 5 件（ページを送ると 10 件）、日本語は 9 件です。",
@@ -270,11 +311,9 @@ const ja = {
     description: "選んでいる候補の意味を一覧の横に出します。英語と日本語の語に対応します。",
   },
   japanese: {
-    cycle: {
-      title: "半角/全角キー",
-      description: "キーを押したときに、どのモードへ切り替えるかを選びます。",
-      toggle: "日本語 ⇄ 英語",
-      round: "日本語 → オート → ダイレクト",
+    missing: {
+      title: "日本語が入っていません",
+      description: "TEKITO のインストーラーをもう一度実行し、日本語を選ぶと追加できます。英語はこれまでどおり使えます。",
     },
     space: {
       title: "スペース",
@@ -285,12 +324,6 @@ const ja = {
     },
     punctuation: { title: "句読点", description: "読点と句点のキーで入る記号です。" },
     prediction: { title: "予測候補", description: "打った読みで始まる語を出します。Tab で選びます。" },
-    forget: {
-      title: "日本語の学習を消す",
-      description: "変換の順番が元に戻ります。英語の学習は残ります。",
-      confirmTitle: "日本語の学習を消しますか？",
-      confirmMessage: "これまでの選択が変換の順番に反映されなくなります。元に戻せません。",
-    },
     keys: {
       convert: "変換、次の候補",
       phrases: "文節を移る",
@@ -311,6 +344,10 @@ const ja = {
     confirmTitle: "学んだ内容を消去しますか?",
     confirmMessage: "これまでの選択は候補に反映されなくなります。元には戻せません。",
     cleared: "学習データを消去しました",
+    japaneseTitle: "日本語の変換",
+    japaneseDescription: "選んだ変換が次から先に出ます。消しても、英語の学習は残ります。",
+    japaneseConfirmTitle: "日本語の学習を消しますか？",
+    japaneseConfirmMessage: "これまでの選択が変換の順番に反映されなくなります。元に戻せません。",
   },
   words: {
     title: "自分の単語",
@@ -345,14 +382,17 @@ const ja = {
   },
 
   about: {
-    tagline: "Windows のキーボードで、英語を楽に打つための入力方式。",
+    tagline: "Windows で日本語と英語を打つための入力方式。",
     version: "バージョン",
     inputMethod: "入力方式",
     installed: "インストールされ、Windows に登録されています。",
     notInstalled: "Windows に登録されていません。TEKITO をインストールし直してください。",
     ready: "準備完了",
     problem: "問題あり",
-    languageData: "言語データ",
+    englishData: "英語のデータ",
+    japaneseData: "日本語のデータ",
+    japaneseMissing: "インストールされていません。インストーラーで日本語を選ぶと追加されます。",
+    notInstalledState: "未インストール",
     allPacks: (n) => `${n} 個のパックがすべてインストールされ、確認済みです。`,
     somePacks: (summary) => `${summary} が利用できます。一部の候補が出ないことがあります。`,
     unavailable: "利用できません",

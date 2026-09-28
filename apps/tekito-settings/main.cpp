@@ -67,6 +67,17 @@ struct DataPackInfo {
     const wchar_t* folder;
     const wchar_t* label;
 };
+// The Japanese ones, installed only with Japanese input. The first two are
+// what Japanese needs at all; the rest add to it.
+constexpr DataPackInfo kJapaneseDataPacks[] = {
+    {L"japanese-core", L"Japanese Dictionary"},
+    {L"japanese-romaji", L"Romaji Table"},
+    {L"japanese-lm", L"Japanese Word Pairs"},
+    {L"japanese-loanwords", L"Loanwords"},
+    {L"japanese-wiktionary", L"Japanese Meanings (Wiktionary)"},
+    {L"japanese-wordnet", L"Japanese Meanings (WordNet)"},
+};
+constexpr std::size_t kJapaneseRequiredPacks = 2;
 constexpr DataPackInfo kDataPacks[] = {
     {L"standard-english", L"Standard English"},
     {L"wikipedia-common-misspellings", L"Common Misspellings"},
@@ -372,7 +383,8 @@ public:
         const auto startupMode = settings_.restoreLastInputMode
                                      ? settings_.lastInputMode
                                      : settings_.defaultInputMode;
-        runtime_ = std::make_unique<tekito::userdata::RuntimeModeState>(startupMode);
+        runtime_ = std::make_unique<tekito::userdata::RuntimeModeState>(
+            startupMode, tekito::userdata::kRuntimeStateName, settings_.lastJapaneseProfileMode);
 
         WNDCLASSW windowClass{};
         windowClass.hInstance = instance_;
@@ -466,7 +478,8 @@ private:
             error = Text(L"The local settings package is missing index.html.", L"設定画面のファイル（index.html）が見つかりません。");
             return false;
         }
-        for (const auto* icon : {L"auto.ico", L"direct.ico", L"tekito.ico"}) {
+        for (const auto* icon : {L"auto.ico", L"direct.ico", L"direct-dark.ico", L"japanese.ico",
+                                 L"japanese-dark.ico", L"tekito.ico"}) {
             const auto path = root / L"assets" / icon;
             std::ifstream file(path, std::ios::binary);
             unsigned char header[4]{};
@@ -679,24 +692,54 @@ private:
         if (!dataPacksJson_.empty()) return dataPacksJson_;
         const auto root = tekito::ExternalLexiconProvider::DataPackRoot();
         std::wstring json = L"[";
-        std::size_t validCount = 0;
-        for (const auto& pack : kDataPacks) {
+        const auto add = [&](const DataPackInfo& pack, const wchar_t* group, bool& valid) {
             tekito::userdata::DataPackStatus status;
-            const bool valid = tekito::userdata::ValidateDataPack(root / pack.folder, status);
-            if (valid) ++validCount;
+            valid = tekito::userdata::ValidateDataPack(root / pack.folder, status);
             if (json.size() > 1) json += L',';
             const auto path = status.packPath.empty() ? root / pack.folder : status.packPath;
             const auto name = status.displayName.empty() ? std::wstring(pack.label) : status.displayName;
-            json += L"{\"displayName\":\"" + JsonEscape(name) + L"\",\"valid\":" +
-                    std::wstring(valid ? L"true" : L"false") + L",\"version\":\"" +
+            json += L"{\"displayName\":\"" + JsonEscape(name) + L"\",\"group\":\"" + group +
+                    L"\",\"valid\":" + std::wstring(valid ? L"true" : L"false") + L",\"version\":\"" +
                     JsonEscape(status.version) + L"\",\"packPath\":\"" + JsonEscape(path.wstring()) +
                     L"\",\"reason\":\"" + JsonEscape(status.reason) + L"\",\"source\":\"" +
                     JsonEscape(status.source) + L"\",\"license\":\"" + JsonEscape(status.license) +
                     L"\",\"noticePath\":\"" + JsonEscape(status.noticePath.wstring()) + L"\"}";
+        };
+        std::size_t validCount = 0;
+        for (const auto& pack : kDataPacks) {
+            bool valid = false;
+            add(pack, L"english", valid);
+            if (valid) ++validCount;
+        }
+        // Japanese is on only with its required packs; missing optional
+        // ones leave it on with less.
+        std::size_t japaneseCount = 0;
+        japaneseAvailable_ = true;
+        for (std::size_t i = 0; i < std::size(kJapaneseDataPacks); ++i) {
+            bool valid = false;
+            add(kJapaneseDataPacks[i], L"japanese", valid);
+            if (valid) ++japaneseCount;
+            if (!valid && i < kJapaneseRequiredPacks) japaneseAvailable_ = false;
         }
         dataPackSummary_ = std::to_wstring(validCount) + L" / " + std::to_wstring(std::size(kDataPacks));
+        japaneseDataSummary_ =
+            std::to_wstring(japaneseCount) + L" / " + std::to_wstring(std::size(kJapaneseDataPacks));
         dataPacksJson_ = json + L']';
         return dataPacksJson_;
+    }
+
+    // The mode Settings shows and sets: the Japanese profile's when Japanese
+    // is installed, otherwise the English profile's.
+    const wchar_t* CurrentModeName() {
+        (void)DataPacksJson();
+        if (!runtime_) return L"auto";
+        if (japaneseAvailable_) {
+            const auto mode = runtime_->JapaneseMode();
+            return mode == tekito::InputMode::Japanese ? L"japanese"
+                   : mode == tekito::InputMode::Direct ? L"direct"
+                                                       : L"auto";
+        }
+        return runtime_->Mode() == tekito::InputMode::Direct ? L"direct" : L"auto";
     }
 
     std::wstring DictionaryJson() const {
@@ -712,7 +755,7 @@ private:
     }
 
     std::wstring SettingsStateJson() {
-        const auto mode = runtime_ && runtime_->Mode() == tekito::InputMode::Direct ? L"direct" : L"auto";
+        const auto mode = CurrentModeName();
         const auto registeredDll = RegisteredTsfDll();
         const auto tsf = !registeredDll.empty() && std::filesystem::exists(registeredDll) ? L"Loaded" : L"Unavailable";
         const auto packs = DataPacksJson();
@@ -754,8 +797,9 @@ private:
                 NameListJson({std::begin(tekito::userdata::kBuiltInExcludedApps),
                               std::end(tekito::userdata::kBuiltInExcludedApps)});
         json += L"},\"mode\":\"" + std::wstring(mode) + L"\",\"runtime\":{\"tsf\":\"" +
-                tsf + L"\",\"dataPacks\":\"" + dataPackSummary_ +
-                L"\"},\"learning\":{\"enabled\":";
+                tsf + L"\",\"dataPacks\":\"" + dataPackSummary_ + L"\",\"japaneseData\":\"" +
+                japaneseDataSummary_ + L"\",\"japanese\":" + (japaneseAvailable_ ? L"true" : L"false") +
+                L"},\"learning\":{\"enabled\":";
         json += settings_.learningEnabled ? L"true" : L"false";
         json += L",\"count\":" + std::to_wstring(learning_.Entries().size() + learning_.PreferenceCount()) + L"},\"dictionary\":";
         json += DictionaryJson();
@@ -920,10 +964,14 @@ private:
             }
         } else if (type == L"mode.set") {
             std::wstring error;
-            const bool saved = SetCurrentMode(message.String(L"value") == L"direct"
-                                                  ? tekito::InputMode::Direct
-                                                  : tekito::InputMode::Convert,
-                                              error);
+            const auto value = message.String(L"value");
+            const auto mode = value == L"direct"     ? tekito::InputMode::Direct
+                              : value == L"japanese" ? tekito::InputMode::Japanese
+                                                     : tekito::InputMode::Convert;
+            (void)DataPacksJson();
+            const bool saved = japaneseAvailable_ ? SetCurrentJapaneseMode(mode, error)
+                               : mode == tekito::InputMode::Japanese ? false
+                                                                     : SetCurrentMode(mode, error);
             Reply(requestId, saved, error);
         } else if (type == L"excludedApps.add") {
             std::wstring error;
@@ -1192,6 +1240,22 @@ private:
     }
 
 
+    bool SetCurrentJapaneseMode(tekito::InputMode mode, std::wstring& error) {
+        const auto previousSettings = settings_;
+        const auto previousMode = runtime_ ? runtime_->JapaneseMode() : settings_.lastJapaneseProfileMode;
+        if (runtime_) runtime_->SetJapaneseMode(mode);
+        settings_.lastJapaneseProfileMode = mode;
+        if (mode != tekito::InputMode::Japanese) settings_.japaneseProfileEnglishMode = mode;
+        if (!repository_ || !repository_->SaveSettings(settings_)) {
+            settings_ = previousSettings;
+            if (runtime_) runtime_->SetJapaneseMode(previousMode);
+            error = Text(L"The current mode could not be saved.", L"入力モードを保存できませんでした。");
+            return false;
+        }
+        if (runtime_) runtime_->NotifySettingsChanged();
+        return true;
+    }
+
     HINSTANCE instance_{};
     HWND hwnd_{};
     HWND fallbackLabel_{};
@@ -1207,6 +1271,8 @@ private:
     EventRegistrationToken webMessageToken_{};
     EventRegistrationToken navigationToken_{};
     std::wstring dataPackSummary_{L"Unavailable"};
+    std::wstring japaneseDataSummary_{L"0 / 0"};
+    bool japaneseAvailable_{false};
     std::wstring dataPacksJson_;
     ComPtr<ICoreWebView2_3> webview3_;
     Generations seenGenerations_{};
