@@ -66,9 +66,12 @@ public:
     [[nodiscard]] static UserPartsOfSpeech Parse(std::string_view text);
     [[nodiscard]] std::optional<Entry> For(UserWordKind kind) const noexcept;
     [[nodiscard]] bool Empty() const noexcept { return entries_.empty(); }
+    // The row "number": digits typed in Japanese, read as one number word.
+    [[nodiscard]] std::optional<Entry> Number() const noexcept { return number_; }
 
 private:
     std::map<UserWordKind, Entry> entries_;
+    std::optional<Entry> number_;
 };
 
 // The user's words, ready for conversion: looked up by reading.

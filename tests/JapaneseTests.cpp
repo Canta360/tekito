@@ -925,6 +925,37 @@ void TestSpecialConversions(const RomajiTable& table, const MiniPack& pack) {
             "やじるし's candidates have the arrows");
     composer.Clear();
 
+    // Digits: half-width when asked, decimal points and commas between them,
+    // and read as a number with its part of speech, so counters join them.
+    {
+        JapaneseComposer digits(&table);
+        digits.SetHalfWidthDigits(true);
+        Type(digits, L"3.14 1,000");
+        RequireText(digits.Commit(), L"3.14\x3000" L"1,000", "half-width digits, with a decimal point and a comma");
+        RequireText(Committed(table, L"3.14"), L"\xFF13\xFF0E\xFF11\xFF14", "full-width digits by default");
+        RequireText(Committed(table, L"3."), L"\xFF13\x3002", "a period after a number ends the sentence");
+    }
+    {
+        auto numbered = converter;
+        const auto parts = tekito::japanese::UserPartsOfSpeech::Load(std::filesystem::path(TEKITO_TEST_DATA_DIR) /
+                                                                     L"japanese-mini" / L"pos.tsv");
+        Require(parts.Number().has_value(), "the test pack has a part of speech for numbers");
+        numbered.SetNumberWord(tekito::japanese::JapaneseConverter::NumberWord{parts.Number()->left, parts.Number()->right,
+                                                                              parts.Number()->cost});
+        const auto phrases = numbered.Convert(L"12345");
+        Require(phrases.size() == 1 && phrases[0].candidates.front().text == L"12345", "digits are one number");
+        JapaneseComposer half(&table);
+        half.SetConverter(&numbered);
+        half.SetSpecialConversions(&special);
+        half.SetHalfWidthDigits(true);
+        Type(half, L"2026");
+        half.Convert();
+        Require(half.Preedit() == L"2026" && (*half.FocusedCandidates())[1].text == L"\xFF12\xFF10\xFF12\xFF16" &&
+                    std::any_of(half.FocusedCandidates()->begin(), half.FocusedCandidates()->end(),
+                                [](const auto& c) { return c.text == L"二千二十六"; }),
+                "half-width first, then full-width and kanji");
+    }
+
     tekito::SpecialConversionOptions off;
     off.calculator = off.numbers = off.symbols = off.dates = false;
     composer.SetSpecialConversions(&special, off);

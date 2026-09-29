@@ -861,6 +861,7 @@ private:
         json += settings_.periodOnEnter ? L"true" : L"false";
         json += L",\"japaneseSpaceWidth\":" + std::to_wstring(settings_.japaneseSpaceWidth);
         json += L",\"japanesePunctuation\":" + std::to_wstring(settings_.japanesePunctuation);
+        json += L",\"japaneseDigitWidth\":" + std::to_wstring(settings_.japaneseDigitWidth);
         json += L",\"japanesePredictionEnabled\":";
         json += settings_.japanesePredictionEnabled ? L"true" : L"false";
         json += L",\"uiLanguage\":" + std::to_wstring(settings_.uiLanguage);
@@ -1019,6 +1020,9 @@ private:
             }
             else if (key == L"japanesePunctuation") {
                 settings_.japanesePunctuation = std::clamp(integerValue, 0, 3);
+            }
+            else if (key == L"japaneseDigitWidth") {
+                settings_.japaneseDigitWidth = std::clamp(integerValue, 0, 1);
             }
             else if (key == L"japanesePredictionEnabled") settings_.japanesePredictionEnabled = value;
             else if (key == L"uiLanguage") settings_.uiLanguage = std::clamp(integerValue, 0, 2);

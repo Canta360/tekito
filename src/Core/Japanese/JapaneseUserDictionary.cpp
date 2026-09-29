@@ -106,7 +106,9 @@ UserPartsOfSpeech UserPartsOfSpeech::Parse(std::string_view text) {
         const auto left = ParseNumber<std::uint16_t>(fields[1]);
         const auto right = ParseNumber<std::uint16_t>(fields[2]);
         const auto cost = ParseNumber<std::int32_t>(fields[3]);
-        if (kind && left && right && cost) parts.entries_[*kind] = {*left, *right, *cost};
+        if (!left || !right || !cost) continue;
+        if (kind) parts.entries_[*kind] = {*left, *right, *cost};
+        if (name == L"number") parts.number_ = Entry{*left, *right, *cost};
     }
     return parts;
 }
