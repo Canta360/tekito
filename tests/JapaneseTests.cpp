@@ -923,6 +923,12 @@ void TestSpecialConversions(const RomajiTable& table, const MiniPack& pack) {
     const auto* arrows = composer.FocusedCandidates();
     Require(arrows && std::any_of(arrows->begin(), arrows->end(), [](const auto& c) { return c.text == L"→"; }),
             "やじるし's candidates have the arrows");
+    {
+        const auto arrow = std::find_if(arrows->begin(), arrows->end(), [](const auto& c) { return c.text == L"→"; });
+        Require(std::none_of(arrow, arrows->end(),
+                             [](const auto& c) { return c.kind != tekito::japanese::PhraseCandidate::Kind::Special; }),
+                "symbols come after the words");
+    }
     composer.Clear();
 
     // Digits: half-width when asked, decimal points and commas between them,
@@ -977,6 +983,18 @@ void TestSpecialConversions(const RomajiTable& table, const MiniPack& pack) {
         RequireText(counted.Commit(), L"3個", "3個 is committed");
         Require(learning.Preference(L"#こ", withCounter.substr(1)) > 0 && learning.Preference(L"こ", L"子") == 3,
                 "the counter is learned apart from こ alone");
+    }
+
+    // A short input brings no other words as slips.
+    {
+        JapaneseComposer quiet(&table);
+        quiet.SetConverter(&converter);
+        Type(quiet, L"ko");
+        quiet.Convert();
+        quiet.Convert();
+        const auto* list = quiet.FocusedCandidates();
+        Require(list && std::none_of(list->begin(), list->end(), [](const auto& c) { return c.slip; }),
+                "ko is not read as other keys");
     }
 
     tekito::SpecialConversionOptions off;

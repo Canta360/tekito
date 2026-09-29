@@ -53,6 +53,9 @@ constexpr std::size_t kWholeSlipKeys = 20;
 constexpr std::size_t kWholeSlipCandidates = 2;
 constexpr std::size_t kWholeSlipExamined = 6;
 constexpr std::size_t kSlipCandidates = 4;
+// Keys a phrase needs before slips in it are offered: shorter ones (ko,
+// kou) would bring whole other words.
+constexpr std::size_t kShortestSlipKeys = 4;
 // The likeliest readings get this many spellings each; the rest one.
 constexpr std::size_t kSlipSpelledReadings = 2;
 constexpr std::size_t kSlipSpellings = 2;
@@ -468,10 +471,9 @@ void JapaneseComposer::AddSpecial(std::wstring_view reading, std::vector<PhraseC
             break;
         }
     }
-    // Symbols after the first few words ("やじるし": 矢印, ..., →).
-    constexpr std::size_t kSymbolPosition = 3;
+    // Symbols after the words ("やじるし": 矢印, やじるし, ヤジルシ, →).
     if (specialOptions_.symbols) {
-        insert(kSymbolPosition, special_->Symbols(SpecialConversions::Language::Japanese, reading), {});
+        insert(candidates.size(), special_->Symbols(SpecialConversions::Language::Japanese, reading), {});
     }
 }
 
@@ -610,7 +612,7 @@ void JapaneseComposer::AddSlipCandidates(PhraseState& phrase) const {
     const std::wstring keys = firstKey == std::wstring::npos || endKey == std::wstring::npos || endKey <= firstKey
                                   ? std::wstring{}
                                   : allKeys.substr(firstKey, endKey - firstKey);
-    if (keys.size() >= 2 && keys.size() <= kSlipPhraseKeys && lettersOnly(keys)) {
+    if (keys.size() >= kShortestSlipKeys && keys.size() <= kSlipPhraseKeys && lettersOnly(keys)) {
         // The kana as typed; when a slip was corrected for the first choice,
         // they are not the phrase's reading, and what they convert to is
         // offered right after it.

@@ -7,9 +7,9 @@
   "type": "special-conversions",
   "format": "rules-tsv-v1",
   "file": "rules.tsv",
-  "entry_count": 6195,
+  "entry_count": 5509,
   "sha256": {
-    "file": "4F1D7BCE5E0F4D479BEAE000BEEB80381CC421A71D3C16ACAF7CED798C1C637A"
+    "file": "6F4D1999C7DAB63083D70C98349FDA44D910AB940AB1863BE38B6C8500B6EB9B"
   },
   "license": "TEKITO-OWNED + BSD-3-Clause (Mozc)",
   "source": "scripts/build-special-conversions.py; Japanese symbols from https://github.com/google/mozc/blob/b9c3fcbd6d76b19649ef572324fa9da2559bc18e/src/data/symbol/symbol.tsv",
