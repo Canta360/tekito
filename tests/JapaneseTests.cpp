@@ -878,6 +878,9 @@ void TestSpecialConversions(const RomajiTable& table, const MiniPack& pack) {
     Require(Contains(special.Symbols(Language::Japanese, L"やじるし"), L"→"), "やじるし is an arrow");
     Require(Contains(special.Symbols(Language::Japanese, L"ー＞"), L"→"), "-> typed in Japanese is an arrow");
     Require(Contains(special.Symbols(Language::English, L"(c)"), L"©"), "(c) is ©");
+    Require(Contains(special.Emoticons(L"にこにこ"), L"(^^)") && special.Emoticons(L"かおもじ").size() > 100,
+            "emoticons by reading, and all of them for かおもじ");
+    Require(!Contains(special.Symbols(Language::Japanese, L"こ"), L"\U0001B038"), "hentaigana only by their name");
 
     // English, typed outside words.
     const tekito::SpecialConversionOptions all;
@@ -940,6 +943,12 @@ void TestSpecialConversions(const RomajiTable& table, const MiniPack& pack) {
         RequireText(digits.Commit(), L"3.14\x3000" L"1,000", "half-width digits, with a decimal point and a comma");
         RequireText(Committed(table, L"3.14"), L"\xFF13\xFF0E\xFF11\xFF14", "full-width digits by default");
         RequireText(Committed(table, L"3."), L"\xFF13\x3002", "a period after a number ends the sentence");
+        JapaneseComposer symbols(&table);
+        symbols.SetHalfWidthSymbols(true);
+        symbols.SetPunctuationStyle(PunctuationStyle::CommaPeriod);
+        Type(symbols, L"(q)!,");
+        RequireText(symbols.Commit(), L"(q)!\xFF0C", "half-width symbols and letters; the comma key keeps its style");
+        RequireText(Committed(table, L"!?"), L"\xFF01\xFF1F", "full-width symbols by default");
     }
     {
         auto numbered = converter;

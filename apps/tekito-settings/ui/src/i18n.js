@@ -151,6 +151,7 @@ const en = {
     },
     punctuation: { title: "Punctuation", description: "What the comma and period keys type." },
     digits: { title: "Digits", description: "Half- or full-width. Converting offers the other width and kanji." },
+    symbols: { title: "Letters and symbols", description: "Half- or full-width, for symbols like ! and ( ) and letters that stay letters." },
     prediction: { title: "Predict words", description: "Offers words that start with what you type. Tab picks one." },
     keys: {
       convert: "Convert, then next candidate",
@@ -419,6 +420,7 @@ const ja = {
     },
     punctuation: { title: "句読点", description: "読点と句点のキーで入る記号です。" },
     digits: { title: "数字", description: "半角か全角か。変換すると、もう一方の幅と漢数字も出ます。" },
+    symbols: { title: "英字と記号", description: "！や（）などの記号と、仮名にならない英字を、半角か全角で入れます。" },
     prediction: { title: "予測候補", description: "打った読みで始まる語を出します。Tab で選びます。" },
     keys: {
       convert: "変換、次の候補",

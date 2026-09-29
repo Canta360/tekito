@@ -208,7 +208,7 @@ def validate_rules(pack: Path, manifest: dict) -> list[str]:
         return [f"{pack_id}: missing files"]
     if digest(data_path) != manifest["sha256"].get("file"):
         errors.append(f"{pack_id}: data checksum mismatch")
-    sections = {"word", "format", "name", "era", "symbol"}
+    sections = {"word", "format", "name", "era", "symbol", "emoticon"}
     count = 0
     for number, line in text_lines(data_path):
         if not line or line.startswith("#"):

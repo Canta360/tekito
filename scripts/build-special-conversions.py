@@ -12,13 +12,16 @@ Rows that share a section, language and key keep their order.
   era      Japanese eras and the day each began
   symbol   symbols by reading (Japanese, from Mozc's symbol table) or by
            their ASCII spelling (English, "->" -> "→")
+  emoticon Japanese emoticons (kaomoji) by reading, from Mozc's emoticon
+           table; "かおもじ" lists them all
 
 The dates, formats, names and English symbols are written here for TEKITO.
-The Japanese symbols come from Mozc (src/data/symbol/symbol.tsv, BSD-3-Clause).
+The Japanese symbols and emoticons come from Mozc (src/data/symbol/symbol.tsv
+and src/data/emoticon/emoticon.tsv, BSD-3-Clause).
 
 Usage:
   python scripts/build-special-conversions.py --mozc-symbols <symbol.tsv> \\
-      --mozc-license <Mozc LICENSE> --mozc-commit <sha>
+      --mozc-emoticons <emoticon.tsv> --mozc-license <Mozc LICENSE> --mozc-commit <sha>
 """
 
 from __future__ import annotations
@@ -131,6 +134,32 @@ def mozc_symbols(path: Path) -> list[tuple[str, str]]:
     return rows
 
 
+# Every emoticon also comes up by this reading, as in Mozc.
+ALL_EMOTICONS = "かおもじ"
+
+
+def mozc_emoticons(path: Path) -> list[tuple[str, str]]:
+    """(reading, emoticon) from Mozc's emoticon.tsv, in its order."""
+    rows: list[tuple[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+    everything: list[str] = []
+    for line in path.read_text(encoding="utf-8").splitlines()[1:]:  # column names first
+        fields = line.split("\t")
+        if len(fields) < 2 or not fields[0].strip() or fields[0].startswith("#"):
+            continue
+        face = fields[0]
+        if any(ord(c) < 0x20 for c in face):
+            continue
+        if face not in everything:
+            everything.append(face)
+        for reading in fields[1].split(" "):
+            if reading and (reading, face) not in seen:
+                seen.add((reading, face))
+                rows.append((reading, face))
+    rows += [(ALL_EMOTICONS, face) for face in everything if (ALL_EMOTICONS, face) not in seen]
+    return rows
+
+
 def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest().upper()
 
@@ -138,6 +167,7 @@ def sha256(path: Path) -> str:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--mozc-symbols", type=Path, required=True, help="Mozc src/data/symbol/symbol.tsv")
+    parser.add_argument("--mozc-emoticons", type=Path, required=True, help="Mozc src/data/emoticon/emoticon.tsv")
     parser.add_argument("--mozc-license", type=Path, required=True, help="Mozc LICENSE")
     parser.add_argument("--mozc-commit", required=True, help="the Mozc commit both files are from")
     args = parser.parse_args()
@@ -152,6 +182,7 @@ def main() -> None:
     rows += [("era", "ja", name, start) for name, start in ERAS]
     rows += [("symbol", "en", key, symbol) for key, symbol in ENGLISH_SYMBOLS]
     rows += [("symbol", "ja", reading, symbol) for reading, symbol in mozc_symbols(args.mozc_symbols)]
+    rows += [("emoticon", "ja", reading, face) for reading, face in mozc_emoticons(args.mozc_emoticons)]
     for row in rows:
         if any("\t" in field or "\n" in field or not field for field in row):
             raise ValueError(f"bad row: {row!r}")
@@ -171,9 +202,10 @@ def main() -> None:
         "The dates, formats, names and English symbols were written for TEKITO\n"
         "and are covered by the TEKITO source license (LICENSE.md in the TEKITO\n"
         "repository).\n\n"
-        "The Japanese symbols and their readings are from Mozc\n"
+        "The Japanese symbols, emoticons and their readings are from Mozc\n"
         f"(https://github.com/google/mozc, commit {args.mozc_commit},\n"
-        "src/data/symbol/symbol.tsv), under the following license:\n\n"
+        "src/data/symbol/symbol.tsv and src/data/emoticon/emoticon.tsv), under\n"
+        "the following license:\n\n"
         + license_text,
         encoding="utf-8", newline="\n")
 
@@ -189,8 +221,8 @@ def main() -> None:
         "entry_count": len(rows),
         "sha256": {"file": sha256(data)},
         "license": "TEKITO-OWNED + BSD-3-Clause (Mozc)",
-        "source": "scripts/build-special-conversions.py; Japanese symbols from "
-                  f"https://github.com/google/mozc/blob/{args.mozc_commit}/src/data/symbol/symbol.tsv",
+        "source": "scripts/build-special-conversions.py; Japanese symbols and emoticons from "
+                  f"https://github.com/google/mozc/tree/{args.mozc_commit}/src/data",
         "notice_file": "NOTICE",
     }
     (PACK / "manifest.json").write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n",

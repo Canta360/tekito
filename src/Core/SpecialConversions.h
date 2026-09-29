@@ -54,6 +54,9 @@ public:
     // The symbols for a reading or an ASCII spelling, in the pack's order.
     // Japanese keys are matched in full-width, as they are typed there.
     [[nodiscard]] std::vector<std::wstring> Symbols(Language language, std::wstring_view key) const;
+    // Japanese emoticons (kaomoji) for a reading ("にこにこ" -> (^^)); "かおもじ"
+    // has them all.
+    [[nodiscard]] std::vector<std::wstring> Emoticons(std::wstring_view reading) const;
     // `digits` (half- or full-width) in its other forms: half- and
     // full-width, with commas, in kanji (千二百三十四, 一二三四, 壱阡弐百参拾四),
     // as a Roman numeral (up to 3999) and circled (up to 50). Empty unless
