@@ -57,6 +57,8 @@ public:
     // Japanese emoticons (kaomoji) for a reading ("にこにこ" -> (^^)); "かおもじ"
     // has them all.
     [[nodiscard]] std::vector<std::wstring> Emoticons(std::wstring_view reading) const;
+    // Single kanji read this way ("こ" -> 己, 子, 小, ...), one per string.
+    [[nodiscard]] std::vector<std::wstring> SingleKanji(std::wstring_view reading) const;
     // `digits` (half- or full-width) in its other forms: half- and
     // full-width, with commas, in kanji (千二百三十四, 一二三四, 壱阡弐百参拾四),
     // as a Roman numeral (up to 3999) and circled (up to 50). Empty unless

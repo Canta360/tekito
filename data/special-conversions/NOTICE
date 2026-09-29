@@ -6,9 +6,9 @@ The dates, formats, names and English symbols were written for TEKITO
 and are covered by the TEKITO source license (LICENSE.md in the TEKITO
 repository).
 
-The Japanese symbols, emoticons and their readings are from Mozc
-(https://github.com/google/mozc, commit b9c3fcbd6d76b19649ef572324fa9da2559bc18e,
-src/data/symbol/symbol.tsv and src/data/emoticon/emoticon.tsv), under
+The Japanese symbols, emoticons, single kanji and their readings are
+from Mozc (https://github.com/google/mozc, commit b9c3fcbd6d76b19649ef572324fa9da2559bc18e,
+src/data/symbol, src/data/emoticon and src/data/single_kanji), under
 the following license:
 
 Copyright 2010-2018, Google Inc.

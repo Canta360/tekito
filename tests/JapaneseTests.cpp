@@ -881,6 +881,8 @@ void TestSpecialConversions(const RomajiTable& table, const MiniPack& pack) {
     Require(Contains(special.Emoticons(L"にこにこ"), L"(^^)") && special.Emoticons(L"かおもじ").size() > 100,
             "emoticons by reading, and all of them for かおもじ");
     Require(!Contains(special.Symbols(Language::Japanese, L"こ"), L"\U0001B038"), "hentaigana only by their name");
+    Require(Contains(special.SingleKanji(L"こ"), L"己") && Contains(special.SingleKanji(L"こ"), L"琥"),
+            "single kanji by reading, one each");
 
     // English, typed outside words.
     const tekito::SpecialConversionOptions all;
