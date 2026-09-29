@@ -54,6 +54,12 @@ about you beyond what any download does, such as your IP address, and
 GitHub's privacy terms apply to it. Installing from a ZIP you downloaded
 yourself (`install.ps1 -JapaneseDataPath`) makes no request at all.
 
+## Postal codes
+
+TEKITO does not download postal code data. **Open Japan Post's page** in
+Settings only opens the page in your browser; the file you download there
+and add in Settings is read on your computer.
+
 ---
 
 ## プライバシー（日本語）
@@ -62,6 +68,7 @@ TEKITO の処理はすべて PC の中で行われます。入力した内容、
 
 - 設定・ユーザー辞書・学習内容は `%LOCALAPPDATA%\TEKITO\user.db` に保存されます。学習しているのは「どの単語でどの候補を選んだか」と、日本語では「どの読みにどの変換を選んだか」の回数だけで、文章や入力履歴は保存しません。日本語の変換は文全体を読むために直前に確定した数語をメモリーにだけ持ちますが、続けて打っている間だけ使い、カーソルがほかへ移ると忘れます。保存はしません。
 - インストール時に日本語を選ぶと、日本語データを GitHub の TEKITO のリリースからダウンロードし、チェックサムを確かめます。ネットワークを使うのはこのときだけです。自分でダウンロードした ZIP から入れる場合（`install.ps1 -JapaneseDataPath`）は通信しません。
+- 郵便番号のデータは、TEKITO はダウンロードしません。設定の「日本郵便のページを開く」はブラウザでページを開くだけで、自分でダウンロードしたファイルを設定に入れると、この PC の中で取り込みます。
 - 診断ログ（`%TEMP%\TekitoTsf.log`、トレース用ビルドか `TEKITO_TSF_TRACE=1` のときだけ作られます）と設定画面の「Copy diagnostics」には、イベント・時間・エラーコードだけが含まれ、入力した文字は含まれません。
 - 学習は設定画面の「辞書と学習 → 選んだ候補から学ぶ」でオン/オフでき、「消去」で消せます。日本語の変換の学習だけを消すこともできます。「一般 → TEKITO をオフにするアプリ」に追加したアプリでは完全にオフになります。
 - アンインストールしても辞書・学習・設定は残ります。消す場合はインストーラーのパッケージにある `uninstall.ps1 -RemoveUserData` を実行してください。

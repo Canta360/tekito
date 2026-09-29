@@ -68,7 +68,8 @@ one (or Ctrl+Space, Ctrl+Shift+Space, or none). With Japanese, it goes
 between Japanese and Auto, Japanese and Direct, or round all three, as you
 choose in Settings. On
 a Japanese keyboard, Henkan switches to Japanese, Muhenkan to English, and
-Hiragana to Japanese in hiragana (katakana with Shift).
+Hiragana to Japanese in hiragana (katakana with Shift). After a switch, the
+new mode shows by the caret for a moment.
 
 Japanese input is optional. Without it, or with it turned off in Settings,
 TEKITO has Auto and Direct only. It stays off in terminals, in apps running
@@ -92,6 +93,10 @@ Typing the next letter settles the word, so there is nothing to undo later.
 TEKITO leaves alone words it recognizes, chat abbreviations like “brb”,
 anything you capitalize yourself, anything that looks like code, URLs and
 addresses, and fields marked as passwords, numbers or email.
+
+A few things come up as choices too: “today” and “now” offer the date and
+time, “(c)” and “->” offer © and →, and “1+2=” offers 3. What you typed
+stays first, so nothing changes unless you pick one.
 
 ![The TEKITO candidate list, glass and simple, in light and dark, with the meaning of the highlighted word beside it](docs/images/candidate-list.png)
 
@@ -134,10 +139,23 @@ for the phrase in focus.
   (ミーティング → meeting).
 - **It learns your way of writing.** The conversion you pick for a reading
   comes first the next time.
+- **Your own words.** Add a reading and how you write it in Settings, and
+  choose whether it comes first, is only offered, or never comes up.
+- **Numbers, dates and symbols.** Digits read as numbers, so 3こ is 3個 and
+  100えん 100円, and converting a number offers the other width and kanji
+  (千二百三十四). きょう and いま offer the date and time, やじるし and ほし
+  symbols, にこにこ emoticons, and 1+2= its answer. Single kanji come after
+  a reading's words.
+- **Postal codes.** Add Japan Post's postal code data under
+  **Settings → Dictionary & learning**, and 1000001 converts to its address.
 
 ## Settings
 
 ![TEKITO Settings](docs/images/settings.png)
+
+Settings shows what most people change; **Show advanced settings** at the
+end of General adds the rest, such as the widths of what you type in
+Japanese and a page to turn each special conversion on or off.
 
 Settings, the setup program and TEKITO's own messages are available in
 English and Japanese; they follow the Windows display language unless you
@@ -150,11 +168,13 @@ typing anywhere, it has no account and no telemetry, and it does not use the
 network while you type. What it learns from your choices stays in
 `%LOCALAPPDATA%\TEKITO` and can be cleared from Settings. The only download
 is the Japanese data, fetched by the setup program when you choose Japanese.
+Postal codes come from a file you download from Japan Post yourself and add
+in Settings.
 See [the privacy notice](PRIVACY.md).
 
 ## Install
 
-Download `TEKITO-0.2.0-full-installer.exe` from
+Download `TEKITO-0.3.0-full-installer.exe` from
 [Releases](https://github.com/Canta360/tekito/releases/latest) and run it.
 
 - **Add Japanese input** (on when Windows shows Japanese) downloads the
