@@ -5,10 +5,12 @@
 #include "Core/ExternalRankingProviders.h"
 #include "Core/ExternalSlangProvider.h"
 #include "Core/MisspellingProvider.h"
+#include "Core/SpecialConversions.h"
 #include "Core/UserDictionary.h"
 #include "Core/UserLearning.h"
 #include "Core/UserLexiconProvider.h"
 
+#include <algorithm>
 #include <atomic>
 #include <cwctype>
 #include <memory>
@@ -177,7 +179,28 @@ ConversionResult CandidateEngine::Convert(const ConversionRequest& request) cons
             }
         }
     }
+    if (request.options.special.dates) AddDates(rawText, candidates);
     return {std::move(candidates)};
+}
+
+void CandidateEngine::AddDates(std::wstring_view rawText, std::vector<Candidate>& candidates) {
+    std::wstring word(rawText);
+    for (auto& c : word) c = static_cast<wchar_t>(std::towlower(c));
+    auto dates = SpecialConversions::Installed().Dates(SpecialConversions::Language::English, word,
+                                                       LocalTime::Now());
+    if (dates.empty() || candidates.empty()) return;
+    // Right after the word as typed, which stays first: a date is only
+    // ever offered.
+    const auto original = std::find_if(candidates.begin(), candidates.end(),
+                                       [](const Candidate& candidate) { return candidate.isOriginal; });
+    auto at = original == candidates.end() ? candidates.begin() + 1 : original + 1;
+    for (auto& date : dates) {
+        Candidate candidate;
+        candidate.text = std::move(date);
+        candidate.isProtected = true;
+        candidate.policyFlags = CandidatePolicySuggestOnly;
+        at = candidates.insert(at, std::move(candidate)) + 1;
+    }
 }
 
 std::vector<Candidate> CandidateEngine::Generate(std::wstring_view rawText) const {

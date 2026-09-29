@@ -70,6 +70,13 @@ struct UserSettings {
     int japanesePunctuation{0};
     // Words that start with what is typed, offered while typing Japanese.
     bool japanesePredictionEnabled{true};
+    // Special conversions, in English and Japanese (the special-conversions
+    // pack): dates and times for "today" and "kyou", a number's other forms,
+    // symbols by reading or ASCII spelling, and the sum for "1+2=".
+    bool dateConversion{true};
+    bool numberConversion{true};
+    bool symbolConversion{true};
+    bool calculatorEnabled{true};
     // Language of TEKITO's own windows: 0 = the Windows display language,
     // 1 = English, 2 = Japanese. See UiLanguage.h.
     int uiLanguage{0};

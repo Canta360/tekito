@@ -15,7 +15,9 @@ class JapaneseDictionary;
 class LanguageModel;
 
 struct PhraseCandidate {
-    enum class Kind : std::uint8_t { Dictionary, Hiragana, Katakana, English };
+    // Special: a date, a number written another way, a symbol or a sum
+    // (SpecialConversions), which is not learned.
+    enum class Kind : std::uint8_t { Dictionary, Hiragana, Katakana, English, Special };
 
     std::wstring text;
     // Lower is more likely, in the matrix's cost units.

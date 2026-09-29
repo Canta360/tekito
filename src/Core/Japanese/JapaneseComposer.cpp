@@ -320,6 +320,12 @@ void JapaneseComposer::BuildPhrases(bool convert) {
     focus_ = 0;
     listOpen_ = false;
     if (reading.empty()) return;
+    if (convert) {
+        if (auto sum = SumCandidates(reading); !sum.empty()) {
+            phrases_.push_back({0, reading.size(), std::move(sum)});
+            return;
+        }
+    }
     if (convert && converter_) {
         // A slip in the keys: converted from the keys as meant. Esc still
         // goes back to what was typed.
@@ -335,6 +341,7 @@ void JapaneseComposer::BuildPhrases(bool convert) {
     if (phrases_.empty()) {
         phrases_.push_back({0, reading.size(),
                             convert ? KanaCandidates(reading) : std::vector<PhraseCandidate>{}});
+        if (convert) AddSpecial(reading, phrases_.back().candidates);
     }
 }
 
@@ -343,6 +350,7 @@ void JapaneseComposer::AddPhrases(std::vector<Phrase> phrases, const std::wstrin
         if (phrase.candidates.empty()) continue;
         if (learning_) learning_->Reorder(reading.substr(phrase.begin, phrase.length), phrase.candidates);
         AddLoanwords(phrase.candidates);
+        AddSpecial(std::wstring_view(reading).substr(phrase.begin, phrase.length), phrase.candidates);
         phrases_.push_back({phrase.begin, phrase.length, std::move(phrase.candidates)});
     }
 }
@@ -381,6 +389,62 @@ void JapaneseComposer::AddLoanwords(std::vector<PhraseCandidate>& candidates) co
         candidates.insert(candidates.begin() + static_cast<std::ptrdiff_t>(i + 1), words.begin(), words.end());
         return;
     }
+}
+
+void JapaneseComposer::AddSpecial(std::wstring_view reading, std::vector<PhraseCandidate>& candidates) const {
+    if (!special_ || candidates.empty()) return;
+    const auto has = [&](const std::wstring& text) {
+        return std::any_of(candidates.begin(), candidates.end(), [&](const PhraseCandidate& c) { return c.text == text; });
+    };
+    const auto insert = [&](std::size_t at, const std::vector<std::wstring>& texts, std::wstring_view suffix) {
+        at = std::min(at, candidates.size());
+        for (const auto& text : texts) {
+            PhraseCandidate candidate{text + std::wstring(suffix), candidates.front().cost,
+                                      PhraseCandidate::Kind::Special, false};
+            if (has(candidate.text)) continue;
+            candidates.insert(candidates.begin() + static_cast<std::ptrdiff_t>(at++), std::move(candidate));
+        }
+    };
+    // Other forms of a number come right after it.
+    if (specialOptions_.numbers) insert(1, special_->Numbers(reading), {});
+    // A date or time word, and what follows it in the phrase as long as the
+    // first candidate ends with it too ("きょうは": 今日は, 2026/09/29は).
+    if (specialOptions_.dates) {
+        const auto now = LocalTime::Now();
+        for (std::size_t length = reading.size(); length >= 2; --length) {
+            const auto suffix = reading.substr(length);
+            if (!candidates.front().text.ends_with(suffix)) continue;
+            auto dates = special_->Dates(SpecialConversions::Language::Japanese, reading.substr(0, length), now);
+            if (dates.empty()) continue;
+            insert(1, dates, suffix);
+            break;
+        }
+    }
+    // Symbols after the first few words ("やじるし": 矢印, ..., →).
+    constexpr std::size_t kSymbolPosition = 3;
+    if (specialOptions_.symbols) {
+        insert(kSymbolPosition, special_->Symbols(SpecialConversions::Language::Japanese, reading), {});
+    }
+}
+
+std::vector<PhraseCandidate> JapaneseComposer::SumCandidates(std::wstring_view reading) const {
+    if (!special_ || !specialOptions_.calculator) return {};
+    const auto sum = SpecialConversions::Calculate(reading);
+    if (!sum) return {};
+    // The arithmetic as ASCII, the way it was meant (ー is minus, ・ divide).
+    std::wstring expression = ToHalfWidthAscii(reading);
+    for (auto& c : expression) {
+        if (c == L'\x30FC') c = L'-';
+        if (c == L'\x30FB') c = L'/';
+    }
+    std::vector<PhraseCandidate> candidates{{*sum, 0, PhraseCandidate::Kind::Special, false},
+                                            {expression + *sum, 0, PhraseCandidate::Kind::Special, false}};
+    for (auto& kana : KanaCandidates(reading)) {
+        const bool seen = std::any_of(candidates.begin(), candidates.end(),
+                                      [&](const PhraseCandidate& c) { return c.text == kana.text; });
+        if (!seen) candidates.push_back(std::move(kana));
+    }
+    return candidates;
 }
 
 void JapaneseComposer::Convert() {
@@ -825,6 +889,11 @@ std::wstring JapaneseComposer::Commit() {
     if (learning_ && IsConverted()) {
         const std::wstring& reading = conversionReading_;
         for (const auto& phrase : phrases_) {
+            // Dates and sums change; they are not learned.
+            if (!phrase.form && phrase.selected < phrase.candidates.size() &&
+                phrase.candidates[phrase.selected].kind == PhraseCandidate::Kind::Special) {
+                continue;
+            }
             const std::wstring chosen = PhraseText(phrase);
             const std::wstring first = phrase.candidates.empty() ? chosen : phrase.candidates.front().text;
             learning_->RecordChoice(reading.substr(phrase.begin, phrase.length), chosen, first);

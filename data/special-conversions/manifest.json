@@ -1,0 +1,17 @@
+{
+  "pack_id": "special-conversions",
+  "display_name": "Special Conversions",
+  "schema_version": 1,
+  "version": "2026.09",
+  "language": "en-US+ja-JP",
+  "type": "special-conversions",
+  "format": "rules-tsv-v1",
+  "file": "rules.tsv",
+  "entry_count": 6195,
+  "sha256": {
+    "file": "4F1D7BCE5E0F4D479BEAE000BEEB80381CC421A71D3C16ACAF7CED798C1C637A"
+  },
+  "license": "TEKITO-OWNED + BSD-3-Clause (Mozc)",
+  "source": "scripts/build-special-conversions.py; Japanese symbols from https://github.com/google/mozc/blob/b9c3fcbd6d76b19649ef572324fa9da2559bc18e/src/data/symbol/symbol.tsv",
+  "notice_file": "NOTICE"
+}

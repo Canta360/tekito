@@ -51,6 +51,7 @@ add_library(tekito_core STATIC
     src/Core/MisspellingProvider.cpp
     src/Core/PolicyEngine.cpp
     src/Core/SpaceBoundaryPolicy.cpp
+    src/Core/SpecialConversions.cpp
     src/Core/SymSpellIndex.cpp
     src/Core/TypoModel.cpp
     src/Core/UserDictionary.cpp

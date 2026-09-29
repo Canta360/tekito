@@ -194,6 +194,36 @@ def validate_sorted_tsv(pack: Path, manifest: dict) -> list[str]:
     return errors
 
 
+def validate_rules(pack: Path, manifest: dict) -> list[str]:
+    """The special-conversions pack (scripts/build-special-conversions.py):
+    one TSV read whole, section, language, key and value on each row."""
+    pack_id = pack.name
+    errors = [f"{pack_id}: manifest missing {field}"
+              for field in ("pack_id", "version", "language", "type", "license", "file",
+                            "notice_file", "entry_count", "sha256") if field not in manifest]
+    if errors:
+        return errors
+    data_path = relative_to_pack(pack, manifest["file"])
+    if not data_path.is_file() or not relative_to_pack(pack, manifest["notice_file"]).is_file():
+        return [f"{pack_id}: missing files"]
+    if digest(data_path) != manifest["sha256"].get("file"):
+        errors.append(f"{pack_id}: data checksum mismatch")
+    sections = {"word", "format", "name", "era", "symbol"}
+    count = 0
+    for number, line in text_lines(data_path):
+        if not line or line.startswith("#"):
+            continue
+        count += 1
+        fields = line.split("\t")
+        if len(fields) != 4 or not all(fields):
+            errors.append(f"{pack_id}:{number}: expected section, language, key and value")
+        elif fields[0] not in sections or fields[1] not in {"en", "ja"}:
+            errors.append(f"{pack_id}:{number}: unknown section or language")
+    if count != manifest["entry_count"]:
+        errors.append(f"{pack_id}: manifest count {manifest['entry_count']} != {count}")
+    return errors
+
+
 def validate_language_model(pack: Path, manifest: dict) -> list[str]:
     """The japanese-lm pack (scripts/build-japanese-lm.py): one binary file,
     mapped and checked by its reader; here it must be what the manifest
@@ -216,6 +246,8 @@ def validate_language_model(pack: Path, manifest: dict) -> list[str]:
 def validate_pack(pack: Path, manifest: dict) -> list[str]:
     if manifest.get("format") == "sorted-tsv-v1":
         return validate_sorted_tsv(pack, manifest)
+    if manifest.get("format") == "rules-tsv-v1":
+        return validate_rules(pack, manifest)
     if str(manifest.get("format", "")).startswith("ja-lm-"):
         return validate_language_model(pack, manifest)
     errors: list[str] = []
