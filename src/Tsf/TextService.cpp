@@ -1009,7 +1009,7 @@ HRESULT TextService::OnTestKeyDown(ITfContext* context, WPARAM wParam, LPARAM lP
         return S_OK;
     }
     KeyInput input{};
-    if (!TranslateKey(wParam, lParam, input)) {
+    if (!TranslateKey(wParam, lParam, input) || !ResolveSpecialKey(context, input)) {
         *eaten = FALSE;
         return S_OK;
     }
@@ -1041,7 +1041,7 @@ HRESULT TextService::OnKeyDown(ITfContext* context, WPARAM wParam, LPARAM lParam
         return S_OK;
     }
     KeyInput input{};
-    if (!TranslateKey(wParam, lParam, input)) {
+    if (!TranslateKey(wParam, lParam, input) || !ResolveSpecialKey(context, input)) {
         *eaten = FALSE;
         return S_OK;
     }
@@ -1170,6 +1170,7 @@ HRESULT TextService::OnCompositionTerminated(TfEditCookie, ITfComposition* compo
     candidateWindow_.Hide();
     state_.Reset();
     rawText_.clear();
+    symbolComposition_ = false;
     japanese_.Clear();
     return S_OK;
 }
@@ -1302,28 +1303,140 @@ bool TextService::TranslateEnglishKey(WPARAM wParam, KeyInput& input) {
                                   buffer, static_cast<int>(std::size(buffer)), 0,
                                   GetKeyboardLayout(0));
     if (count == 1 && buffer[0] >= 0x20 && buffer[0] != 0x7f) {
-        PunctuationRole punctuationRole{};
-        if (TryClassifyPunctuation(buffer[0], punctuationRole)) {
-            if (!state_.IsActive()) return false;
-            input.type = KeyInput::Type::Punctuation;
+        // Not in an English word typed inside Japanese, which ends on its own keys.
+        if (mode_ != InputMode::Japanese && SpecialConversions::Installed().MayEndEnglish(buffer[0], SpecialOptions())) {
+            input.type = KeyInput::Type::SpecialEnd;
             input.character = buffer[0];
-            input.punctuationRole = punctuationRole;
             return true;
         }
-        if (!IsWordCharacter(buffer[0])) {
-            // Digits and symbols are not part of a word: finish the word
-            // being typed as it stands and let the character through.
-            if (!state_.IsActive()) return false;
-            input.type = KeyInput::Type::EndComposition;
-            return true;
-        }
-        if (!state_.IsActive() && !std::iswalpha(buffer[0])) return false;  // no word starts with '
-        input.type = KeyInput::Type::Printable;
-        input.character = buffer[0];
-        return true;
+        return TranslateEnglishCharacter(buffer[0], input);
     }
 
     return false;
+}
+
+bool TextService::TranslateEnglishCharacter(wchar_t character, KeyInput& input) const {
+    PunctuationRole punctuationRole{};
+    if (TryClassifyPunctuation(character, punctuationRole)) {
+        if (!state_.IsActive()) return false;
+        input.type = KeyInput::Type::Punctuation;
+        input.character = character;
+        input.punctuationRole = punctuationRole;
+        return true;
+    }
+    if (!IsWordCharacter(character)) {
+        // Digits and symbols are not part of a word: finish the word
+        // being typed as it stands and let the character through.
+        if (!state_.IsActive()) return false;
+        input.type = KeyInput::Type::EndComposition;
+        return true;
+    }
+    if (!state_.IsActive() && !std::iswalpha(character)) return false;  // no word starts with '
+    input.type = KeyInput::Type::Printable;
+    input.character = character;
+    return true;
+}
+
+std::optional<SpecialConversions::Ending> TextService::SpecialEnding(std::wstring_view preceding,
+                                                                    wchar_t character) const {
+    std::wstring text(preceding);
+    text.push_back(character);
+    auto ending = SpecialConversions::Installed().EnglishEnding(text, SpecialOptions());
+    // What was typed before the key must be in the document: at least one
+    // character of it.
+    if (ending && ending->length < 2) ending.reset();
+    return ending;
+}
+
+bool TextService::ResolveSpecialKey(ITfContext* context, KeyInput& input) {
+    if (input.type != KeyInput::Type::SpecialEnd) return true;
+    bool found = false;
+    if (context) {
+        auto* session = new (std::nothrow) ReadEditSession([&](TfEditCookie editCookie) {
+            found = SpecialEnding(ReadSelectionContext(context, editCookie), input.character).has_value();
+        });
+        if (session) {
+            HRESULT result = E_FAIL;
+            [[maybe_unused]] const HRESULT hr =
+                context->RequestEditSession(clientId_, session, TF_ES_SYNC | TF_ES_READ, &result);
+            session->Release();
+        }
+    }
+    if (found) return true;
+    const wchar_t character = input.character;
+    input = KeyInput{};
+    return TranslateEnglishCharacter(character, input);
+}
+
+HRESULT TextService::HandleSpecialEnd(ITfContext* context, TfEditCookie editCookie, wchar_t character) {
+    const std::wstring preceding = ReadSelectionContext(context, editCookie);
+    const auto ending = SpecialEnding(preceding, character);
+    // A word being typed ends as it stands.
+    if (composition_) {
+        HRESULT hr = EndComposition(editCookie);
+        if (FAILED(hr)) return hr;
+    }
+    candidateWindow_.Hide();
+    state_.Reset();
+    rawText_.clear();
+    // The document changed since the key was looked at: type it as it is.
+    if (!ending) return InsertAtSelection(context, editCookie, std::wstring(1, character));
+
+    HRESULT hr = StartCompositionBefore(context, editCookie, ending->length - 1);
+    if (FAILED(hr)) return InsertAtSelection(context, editCookie, std::wstring(1, character));
+    rawText_ = preceding.substr(preceding.size() - (ending->length - 1));
+    rawText_.push_back(character);
+    hr = ReplaceComposition(context, editCookie, rawText_);
+    if (FAILED(hr)) return hr;
+    // What was typed stays first; the symbols or the sum are only offered.
+    std::vector<Candidate> candidates;
+    Candidate typed;
+    typed.text = rawText_;
+    typed.label = SemanticLabel::Original;
+    typed.isOriginal = true;
+    typed.isProtected = true;
+    typed.policyFlags = CandidatePolicyProtect;
+    candidates.push_back(std::move(typed));
+    for (const auto& offer : ending->offers) {
+        if (offer == rawText_) continue;
+        Candidate candidate;
+        candidate.text = offer;
+        candidate.isProtected = true;
+        candidate.policyFlags = CandidatePolicySuggestOnly;
+        candidates.push_back(std::move(candidate));
+    }
+    symbolComposition_ = true;
+    state_.BeginOrUpdate(rawText_, std::move(candidates));
+    ShowCandidates(context, editCookie);
+    return S_OK;
+}
+
+HRESULT TextService::StartCompositionBefore(ITfContext* context, TfEditCookie editCookie, std::size_t count) {
+    TF_SELECTION selection{};
+    ULONG fetched = 0;
+    HRESULT hr = context->GetSelection(editCookie, TF_DEFAULT_SELECTION, 1, &selection, &fetched);
+    if (FAILED(hr) || fetched != 1 || !selection.range) return FAILED(hr) ? hr : E_FAIL;
+    ComPtr<ITfRange> range;
+    range.Attach(selection.range);
+    hr = range->Collapse(editCookie, TF_ANCHOR_START);
+    if (FAILED(hr)) return hr;
+    LONG moved = 0;
+    hr = range->ShiftStart(editCookie, -static_cast<LONG>(count), &moved, nullptr);
+    if (FAILED(hr)) return hr;
+    if (moved != -static_cast<LONG>(count)) return E_FAIL;
+
+    ComPtr<ITfContextComposition> compositionContext;
+    hr = context->QueryInterface(IID_PPV_ARGS(compositionContext.Put()));
+    if (FAILED(hr)) return hr;
+    hr = compositionContext->StartComposition(editCookie, range.Get(), this, &composition_);
+    if (FAILED(hr) || !composition_) {
+        TraceHr(L"StartCompositionBefore StartComposition failed", hr);
+        return FAILED(hr) ? hr : E_FAIL;
+    }
+    compositionContext_ = context;
+    compositionContext_->AddRef();
+    AdviseContextSinks(context);
+    return S_OK;
 }
 
 HRESULT TextService::RequestKeyEditSession(ITfContext* context, const KeyInput& input) {
@@ -1432,6 +1545,29 @@ HRESULT TextService::HandleKeyInEditSessionCore(ITfContext* context, TfEditCooki
         return SUCCEEDED(hr) ? S_FALSE : hr;
     }
 
+    if (input.type == KeyInput::Type::SpecialEnd) return HandleSpecialEnd(context, editCookie, input.character);
+    // A spelling or sum: typing on keeps it as typed; Backspace takes its
+    // last character and keeps the rest.
+    if (symbolComposition_ && state_.State() == CompositionState::Composing) {
+        if (input.type == KeyInput::Type::Backspace) {
+            if (!rawText_.empty()) rawText_.pop_back();
+            HRESULT hr = ReplaceComposition(context, editCookie, rawText_);
+            if (FAILED(hr)) return hr;
+            candidateWindow_.Hide();
+            state_.Reset();
+            rawText_.clear();
+            return EndComposition(editCookie);
+        }
+        if (input.type == KeyInput::Type::Printable) {
+            HRESULT hr = EndComposition(editCookie);
+            if (FAILED(hr)) return hr;
+            candidateWindow_.Hide();
+            state_.Reset();
+            rawText_.clear();
+        }
+    }
+    const bool learning = userSettings_.learningEnabled && !symbolComposition_;
+
     const auto recordSocialSelection = [&](const Candidate& candidate) {
         if (userSettings_.socialPersonalization <= 0 ||
             candidate.socialRange == SocialRangeUnspecified) return;
@@ -1449,7 +1585,7 @@ HRESULT TextService::HandleKeyInEditSessionCore(ITfContext* context, TfEditCooki
                                             const std::vector<Candidate>& candidates,
                                             std::size_t selectedIndex,
                                             bool explicitSelection) {
-        if (!userSettings_.learningEnabled || raw.empty() || selectedIndex >= candidates.size()) {
+        if (!learning || raw.empty() || selectedIndex >= candidates.size()) {
             return;
         }
         const auto& selected = candidates[selectedIndex];
@@ -1523,7 +1659,7 @@ HRESULT TextService::HandleKeyInEditSessionCore(ITfContext* context, TfEditCooki
         }
         const auto action = state_.OnSpace();
         if (action.kind == ActionKind::CommitAndStartNext) {
-            if (userSettings_.learningEnabled) {
+            if (learning) {
                 if (explicitSelection && !candidateBefore.empty() && candidateBefore != rawBefore) {
                     userLearning_.RecordCandidateSelection(candidateBefore);
                 } else {
@@ -1588,8 +1724,8 @@ HRESULT TextService::HandleKeyInEditSessionCore(ITfContext* context, TfEditCooki
             state_.Candidates()[selectedBefore].socialRange != SocialRangeUnspecified;
         const auto action = state_.OnBackspace();
         if (action.kind == ActionKind::RestoreOriginal) {
-            if (userSettings_.learningEnabled && !candidateBefore.empty()) userLearning_.RecordUndo(candidateBefore);
-            if (userSettings_.learningEnabled && !candidateBefore.empty()) {
+            if (learning && !candidateBefore.empty()) userLearning_.RecordUndo(candidateBefore);
+            if (learning && !candidateBefore.empty()) {
                 userLearning_.RecordExposure(rawText_, candidateBefore);
                 userLearning_.RecordUndo(rawText_, candidateBefore);
             }
@@ -1630,9 +1766,9 @@ HRESULT TextService::HandleKeyInEditSessionCore(ITfContext* context, TfEditCooki
         const auto action = state_.OnPunctuation(input.character, input.punctuationRole);
         if (action.kind != ActionKind::ReplaceComposition) return S_FALSE;
         if (!candidateBefore.empty() && candidateBefore != rawBefore) {
-            if (userSettings_.learningEnabled) userLearning_.RecordCandidateSelection(candidateBefore);
+            if (learning) userLearning_.RecordCandidateSelection(candidateBefore);
         } else {
-            if (userSettings_.learningEnabled) userLearning_.RecordRawKeep(rawBefore);
+            if (learning) userLearning_.RecordRawKeep(rawBefore);
         }
         HRESULT hr = ReplaceComposition(context, editCookie, action.text);
         if (FAILED(hr)) return hr;
@@ -1654,7 +1790,7 @@ HRESULT TextService::HandleKeyInEditSessionCore(ITfContext* context, TfEditCooki
         HRESULT hr = ReplaceComposition(context, editCookie, action.text);
         if (FAILED(hr)) return hr;
         if (action.kind == ActionKind::RestoreOriginal) {
-            if (userSettings_.learningEnabled && !candidateBefore.empty()) {
+            if (learning && !candidateBefore.empty()) {
                 userLearning_.RecordExposure(rawText_, candidateBefore);
                 userLearning_.RecordUndo(rawText_, candidateBefore);
             }
@@ -1698,9 +1834,9 @@ HRESULT TextService::HandleKeyInEditSessionCore(ITfContext* context, TfEditCooki
         if (action.kind != ActionKind::CommitBeforeNewline &&
             action.kind != ActionKind::EndComposition) return S_FALSE;
         if (!candidateBefore.empty() && candidateBefore != rawBefore) {
-            if (userSettings_.learningEnabled) userLearning_.RecordCandidateSelection(candidateBefore);
+            if (learning) userLearning_.RecordCandidateSelection(candidateBefore);
         } else {
-            if (userSettings_.learningEnabled) userLearning_.RecordRawKeep(rawBefore);
+            if (learning) userLearning_.RecordRawKeep(rawBefore);
         }
         HRESULT hr = ReplaceComposition(context, editCookie, action.text);
         if (FAILED(hr)) return hr;
@@ -1833,6 +1969,7 @@ HRESULT TextService::ApplyDisplayAttribute(ITfContext* context, TfEditCookie edi
 }
 
 HRESULT TextService::EndComposition(TfEditCookie editCookie) {
+    symbolComposition_ = false;
     if (!composition_) return S_OK;
     ITfComposition* composition = composition_;
     composition->AddRef();
