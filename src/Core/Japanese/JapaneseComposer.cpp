@@ -80,6 +80,15 @@ bool IsDigits(std::wstring_view text) {
     return !text.empty() && std::all_of(text.begin(), text.end(), IsDigit);
 }
 
+// The reading a phrase is learned under. Right after digits it is learned
+// apart ("#こ"): 3こ stays 3個 even when こ alone is usually 子. The mark
+// keeps it out of predictions, which look up typed kana.
+std::wstring LearningReading(std::wstring_view reading, std::size_t begin, std::size_t length) {
+    std::wstring key(reading.substr(begin, length));
+    if (begin > 0 && IsDigit(reading[begin - 1]) && !key.empty() && !IsDigit(key.front())) key.insert(0, 1, L'#');
+    return key;
+}
+
 // A number in digits for a word read in kana (いち: 1, the dictionary's
 // likeliest) comes after the first two words.
 constexpr std::size_t kDigitsPosition = 2;
@@ -373,7 +382,7 @@ void JapaneseComposer::AddPhrases(std::vector<Phrase> phrases, const std::wstrin
         if (phrase.candidates.empty()) continue;
         const auto phraseReading = std::wstring_view(reading).substr(phrase.begin, phrase.length);
         if (std::none_of(phraseReading.begin(), phraseReading.end(), IsDigit)) PutDigitsAfterWords(phrase.candidates);
-        if (learning_) learning_->Reorder(reading.substr(phrase.begin, phrase.length), phrase.candidates);
+        if (learning_) learning_->Reorder(LearningReading(reading, phrase.begin, phrase.length), phrase.candidates);
         AddLoanwords(phrase.candidates);
         AddSpecial(std::wstring_view(reading).substr(phrase.begin, phrase.length), phrase.candidates);
         phrases_.push_back({phrase.begin, phrase.length, std::move(phrase.candidates)});
@@ -946,7 +955,7 @@ std::wstring JapaneseComposer::Commit() {
             }
             const std::wstring chosen = PhraseText(phrase);
             const std::wstring first = phrase.candidates.empty() ? chosen : phrase.candidates.front().text;
-            learning_->RecordChoice(reading.substr(phrase.begin, phrase.length), chosen, first);
+            learning_->RecordChoice(LearningReading(reading, phrase.begin, phrase.length), chosen, first);
         }
     }
     std::uint16_t last = 0;
