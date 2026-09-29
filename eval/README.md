@@ -62,6 +62,21 @@ should regress. The per-category breakdown (`accuracy_category` /
 candidate list at all vs. ranked too low vs. wrongly auto-applied) so the
 next fix can be targeted.
 
+### English Auto on real text
+
+`--sentences <eng_news_*-sentences.txt>` types each word of real, correctly
+typed sentences (Leipzig, CC BY 4.0) the way the text service does (128
+characters of context before it) and lets `InputStateMachine::OnSpace()`
+decide, so every word Space rewrites is a false correction. It runs TEKITO
+as it is, keeping a word once its correction is undone (user dictionary),
+and deciding at the next word; each also gets one real word a letter away
+per sentence to see how many such slips Space puts right. `--corpus` adds a
+check that the kept words do not stop the corpus's typo corrections, and
+`--probe "<sentence>"` prints what Space does to each word and why.
+
+Unlike `overall_false_correction_rate`, which asks `AutoApplyPolicy` about
+words without context, this follows what Space actually does.
+
 ## Japanese conversion
 
 `tekito_ja_eval` measures kana-kanji conversion with the `japanese-core` pack

@@ -5,6 +5,7 @@
 #include "Core/ConversionEngine.h"
 #include "Core/CandidateEngine.h"
 #include "Core/ExternalLexiconProvider.h"
+#include "EnglishTypingStudy.h"
 
 #include <algorithm>
 #include <chrono>
@@ -162,10 +163,14 @@ int main(int argc, char** argv) {
     std::string splitFilter = "test";
     std::size_t latencySampleSize = 200;
     std::size_t maxRows = 0;  // 0 = unlimited
+    // --sentences: English Auto on real text (EnglishTypingStudy.h).
+    EnglishStudyOptions study;
 
     const auto usage = [] {
         std::cerr << "Usage: tekito_core_eval --corpus PATH [--split test|validation|train|all] "
-                     "[--latency-sample N] [--max-rows N]\n";
+                     "[--latency-sample N] [--max-rows N]\n"
+                     "       tekito_core_eval --sentences LEIPZIG_SENTENCES [--corpus PATH] "
+                     "[--max-sentences N] [--show-examples N]\n";
     };
 
     for (int index = 1; index < argc; ++index) {
@@ -179,13 +184,21 @@ int main(int argc, char** argv) {
             latencySampleSize = static_cast<std::size_t>(std::stoul(argv[++index]));
         } else if (arg == "--max-rows" && index + 1 < argc) {
             maxRows = static_cast<std::size_t>(std::stoul(argv[++index]));
+        } else if (arg == "--sentences" && index + 1 < argc) {
+            study.sentences = argv[++index];
+        } else if (arg == "--max-sentences" && index + 1 < argc) {
+            study.maxSentences = static_cast<std::size_t>(std::stoul(argv[++index]));
+        } else if (arg == "--probe" && index + 1 < argc) {
+            study.probe = argv[++index];
+        } else if (arg == "--show-examples" && index + 1 < argc) {
+            study.showExamples = static_cast<std::size_t>(std::stoul(argv[++index]));
         } else {
             usage();
             return 2;
         }
     }
 
-    if (corpusPath.empty()) {
+    if (corpusPath.empty() && study.sentences.empty() && study.probe.empty()) {
         usage();
         return 2;
     }
@@ -196,6 +209,10 @@ int main(int argc, char** argv) {
         std::cerr << "TEKITO_DATA_PACK_DIR does not point at a valid data pack directory ("
                   << dataPackRoot << "). Set it to the repository's data/ directory.\n";
         return 2;
+    }
+    if (!study.sentences.empty() || !study.probe.empty()) {
+        study.corpus = corpusPath;
+        return RunEnglishStudy(study);
     }
 
     auto rows = LoadCorpus(corpusPath, splitFilter);

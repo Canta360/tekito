@@ -233,7 +233,7 @@ if(TEKITO_BUILD_BENCHMARKS)
 endif()
 
 if(TEKITO_BUILD_EVAL)
-    add_executable(tekito_core_eval eval/EvalHarness.cpp)
+    add_executable(tekito_core_eval eval/EvalHarness.cpp eval/EnglishTypingStudy.cpp)
     target_compile_definitions(tekito_core_eval PRIVATE NOMINMAX)
     target_link_libraries(tekito_core_eval PRIVATE tekito_core)
 
