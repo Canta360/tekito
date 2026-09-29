@@ -103,6 +103,12 @@ ENGLISH_SYMBOLS = [
 ]
 
 
+# Rows whose first reading names a group of rare characters (radicals,
+# hentaigana, nasal kana, Ainu kana): they come up only by that name, not
+# by the kana they are also listed under (こ would offer 𛀸 and こ゚).
+NAMED_GROUPS = {"ぶしゅ", "へんたいがな", "びだくおん", "あいぬ"}
+
+
 def mozc_symbols(path: Path) -> list[tuple[str, str]]:
     """(reading, symbol) from Mozc's symbol.tsv, in its order."""
     rows: list[tuple[str, str]] = []
@@ -115,7 +121,10 @@ def mozc_symbols(path: Path) -> list[tuple[str, str]]:
         symbol = fields[1]
         if any(ord(c) < 0x20 for c in symbol):
             continue
-        for reading in fields[2].split(" "):
+        readings = fields[2].split(" ")
+        if readings[0] in NAMED_GROUPS:
+            readings = readings[:1]
+        for reading in readings:
             if reading and (reading, symbol) not in seen:
                 seen.add((reading, symbol))
                 rows.append((reading, symbol))
