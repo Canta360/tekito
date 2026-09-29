@@ -100,7 +100,7 @@ const en = {
   special: {
     dateConversion: { title: "Dates and times", description: "“today” and “now” offer the date and time." },
     numberConversion: { title: "Numbers", description: "In Japanese, a number converts to kanji and more." },
-    symbolConversion: { title: "Symbols", description: "Spellings like “(c)” and readings offer symbols." },
+    symbolConversion: { title: "Symbols", description: "Spellings like “(c)” and readings offer symbols and emoticons." },
     calculatorEnabled: { title: "Calculator", description: "A sum ending in “=” offers the answer." },
     examples: {
       title: "Try typing",
@@ -369,7 +369,7 @@ const ja = {
   special: {
     dateConversion: { title: "日付と時刻", description: "「today」「now」や「きょう」「いま」で、日付と時刻を出します。" },
     numberConversion: { title: "数字", description: "日本語で数字を変換すると、漢数字などにします。" },
-    symbolConversion: { title: "記号", description: "「(c)」のような綴りや「やじるし」のような読みで、記号を出します。" },
+    symbolConversion: { title: "記号", description: "「(c)」のような綴りや「やじるし」「にこにこ」のような読みで、記号と顔文字を出します。" },
     calculatorEnabled: { title: "計算", description: "「1+2=」のように「=」で終わる式で、答えを出します。" },
     examples: {
       title: "打ってみる",
