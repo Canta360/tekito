@@ -77,6 +77,7 @@ constexpr DataPackInfo kJapaneseDataPacks[] = {
     {L"japanese-loanwords", L"Loanwords"},
     {L"japanese-wiktionary", L"Japanese Meanings (Wiktionary)"},
     {L"japanese-wordnet", L"Japanese Meanings (WordNet)"},
+    {L"japanese-zipcode", L"Japanese Postal Codes"},
 };
 constexpr std::size_t kJapaneseRequiredPacks = 2;
 constexpr DataPackInfo kDataPacks[] = {

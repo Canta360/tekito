@@ -103,7 +103,7 @@ const en = {
   },
   special: {
     dateConversion: { title: "Dates and times", description: "Type “today” or “now” to get the date or time." },
-    numberConversion: { title: "Numbers", description: "Convert numbers to kanji in Japanese." },
+    numberConversion: { title: "Numbers", description: "Convert numbers to kanji, and postal codes to addresses." },
     symbolConversion: { title: "Symbols", description: "Type “(c)” or “->” to get © or →." },
     calculatorEnabled: { title: "Calculator", description: "Type “1+2=” to get 3." },
     examples: {
@@ -376,7 +376,7 @@ const ja = {
   },
   special: {
     dateConversion: { title: "日付と時刻", description: "「きょう」「today」で今日の日付を出します。" },
-    numberConversion: { title: "数字", description: "数字を漢数字などに変換できます。" },
+    numberConversion: { title: "数字", description: "数字を漢数字に、郵便番号を住所に変換できます。" },
     symbolConversion: { title: "記号", description: "「やじるし」「(c)」で → や © を出します。" },
     calculatorEnabled: { title: "計算", description: "「1+2=」で 3 を出します。" },
     examples: {

@@ -179,10 +179,17 @@ def validate_sorted_tsv(pack: Path, manifest: dict) -> list[str]:
         errors.append(f"{pack_id}: data checksum mismatch")
     count = 0
     previous = None
+    # Meaning packs: surface, reading, senses. Others say how many fields
+    # their rows have (japanese-zipcode: code, address).
+    fields_expected = manifest.get("fields")
     for number, line in text_lines(data_path):
         count += 1
         fields = line.split("\t")
-        if len(fields) < 3 or not fields[0] or not all(fields[2:]):
+        if fields_expected is not None:
+            if len(fields) != fields_expected or not all(fields):
+                errors.append(f"{pack_id}:{number}: expected {fields_expected} fields")
+                continue
+        elif len(fields) < 3 or not fields[0] or not all(fields[2:]):
             errors.append(f"{pack_id}:{number}: expected a surface, a reading and senses")
             continue
         key = (fields[0], fields[1])

@@ -629,6 +629,7 @@ function SpecialPage({ japanese, settings, setSetting }) {
     { language: "english", typed: "1+2=", result: "3", key: "calculatorEnabled" },
     { language: "japanese", typed: "きょう", result: japaneseDate, key: "dateConversion" },
     { language: "japanese", typed: "1234", result: "千二百三十四", key: "numberConversion" },
+    { language: "japanese", typed: "100-0001", result: "東京都千代田区千代田", key: "numberConversion" },
     { language: "japanese", typed: "やじるし", result: "→", key: "symbolConversion" },
     { language: "japanese", typed: "1+2=", result: "3", key: "calculatorEnabled" },
   ].filter((example) => japanese || example.language === "english");

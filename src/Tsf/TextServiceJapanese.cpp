@@ -10,6 +10,7 @@
 #include "Core/Japanese/KeyConverter.h"
 #include "Core/Japanese/LanguageModel.h"
 #include "Core/Japanese/Loanwords.h"
+#include "Core/Japanese/PostalCodes.h"
 #include "Core/Japanese/RomajiTable.h"
 #include "Tsf/Compartments.h"
 #include "Tsf/DisplayAttributes.h"
@@ -75,6 +76,8 @@ struct JapaneseData {
     japanese::ConnectionMatrix matrix;
     japanese::LanguageModel model;
     japanese::Loanwords loanwords;
+    // The japanese-zipcode pack: addresses for postal codes.
+    japanese::PostalCodes postalCodes;
     // The parts of speech of the user's words (japanese-core/pos.tsv).
     japanese::UserPartsOfSpeech userParts;
     std::unique_ptr<japanese::JapaneseConverter> converter;
@@ -101,6 +104,7 @@ const JapaneseData* ProcessJapaneseData() {
                                                                     *loaded->converter, *table);
         }
         if (!loaded->loanwords.Open(root / L"japanese-loanwords")) Trace(L"Japanese loanwords unavailable");
+        if (!loaded->postalCodes.Open(root / L"japanese-zipcode")) Trace(L"Japanese postal codes unavailable");
         loaded->userParts = japanese::UserPartsOfSpeech::Load(root / L"japanese-core" / L"pos.tsv");
         if (loaded->userParts.Empty()) Trace(L"Japanese user word parts of speech unavailable");
         if (const auto number = loaded->userParts.Number()) {
@@ -126,6 +130,7 @@ void AttachJapaneseData(japanese::JapaneseComposer& composer) {
     composer.SetConverter(data ? data->converter.get() : nullptr);
     composer.SetKeyConverter(data ? data->keys.get() : nullptr);
     composer.SetLoanwords(data && data->loanwords.IsOpen() ? &data->loanwords : nullptr);
+    composer.SetPostalCodes(data && data->postalCodes.IsOpen() ? &data->postalCodes : nullptr);
 }
 
 }  // namespace

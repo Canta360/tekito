@@ -5,6 +5,7 @@
 #include "Core/TypoModel.h"
 #include "Core/Japanese/KeyConverter.h"
 #include "Core/Japanese/Loanwords.h"
+#include "Core/Japanese/PostalCodes.h"
 #include "Core/Japanese/RomajiTable.h"
 
 #include <algorithm>
@@ -360,6 +361,10 @@ void JapaneseComposer::BuildPhrases(bool convert) {
             phrases_.push_back({0, reading.size(), std::move(sum)});
             return;
         }
+        if (auto postal = PostalCandidates(reading); !postal.empty()) {
+            phrases_.push_back({0, reading.size(), std::move(postal)});
+            return;
+        }
     }
     if (convert && converter_) {
         // A slip in the keys: converted from the keys as meant. Esc still
@@ -497,6 +502,27 @@ std::vector<PhraseCandidate> JapaneseComposer::SumCandidates(std::wstring_view r
                                       [&](const PhraseCandidate& c) { return c.text == kana.text; });
         if (!seen) candidates.push_back(std::move(kana));
     }
+    return candidates;
+}
+
+std::vector<PhraseCandidate> JapaneseComposer::PostalCandidates(std::wstring_view reading) const {
+    if (!postalCodes_ || !specialOptions_.numbers) return {};
+    const auto digits = PostalCodeDigits(reading);
+    if (!digits) return {};
+    constexpr std::size_t kAddresses = 9;
+    const auto addresses = postalCodes_->Addresses(*digits, kAddresses);
+    if (addresses.empty()) return {};
+    // The code as typed stays first (a hyphen as a hyphen), then the
+    // addresses and the code with its mark.
+    std::wstring typed(reading);
+    for (auto& c : typed) {
+        if (c == L'\x30FC') c = IsDigit(typed.front()) && typed.front() < 0x80 ? L'-' : L'\xFF0D';
+    }
+    const std::wstring code = digits->substr(0, 3) + L"-" + digits->substr(3);
+    std::vector<PhraseCandidate> candidates{{typed, 0, PhraseCandidate::Kind::Special, false}};
+    for (const auto& address : addresses) candidates.push_back({address, 0, PhraseCandidate::Kind::Special, false});
+    candidates.push_back({L"\x3012" + code, 0, PhraseCandidate::Kind::Special, false});
+    if (typed != code) candidates.push_back({code, 0, PhraseCandidate::Kind::Special, false});
     return candidates;
 }
 
