@@ -70,6 +70,7 @@ target_compile_options(tekito_sqlite PRIVATE /W0)
 
 add_library(tekito_userdata STATIC
     src/UserData/DataPackValidation.cpp
+    src/UserData/PostalCodeImport.cpp
     src/UserData/RuntimeModeState.cpp
     src/UserData/SqliteUserDictionaryRepository.cpp
     src/UserData/UserDictionaryFile.cpp

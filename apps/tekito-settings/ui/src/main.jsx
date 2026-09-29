@@ -100,6 +100,10 @@ function pageFromHash() {
   return pages.some((item) => item.id === page) ? page : "general";
 }
 
+// A file dropped anywhere but a drop area is ignored (WebView2 would
+// otherwise open it in place of Settings).
+for (const name of ["dragover", "drop"]) window.addEventListener(name, (event) => event.preventDefault());
+
 function App() {
   // "#japanese" etc. opens a page directly.
   const [page, setPage] = useState(pageFromHash);
@@ -111,6 +115,7 @@ function App() {
   const [dictionary, setDictionary] = useState([]);
   const [japaneseWords, setJapaneseWords] = useState([]);
   const [packs, setPacks] = useState([]);
+  const [postalCodes, setPostalCodes] = useState({ installed: false });
   const [version, setVersion] = useState("");
   const [appearance, setAppearance] = useState({ accent: "#0078d4", systemLanguage: navigator.language.startsWith("ja") ? "ja" : "en" });
   const [modal, setModal] = useState(null);
@@ -131,6 +136,7 @@ function App() {
     setDictionary(state.dictionary || []);
     setJapaneseWords(state.japaneseWords || []);
     setPacks(state.packs || []);
+    if (state.postalCodes) setPostalCodes(state.postalCodes);
     if (state.version) setVersion(state.version);
     if (state.appearance) setAppearance((value) => ({ ...value, ...state.appearance }));
   }, []);
@@ -196,8 +202,8 @@ function App() {
     }
   };
 
-  const runAction = async (type, payload, successMessage) => {
-    const response = await hostRequest(type, payload);
+  const runAction = async (type, payload, successMessage, files) => {
+    const response = await hostRequest(type, payload, files);
     if (response.ok) {
       applyState(response.state);
       if (successMessage) showNotice(successMessage);
@@ -276,7 +282,7 @@ function App() {
               {current.id === "candidates" && <CandidatesPage advanced={advanced} settings={settings} setSetting={setSetting} />}
               {current.id === "english" && <EnglishPage advanced={advanced} settings={settings} setSetting={setSetting} />}
               {current.id === "japanese" && <JapanesePage advanced={advanced} settings={settings} setSetting={setSetting} />}
-              {current.id === "special" && <SpecialPage japanese={japanese} settings={settings} setSetting={setSetting} />}
+              {current.id === "special" && <SpecialPage japanese={japanese} settings={settings} setSetting={setSetting} postalCodes={postalCodes} runAction={runAction} />}
               {current.id === "dictionary" && <DictionaryPage japanese={japaneseInstalled} japaneseWords={japaneseWords} learning={learning} settings={settings} setSetting={setSetting} dictionary={dictionary} setModal={setModal} setConfirm={setConfirm} runAction={runAction} />}
               {current.id === "about" && <AboutPage version={version} runtime={runtime} packs={packs} runAction={runAction} />}
             </div>
@@ -613,7 +619,7 @@ function JapanesePage({ advanced, settings, setSetting }) {
 
 // Special conversions: what else becomes a candidate, in both languages.
 // Examples show today's date and time; Japanese ones only with Japanese on.
-function SpecialPage({ japanese, settings, setSetting }) {
+function SpecialPage({ japanese, settings, setSetting, postalCodes, runAction }) {
   const t = useText();
   const s = t.special;
   const now = new Date();
@@ -629,7 +635,7 @@ function SpecialPage({ japanese, settings, setSetting }) {
     { language: "english", typed: "1+2=", result: "3", key: "calculatorEnabled" },
     { language: "japanese", typed: "きょう", result: japaneseDate, key: "dateConversion" },
     { language: "japanese", typed: "1234", result: "千二百三十四", key: "numberConversion" },
-    { language: "japanese", typed: "100-0001", result: "東京都千代田区千代田", key: "numberConversion" },
+    { language: "japanese", typed: "100-0001", result: "東京都千代田区千代田", key: "numberConversion", needs: postalCodes.installed },
     { language: "japanese", typed: "やじるし", result: "→", key: "symbolConversion" },
     { language: "japanese", typed: "1+2=", result: "3", key: "calculatorEnabled" },
   ].filter((example) => japanese || example.language === "english");
@@ -651,7 +657,7 @@ function SpecialPage({ japanese, settings, setSetting }) {
             <section key={language} className="example-group">
               <h3>{s.examples[language]}</h3>
               {examples.filter((example) => example.language === language).map((example) => (
-                <div key={example.typed} className={`example ${settings[example.key] ? "" : "is-off"}`}>
+                <div key={example.typed} className={`example ${settings[example.key] && example.needs !== false ? "" : "is-off"}`}>
                   <span className="example-typed">{example.typed}</span>
                   <span className="example-arrow" aria-hidden="true">{"→"}</span>
                   <span className="example-result">{example.result}</span>
@@ -661,7 +667,56 @@ function SpecialPage({ japanese, settings, setSetting }) {
           ))}
         </div>
       </Glass>
+      {japanese && <PostalCodes postalCodes={postalCodes} runAction={runAction} />}
     </>
+  );
+}
+
+// Postal codes to addresses: Japan Post's data, downloaded by the user and
+// dropped here (or chosen), since it changes every month.
+function PostalCodes({ postalCodes, runAction }) {
+  const t = useText();
+  const p = t.postalCodes;
+  const [dragging, setDragging] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const add = async (type, files) => {
+    setBusy(true);
+    await runAction(type, {}, p.added, files);
+    setBusy(false);
+  };
+  const drop = (event) => {
+    event.preventDefault();
+    setDragging(false);
+    const file = event.dataTransfer.files[0];
+    if (file && !busy) add("postalCodes.import", [file]);
+  };
+  const [year, month] = String(postalCodes.version || "").split(".");
+  return (
+    <Glass className={`card postal ${dragging ? "is-dragging" : ""}`}
+      onDragOver={(event) => { event.preventDefault(); setDragging(true); }}
+      onDragLeave={() => setDragging(false)} onDrop={drop}>
+      <div className="card-head">
+        <div>
+          <h2 className="card-title">{p.title}</h2>
+          <p className="muted">{postalCodes.installed ? p.installed(year, month, postalCodes.count) : p.description}</p>
+        </div>
+        {postalCodes.installed && (
+          <Button icon="trash" onClick={() => runAction("postalCodes.remove", {}, p.removed)}>{t.words.remove}</Button>
+        )}
+      </div>
+      <div className="postal-steps">
+        <div className="postal-step">
+          <span className="step-number">1</span>
+          <p>{p.download}</p>
+          <Button onClick={() => runAction("postalCodes.open", {})}>{p.openPage}</Button>
+        </div>
+        <div className="postal-step drop-zone">
+          <span className="step-number">2</span>
+          <p>{busy ? p.adding : p.drop}</p>
+          <Button icon="folder" disabled={busy} onClick={() => add("postalCodes.browse")}>{p.choose}</Button>
+        </div>
+      </div>
+    </Glass>
   );
 }
 

@@ -30,7 +30,7 @@ download that setup fetches when Japanese is chosen.
 | `japanese-loanwords` | English words for katakana candidates (ミーティング → meeting) | Generated from japanese-phonetic (CMUdict) with Leipzig frequencies | CMUdict license, CC BY 4.0 |
 | `japanese-wiktionary` | What Japanese words mean, shown beside the highlighted candidate | Japanese Wiktionary via kaikki.org | CC BY-SA 4.0 (kept as its own pack) |
 | `japanese-wordnet` | Meanings of the words Wiktionary lacks | Japanese WordNet 1.1 (NICT) | Japanese WordNet license |
-| `japanese-zipcode` | The addresses postal codes cover (1000001 → 東京都千代田区千代田) | Japan Post postal code data | No copyright claimed by Japan Post |
+| `japanese-zipcode` | The addresses postal codes cover (1000001 → 東京都千代田区千代田); not shipped, added by the user in Settings | Japan Post postal code data | No copyright claimed by Japan Post |
 
 Each pack directory holds the data file, its index, a `manifest.json` with
 the version, source, license and SHA-256 of both files, and a `NOTICE` with
@@ -95,16 +95,12 @@ WordNet. Each is one TSV sorted by the word (`surface`, hiragana `reading`
 or empty, then the senses) that TEKITO searches in place. Without them the
 candidate list shows English meanings (from `dictionary-display`) only.
 
-`japanese-zipcode` (about 5 MB) is built from Japan Post's postal code data,
-which Japan Post updates monthly; rebuild it before a release. Japan Post's
-site does not serve the file to scripts, so download `utf_ken_all.zip`
-from https://www.post.japanpost.jp/zipcode/dl/utf-zip.html in a browser:
-
-```powershell
-python scripts\build-japanese-zipcode.py --ken-all <utf_ken_all.zip>
-```
-
-Without it, postal codes convert as numbers only.
+`japanese-zipcode` (about 5 MB) is not shipped. Japan Post updates its
+postal code data monthly, so users download `utf_ken_all.zip` from
+https://www.post.japanpost.jp/zipcode/dl/utf-zip.html and drop it on
+Settings (Special conversions, with advanced settings on), which builds the
+pack in the data folder (`src/UserData/PostalCodeImport.cpp`). Without it,
+postal codes convert as numbers only.
 
 ## Changing a pack
 

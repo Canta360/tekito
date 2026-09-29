@@ -15,6 +15,7 @@
 #include "Dictionary/ExternalDictionaryProvider.h"
 #include "UserData/DataPackValidation.h"
 #include "UserData/KeyboardLayout.h"
+#include "UserData/PostalCodeImport.h"
 #include "UserData/RuntimeModeState.h"
 #include "UserData/UiLanguage.h"
 #include "UserData/UserDataRepository.h"
@@ -77,9 +78,10 @@ constexpr DataPackInfo kJapaneseDataPacks[] = {
     {L"japanese-loanwords", L"Loanwords"},
     {L"japanese-wiktionary", L"Japanese Meanings (Wiktionary)"},
     {L"japanese-wordnet", L"Japanese Meanings (WordNet)"},
-    {L"japanese-zipcode", L"Japanese Postal Codes"},
 };
 constexpr std::size_t kJapaneseRequiredPacks = 2;
+// Where Japan Post offers its postal code data (UTF-8), which Settings adds.
+constexpr wchar_t kPostalCodePage[] = L"https://www.post.japanpost.jp/zipcode/dl/utf-zip.html";
 constexpr DataPackInfo kDataPacks[] = {
     {L"standard-english", L"Standard English"},
     {L"wikipedia-common-misspellings", L"Common Misspellings"},
@@ -568,6 +570,7 @@ private:
                                         [this](ICoreWebView2*,
                                                ICoreWebView2WebMessageReceivedEventArgs* args) -> HRESULT {
                                             LPWSTR message = nullptr;
+                                            droppedFile_ = DroppedFile(args);
                                             if (args && SUCCEEDED(args->TryGetWebMessageAsString(&message)) &&
                                                 message) {
                                                 HandleWebMessage(message);
@@ -883,6 +886,7 @@ private:
         json += DictionaryJson();
         json += L",\"japaneseWords\":" + JapaneseWordsJson();
         json += L",\"packs\":" + packs;
+        json += L",\"postalCodes\":" + PostalCodesJson();
         json += L",\"appearance\":{\"accent\":\"" + AccentColorHex() + L"\",\"systemLanguage\":\"" +
                 std::wstring(tekito::userdata::UseJapaneseUi(0) ? L"ja" : L"en") + L"\"}}";
         return json;
@@ -1086,6 +1090,24 @@ private:
             std::wstring error;
             const bool added = path.empty() || AddExcludedApp(path.wstring(), error);
             Reply(requestId, added, error);
+        } else if (type == L"postalCodes.open") {
+            const auto result = reinterpret_cast<INT_PTR>(ShellExecuteW(
+                hwnd_, L"open", kPostalCodePage, nullptr, nullptr, SW_SHOWNORMAL));
+            Reply(requestId, result > 32, result > 32 ? L"" : Text(L"The page could not be opened.", L"ページを開けませんでした。"));
+        } else if (type == L"postalCodes.import" || type == L"postalCodes.browse") {
+            const auto source = type == L"postalCodes.browse" ? ChoosePostalCodeFile() : droppedFile_;
+            if (source.empty()) {
+                Reply(requestId, type == L"postalCodes.browse");  // the dialog was closed
+                return;
+            }
+            tekito::userdata::PostalCodeImportError error{};
+            const auto imported = tekito::userdata::ImportPostalCodes(source, PostalCodeDirectory(), error);
+            if (imported) runtime_->NotifyDictionaryChanged();
+            Reply(requestId, imported.has_value(), imported ? L"" : PostalCodeErrorText(error));
+        } else if (type == L"postalCodes.remove") {
+            const bool removed = tekito::userdata::RemovePostalCodes(PostalCodeDirectory());
+            if (removed) runtime_->NotifyDictionaryChanged();
+            Reply(requestId, removed, removed ? L"" : Text(L"The postal codes could not be removed.", L"郵便番号を削除できませんでした。"));
         } else if (type == L"excludedApps.remove") {
             const auto name = message.String(L"name");
             const auto previous = settings_;
@@ -1260,6 +1282,66 @@ private:
                    : std::filesystem::path{};
     }
 
+    static std::filesystem::path PostalCodeDirectory() {
+        return tekito::ExternalLexiconProvider::DataPackRoot() / L"japanese-zipcode";
+    }
+
+    std::wstring PostalCodesJson() const {
+        const auto installed = tekito::userdata::InstalledPostalCodes(PostalCodeDirectory());
+        if (!installed) return L"{\"installed\":false}";
+        return L"{\"installed\":true,\"version\":\"" + JsonEscape(installed->version) + L"\",\"count\":" +
+               std::to_wstring(installed->count) + L"}";
+    }
+
+    std::wstring PostalCodeErrorText(tekito::userdata::PostalCodeImportError error) const {
+        using tekito::userdata::PostalCodeImportError;
+        switch (error) {
+        case PostalCodeImportError::ShiftJis:
+            return Text(L"This is the Shift_JIS version. Download the UTF-8 version instead.",
+                        L"Shift_JIS 形式のファイルです。UTF-8 形式をダウンロードしてください。");
+        case PostalCodeImportError::NotPostalCodes:
+            return Text(L"This is not Japan Post's postal code data.", L"日本郵便の郵便番号データではないようです。");
+        case PostalCodeImportError::WriteFailed:
+            return Text(L"The postal codes could not be saved.", L"郵便番号を保存できませんでした。");
+        default:
+            return Text(L"The file could not be read.", L"ファイルを読み込めませんでした。");
+        }
+    }
+
+    // The file dropped on the page, sent with the message.
+    static std::filesystem::path DroppedFile(ICoreWebView2WebMessageReceivedEventArgs* args) {
+        ComPtr<ICoreWebView2WebMessageReceivedEventArgs2> withObjects;
+        ComPtr<ICoreWebView2ObjectCollectionView> objects;
+        UINT32 count = 0;
+        if (!args || FAILED(args->QueryInterface(IID_PPV_ARGS(&withObjects))) ||
+            FAILED(withObjects->get_AdditionalObjects(&objects)) || !objects ||
+            FAILED(objects->get_Count(&count)) || count == 0) {
+            return {};
+        }
+        ComPtr<IUnknown> first;
+        ComPtr<ICoreWebView2File> file;
+        LPWSTR path = nullptr;
+        if (FAILED(objects->GetValueAtIndex(0, &first)) || FAILED(first.As(&file)) ||
+            FAILED(file->get_Path(&path)) || !path) {
+            return {};
+        }
+        std::filesystem::path result(path);
+        CoTaskMemFree(path);
+        return result;
+    }
+
+    std::filesystem::path ChoosePostalCodeFile() {
+        wchar_t buffer[MAX_PATH]{};
+        OPENFILENAMEW dialog{sizeof(dialog)};
+        dialog.hwndOwner = hwnd_;
+        dialog.lpstrFile = buffer;
+        dialog.nMaxFile = MAX_PATH;
+        dialog.lpstrFilter = L"utf_ken_all.zip\0*.zip;*.csv\0";
+        dialog.lpstrTitle = Text(L"Choose Japan Post's postal code data", L"日本郵便の郵便番号データを選ぶ");
+        dialog.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_NOCHANGEDIR;
+        return GetOpenFileNameW(&dialog) ? std::filesystem::path(buffer) : std::filesystem::path{};
+    }
+
     std::filesystem::path ChooseExecutable() {
         wchar_t buffer[MAX_PATH]{};
         OPENFILENAMEW dialog{sizeof(dialog)};
@@ -1392,6 +1474,8 @@ private:
     ComPtr<ICoreWebView2Controller> controller_;
     ComPtr<ICoreWebView2> webview_;
     EventRegistrationToken webMessageToken_{};
+    // A file dropped on the page comes with its message (postal codes).
+    std::filesystem::path droppedFile_;
     EventRegistrationToken navigationToken_{};
     std::wstring dataPackSummary_{L"Unavailable"};
     std::wstring japaneseDataSummary_{L"0 / 0"};

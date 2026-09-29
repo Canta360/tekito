@@ -95,6 +95,10 @@ std::string Sha256(const std::filesystem::path& path) {
 
 }  // namespace
 
+std::string FileSha256(const std::filesystem::path& path) {
+    return Sha256(path);
+}
+
 bool ValidateDataPack(const std::filesystem::path& packPath,
                       DataPackStatus& status) noexcept {
     status = {};

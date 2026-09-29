@@ -345,6 +345,18 @@ nav { display: grid; gap: 4px; }
 }
 .example-arrow { color: var(--ink-3); text-align: center; }
 .example.is-off { opacity: 0.4; }
+.postal-steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
+.postal-step {
+  display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 8px 10px;
+  padding: 12px 14px; border-radius: 14px; background: var(--recess); font-size: 13px;
+}
+.postal-step .btn { grid-column: 2; justify-self: start; }
+.step-number {
+  width: 22px; height: 22px; display: grid; place-items: center; border-radius: 50%;
+  background: var(--glass-strong); font: 600 12px var(--font); color: var(--ink-2);
+}
+.drop-zone { outline: 1.5px dashed var(--hairline); outline-offset: -1.5px; }
+.postal.is-dragging .drop-zone { outline-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--recess)); }
 .key { display: grid; gap: 7px; padding: 12px 14px; border-radius: 14px; background: var(--recess); }
 .keycaps { display: flex; gap: 5px; flex-wrap: wrap; align-items: center; }
 .key small { color: var(--ink-2); font-size: 12px; }

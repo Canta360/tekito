@@ -21,6 +21,7 @@
 #include <algorithm>
 #include <iterator>
 #include <memory>
+#include <mutex>
 
 namespace tekito::tsf {
 namespace {
@@ -76,8 +77,6 @@ struct JapaneseData {
     japanese::ConnectionMatrix matrix;
     japanese::LanguageModel model;
     japanese::Loanwords loanwords;
-    // The japanese-zipcode pack: addresses for postal codes.
-    japanese::PostalCodes postalCodes;
     // The parts of speech of the user's words (japanese-core/pos.tsv).
     japanese::UserPartsOfSpeech userParts;
     std::unique_ptr<japanese::JapaneseConverter> converter;
@@ -104,7 +103,6 @@ const JapaneseData* ProcessJapaneseData() {
                                                                     *loaded->converter, *table);
         }
         if (!loaded->loanwords.Open(root / L"japanese-loanwords")) Trace(L"Japanese loanwords unavailable");
-        if (!loaded->postalCodes.Open(root / L"japanese-zipcode")) Trace(L"Japanese postal codes unavailable");
         loaded->userParts = japanese::UserPartsOfSpeech::Load(root / L"japanese-core" / L"pos.tsv");
         if (loaded->userParts.Empty()) Trace(L"Japanese user word parts of speech unavailable");
         if (const auto number = loaded->userParts.Number()) {
@@ -113,6 +111,29 @@ const JapaneseData* ProcessJapaneseData() {
         return loaded;
     }();
     return data.get();
+}
+
+// The japanese-zipcode pack, which the user adds in Settings: opened again
+// whenever its file changed (added, replaced or removed). Text services keep
+// the copy they were given until they ask again.
+std::shared_ptr<const japanese::PostalCodes> ProcessPostalCodes() {
+    static std::mutex mutex;
+    static std::shared_ptr<const japanese::PostalCodes> cached;
+    static std::filesystem::file_time_type stamp;
+    std::lock_guard lock(mutex);
+    const auto directory = ExternalLexiconProvider::DataPackRoot() / L"japanese-zipcode";
+    std::error_code error;
+    const auto written = std::filesystem::last_write_time(directory / L"zipcodes.tsv", error);
+    if (error || !std::filesystem::exists(directory / L"manifest.json", error)) {
+        cached.reset();
+        return cached;
+    }
+    if (!cached || written != stamp) {
+        auto opened = std::make_shared<japanese::PostalCodes>();
+        cached = opened->Open(directory) ? std::move(opened) : nullptr;
+        stamp = written;
+    }
+    return cached;
 }
 
 // The meaning packs, mapped on first use; lookups read them in place.
@@ -130,7 +151,6 @@ void AttachJapaneseData(japanese::JapaneseComposer& composer) {
     composer.SetConverter(data ? data->converter.get() : nullptr);
     composer.SetKeyConverter(data ? data->keys.get() : nullptr);
     composer.SetLoanwords(data && data->loanwords.IsOpen() ? &data->loanwords : nullptr);
-    composer.SetPostalCodes(data && data->postalCodes.IsOpen() ? &data->postalCodes : nullptr);
 }
 
 }  // namespace
@@ -187,6 +207,8 @@ void TextService::RefreshJapaneseUserWords() {
         return;
     }
     japaneseUserDictionary_.Set(japaneseUserWords_, data->userParts);
+    postalCodes_ = ProcessPostalCodes();
+    japanese_.SetPostalCodes(postalCodes_.get());
     japanese_.SetUserDictionary(japaneseUserDictionary_.Empty() ? nullptr : &japaneseUserDictionary_);
 }
 
