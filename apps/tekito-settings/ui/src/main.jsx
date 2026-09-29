@@ -282,8 +282,8 @@ function App() {
               {current.id === "candidates" && <CandidatesPage advanced={advanced} settings={settings} setSetting={setSetting} />}
               {current.id === "english" && <EnglishPage advanced={advanced} settings={settings} setSetting={setSetting} />}
               {current.id === "japanese" && <JapanesePage advanced={advanced} settings={settings} setSetting={setSetting} />}
-              {current.id === "special" && <SpecialPage japanese={japanese} settings={settings} setSetting={setSetting} postalCodes={postalCodes} runAction={runAction} />}
-              {current.id === "dictionary" && <DictionaryPage japanese={japaneseInstalled} japaneseWords={japaneseWords} learning={learning} settings={settings} setSetting={setSetting} dictionary={dictionary} setModal={setModal} setConfirm={setConfirm} runAction={runAction} />}
+              {current.id === "special" && <SpecialPage japanese={japanese} settings={settings} setSetting={setSetting} />}
+              {current.id === "dictionary" && <DictionaryPage japanese={japaneseInstalled} postalCodes={postalCodes} japaneseWords={japaneseWords} learning={learning} settings={settings} setSetting={setSetting} dictionary={dictionary} setModal={setModal} setConfirm={setConfirm} runAction={runAction} />}
               {current.id === "about" && <AboutPage version={version} runtime={runtime} packs={packs} runAction={runAction} />}
             </div>
           )}
@@ -619,7 +619,7 @@ function JapanesePage({ advanced, settings, setSetting }) {
 
 // Special conversions: what else becomes a candidate, in both languages.
 // Examples show today's date and time; Japanese ones only with Japanese on.
-function SpecialPage({ japanese, settings, setSetting, postalCodes, runAction }) {
+function SpecialPage({ japanese, settings, setSetting }) {
   const t = useText();
   const s = t.special;
   const now = new Date();
@@ -635,7 +635,6 @@ function SpecialPage({ japanese, settings, setSetting, postalCodes, runAction })
     { language: "english", typed: "1+2=", result: "3", key: "calculatorEnabled" },
     { language: "japanese", typed: "きょう", result: japaneseDate, key: "dateConversion" },
     { language: "japanese", typed: "1234", result: "千二百三十四", key: "numberConversion" },
-    { language: "japanese", typed: "100-0001", result: "東京都千代田区千代田", key: "numberConversion", needs: postalCodes.installed },
     { language: "japanese", typed: "やじるし", result: "→", key: "symbolConversion" },
     { language: "japanese", typed: "1+2=", result: "3", key: "calculatorEnabled" },
   ].filter((example) => japanese || example.language === "english");
@@ -657,7 +656,7 @@ function SpecialPage({ japanese, settings, setSetting, postalCodes, runAction })
             <section key={language} className="example-group">
               <h3>{s.examples[language]}</h3>
               {examples.filter((example) => example.language === language).map((example) => (
-                <div key={example.typed} className={`example ${settings[example.key] && example.needs !== false ? "" : "is-off"}`}>
+                <div key={example.typed} className={`example ${settings[example.key] ? "" : "is-off"}`}>
                   <span className="example-typed">{example.typed}</span>
                   <span className="example-arrow" aria-hidden="true">{"→"}</span>
                   <span className="example-result">{example.result}</span>
@@ -667,13 +666,12 @@ function SpecialPage({ japanese, settings, setSetting, postalCodes, runAction })
           ))}
         </div>
       </Glass>
-      {japanese && <PostalCodes postalCodes={postalCodes} runAction={runAction} />}
     </>
   );
 }
 
-// Postal codes to addresses: Japan Post's data, downloaded by the user and
-// dropped here (or chosen), since it changes every month.
+// Postal codes to addresses, a dictionary the user adds: Japan Post's data,
+// downloaded and dropped here (or chosen), since it changes every month.
 function PostalCodes({ postalCodes, runAction }) {
   const t = useText();
   const p = t.postalCodes;
@@ -734,7 +732,7 @@ function Key({ label, keys }) {
 }
 
 // Dictionary and learning: your words, and what TEKITO learned from you.
-function DictionaryPage({ japanese, japaneseWords, learning, settings, setSetting, dictionary, setModal, setConfirm, runAction }) {
+function DictionaryPage({ japanese, postalCodes, japaneseWords, learning, settings, setSetting, dictionary, setModal, setConfirm, runAction }) {
   const t = useText();
   const [query, setQuery] = useState("");
   const filtered = useMemo(() => {
@@ -861,6 +859,7 @@ function DictionaryPage({ japanese, japaneseWords, learning, settings, setSettin
           {japaneseWords.length === 0 && <div className="empty">{t.japaneseWords.empty}</div>}
         </Glass>
       )}
+      {japanese && <PostalCodes postalCodes={postalCodes} runAction={runAction} />}
     </>
   );
 }

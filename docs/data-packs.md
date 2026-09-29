@@ -98,7 +98,7 @@ candidate list shows English meanings (from `dictionary-display`) only.
 `japanese-zipcode` (about 5 MB) is not shipped. Japan Post updates its
 postal code data monthly, so users download `utf_ken_all.zip` from
 https://www.post.japanpost.jp/zipcode/dl/utf-zip.html and drop it on
-Settings (Special conversions, with advanced settings on), which builds the
+Settings (Dictionary & learning), which builds the
 pack in the data folder (`src/UserData/PostalCodeImport.cpp`). Without it,
 postal codes convert as numbers only.
 
