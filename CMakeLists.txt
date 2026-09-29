@@ -237,7 +237,7 @@ if(TEKITO_BUILD_EVAL)
     target_compile_definitions(tekito_core_eval PRIVATE NOMINMAX)
     target_link_libraries(tekito_core_eval PRIVATE tekito_core)
 
-    add_executable(tekito_ja_eval eval/JapaneseEval.cpp)
+    add_executable(tekito_ja_eval eval/JapaneseEval.cpp eval/JapaneseTypingStudy.cpp)
     target_compile_definitions(tekito_ja_eval PRIVATE NOMINMAX)
     target_compile_options(tekito_ja_eval PRIVATE ${TEKITO_WARNINGS})
     target_link_libraries(tekito_ja_eval PRIVATE tekito_core)

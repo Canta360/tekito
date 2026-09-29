@@ -69,11 +69,15 @@ public:
     // sentence ties.
     // `user` adds the user's words; the phrase read exactly like one of
     // them offers it first.
+    // `breaks` are positions in the reading where a phrase must end (where
+    // the user marked one while typing); unlike fixedLengths, the phrases
+    // between them are still split by the rules.
     [[nodiscard]] std::vector<Phrase> Convert(std::wstring_view reading,
                                               std::span<const std::size_t> fixedLengths = {},
                                               std::uint16_t context = 0,
                                               std::span<const std::wstring> contextWords = {},
-                                              const JapaneseUserDictionary* user = nullptr) const;
+                                              const JapaneseUserDictionary* user = nullptr,
+                                              std::span<const std::size_t> breaks = {}) const;
 
     // Only the likeliest text for the whole reading and its cost, much
     // quicker than Convert (and without the language model); nothing when

@@ -155,3 +155,16 @@ twice as long, a few milliseconds.
 Typed phrase by phrase with the language model, the content words committed
 before count as the sentence's too: 63.0% of the Mozc and AJIMEE sentences
 and 37.7% of the JSUT ones come out right that way.
+
+`--study hints|live|register` measures ways of typing borrowed from SKK on a
+keys file (`eval/JapaneseTypingStudy.h` explains each), with the phrase
+breaks a typist would mark taken from the acceptable text:
+
+- `hints`: Space where a phrase ends, either committing there (as today) or
+  kept as a break for one conversion of the whole sentence.
+- `live`: converting on every key, with the phrases more than a few back
+  settled; per-key time and how often text before the phrase being typed
+  changes. `--join N` types N sentences as one input, `--sample N` keeps N
+  inputs.
+- `register`: how often no candidate fits a phrase, whether shorter phrases
+  make it, and what registering those words does to other sentences.

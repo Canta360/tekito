@@ -152,6 +152,9 @@ public:
 
     // What to show in the document while composing.
     [[nodiscard]] std::wstring Preedit() const;
+    // The kana typed so far as the converter reads them, without the keys
+    // still pending.
+    [[nodiscard]] std::wstring TypedReading() const { return Reading(); }
     [[nodiscard]] std::vector<PreeditSegment> Segments() const;
     // The focused phrase's candidates, and whether the list is open (from
     // the second Space, or an arrow key).

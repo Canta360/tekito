@@ -197,7 +197,8 @@ std::vector<Phrase> JapaneseConverter::Convert(std::wstring_view reading,
                                                std::span<const std::size_t> fixedLengths,
                                                std::uint16_t context,
                                                std::span<const std::wstring> contextWords,
-                                               const JapaneseUserDictionary* user) const {
+                                               const JapaneseUserDictionary* user,
+                                               std::span<const std::size_t> breaks) const {
     const std::size_t n = reading.size();
     if (n == 0) return {};
     const ReadingCodes codes = dictionary_.Encode(reading);
@@ -208,6 +209,9 @@ std::vector<Phrase> JapaneseConverter::Convert(std::wstring_view reading,
         if (length == 0 || fixedEnd + length > n) break;
         fixedEnd += length;
         fixedBoundary[fixedEnd] = true;
+    }
+    for (const std::size_t at : breaks) {
+        if (at > 0 && at < n) fixedBoundary[at] = true;
     }
     const bool pairs = model_ && (weights_.costPerNat > 0 || weights_.penaltyPerNat > 0);
     const Lattice lattice = BuildLattice(dictionary_, codes, fixedBoundary, reading, pairs ? model_ : nullptr, user,
