@@ -151,6 +151,15 @@ void TestSpaceBoundaryAndAutoApplyPolicy() {
                 protectedUserBoundary.text == L"protected " && state.State() == tekito::CompositionState::Boundary,
             "User Dictionary protect policy keeps the raw word at the first Space");
 
+    state.BeginOrUpdate(L"them", {
+        {L"the", tekito::SemanticLabel::None, false, 100.0, false,
+         tekito::CandidatePolicyCorrect, tekito::CandidateSourceGeneratedEditDistance},
+        {L"them", tekito::SemanticLabel::Original, true, 90.0, false,
+         tekito::CandidatePolicyProtect, tekito::CandidateSourceUserDictionary},
+    });
+    Require(state.OnSpace().text == L"them ",
+            "Space never replaces a word the user keeps as typed, even behind a correction");
+
     state.BeginOrUpdate(L"Hallo", correctionCandidates);
     Require(state.OnPunctuation(L'.', tekito::PunctuationRole::SentenceTerminal).text == L"Hello.",
             "punctuation uses the same auto-apply policy");
@@ -1359,14 +1368,20 @@ void TestLocalDataPackProviders() {
             "default engine ranks frequent hello above rare halo");
     tekito::InputStateMachine contextualBoundary;
     if (OptionalPackInstalled(L"phrase")) {
+        // The words before alone do not replace a word typed right: they
+        // rewrote real text ("buy them," to "buy the") far more often than
+        // they caught a slip. The word that fits is offered instead.
         const auto tooInWant = engine->Convert({L"too", {false, L"I want", L""}});
-        Require(!tooInWant.candidates.empty() && tooInWant.candidates.front().text == L"to" &&
-                    HasFlag(tooInWant.candidates.front().policyFlags,
-                            tekito::CandidatePolicyCorrect),
-                "context advantage promotes too to to after I want");
+        Require(!tooInWant.candidates.empty() && tooInWant.candidates.front().text == L"too" &&
+                    std::any_of(tooInWant.candidates.begin(), tooInWant.candidates.end(),
+                                [](const auto& candidate) { return candidate.text == L"to"; }),
+                "after I want, too stays first and to is offered");
         contextualBoundary.BeginOrUpdate(L"too", tooInWant.candidates);
-        Require(contextualBoundary.OnSpace().text == L"to ",
-                "Space accepts a valid-word correction with strong context advantage");
+        Require(contextualBoundary.OnSpace().text == L"too ",
+                "Space keeps a valid word even when context favors one a letter away");
+        const auto themAfterBuy = engine->Convert({L"them", {false, L"But people want to buy", L""}});
+        contextualBoundary.BeginOrUpdate(L"them", themAfterBuy.candidates);
+        Require(contextualBoundary.OnSpace().text == L"them ", "Space keeps them after buy");
     }
     const auto tooAfterMe = engine->Convert({L"too", {false, L"Me", L""}});
     Require(!tooAfterMe.candidates.empty() && tooAfterMe.candidates.front().text == L"too" &&
@@ -1525,6 +1540,13 @@ void TestUserLearningStore() {
     learning.RecordUndo(L"hte", L"the");
     Require(provider.Score(L"hte", L"the") < scoreBeforeUndo,
             "pairwise online learning reduces a correction after undo");
+    Require(!provider.Undone(L"hte", L"the"),
+            "one undo of a correction taken many times does not stop it");
+    learning.RecordUndo(L"teh", L"the");
+    Require(provider.Undone(L"teh", L"the") && provider.Undone(L"TEH", L"The"),
+            "one undo of a correction never taken stops it, whatever the case");
+    provider.SetEnabled(false);
+    Require(!provider.Undone(L"teh", L"the"), "disabled user learning stops nothing");
 }
 
 void TestSqliteUserLearningRepository() {
@@ -1872,6 +1894,27 @@ void TestUserDictionaryRefreshInPlace() {
             "refreshed engine drops a user entry removed after it was created");
 }
 
+void TestUndoneCorrectionIsOnlyOffered() {
+    // Undoing an automatic correction (Backspace) keeps the word as typed
+    // from then on; the correction is still in the list.
+    tekito::UserDictionary dictionary;
+    tekito::UserLearningStore learning;
+    tekito::UserLearningProvider provider(learning);
+    const auto engine = tekito::CreateDefaultConversionEngine(dictionary, provider);
+    tekito::InputStateMachine state;
+    state.BeginOrUpdate(L"teh", engine->Convert({L"teh"}).candidates);
+    Require(state.OnSpace().text == L"the ", "undo test starts with teh corrected at Space");
+    state.Reset();
+
+    learning.RecordExposure(L"teh", L"the");
+    learning.RecordUndo(L"teh", L"the");
+    const auto after = engine->Convert({L"teh"}).candidates;
+    state.BeginOrUpdate(L"teh", after);
+    Require(state.OnSpace().text == L"teh ", "an undone correction is not applied again at Space");
+    Require(std::any_of(after.begin(), after.end(), [](const auto& candidate) { return candidate.text == L"the"; }),
+            "an undone correction is still offered");
+}
+
 void TestSqliteUserDictionaryRepository() {
     const auto path = std::filesystem::temp_directory_path() /
                       L"tekito-user-dictionary-repository-test.db";
@@ -2162,6 +2205,7 @@ int main() {
     TestUserLexiconProviderBoundary();
     TestUserDictionaryEngineConnection();
     TestUserDictionaryRefreshInPlace();
+    TestUndoneCorrectionIsOnlyOffered();
     TestSqliteUserDictionaryRepository();
     TestSqliteUserSettingsRepository();
     TestRuntimeModeState();

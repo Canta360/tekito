@@ -44,6 +44,8 @@ public:
     [[nodiscard]] double Score(std::wstring_view word) const noexcept;
     [[nodiscard]] double Score(std::wstring_view rawText,
                                std::wstring_view candidate) const noexcept;
+    // Undone at least once, and more than it was taken.
+    [[nodiscard]] bool Undone(std::wstring_view rawText, std::wstring_view candidate) const noexcept;
     void Reset() noexcept;
     [[nodiscard]] std::span<const UserLearningEntry> Entries() const noexcept;
     [[nodiscard]] std::span<const UserLearningPreference> Preferences() const noexcept;
@@ -69,6 +71,10 @@ public:
     [[nodiscard]] double Score(std::wstring_view rawText,
                                std::wstring_view candidate) const noexcept override {
         return enabled_ ? store_.Score(rawText, candidate) : 0.0;
+    }
+    [[nodiscard]] bool Undone(std::wstring_view rawText,
+                              std::wstring_view candidate) const noexcept override {
+        return enabled_ && store_.Undone(rawText, candidate);
     }
 
 private:

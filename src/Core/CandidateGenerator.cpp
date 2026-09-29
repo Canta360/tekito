@@ -300,6 +300,13 @@ CandidateGenerator::CandidateGenerator(const ILexiconProvider& lexiconProvider,
       learningProvider_(learningProvider),
       socialLearningProvider_(&socialLearningProvider) {}
 
+std::uint32_t CandidateGenerator::Offered(std::wstring_view lowerRaw, std::wstring_view candidate,
+                                          std::uint32_t flags) const {
+    constexpr std::uint32_t kAutomatic = CandidatePolicyCorrect | CandidatePolicyNormalize;
+    if ((flags & kAutomatic) == 0 || !learningProvider_.Undone(lowerRaw, Lower(candidate))) return flags;
+    return (flags & ~kAutomatic) | CandidatePolicySuggestOnly;
+}
+
 std::vector<Candidate> CandidateGenerator::Generate(std::wstring_view rawText,
                                                     std::wstring_view context,
                                                     std::wstring_view followingContext,
@@ -326,8 +333,11 @@ std::vector<Candidate> CandidateGenerator::Generate(std::wstring_view rawText,
 
     bool exact = false;
     bool exactHasWeakFrequency = false;
+    // The user keeps this word as typed (user dictionary): nothing replaces it.
+    bool keptAsTyped = false;
     lexiconProvider_.Find({LexiconQuery::Kind::Exact, rawText}, [&](const auto& entry) {
         exact = true;
+        keptAsTyped = keptAsTyped || (policyEngine_.RawFlags(entry) & CandidatePolicyProtect) != 0;
         const auto frequency = frequencyProvider_.Score(entry.raw);
         exactHasWeakFrequency = exactHasWeakFrequency || (frequency > 0.0 && frequency < 1.0);
         if (entry.originalFirst) {
@@ -337,7 +347,7 @@ std::vector<Candidate> CandidateGenerator::Generate(std::wstring_view rawText,
                         DictionaryEntryIdFor(entry, entry.rawLabel));
         }
         AddUnique(output, seen, std::wstring(entry.candidate), entry.candidateLabel, false, 95.0,
-                  false, policyEngine_.CandidateFlags(entry),
+                  false, Offered(lower, entry.candidate, policyEngine_.CandidateFlags(entry)),
                   SourceFlagsFor(entry, entry.candidateLabel),
                   DictionaryEntryIdFor(entry, entry.candidateLabel));
         if (!entry.originalFirst) {
@@ -350,29 +360,9 @@ std::vector<Candidate> CandidateGenerator::Generate(std::wstring_view rawText,
         const auto rawFrequency = frequencyProvider_.Score(rawText);
         exactHasWeakFrequency = rawFrequency > 0.0 && rawFrequency < 1.0;
     }
-    bool hasStrongContextualAlternative = false;
-    if (options.correctionEnabled && exact && !exactHasWeakFrequency &&
-        options.contextSuggestionsEnabled && rawText.size() > 2) {
-        const auto inspectAlternative = [&](const auto& entry) {
-            if (!entry.spellcheckWord || entry.caseSensitive) return;
-            const auto evidence = typoModel_.Compare(lower, Lower(entry.raw));
-            const auto advantage = contextScore(entry.raw) - rawContextScore;
-            hasStrongContextualAlternative =
-                hasStrongContextualAlternative ||
-                (evidence.distance == 1 && advantage >= kStrongContextConfidence);
-        };
-        for (const auto& prefix : SearchPrefixes(lower)) {
-            if (hasStrongContextualAlternative) break;
-            lexiconProvider_.Find({LexiconQuery::Kind::Prefix, prefix, 512},
-                                  inspectAlternative);
-        }
-    }
-    if (exactHasWeakFrequency) {
+    if (exactHasWeakFrequency && !keptAsTyped) {
         // A rare exact lexicon entry may be an obsolete/false-positive spelling.
         // Re-run the general typo search; no word-specific exception is used.
-        output.clear();
-        seen.clear();
-    } else if (exact && hasStrongContextualAlternative) {
         output.clear();
         seen.clear();
     }
@@ -467,14 +457,13 @@ std::vector<Candidate> CandidateGenerator::Generate(std::wstring_view rawText,
     }
     ranker_.RankCorrections(ranked, lower.size());
 
-    const bool hasStrongValidCorrection = std::any_of(
-        ranked.begin(), ranked.end(), [](const auto& correction) {
-            return correction.validWordConflict &&
-                   correction.signals.contextConfidence >= kStrongContextConfidence;
-        });
+    // A word typed right stays first: a word a letter away that fits the
+    // context better is only offered. Deciding it from the words before
+    // alone rewrote about one word in sixty of real text ("buy them," to
+    // "buy the"), far more often than it caught a slip.
     if (exact && std::any_of(ranked.begin(), ranked.end(), [](const auto& correction) {
             return correction.validWordConflict;
-        }) && !hasStrongValidCorrection) {
+        })) {
         AddOriginal(output, seen, rawText);
     }
 
@@ -502,12 +491,9 @@ std::vector<Candidate> CandidateGenerator::Generate(std::wstring_view rawText,
                            (correction.extraCharacter ? CandidateSourceExtraCharacter : CandidateSourceNone) |
                            (correction.qwertyNeighbor ? CandidateSourceQwertyNeighbor : CandidateSourceNone);
         }
-        const bool contextAccepted = !correction.validWordConflict ||
-                                     correction.signals.contextConfidence >=
-                                         kStrongContextConfidence;
-        const auto policy = contextAccepted
-                                ? CandidatePolicyCorrect
-                                : CandidatePolicySuggestOnly | CandidatePolicyContext;
+        const auto policy = correction.validWordConflict || keptAsTyped
+                                ? CandidatePolicySuggestOnly | CandidatePolicyContext
+                                : Offered(lower, entry.raw, CandidatePolicyCorrect);
         const auto sizeBefore = output.size();
         AddUnique(output, seen, MatchCase(rawText, std::wstring(entry.raw)), SemanticLabel::None, false,
                   100.0 - static_cast<double>(correction.distance), false, policy,

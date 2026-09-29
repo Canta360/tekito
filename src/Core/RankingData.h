@@ -11,8 +11,6 @@ struct RankingSignals {
     double contextConfidence{0.0};
 };
 
-constexpr double kStrongContextConfidence = 5.0;
-
 class IFrequencyProvider {
 public:
     virtual ~IFrequencyProvider() = default;
@@ -33,6 +31,12 @@ public:
     [[nodiscard]] virtual double Score(std::wstring_view,
                                        std::wstring_view candidate) const noexcept {
         return Score(candidate);
+    }
+    // Whether the user undid `candidate` as the correction of `rawText`
+    // more than they took it: it is then no longer applied on its own.
+    [[nodiscard]] virtual bool Undone(std::wstring_view /*rawText*/,
+                                      std::wstring_view /*candidate*/) const noexcept {
+        return false;
     }
 };
 

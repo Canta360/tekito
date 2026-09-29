@@ -11,6 +11,7 @@ namespace tekito {
 namespace {
 
 constexpr double kMaximumLearningMass = 1000000.0;
+constexpr double kUndoMass = 1.5;
 
 std::wstring LearningKey(std::wstring_view value) {
     std::wstring result(value);
@@ -169,8 +170,8 @@ void UserLearningStore::RecordUndo(std::wstring_view rawText,
                                    std::wstring_view candidate) {
     if (rawText.empty() || candidate.empty()) return;
     auto& preference = FindOrAddPreference(rawText, candidate);
-    AddMass(preference.beta, 1.5);
-    AddMass(preference.directEventMass, 1.5);
+    AddMass(preference.beta, kUndoMass);
+    AddMass(preference.directEventMass, kUndoMass);
 }
 
 double UserLearningStore::Score(std::wstring_view rawText,
@@ -181,6 +182,13 @@ double UserLearningStore::Score(std::wstring_view rawText,
     const auto mean = preference->alpha / total;
     const auto confidence = 1.0 - std::exp(-(total - 2.0) / 3.0);
     return std::clamp(confidence * (mean - 0.5), -0.5, 0.5);
+}
+
+bool UserLearningStore::Undone(std::wstring_view rawText,
+                               std::wstring_view candidate) const noexcept {
+    // One undo adds kUndoMass to beta; taking the correction adds to alpha.
+    const auto* preference = FindPreference(rawText, candidate);
+    return preference && preference->beta >= kUndoMass && preference->beta > preference->alpha;
 }
 
 void UserLearningStore::Reset() noexcept {

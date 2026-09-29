@@ -7,6 +7,13 @@ std::optional<std::size_t> SpaceBoundaryPolicy::SelectCorrection(
     if (candidates.empty() || !IsAcceptableCorrection(rawText, candidates.front())) {
         return std::nullopt;
     }
+    // A word the user keeps as typed is never replaced.
+    for (const auto& candidate : candidates) {
+        const bool kept = candidate.isProtected || (candidate.policyFlags & CandidatePolicyProtect) != 0;
+        if (candidate.isOriginal && kept) {
+            return std::nullopt;
+        }
+    }
     return 0;
 }
 

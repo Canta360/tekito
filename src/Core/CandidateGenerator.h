@@ -48,6 +48,11 @@ public:
         const ConversionOptions& options = {}) const;
 
 private:
+    // `flags` for `candidate`, except that a correction the user undid for
+    // this input is only offered from then on.
+    [[nodiscard]] std::uint32_t Offered(std::wstring_view lowerRaw, std::wstring_view candidate,
+                                        std::uint32_t flags) const;
+
     const ILexiconProvider& lexiconProvider_;
     const ILexiconProvider* supplementaryProvider_{nullptr};
     const IMisspellingProvider& misspellingProvider_;
