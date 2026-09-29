@@ -45,6 +45,7 @@ function initialState() {
       japanesePunctuation: 0,
       japaneseDigitWidth: 0,
       japaneseSymbolWidth: 0,
+      advancedSettings: false,
       japanesePredictionEnabled: true,
       uiLanguage: 0,
       excludedApps: ["Code.exe"],

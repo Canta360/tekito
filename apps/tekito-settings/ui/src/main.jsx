@@ -45,6 +45,7 @@ const initialSettings = {
   japanesePunctuation: 0,
   japaneseDigitWidth: 0,
   japaneseSymbolWidth: 0,
+  advancedSettings: false,
   japanesePredictionEnabled: true,
   dateConversion: true,
   numberConversion: true,
@@ -57,11 +58,11 @@ const initialSettings = {
 
 // The switches a person would actually want to flip for English. Common
 // misspellings and context ranking stay on (they only make corrections
-// better) and are not shown.
+// better) and are not shown; Japanese sounds only with advanced settings.
 const englishFeatures = [
   { key: "correctionEnabled", icon: "spelling" },
   { key: "completionEnabled", icon: "completion" },
-  { key: "japanesePhoneticSuggestionsEnabled", icon: "japanese" },
+  { key: "japanesePhoneticSuggestionsEnabled", icon: "japanese", advanced: true },
 ];
 
 // Special conversions (UserSettings), for English and Japanese alike.
@@ -228,7 +229,10 @@ function App() {
   };
 
   // The Japanese page is there only while Japanese input is on.
-  const shownPages = pages.filter((item) => item.id !== "japanese" || japanese);
+  // Japanese only while it is on; Special conversions only with advanced
+  // settings (everything on it is on by default).
+  const advanced = Boolean(settings.advancedSettings);
+  const shownPages = pages.filter((item) => (item.id !== "japanese" || japanese) && (item.id !== "special" || advanced));
   const current = shownPages.find((item) => item.id === page) || shownPages[0];
 
   return (
@@ -267,11 +271,11 @@ function App() {
             </Glass>
           ) : (
             <div className="page" key={current.id}>
-              {current.id === "general" && <GeneralPage mode={mode} japanese={japanese} japaneseInstalled={japaneseInstalled} settings={settings} changeMode={changeMode} setSetting={setSetting} runAction={runAction} />}
-              {current.id === "switching" && <SwitchingPage japanese={japanese} japaneseKeyboard={Boolean(runtime.japaneseKeyboard)} settings={settings} setSetting={setSetting} />}
-              {current.id === "candidates" && <CandidatesPage settings={settings} setSetting={setSetting} />}
-              {current.id === "english" && <EnglishPage settings={settings} setSetting={setSetting} />}
-              {current.id === "japanese" && <JapanesePage settings={settings} setSetting={setSetting} />}
+              {current.id === "general" && <GeneralPage advanced={advanced} mode={mode} japanese={japanese} japaneseInstalled={japaneseInstalled} settings={settings} changeMode={changeMode} setSetting={setSetting} runAction={runAction} />}
+              {current.id === "switching" && <SwitchingPage advanced={advanced} japanese={japanese} japaneseKeyboard={Boolean(runtime.japaneseKeyboard)} settings={settings} setSetting={setSetting} />}
+              {current.id === "candidates" && <CandidatesPage advanced={advanced} settings={settings} setSetting={setSetting} />}
+              {current.id === "english" && <EnglishPage advanced={advanced} settings={settings} setSetting={setSetting} />}
+              {current.id === "japanese" && <JapanesePage advanced={advanced} settings={settings} setSetting={setSetting} />}
               {current.id === "special" && <SpecialPage japanese={japanese} settings={settings} setSetting={setSetting} />}
               {current.id === "dictionary" && <DictionaryPage japanese={japaneseInstalled} japaneseWords={japaneseWords} learning={learning} settings={settings} setSetting={setSetting} dictionary={dictionary} setModal={setModal} setConfirm={setConfirm} runAction={runAction} />}
               {current.id === "about" && <AboutPage version={version} runtime={runtime} packs={packs} runAction={runAction} />}
@@ -347,9 +351,10 @@ const switchKeyCaps = (toggleKey, japaneseKeyboard, t) =>
   : toggleKey === 3 ? ["Ctrl", "Shift", "Space"]
   : null;
 
-// What TEKITO is doing overall: the mode, Japanese, the language, and the
-// apps where it stays off.
-function GeneralPage({ mode, japanese, japaneseInstalled, settings, changeMode, setSetting, runAction }) {
+// What TEKITO is doing overall: the mode, Japanese, the language, and (with
+// advanced settings) how it starts and the apps where it stays off. The
+// switch for advanced settings is last.
+function GeneralPage({ advanced, mode, japanese, japaneseInstalled, settings, changeMode, setSetting, runAction }) {
   const t = useText();
   // UserSettings::uiLanguage.
   const languages = [[0, t.language.system], [1, "English"], [2, "日本語"]];
@@ -370,21 +375,28 @@ function GeneralPage({ mode, japanese, japaneseInstalled, settings, changeMode, 
           <Toggle label={t.japaneseInput.title} checked={japanese} disabled={!japaneseInstalled}
             onChange={(value) => setSetting("japaneseEnabled", value)} />
         </Row>
-        <Row title={t.restoreMode.title} description={japanese ? t.restoreMode.descriptionJapanese : t.restoreMode.description}>
-          <Toggle label={t.restoreMode.title} checked={settings.restoreLastInputMode} onChange={(value) => setSetting("restoreLastInputMode", value)} />
-        </Row>
         <Row title={t.language.title} description={t.language.description}>
           <Segmented label={t.language.title} value={settings.uiLanguage} options={languages} onChange={(value) => setSetting("uiLanguage", value)} />
         </Row>
+        {advanced && (
+          <Row title={t.restoreMode.title} description={japanese ? t.restoreMode.descriptionJapanese : t.restoreMode.description}>
+            <Toggle label={t.restoreMode.title} checked={settings.restoreLastInputMode} onChange={(value) => setSetting("restoreLastInputMode", value)} />
+          </Row>
+        )}
       </Glass>
-      <ExcludedApps settings={settings} runAction={runAction} />
+      {advanced && <ExcludedApps settings={settings} runAction={runAction} />}
+      <Glass className="card">
+        <Row title={t.advanced.title} description={t.advanced.description}>
+          <Toggle label={t.advanced.title} checked={advanced} onChange={(value) => setSetting("advancedSettings", value)} />
+        </Row>
+      </Glass>
     </>
   );
 }
 
 // How the mode is switched: the keyboard, the switch key and its order, the
 // badge shown after a switch, and the keys for it.
-function SwitchingPage({ japanese, japaneseKeyboard, settings, setSetting }) {
+function SwitchingPage({ advanced, japanese, japaneseKeyboard, settings, setSetting }) {
   const t = useText();
   // UserSettings::keyboardType, ::toggleKey and ::japaneseSwitchOrder. The
   // switch key choices follow the keyboard.
@@ -400,13 +412,15 @@ function SwitchingPage({ japanese, japaneseKeyboard, settings, setSetting }) {
   return (
     <>
       <Glass className="card">
-        <Row title={t.keyboard.title} description={t.keyboard.description}>
-          <Segmented label={t.keyboard.title} value={settings.keyboardType} options={keyboards} onChange={(value) => setSetting("keyboardType", value)} />
-        </Row>
+        {advanced && (
+          <Row title={t.keyboard.title} description={t.keyboard.description}>
+            <Segmented label={t.keyboard.title} value={settings.keyboardType} options={keyboards} onChange={(value) => setSetting("keyboardType", value)} />
+          </Row>
+        )}
         <Row title={t.switchKey.title} description={japanese ? t.switchKey.descriptionJapanese : t.switchKey.description}>
           <Segmented label={t.switchKey.title} value={settings.toggleKey} options={toggleKeys} onChange={(value) => setSetting("toggleKey", value)} />
         </Row>
-        {japanese && (
+        {japanese && advanced && (
           <Row title={t.order.title} description={t.order.description}>
             <Segmented label={t.order.title} value={settings.japaneseSwitchOrder} options={orders} onChange={(value) => setSetting("japaneseSwitchOrder", value)} />
           </Row>
@@ -477,18 +491,13 @@ function ExcludedApps({ settings, runAction }) {
 }
 
 // The candidate list, shared by English and Japanese.
-function CandidatesPage({ settings, setSetting }) {
+function CandidatesPage({ advanced, settings, setSetting }) {
   const t = useText();
   // UserSettings::candidateRows.
   const rowCounts = [[0, t.rows.automatic], [5, "5"], [7, "7"], [9, "9"]];
   const shown = settings.candidateWindowEnabled;
   return (
     <>
-      <Glass className="card">
-        <Row title={t.candidateList.title} description={t.candidateList.description}>
-          <Toggle label={t.candidateList.title} checked={shown} onChange={(value) => setSetting("candidateWindowEnabled", value)} />
-        </Row>
-      </Glass>
       <div className={`tile-grid mode-grid ${shown ? "" : "is-muted"}`}>
         {candidateStyles.map((style) => (
           <Tile key={style.value} on={settings.candidateWindowStyle === style.value} title={t.styles[style.id].title}
@@ -496,26 +505,32 @@ function CandidatesPage({ settings, setSetting }) {
             art={<MiniList variant={style.id} />} onPress={() => setSetting("candidateWindowStyle", style.value)} />
         ))}
       </div>
-      <Glass className="card">
-        <Row title={t.rows.title} description={t.rows.description}>
-          <Segmented label={t.rows.title} value={settings.candidateRows} options={rowCounts} onChange={(value) => setSetting("candidateRows", value)} />
-        </Row>
-        <Row title={t.meanings.title} description={t.meanings.description}>
-          <Toggle label={t.meanings.title} checked={settings.meaningsEnabled} onChange={(value) => setSetting("meaningsEnabled", value)} />
-        </Row>
-      </Glass>
+      {advanced && (
+        <Glass className="card">
+          <Row title={t.candidateList.title} description={t.candidateList.description}>
+            <Toggle label={t.candidateList.title} checked={shown} onChange={(value) => setSetting("candidateWindowEnabled", value)} />
+          </Row>
+          <Row title={t.rows.title} description={t.rows.description}>
+            <Segmented label={t.rows.title} value={settings.candidateRows} options={rowCounts} onChange={(value) => setSetting("candidateRows", value)} />
+          </Row>
+          <Row title={t.meanings.title} description={t.meanings.description}>
+            <Toggle label={t.meanings.title} checked={settings.meaningsEnabled} onChange={(value) => setSetting("meaningsEnabled", value)} />
+          </Row>
+        </Glass>
+      )}
     </>
   );
 }
 
 // English: what Auto does as you type.
-function EnglishPage({ settings, setSetting }) {
+function EnglishPage({ advanced, settings, setSetting }) {
   const t = useText();
   const expressionRanges = t.casual.ranges.map((label, value) => [value, label]);
+  const features = englishFeatures.filter((feature) => advanced || !feature.advanced);
   return (
     <>
-      <div className="tile-grid feature-grid three">
-        {englishFeatures.map((feature) => (
+      <div className={`tile-grid feature-grid ${features.length === 3 ? "three" : "two"}`}>
+        {features.map((feature) => (
           <Tile key={feature.key} on={Boolean(settings[feature.key])} icon={feature.icon} title={t.features[feature.key].title}
             description={t.features[feature.key].description} status={settings[feature.key] ? t.on : t.off}
             onPress={() => setSetting(feature.key, !settings[feature.key])} />
@@ -525,9 +540,11 @@ function EnglishPage({ settings, setSetting }) {
         <Row title={t.casual.title} description={t.casual.description}>
           <Segmented label={t.casual.title} value={settings.socialExpressionRange} options={expressionRanges} onChange={(value) => setSetting("socialExpressionRange", value)} />
         </Row>
-        <Row title={t.period.title} description={t.period.description}>
-          <Toggle label={t.period.title} checked={settings.periodOnEnter} onChange={(value) => setSetting("periodOnEnter", value)} />
-        </Row>
+        {advanced && (
+          <Row title={t.period.title} description={t.period.description}>
+            <Toggle label={t.period.title} checked={settings.periodOnEnter} onChange={(value) => setSetting("periodOnEnter", value)} />
+          </Row>
+        )}
       </Glass>
       <Glass className="card">
         <h2 className="card-title">{t.keys.title}</h2>
@@ -545,7 +562,7 @@ function EnglishPage({ settings, setSetting }) {
 
 // Japanese: how romaji becomes Japanese, when Japanese is installed.
 // Shown only while Japanese input is on (see General).
-function JapanesePage({ settings, setSetting }) {
+function JapanesePage({ advanced, settings, setSetting }) {
   const t = useText();
   const j = t.japanese;
   // UserSettings::japaneseSpaceWidth, ::japanesePunctuation, ::japaneseDigitWidth
@@ -557,21 +574,25 @@ function JapanesePage({ settings, setSetting }) {
   return (
     <>
       <Glass className="card">
-        <Row title={j.space.title} description={j.space.description}>
-          <Segmented label={j.space.title} value={settings.japaneseSpaceWidth} options={spaces} onChange={(value) => setSetting("japaneseSpaceWidth", value)} />
+        <Row title={j.prediction.title} description={j.prediction.description}>
+          <Toggle label={j.prediction.title} checked={settings.japanesePredictionEnabled} onChange={(value) => setSetting("japanesePredictionEnabled", value)} />
         </Row>
         <Row title={j.punctuation.title} description={j.punctuation.description}>
           <Segmented label={j.punctuation.title} value={settings.japanesePunctuation} options={marks} onChange={(value) => setSetting("japanesePunctuation", value)} />
         </Row>
-        <Row title={j.digits.title} description={j.digits.description}>
-          <Segmented label={j.digits.title} value={settings.japaneseDigitWidth} options={digits} onChange={(value) => setSetting("japaneseDigitWidth", value)} />
-        </Row>
-        <Row title={j.symbols.title} description={j.symbols.description}>
-          <Segmented label={j.symbols.title} value={settings.japaneseSymbolWidth} options={symbols} onChange={(value) => setSetting("japaneseSymbolWidth", value)} />
-        </Row>
-        <Row title={j.prediction.title} description={j.prediction.description}>
-          <Toggle label={j.prediction.title} checked={settings.japanesePredictionEnabled} onChange={(value) => setSetting("japanesePredictionEnabled", value)} />
-        </Row>
+        {advanced && (
+          <>
+            <Row title={j.space.title} description={j.space.description}>
+              <Segmented label={j.space.title} value={settings.japaneseSpaceWidth} options={spaces} onChange={(value) => setSetting("japaneseSpaceWidth", value)} />
+            </Row>
+            <Row title={j.digits.title} description={j.digits.description}>
+              <Segmented label={j.digits.title} value={settings.japaneseDigitWidth} options={digits} onChange={(value) => setSetting("japaneseDigitWidth", value)} />
+            </Row>
+            <Row title={j.symbols.title} description={j.symbols.description}>
+              <Segmented label={j.symbols.title} value={settings.japaneseSymbolWidth} options={symbols} onChange={(value) => setSetting("japaneseSymbolWidth", value)} />
+            </Row>
+          </>
+        )}
       </Glass>
       <Glass className="card">
         <h2 className="card-title">{t.keys.title}</h2>

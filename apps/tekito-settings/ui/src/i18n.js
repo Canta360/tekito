@@ -9,7 +9,7 @@ const en = {
   lang: "en",
   settings: "Settings",
   pages: {
-    general: { label: "General", description: "The input mode, Japanese input, the language, and where TEKITO stays off." },
+    general: { label: "General", description: "The input mode, Japanese input, the language, and whether to show advanced settings." },
     switching: { label: "Switching", description: "The keys that switch the mode, and what shows when it switches." },
     candidates: { label: "Candidate list", description: "The list of choices under what you type, in English and Japanese." },
     english: { label: "English", description: "What Auto does as you type English." },
@@ -39,6 +39,10 @@ const en = {
     japanese: "Turns romaji into kana and kanji.",
     auto: "Corrects spelling and suggests words as you type.",
     direct: "Types exactly the keys you press.",
+  },
+  advanced: {
+    title: "Show advanced settings",
+    description: "Adds the finer settings to each page, and the Special conversions page. The defaults suit most people.",
   },
   restoreMode: {
     title: "Start in the last mode used",
@@ -279,7 +283,7 @@ const ja = {
   lang: "ja",
   settings: "設定",
   pages: {
-    general: { label: "一般", description: "入力モード、日本語入力、表示言語、TEKITO をオフにするアプリを選びます。" },
+    general: { label: "一般", description: "入力モード、日本語入力、表示言語と、詳細設定を表示するかを選びます。" },
     switching: { label: "切り替え", description: "モードを切り替えるキーと、切り替えたときの表示を選びます。" },
     candidates: { label: "候補一覧", description: "打っている文字の下に出る候補の一覧です。英語と日本語で共通です。" },
     english: { label: "英語入力", description: "Auto で英語を打つときに TEKITO がすることを選びます。" },
@@ -308,6 +312,10 @@ const ja = {
     japanese: "ローマ字をかなと漢字にします。",
     auto: "打ちながらスペルを直し、単語を提案します。",
     direct: "押したキーがそのまま入ります。",
+  },
+  advanced: {
+    title: "詳細設定を表示",
+    description: "各ページに細かい設定を足し、「特別な変換」のページも出します。ふだんは既定のままで使えます。",
   },
   restoreMode: {
     title: "前回のモードで始める",

@@ -1894,6 +1894,7 @@ void TestSqliteUserSettingsRepository() {
     source.japanesePunctuation = 3;
     source.japaneseDigitWidth = 1;
     source.japaneseSymbolWidth = 1;
+    source.advancedSettings = true;
     source.japanesePredictionEnabled = false;
     source.candidateRows = 7;
     source.meaningsEnabled = false;
@@ -1940,7 +1941,7 @@ void TestSqliteUserSettingsRepository() {
     Require(loaded.keyboardType == 1 &&
                 loaded.lastJapaneseProfileMode == tekito::InputMode::Convert &&
                 loaded.japaneseProfileEnglishMode == tekito::InputMode::Direct &&
-                loaded.japaneseSpaceWidth == 2 && loaded.japanesePunctuation == 3 && loaded.japaneseDigitWidth == 1 && loaded.japaneseSymbolWidth == 1 &&
+                loaded.japaneseSpaceWidth == 2 && loaded.japanesePunctuation == 3 && loaded.japaneseDigitWidth == 1 && loaded.japaneseSymbolWidth == 1 && loaded.advancedSettings &&
                 !loaded.japanesePredictionEnabled &&
                 loaded.candidateRows == 7 && !loaded.meaningsEnabled && loaded.japaneseSwitchOrder == 2 &&
                     !loaded.japaneseEnabled && !loaded.modeIndicatorEnabled,
