@@ -36,7 +36,8 @@ $SourceDataRoot = (Resolve-Path $SourceDataRoot).Path
 # is built locally (scripts\prepare-full-data-packs.ps1): TEKITO runs without
 # it, but English corrections lose their context ranking.
 $requiredPacks = @("standard-english", "wikipedia-common-misspellings", "frequency", "phrase",
-                   "dictionary-display", "slang", "wiktionary-slang", "pronunciation", "emoji")
+                   "dictionary-display", "slang", "wiktionary-slang", "pronunciation", "emoji",
+                   "special-conversions")
 # Japanese input, downloaded separately; the first two are required for it.
 $japanesePacks = @("japanese-core", "japanese-romaji", "japanese-lm", "japanese-loanwords",
                    "japanese-wiktionary", "japanese-wordnet")

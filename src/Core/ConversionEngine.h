@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Core/Candidate.h"
+#include "Core/SpecialConversions.h"
 
 #include <memory>
 #include <string>
@@ -38,6 +39,8 @@ struct ConversionOptions {
     bool completionEnabled{true};
     bool japanesePhoneticSuggestionsEnabled{true};
     int socialExpressionRange{1};
+    // English uses the dates ("today"); the rest is typed outside words.
+    SpecialConversionOptions special;
 };
 
 struct ConversionRequest {

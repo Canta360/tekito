@@ -766,6 +766,7 @@ void TextService::ApplySettings() {
         static_cast<japanese::PunctuationStyle>(std::clamp(userSettings_.japanesePunctuation, 0, 3)));
     japanese_.SetLearning(userSettings_.learningEnabled ? &japaneseLearning_ : nullptr);
     japanese_.SetPredictionEnabled(userSettings_.japanesePredictionEnabled);
+    japanese_.SetSpecialConversions(&SpecialConversions::Installed(), SpecialOptions());
     const auto rows = static_cast<std::size_t>(userSettings_.candidateRows);
     state_.SetPageSizes(rows ? rows : 5, rows ? rows : 10);
     japanesePage_ = rows ? rows : 9;
@@ -1891,6 +1892,7 @@ void TextService::RefreshCandidates(ITfContext* context, TfEditCookie editCookie
     request.options.japanesePhoneticSuggestionsEnabled =
         userSettings_.japanesePhoneticSuggestionsEnabled;
     request.options.socialExpressionRange = userSettings_.socialExpressionRange;
+    request.options.special = SpecialOptions();
     {
         ScopedTraceDuration duration(L"Perf CandidateEngine");
         auto result = candidateEngine_->Convert(request);

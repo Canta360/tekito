@@ -33,6 +33,9 @@ public:
 private:
     struct Providers;
 
+    // Today's date for "today" and the like, after the word as typed.
+    static void AddDates(std::wstring_view rawText, std::vector<Candidate>& candidates);
+
     CandidateEngine(const UserDictionary* dictionary,
                     const IUserLearningProvider& learningProvider,
                     const SocialLearningProvider& socialLearningProvider);

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Core/Japanese/JapaneseConverter.h"
+#include "Core/SpecialConversions.h"
 
 #include <cstdint>
 #include <functional>
@@ -74,6 +75,12 @@ public:
     void SetLoanwords(const Loanwords* loanwords) noexcept { loanwords_ = loanwords; }
     // The user's words, for conversion and predictions; null for none.
     void SetUserDictionary(const JapaneseUserDictionary* user) noexcept { userDictionary_ = user; }
+    // Dates for "きょう", numbers in kanji, symbols by reading and sums for
+    // "1+2=", as far as `options` has them on; null for none.
+    void SetSpecialConversions(const SpecialConversions* special, SpecialConversionOptions options = {}) noexcept {
+        special_ = special;
+        specialOptions_ = options;
+    }
     // How the romaji table reads `keys` from the start, unit by unit.
     [[nodiscard]] static std::vector<RomajiToken> ParseRomaji(const RomajiTable& table, std::wstring_view keys);
     // What the user chose before puts candidates first; each commit is
@@ -204,6 +211,10 @@ private:
     void UpdatePredictions();
     // The English word after the first candidate that starts in katakana.
     void AddLoanwords(std::vector<PhraseCandidate>& candidates) const;
+    // Dates, number forms and symbols for a phrase read as `reading`.
+    void AddSpecial(std::wstring_view reading, std::vector<PhraseCandidate>& candidates) const;
+    // The sum for arithmetic ending in "=" ("1+2=" -> 3, 1+2=3), or nothing.
+    [[nodiscard]] std::vector<PhraseCandidate> SumCandidates(std::wstring_view reading) const;
     // When the list opens: the phrase's keys with one slip undone, as more
     // candidates, so a slip the first choice kept is one pick away; for a
     // short input split into phrases, the whole input too ("hahimemashite":
@@ -231,6 +242,8 @@ private:
     const KeyConverter* keyConverter_{nullptr};
     const Loanwords* loanwords_{nullptr};
     const JapaneseUserDictionary* userDictionary_{nullptr};
+    const SpecialConversions* special_{nullptr};
+    SpecialConversionOptions specialOptions_;
     JapaneseLearningStore* learning_{nullptr};
     std::vector<Unit> units_;
     // Units before the caret; pending keys belong at the caret.

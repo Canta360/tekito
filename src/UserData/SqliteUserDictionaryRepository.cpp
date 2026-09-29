@@ -252,6 +252,14 @@ bool SqliteUserDictionaryRepository::LoadSettings(UserSettings& settings) const 
             loaded.candidateWindowStyle = std::clamp(value, 0, 1);
         } else if (std::strcmp(key, "mode_indicator_enabled") == 0) {
             loaded.modeIndicatorEnabled = value != 0;
+        } else if (std::strcmp(key, "date_conversion") == 0) {
+            loaded.dateConversion = value != 0;
+        } else if (std::strcmp(key, "number_conversion") == 0) {
+            loaded.numberConversion = value != 0;
+        } else if (std::strcmp(key, "symbol_conversion") == 0) {
+            loaded.symbolConversion = value != 0;
+        } else if (std::strcmp(key, "calculator_enabled") == 0) {
+            loaded.calculatorEnabled = value != 0;
         } else if (std::strcmp(key, "japanese_enabled") == 0) {
             loaded.japaneseEnabled = value != 0;
         } else if (std::strcmp(key, "japanese_switch_order") == 0) {
@@ -348,6 +356,10 @@ bool SqliteUserDictionaryRepository::SaveSettings(const UserSettings& settings) 
     saveValue("candidate_window_style", std::clamp(settings.candidateWindowStyle, 0, 1));
     saveValue("candidate_rows", settings.candidateRows);
     saveValue("mode_indicator_enabled", settings.modeIndicatorEnabled ? 1 : 0);
+    saveValue("date_conversion", settings.dateConversion ? 1 : 0);
+    saveValue("number_conversion", settings.numberConversion ? 1 : 0);
+    saveValue("symbol_conversion", settings.symbolConversion ? 1 : 0);
+    saveValue("calculator_enabled", settings.calculatorEnabled ? 1 : 0);
     saveValue("japanese_enabled", settings.japaneseEnabled ? 1 : 0);
     saveValue("japanese_switch_order", std::clamp(settings.japaneseSwitchOrder, 0, 2));
     saveValue("meanings_enabled", settings.meaningsEnabled ? 1 : 0);

@@ -10,6 +10,7 @@
 #include "Core/Japanese/KanaText.h"
 #include "Core/Japanese/Meanings.h"
 #include "Core/Japanese/RomajiTable.h"
+#include "Core/SpecialConversions.h"
 
 #include <algorithm>
 #include <cmath>
@@ -817,6 +818,122 @@ void TestMeanings() {
 
 }  // namespace
 
+bool Contains(const std::vector<std::wstring>& list, std::wstring_view text) {
+    return std::find(list.begin(), list.end(), text) != list.end();
+}
+
+void TestSpecialConversions(const RomajiTable& table, const MiniPack& pack) {
+    using tekito::LocalTime;
+    using tekito::SpecialConversions;
+    using Language = SpecialConversions::Language;
+    SpecialConversions special;
+    Require(special.Load(tekito::ExternalLexiconProvider::DataPackRoot() / L"special-conversions" / L"rules.tsv"),
+            "the special-conversions pack loads");
+
+    const LocalTime morning{2026, 9, 29, 6, 5};  // a Tuesday
+    const auto today = special.Dates(Language::English, L"today", morning);
+    Require(today.size() >= 3, "today has several formats");
+    RequireText(today[0], L"September 29, 2026", "today, written out");
+    Require(Contains(today, L"2026-09-29") && Contains(today, L"Tuesday, September 29"), "today as ISO and with the weekday");
+    Require(Contains(special.Dates(Language::English, L"now", morning), L"6:05 AM"), "now, in the morning");
+    RequireText(special.Dates(Language::English, L"tomorrow", morning)[0], L"September 30, 2026", "tomorrow");
+    Require(special.Dates(Language::English, L"table", morning).empty(), "other words have no date");
+
+    const auto kyou = special.Dates(Language::Japanese, L"きょう", morning);
+    RequireText(kyou[0], L"2026/09/29", "きょう, with slashes");
+    Require(Contains(kyou, L"2026年9月29日") && Contains(kyou, L"9月29日(火)") && Contains(kyou, L"令和8年9月29日") &&
+                Contains(kyou, L"火曜日"),
+            "きょう in kanji, with the weekday and the era");
+    RequireText(special.Dates(Language::Japanese, L"あした", {2026, 9, 30, 0, 0})[0], L"2026/10/01",
+                "あした goes into the next month");
+    Require(Contains(special.Dates(Language::Japanese, L"らいげつ", {2026, 1, 31, 0, 0}), L"2026年2月"),
+            "らいげつ from the end of January");
+    Require(Contains(special.Dates(Language::Japanese, L"いま", {2026, 9, 29, 13, 5}), L"午後1時5分"),
+            "いま in the afternoon");
+    Require(Contains(special.Dates(Language::Japanese, L"ことし", {2019, 6, 1, 0, 0}), L"令和元年"),
+            "the first year of an era is 元年");
+
+    const auto numbers = special.Numbers(L"1234");
+    Require(Contains(numbers, L"１２３４") && Contains(numbers, L"1,234") && Contains(numbers, L"千二百三十四") &&
+                Contains(numbers, L"一二三四") && Contains(numbers, L"壱阡弐百参拾四"),
+            "a number with commas and in kanji");
+    Require(Contains(numbers, L"\x216F\x216D\x216D\x2169\x2169\x2169\x2160\x2164"), "a number in Roman numerals");
+    Require(Contains(special.Numbers(L"１２"), L"十二") && Contains(special.Numbers(L"12"), L"\x216B") &&
+                Contains(special.Numbers(L"12"), L"\x246B"),
+            "twelve in kanji, as one Roman numeral and circled");
+    Require(Contains(special.Numbers(L"10000"), L"一万") && Contains(special.Numbers(L"120000000"), L"一億二千万"),
+            "large numbers in kanji");
+    Require(special.Numbers(L"0120").size() == 2, "a number that starts with 0 only changes width");
+    Require(special.Numbers(L"12a").empty(), "not a number");
+
+    RequireText(SpecialConversions::Calculate(L"1+2=").value_or(L""), L"3", "a sum");
+    RequireText(SpecialConversions::Calculate(L"（３＋４）＊２＝").value_or(L""), L"14", "full-width arithmetic");
+    RequireText(SpecialConversions::Calculate(L"10・4=").value_or(L""), L"2.5", "・ divides, as Japanese input types /");
+    RequireText(SpecialConversions::Calculate(L"5ー8＝").value_or(L""), L"-3", "ー subtracts, as Japanese input types -");
+    RequireText(SpecialConversions::Calculate(L"2*-3=").value_or(L""), L"-6", "a negative number");
+    Require(!SpecialConversions::Calculate(L"1/0=") && !SpecialConversions::Calculate(L"123=") &&
+                !SpecialConversions::Calculate(L"1+=") && !SpecialConversions::Calculate(L"1+2"),
+            "no sum for dividing by zero, no operator, a missing number or no =");
+
+    Require(Contains(special.Symbols(Language::Japanese, L"やじるし"), L"→"), "やじるし is an arrow");
+    Require(Contains(special.Symbols(Language::Japanese, L"ー＞"), L"→"), "-> typed in Japanese is an arrow");
+    Require(Contains(special.Symbols(Language::English, L"(c)"), L"©"), "(c) is ©");
+
+    // English, typed outside words.
+    const tekito::SpecialConversionOptions all;
+    const auto ending = [&](std::wstring_view text) { return special.EnglishEnding(text, all); };
+    Require(special.MayEndEnglish(L')', all) && special.MayEndEnglish(L'=', all) && !special.MayEndEnglish(L'a', all),
+            "keys that may finish a spelling or a sum");
+    Require(ending(L"see (c)") && ending(L"see (c)")->length == 3 && Contains(ending(L"see (c)")->offers, L"©"),
+            "(c) at the end of the text is ©");
+    Require(ending(L"a <->") && ending(L"a <->")->length == 3, "the longest spelling that fits");
+    Require(ending(L"1/2") && !ending(L"11/2") && !ending(L"3/1/2"), "1/2, but not inside a longer number");
+    const auto sum = ending(L"I have 3 1 + 2 =");
+    Require(sum && sum->length == 7 && sum->offers.size() == 2 && sum->offers[0] == L"3" &&
+                sum->offers[1] == L"1 + 2 = 3",
+            "a spaced sum, clear of the number before it");
+    Require(!ending(L"x=") && !ending(L"a+b=") && !ending(L"hello"), "nothing to offer");
+    tekito::SpecialConversionOptions none;
+    none.symbols = none.calculator = false;
+    Require(!special.EnglishEnding(L"(c)", none) && !special.EnglishEnding(L"1+2=", none) &&
+                !special.MayEndEnglish(L')', none),
+            "with symbols and the calculator off, nothing");
+
+    // In the composer.
+    const tekito::japanese::JapaneseConverter converter(pack.dictionary, pack.matrix);
+    JapaneseComposer composer(&table);
+    composer.SetConverter(&converter);
+    composer.SetSpecialConversions(&special);
+    Type(composer, L"1+2=");
+    composer.Convert();
+    RequireText(composer.Preedit(), L"3", "1+2= converts to the sum");
+    Require(composer.FocusedCandidates()->size() >= 2 && (*composer.FocusedCandidates())[1].text == L"1+2=3",
+            "and to the arithmetic with the sum");
+    composer.Clear();
+
+    Type(composer, L"1234");
+    composer.Convert();
+    const auto* forms = composer.FocusedCandidates();
+    Require(forms && std::any_of(forms->begin(), forms->end(), [](const auto& c) { return c.text == L"千二百三十四"; }),
+            "a number's candidates have it in kanji");
+    composer.Clear();
+
+    Type(composer, L"yajirusi");
+    composer.Convert();
+    const auto* arrows = composer.FocusedCandidates();
+    Require(arrows && std::any_of(arrows->begin(), arrows->end(), [](const auto& c) { return c.text == L"→"; }),
+            "やじるし's candidates have the arrows");
+    composer.Clear();
+
+    tekito::SpecialConversionOptions off;
+    off.calculator = off.numbers = off.symbols = off.dates = false;
+    composer.SetSpecialConversions(&special, off);
+    Type(composer, L"1+2=");
+    composer.Convert();
+    Require(composer.Preedit() != L"3", "with the calculator off, 1+2= is not summed");
+    composer.Clear();
+}
+
 int main(int argc, char** argv) {
     const auto table = LoadTable();
     TestKanaText();
@@ -839,6 +956,7 @@ int main(int argc, char** argv) {
     TestRomajiCorrection(*table, *pack);
     TestPrediction(*table, *pack);
     TestUserWords(*table, *pack);
+    TestSpecialConversions(*table, *pack);
     TestMeanings();
     if (argc > 1 && std::string_view(argv[1]) == "--dump") DumpConversions(*pack);
     std::cout << "All TEKITO Japanese tests passed.\n";

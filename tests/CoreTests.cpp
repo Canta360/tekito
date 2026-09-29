@@ -596,6 +596,23 @@ void TestCandidateEngine() {
     Require(lowerCandidates[1].text == L"neme" && lowerCandidates[1].isOriginal,
             "generated correction keeps original candidate near the top");
 
+    tekito::ConversionRequest todayRequest;
+    todayRequest.rawText = L"today";
+    const auto today = engine.Convert(todayRequest).candidates;
+    const auto firstDate = std::find_if(today.begin(), today.end(), [](const auto& candidate) {
+        return candidate.text.find(L"-") != std::wstring::npos;  // 2026-09-29
+    });
+    Require(firstDate != today.end() && firstDate != today.begin() && today.front().text == L"today",
+            "today offers the date after the word as typed");
+    Require(tekito::SpaceBoundaryPolicy{}.SelectCorrection(L"today", today) != std::optional<std::size_t>(
+                static_cast<std::size_t>(firstDate - today.begin())),
+            "a date is never put in by Space");
+    todayRequest.options.special.dates = false;
+    const auto plainToday = engine.Convert(todayRequest).candidates;
+    Require(std::none_of(plainToday.begin(), plainToday.end(),
+                         [](const auto& candidate) { return candidate.text.find(L"-") != std::wstring::npos; }),
+            "with dates off, today is only the word");
+
     const auto heCandidates = engine.Generate(L"he");
     Require(heCandidates.size() > 1 && heCandidates.front().text == L"he" &&
                 heCandidates.front().isOriginal,
@@ -1551,7 +1568,7 @@ void TestDataPackValidation() {
                              L"dictionary-display", L"frequency", L"phrase", L"slang",
                              L"wiktionary-slang", L"proper-nouns", L"pronunciation",
                              L"emoji", L"social-expression", L"japanese-phonetic",
-                             L"qwerty-typo-catalog"}) {
+                             L"qwerty-typo-catalog", L"special-conversions"}) {
         if (IsOptionalPack(pack) && !OptionalPackInstalled(pack)) continue;
         tekito::userdata::DataPackStatus status;
         const bool valid = tekito::userdata::ValidateDataPack(dataRoot / pack, status);
@@ -1881,6 +1898,10 @@ void TestSqliteUserSettingsRepository() {
     source.japaneseSwitchOrder = 2;
     source.japaneseEnabled = false;
     source.modeIndicatorEnabled = false;
+    source.dateConversion = false;
+    source.numberConversion = false;
+    source.symbolConversion = false;
+    source.calculatorEnabled = false;
     source.excludedApps = {L"Code.exe", L"code.exe", L"game.exe"};
     {
         const tekito::userdata::UserSettings defaults;
@@ -1922,6 +1943,9 @@ void TestSqliteUserSettingsRepository() {
                 loaded.candidateRows == 7 && !loaded.meaningsEnabled && loaded.japaneseSwitchOrder == 2 &&
                     !loaded.japaneseEnabled && !loaded.modeIndicatorEnabled,
             "settings repository restores the keyboard and Japanese settings");
+    Require(!loaded.dateConversion && !loaded.numberConversion && !loaded.symbolConversion &&
+                !loaded.calculatorEnabled,
+            "settings repository restores the special conversions");
     Require(loaded.excludedApps.size() == 2 && loaded.excludedApps[0] == L"Code.exe" &&
                 loaded.excludedApps[1] == L"game.exe",
             "settings repository keeps excluded apps once each, ignoring case");
