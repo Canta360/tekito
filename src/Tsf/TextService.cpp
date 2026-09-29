@@ -765,6 +765,7 @@ void TextService::ApplySettings() {
     japanese_.SetPunctuationStyle(
         static_cast<japanese::PunctuationStyle>(std::clamp(userSettings_.japanesePunctuation, 0, 3)));
     japanese_.SetHalfWidthDigits(userSettings_.japaneseDigitWidth == 0);
+    japanese_.SetHalfWidthSymbols(userSettings_.japaneseSymbolWidth == 1);
     japanese_.SetLearning(userSettings_.learningEnabled ? &japaneseLearning_ : nullptr);
     japanese_.SetPredictionEnabled(userSettings_.japanesePredictionEnabled);
     japanese_.SetSpecialConversions(&SpecialConversions::Installed(), SpecialOptions());

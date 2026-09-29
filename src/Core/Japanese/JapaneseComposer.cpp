@@ -471,9 +471,11 @@ void JapaneseComposer::AddSpecial(std::wstring_view reading, std::vector<PhraseC
             break;
         }
     }
-    // Symbols after the words ("やじるし": 矢印, やじるし, ヤジルシ, →).
+    // Symbols and emoticons after the words ("やじるし": 矢印, やじるし,
+    // ヤジルシ, →).
     if (specialOptions_.symbols) {
         insert(candidates.size(), special_->Symbols(SpecialConversions::Language::Japanese, reading), {});
+        insert(candidates.size(), special_->Emoticons(reading), {});
     }
 }
 
@@ -824,7 +826,9 @@ std::wstring JapaneseComposer::ApplyTypingStyle(std::wstring text) const {
                         punctuation_ == PunctuationStyle::ToutenPeriod;
     for (std::size_t i = 0; i < text.size(); ++i) {
         auto& ch = text[i];
-        if (halfWidthDigits_ && ch >= L'\xFF10' && ch <= L'\xFF19') ch = static_cast<wchar_t>(ch - 0xFF10 + L'0');
+        const bool wide = ch >= L'\xFF01' && ch <= L'\xFF5E';
+        const bool digit = ch >= L'\xFF10' && ch <= L'\xFF19';
+        if (wide && (digit ? halfWidthDigits_ : halfWidthSymbols_)) ch = static_cast<wchar_t>(ch - 0xFEE0);
         // Between digits: a decimal point or a thousands comma.
         const bool betweenDigits = i > 0 && i + 1 < text.size() && IsDigit(text[i - 1]) && IsDigit(text[i + 1]);
         if (betweenDigits && (ch == L'。' || ch == L'．')) {
@@ -843,7 +847,7 @@ std::wstring JapaneseComposer::ApplyTypingStyle(std::wstring text) const {
 std::wstring JapaneseComposer::RenderTyping(bool includePending) const {
     std::wstring kana = Reading();
     // Pending keys show at the caret, where the kana they make will go.
-    if (includePending) kana.insert(ReadingOffset(caret_), ToFullWidthAscii(pending_));
+    if (includePending) kana.insert(ReadingOffset(caret_), halfWidthSymbols_ ? pending_ : ToFullWidthAscii(pending_));
     return inputForm_ == KanaForm::Katakana ? ToKatakana(kana) : kana;
 }
 

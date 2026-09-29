@@ -94,6 +94,10 @@ public:
     // (１２３). A period or comma between digits is a decimal point or a
     // thousands comma of the same width (3.14), not 。 or 、.
     void SetHalfWidthDigits(bool half) noexcept { halfWidthDigits_ = half; }
+    // Letters and symbols typed in Japanese that stay as they are (! ? ( ) q):
+    // half-width, or by default full-width. The Japanese marks (、。「」・ー)
+    // are not among them.
+    void SetHalfWidthSymbols(bool half) noexcept { halfWidthSymbols_ = half; }
     // Hiragana or Katakana: how new text is shown while typing.
     void SetInputForm(KanaForm form) noexcept;
     [[nodiscard]] KanaForm InputForm() const noexcept { return inputForm_; }
@@ -257,6 +261,7 @@ private:
     KanaForm inputForm_{KanaForm::Hiragana};
     PunctuationStyle punctuation_{PunctuationStyle::ToutenKuten};
     bool halfWidthDigits_{false};
+    bool halfWidthSymbols_{false};
     std::vector<PhraseState> phrases_;
     // The reading the phrases were converted from: the typed one, or the
     // corrected one after a romaji correction (Esc still goes back to what

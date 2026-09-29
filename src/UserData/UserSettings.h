@@ -71,6 +71,9 @@ struct UserSettings {
     // Digits typed in Japanese: 0 = half-width (123), 1 = full-width
     // (the wide forms). Converting offers the other one.
     int japaneseDigitWidth{0};
+    // Letters and symbols typed in Japanese (! ? ( ) and letters that stay
+    // letters): 0 = full-width, 1 = half-width.
+    int japaneseSymbolWidth{0};
     // Words that start with what is typed, offered while typing Japanese.
     bool japanesePredictionEnabled{true};
     // Special conversions, in English and Japanese (the special-conversions

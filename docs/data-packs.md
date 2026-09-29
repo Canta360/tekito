@@ -22,7 +22,7 @@ download that setup fetches when Japanese is chosen.
 | `emoji` | Emoji and their names | Unicode CLDR | Unicode License v3 |
 | `social-expression` | Emoji, emoticons, kaomoji, symbols and short forms for chat words | Written for TEKITO (`scripts/social-expression-seeds.tsv`) | TEKITO (see `LICENSE.md`) |
 | `japanese-phonetic` | English words from how they sound in romaji ("konpyuutaa" → computer) | Generated from CMUdict; words chosen by Leipzig frequency | CMUdict license |
-| `special-conversions` | Dates and times for words like "today" and "きょう", symbols by ASCII spelling ("->" → →) or Japanese reading ("やじるし" → →), and the kanji for numbers | Written for TEKITO (`scripts/build-special-conversions.py`); Japanese symbols from Mozc (`src/data/symbol/symbol.tsv`) | TEKITO (see `LICENSE.md`), BSD-3-Clause |
+| `special-conversions` | Dates and times for words like "today" and "きょう", symbols by ASCII spelling ("->" → →) or Japanese reading ("やじるし" → →), Japanese emoticons ("にこにこ" → (^^)), and the kanji for numbers | Written for TEKITO (`scripts/build-special-conversions.py`); Japanese symbols and emoticons from Mozc (`src/data/symbol`, `src/data/emoticon`) | TEKITO (see `LICENSE.md`), BSD-3-Clause |
 | `qwerty-typo-catalog` | Synthetic typos of common words, for evaluation only | Generated for TEKITO | TEKITO (see `LICENSE.md`) |
 | `japanese-romaji` | How typed keys become kana in Japanese input | Written for TEKITO (`scripts/build-japanese-romaji.py`) | TEKITO (see `LICENSE.md`) |
 | `japanese-core` | Words, readings and how they join, for kana-kanji conversion | Mozc OSS dictionary (IPAdic, Okinawa dictionary) | IPAdic license, BSD-3-Clause |
@@ -75,10 +75,10 @@ it converts as before but leaves the user's Japanese words out. `japanese-romaji
 `special-conversions` is one small text file (`rules.tsv`, no index) read
 whole at startup. `scripts\build-special-conversions.py` writes it from the
 dates, formats, names and English symbols in the script and Mozc's symbol
-table at a pinned commit:
+and emoticon tables at a pinned commit:
 
 ```powershell
-python scripts\build-special-conversions.py --mozc-symbols <symbol.tsv> --mozc-license <LICENSE> --mozc-commit <sha>
+python scripts\build-special-conversions.py --mozc-symbols <symbol.tsv> --mozc-emoticons <emoticon.tsv> --mozc-license <LICENSE> --mozc-commit <sha>
 ```
 
 The same script builds `japanese-lm` (about 43 MB) with

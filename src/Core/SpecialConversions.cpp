@@ -342,8 +342,16 @@ std::wstring SpecialConversions::Format(Language language, std::wstring_view pat
 }
 
 std::vector<std::wstring> SpecialConversions::Symbols(Language language, std::wstring_view key) const {
-    const auto* symbols = Find(L"symbol", language, key);
+    // Japanese keys are kept in full-width, however the symbols were typed.
+    const auto* symbols = language == Language::Japanese
+                              ? Find(L"symbol", language, japanese::ToFullWidthAscii(key))
+                              : Find(L"symbol", language, key);
     return symbols ? *symbols : std::vector<std::wstring>{};
+}
+
+std::vector<std::wstring> SpecialConversions::Emoticons(std::wstring_view reading) const {
+    const auto* faces = Find(L"emoticon", Language::Japanese, reading);
+    return faces ? *faces : std::vector<std::wstring>{};
 }
 
 std::wstring SpecialConversions::Kanji(std::wstring_view digits, bool daiji) const {
