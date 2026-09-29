@@ -43,6 +43,7 @@ const initialSettings = {
   periodOnEnter: false,
   japaneseSpaceWidth: 0,
   japanesePunctuation: 0,
+  japaneseDigitWidth: 0,
   japanesePredictionEnabled: true,
   dateConversion: true,
   numberConversion: true,
@@ -546,9 +547,10 @@ function EnglishPage({ settings, setSetting }) {
 function JapanesePage({ settings, setSetting }) {
   const t = useText();
   const j = t.japanese;
-  // UserSettings::japaneseSpaceWidth and ::japanesePunctuation.
+  // UserSettings::japaneseSpaceWidth, ::japanesePunctuation and ::japaneseDigitWidth.
   const spaces = [[0, j.space.follow], [1, j.space.half], [2, j.space.full]];
   const marks = [[0, "、。"], [1, "，．"], [2, "，。"], [3, "、．"]];
+  const digits = [[0, "123"], [1, "１２３"]];
   return (
     <>
       <Glass className="card">
@@ -557,6 +559,9 @@ function JapanesePage({ settings, setSetting }) {
         </Row>
         <Row title={j.punctuation.title} description={j.punctuation.description}>
           <Segmented label={j.punctuation.title} value={settings.japanesePunctuation} options={marks} onChange={(value) => setSetting("japanesePunctuation", value)} />
+        </Row>
+        <Row title={j.digits.title} description={j.digits.description}>
+          <Segmented label={j.digits.title} value={settings.japaneseDigitWidth} options={digits} onChange={(value) => setSetting("japaneseDigitWidth", value)} />
         </Row>
         <Row title={j.prediction.title} description={j.prediction.description}>
           <Toggle label={j.prediction.title} checked={settings.japanesePredictionEnabled} onChange={(value) => setSetting("japanesePredictionEnabled", value)} />

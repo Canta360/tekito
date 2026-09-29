@@ -103,6 +103,9 @@ const JapaneseData* ProcessJapaneseData() {
         if (!loaded->loanwords.Open(root / L"japanese-loanwords")) Trace(L"Japanese loanwords unavailable");
         loaded->userParts = japanese::UserPartsOfSpeech::Load(root / L"japanese-core" / L"pos.tsv");
         if (loaded->userParts.Empty()) Trace(L"Japanese user word parts of speech unavailable");
+        if (const auto number = loaded->userParts.Number()) {
+            loaded->converter->SetNumberWord(japanese::JapaneseConverter::NumberWord{number->left, number->right, number->cost});
+        }
         return loaded;
     }();
     return data.get();

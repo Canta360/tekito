@@ -72,6 +72,29 @@ bool IsAlphanumeric(KanaForm form) {
     return form == KanaForm::FullWidthAlphanumeric || form == KanaForm::HalfWidthAlphanumeric;
 }
 
+bool IsDigit(wchar_t c) {
+    return (c >= L'0' && c <= L'9') || (c >= L'\xFF10' && c <= L'\xFF19');
+}
+
+bool IsDigits(std::wstring_view text) {
+    return !text.empty() && std::all_of(text.begin(), text.end(), IsDigit);
+}
+
+// A number in digits for a word read in kana (いち: 1, the dictionary's
+// likeliest) comes after the first two words.
+constexpr std::size_t kDigitsPosition = 2;
+void PutDigitsAfterWords(std::vector<PhraseCandidate>& candidates) {
+    std::vector<PhraseCandidate> digits;
+    for (std::size_t i = 0; i < std::min(candidates.size(), kDigitsPosition); ++i) {
+        if (candidates[i].kind == PhraseCandidate::Kind::Dictionary && IsDigits(candidates[i].text)) {
+            digits.push_back(std::move(candidates[i]));
+            candidates.erase(candidates.begin() + static_cast<std::ptrdiff_t>(i--));
+        }
+    }
+    const auto at = candidates.begin() + static_cast<std::ptrdiff_t>(std::min(candidates.size(), kDigitsPosition));
+    candidates.insert(at, std::make_move_iterator(digits.begin()), std::make_move_iterator(digits.end()));
+}
+
 }  // namespace
 
 void JapaneseComposer::SetTable(const RomajiTable* table) noexcept {
@@ -290,7 +313,7 @@ std::wstring JapaneseComposer::Reading() const {
     for (const auto& unit : units_) kana += unit.kana;
     // Keys the table did not turn into kana are full-width, as in Microsoft
     // IME ("ｋ" while "ka" is being typed).
-    return ApplyPunctuation(ToFullWidthAscii(kana));
+    return ApplyTypingStyle(ToFullWidthAscii(kana));
 }
 
 std::vector<PhraseCandidate> JapaneseComposer::KanaCandidates(std::wstring_view reading) const {
@@ -331,7 +354,7 @@ void JapaneseComposer::BuildPhrases(bool convert) {
         // goes back to what was typed.
         if (auto conversion = keyConverter_ ? keyConverter_->Convert(Keys(false), context_, contextWords_, userDictionary_)
                                             : std::nullopt) {
-            conversionReading_ = ApplyPunctuation(std::move(conversion->reading));
+            conversionReading_ = ApplyTypingStyle(std::move(conversion->reading));
             readingKeys_ = std::move(conversion->keyAt);
             AddPhrases(std::move(conversion->phrases), conversionReading_);
         } else {
@@ -348,6 +371,8 @@ void JapaneseComposer::BuildPhrases(bool convert) {
 void JapaneseComposer::AddPhrases(std::vector<Phrase> phrases, const std::wstring& reading) {
     for (auto& phrase : phrases) {
         if (phrase.candidates.empty()) continue;
+        const auto phraseReading = std::wstring_view(reading).substr(phrase.begin, phrase.length);
+        if (std::none_of(phraseReading.begin(), phraseReading.end(), IsDigit)) PutDigitsAfterWords(phrase.candidates);
         if (learning_) learning_->Reorder(reading.substr(phrase.begin, phrase.length), phrase.candidates);
         AddLoanwords(phrase.candidates);
         AddSpecial(std::wstring_view(reading).substr(phrase.begin, phrase.length), phrase.candidates);
@@ -405,8 +430,22 @@ void JapaneseComposer::AddSpecial(std::wstring_view reading, std::vector<PhraseC
             candidates.insert(candidates.begin() + static_cast<std::ptrdiff_t>(at++), std::move(candidate));
         }
     };
-    // Other forms of a number come right after it.
-    if (specialOptions_.numbers) insert(1, special_->Numbers(reading), {});
+    // Other forms of a number come right after it, and after a number with
+    // a counter as the first candidate writes it (３個: 3個, 三個).
+    if (specialOptions_.numbers) {
+        std::size_t digits = 0;
+        while (digits < reading.size() && IsDigit(reading[digits])) ++digits;
+        const auto& first = candidates.front().text;
+        if (digits == reading.size()) {
+            insert(1, special_->Numbers(reading), {});
+        } else if (digits > 0 && first.size() > digits && !IsDigit(first[digits]) &&
+                   ToHalfWidthAscii(first.substr(0, digits)) == ToHalfWidthAscii(reading.substr(0, digits))) {
+            const std::wstring rest = first.substr(digits);
+            if (rest.front() != L'.' && rest.front() != L',' && rest.front() != L'\xFF0E' && rest.front() != L'\xFF0C') {
+                insert(1, special_->Numbers(reading.substr(0, digits)), rest);
+            }
+        }
+    }
     // A date or time word, and what follows it in the phrase as long as the
     // first candidate ends with it too ("きょうは": 今日は, 2026/09/29は).
     if (specialOptions_.dates) {
@@ -492,7 +531,7 @@ std::vector<std::pair<PhraseCandidate, std::wstring>> JapaneseComposer::SlipRead
             kana += token.kana;
         }
         if (!readable) continue;
-        kana = ApplyPunctuation(std::move(kana));
+        kana = ApplyTypingStyle(std::move(kana));
         if (!skip.insert(kana).second) continue;
         auto candidate = converter_->Best(kana, 0, userDictionary_);
         if (candidate && !candidate->spellingCorrection && candidate->cost <= typedCost + kSlipMargin) {
@@ -513,7 +552,7 @@ void JapaneseComposer::AddSlipCandidates(PhraseState& phrase) const {
     const auto typedKanaOf = [&](const std::wstring& keys) {
         std::wstring kana;
         for (const auto& token : ParseRomaji(*table_, keys)) kana += token.kana;
-        return ApplyPunctuation(ToFullWidthAscii(kana));
+        return ApplyTypingStyle(ToFullWidthAscii(kana));
     };
     const auto costOf = [&](const std::optional<PhraseCandidate>& candidate) {
         return candidate ? candidate->cost : std::numeric_limits<std::int64_t>::max() / 4;
@@ -767,14 +806,25 @@ std::wstring JapaneseComposer::KeysFor(std::size_t begin, std::size_t length) co
     return keys;
 }
 
-std::wstring JapaneseComposer::ApplyPunctuation(std::wstring text) const {
+std::wstring JapaneseComposer::ApplyTypingStyle(std::wstring text) const {
     const bool comma = punctuation_ == PunctuationStyle::CommaPeriod ||
                        punctuation_ == PunctuationStyle::CommaKuten;
     const bool period = punctuation_ == PunctuationStyle::CommaPeriod ||
                         punctuation_ == PunctuationStyle::ToutenPeriod;
-    for (auto& ch : text) {
-        if (comma && ch == L'、') ch = L'，';
-        if (period && ch == L'。') ch = L'．';
+    for (std::size_t i = 0; i < text.size(); ++i) {
+        auto& ch = text[i];
+        if (halfWidthDigits_ && ch >= L'\xFF10' && ch <= L'\xFF19') ch = static_cast<wchar_t>(ch - 0xFF10 + L'0');
+        // Between digits: a decimal point or a thousands comma.
+        const bool betweenDigits = i > 0 && i + 1 < text.size() && IsDigit(text[i - 1]) && IsDigit(text[i + 1]);
+        if (betweenDigits && (ch == L'。' || ch == L'．')) {
+            ch = halfWidthDigits_ ? L'.' : L'．';
+        } else if (betweenDigits && (ch == L'、' || ch == L'，')) {
+            ch = halfWidthDigits_ ? L',' : L'，';
+        } else if (comma && ch == L'、') {
+            ch = L'，';
+        } else if (period && ch == L'。') {
+            ch = L'．';
+        }
     }
     return text;
 }

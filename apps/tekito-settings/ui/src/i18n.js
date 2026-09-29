@@ -150,6 +150,7 @@ const en = {
       full: "Full-width",
     },
     punctuation: { title: "Punctuation", description: "What the comma and period keys type." },
+    digits: { title: "Digits", description: "Half- or full-width. Converting offers the other width and kanji." },
     prediction: { title: "Predict words", description: "Offers words that start with what you type. Tab picks one." },
     keys: {
       convert: "Convert, then next candidate",
@@ -417,6 +418,7 @@ const ja = {
       full: "全角",
     },
     punctuation: { title: "句読点", description: "読点と句点のキーで入る記号です。" },
+    digits: { title: "数字", description: "半角か全角か。変換すると、もう一方の幅と漢数字も出ます。" },
     prediction: { title: "予測候補", description: "打った読みで始まる語を出します。Tab で選びます。" },
     keys: {
       convert: "変換、次の候補",

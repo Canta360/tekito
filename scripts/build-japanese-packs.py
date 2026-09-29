@@ -32,8 +32,9 @@ connection.bin (ja-matrix-v1): how words join
                (Mozc's segmenter.def rules; id 0 is the start and end)
 
 pos.tsv: the part of speech a word the user adds takes, by the kind Settings
-offers (JapaneseUserDictionary.h): kind, left id, right id, cost. Comment
-lines start with #.
+offers (JapaneseUserDictionary.h): kind, left id, right id, cost; and, as
+kind "number", the part of speech and cost of digits typed in Japanese, so
+counters join them (3こ -> 3個). Comment lines start with #.
 
 Usage:
   python scripts/build-japanese-packs.py --mozc <Mozc src/data> --commit <sha> --out data/japanese-core
@@ -80,6 +81,10 @@ USER_POS = (
 )
 # Cheaper than 95 % of Mozc's words: the user's words win their readings.
 USER_WORD_COST = 4000
+# Digits typed in Japanese read as one number, about as likely as Mozc's
+# single digits (1904-3380).
+NUMBER_POS = "名詞,数,アラビア数字,*,*,*,*"
+NUMBER_COST = 2500
 
 
 def katakana(text: str) -> str:
@@ -286,9 +291,10 @@ def keep_for_sentences(entries, sentences: list[str], unknown_id: int, keep_ids:
     return [(r, remap[l], remap[rt], c, s, sp) for r, l, rt, c, s, sp in wanted], used
 
 
-def write_user_pos(ids: list[int], out: Path) -> None:
+def write_user_pos(ids: list[int], number_id: int, out: Path) -> None:
     lines = ["# kind\tleft id\tright id\tcost (scripts/build-japanese-packs.py)"]
     lines += [f"{kind}\t{pos}\t{pos}\t{USER_WORD_COST}" for (kind, _), pos in zip(USER_POS, ids)]
+    lines.append(f"number\t{number_id}\t{number_id}\t{NUMBER_COST}")
     out.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
 
 
@@ -320,21 +326,23 @@ def main() -> None:
         raise ValueError("id.def and the connection matrix disagree on the id count")
     unknown_id = pos_names.index(UNKNOWN_POS)
     user_ids = [pos_names.index(name) for _, name in USER_POS]
+    number_id = pos_names.index(NUMBER_POS)
     if args.sentences:
         sentences = [line.strip() for line in args.sentences.read_text(encoding="utf-8").splitlines()
                      if line.strip() and not line.startswith("#")]
-        entries, used = keep_for_sentences(entries, sentences, unknown_id, user_ids)
+        entries, used = keep_for_sentences(entries, sentences, unknown_id, user_ids + [number_id])
         costs = [costs[r * size + l] for r in used for l in used]
         pos_names = [pos_names[i] for i in used]
         unknown_id = used.index(unknown_id)
         user_ids = [used.index(i) for i in user_ids]
+        number_id = used.index(number_id)
         size = len(used)
     boundary = boundary_rows(args.mozc, pos_names)
 
     args.out.mkdir(parents=True, exist_ok=True)
     dictionary = build_dictionary(entries, unknown_id, args.out / "dictionary.bin")
     matrix = build_matrix(size, costs, boundary, args.out / "connection.bin")
-    write_user_pos(user_ids, args.out / "pos.tsv")
+    write_user_pos(user_ids, number_id, args.out / "pos.tsv")
     write_notice(args.mozc, args.out / "NOTICE", args.commit)
     manifest = {
         "pack_id": "japanese-core",

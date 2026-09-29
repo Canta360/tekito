@@ -53,9 +53,19 @@ struct Lattice {
     std::vector<std::vector<int>> endingAt;
 };
 
+bool IsDigit(wchar_t c) {
+    return (c >= L'0' && c <= L'9') || (c >= L'\xFF10' && c <= L'\xFF19');
+}
+
+// A decimal point or thousands comma, as typed in Japanese.
+bool IsNumberMark(wchar_t c) {
+    return c == L'.' || c == L',' || c == L'\xFF0E' || c == L'\xFF0C';
+}
+
 Lattice BuildLattice(const JapaneseDictionary& dictionary, const ReadingCodes& codes,
                      const std::vector<bool>& fixedBoundary, std::wstring_view reading,
-                     const LanguageModel* model, const JapaneseUserDictionary* user) {
+                     const LanguageModel* model, const JapaneseUserDictionary* user,
+                     const JapaneseConverter::NumberWord* number) {
     const std::size_t n = codes.size();
     Lattice lattice;
     lattice.beginningAt.resize(n + 1);
@@ -122,6 +132,21 @@ Lattice BuildLattice(const JapaneseDictionary& dictionary, const ReadingCodes& c
                 add(std::move(node));
             });
         }
+        // A number: the digits from here, with the marks between them.
+        if (number && IsDigit(reading[i]) && (i == 0 || !IsDigit(reading[i - 1]))) {
+            std::size_t end = i;
+            while (end < n && (end == i || !fixedBoundary[end]) &&
+                   (IsDigit(reading[end]) || (IsNumberMark(reading[end]) && end + 1 < n && IsDigit(reading[end + 1])))) {
+                ++end;
+            }
+            Node digits;
+            digits.begin = static_cast<std::uint32_t>(i);
+            digits.end = static_cast<std::uint32_t>(end);
+            digits.left = number->left;
+            digits.right = number->right;
+            digits.cost = number->cost;
+            add(std::move(digits));
+        }
         Node single;
         single.begin = static_cast<std::uint32_t>(i);
         single.end = static_cast<std::uint32_t>(i + 1);
@@ -185,7 +210,8 @@ std::vector<Phrase> JapaneseConverter::Convert(std::wstring_view reading,
         fixedBoundary[fixedEnd] = true;
     }
     const bool pairs = model_ && (weights_.costPerNat > 0 || weights_.penaltyPerNat > 0);
-    const Lattice lattice = BuildLattice(dictionary_, codes, fixedBoundary, reading, pairs ? model_ : nullptr, user);
+    const Lattice lattice = BuildLattice(dictionary_, codes, fixedBoundary, reading, pairs ? model_ : nullptr, user,
+                                         number_ ? &*number_ : nullptr);
     const auto& nodes = lattice.nodes;
 
     // The most likely words for the whole reading.
@@ -467,7 +493,8 @@ std::optional<PhraseCandidate> JapaneseConverter::Best(std::wstring_view reading
     const ReadingCodes codes = dictionary_.Encode(reading);
     const std::vector<bool> noBoundary(n + 1, false);
     // Quick on purpose: the language model is left out.
-    const Lattice lattice = BuildLattice(dictionary_, codes, noBoundary, reading, nullptr, user);
+    const Lattice lattice = BuildLattice(dictionary_, codes, noBoundary, reading, nullptr, user,
+                                         number_ ? &*number_ : nullptr);
     const auto& nodes = lattice.nodes;
     std::vector<std::int64_t> best(nodes.size(), kInfinity);
     std::vector<int> previous(nodes.size(), -1);

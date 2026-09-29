@@ -108,6 +108,17 @@ public:
         // (both chuusha) after "anesthetic".
         std::int64_t costPerTopic{300};
     };
+    // Digits (and a decimal point or comma between them) read as one number
+    // word of this part of speech (japanese-core/pos.tsv, "number"), so
+    // counters join them: 3こ is 3個, 100えん 100円. Without it they are
+    // unknown characters.
+    struct NumberWord {
+        std::uint16_t left{0};
+        std::uint16_t right{0};
+        std::int64_t cost{0};
+    };
+    void SetNumberWord(std::optional<NumberWord> number) noexcept { number_ = number; }
+
     // nullptr turns the model off.
     void SetLanguageModel(const LanguageModel* model, ModelWeights weights = {}) noexcept {
         model_ = model;
@@ -119,6 +130,7 @@ private:
     const ConnectionMatrix& matrix_;
     const LanguageModel* model_{nullptr};
     ModelWeights weights_;
+    std::optional<NumberWord> number_;
 };
 
 }  // namespace tekito::japanese

@@ -43,6 +43,7 @@ function initialState() {
       periodOnEnter: false,
       japaneseSpaceWidth: 0,
       japanesePunctuation: 0,
+      japaneseDigitWidth: 0,
       japanesePredictionEnabled: true,
       uiLanguage: 0,
       excludedApps: ["Code.exe"],

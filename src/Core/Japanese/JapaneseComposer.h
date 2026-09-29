@@ -90,6 +90,10 @@ public:
     // kana (dictionary and learning). Off by default.
     void SetPredictionEnabled(bool enabled) noexcept { predictionEnabled_ = enabled; }
     void SetPunctuationStyle(PunctuationStyle style) noexcept { punctuation_ = style; }
+    // Digits typed in Japanese: half-width (123) or, by default, full-width
+    // (１２３). A period or comma between digits is a decimal point or a
+    // thousands comma of the same width (3.14), not 。 or 、.
+    void SetHalfWidthDigits(bool half) noexcept { halfWidthDigits_ = half; }
     // Hiragana or Katakana: how new text is shown while typing.
     void SetInputForm(KanaForm form) noexcept;
     [[nodiscard]] KanaForm InputForm() const noexcept { return inputForm_; }
@@ -199,7 +203,8 @@ private:
     [[nodiscard]] std::wstring Keys(bool includePending) const;
     // The keys typed for the reading from `begin`, `length` long.
     [[nodiscard]] std::wstring KeysFor(std::size_t begin, std::size_t length) const;
-    [[nodiscard]] std::wstring ApplyPunctuation(std::wstring text) const;
+    // The punctuation style and the digits' width.
+    [[nodiscard]] std::wstring ApplyTypingStyle(std::wstring text) const;
     [[nodiscard]] std::wstring RenderTyping(bool includePending) const;
     [[nodiscard]] std::wstring PhraseText(const PhraseState& phrase) const;
     [[nodiscard]] std::wstring FormText(KanaForm form, std::size_t begin, std::size_t length,
@@ -251,6 +256,7 @@ private:
     std::wstring pending_;
     KanaForm inputForm_{KanaForm::Hiragana};
     PunctuationStyle punctuation_{PunctuationStyle::ToutenKuten};
+    bool halfWidthDigits_{false};
     std::vector<PhraseState> phrases_;
     // The reading the phrases were converted from: the typed one, or the
     // corrected one after a romaji correction (Esc still goes back to what
