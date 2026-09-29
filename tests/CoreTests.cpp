@@ -18,6 +18,7 @@
 #include "UserData/SqliteUserDictionaryRepository.h"
 #include "UserData/UserDictionaryFile.h"
 #include "UserData/DataPackValidation.h"
+#include "UserData/PostalCodeImport.h"
 #include "sqlite3.h"
 #include "UserData/RuntimeModeState.h"
 
@@ -1562,6 +1563,52 @@ void TestSqliteUserLearningRepository() {
     std::filesystem::remove(path, error);
 }
 
+// Postal codes added in Settings: Japan Post's CSV becomes a sorted pack.
+void TestPostalCodeImport() {
+    using tekito::userdata::PostalCodeImportError;
+    const auto directory = std::filesystem::temp_directory_path() / L"tekito-postal-test";
+    std::error_code error;
+    std::filesystem::remove_all(directory, error);
+
+    // Japan Post's rows: code in the third field, prefecture, city and town
+    // in the seventh to ninth (the Japanese text as UTF-8 bytes).
+    const std::string tokyo = "\xE6\x9D\xB1\xE4\xBA\xAC\xE9\x83\xBD";                   // Tokyo-to
+    const std::string chiyoda = "\xE5\x8D\x83\xE4\xBB\xA3\xE7\x94\xB0\xE5\x8C\xBA";     // Chiyoda-ku
+    const std::string town = "\xE5\x8D\x83\xE4\xBB\xA3\xE7\x94\xB0";                    // Chiyoda
+    const std::string note = "\xEF\xBC\x88\xE6\xB3\xA8\xEF\xBC\x89";                    // (note), full-width
+    std::string csv = "\xEF\xBB\xBF";
+    for (int code = 1000000; code < 1060000; ++code) {
+        csv += "13101,\"100  \",\"" + std::to_string(code) + "\",\"a\",\"b\",\"c\",\"" + tokyo + "\",\"" + chiyoda +
+               "\",\"" + town + (code == 1000001 ? note : "") + "\",0,0,0,0,0,0\r\n";
+    }
+    PostalCodeImportError failure{};
+    const auto built = tekito::userdata::BuildPostalCodePack(csv, L"2026.09", directory, failure);
+    Require(built && built->count == 60000 && failure == PostalCodeImportError::None,
+            "Japan Post's rows become the postal code pack");
+    std::ifstream data(directory / L"zipcodes.tsv", std::ios::binary);
+    std::string first, second;
+    std::getline(data, first);
+    std::getline(data, second);
+    Require(first == "1000000\t" + tokyo + chiyoda + town && second == "1000001\t" + tokyo + chiyoda + town,
+            "rows are code and address, in order, without notes in parentheses");
+    data.close();
+    const auto installed = tekito::userdata::InstalledPostalCodes(directory);
+    Require(installed && installed->count == 60000 && installed->version == L"2026.09",
+            "the added pack validates and says what it holds");
+
+    Require(!tekito::userdata::BuildPostalCodePack("\x93\x8C\x8B\x9E", L"x", directory, failure) &&
+                failure == PostalCodeImportError::ShiftJis,
+            "Japan Post's Shift_JIS download is told apart");
+    Require(!tekito::userdata::BuildPostalCodePack("a,b,c\n", L"x", directory, failure) &&
+                failure == PostalCodeImportError::NotPostalCodes,
+            "other files are not taken");
+    Require(tekito::userdata::InstalledPostalCodes(directory).has_value(), "a failed import keeps what was there");
+
+    Require(tekito::userdata::RemovePostalCodes(directory) && !tekito::userdata::InstalledPostalCodes(directory),
+            "the postal codes can be removed");
+    std::filesystem::remove_all(directory, error);
+}
+
 void TestDataPackValidation() {
     const auto dataRoot = tekito::ExternalLexiconProvider::DataPackRoot();
     for (const auto& pack : {L"standard-english", L"wikipedia-common-misspellings",
@@ -2106,6 +2153,7 @@ int main() {
     TestUserLearningStore();
     TestSqliteUserLearningRepository();
     TestDataPackValidation();
+    TestPostalCodeImport();
     TestRankingDataBoundaries();
     TestCompositeLexiconProvider();
     TestPolicyEngineBoundary();

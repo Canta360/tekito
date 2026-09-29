@@ -20,6 +20,10 @@ struct DataPackStatus {
     std::wstring reason;
 };
 
+// A file's SHA-256 in upper-case hex, as manifests give it; empty if it
+// cannot be read.
+[[nodiscard]] std::string FileSha256(const std::filesystem::path& path);
+
 [[nodiscard]] bool ValidateDataPack(const std::filesystem::path& packPath,
                                     DataPackStatus& status) noexcept;
 

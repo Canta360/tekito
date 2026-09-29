@@ -40,7 +40,7 @@ $requiredPacks = @("standard-english", "wikipedia-common-misspellings", "frequen
                    "special-conversions")
 # Japanese input, downloaded separately; the first two are required for it.
 $japanesePacks = @("japanese-core", "japanese-romaji", "japanese-lm", "japanese-loanwords",
-                   "japanese-wiktionary", "japanese-wordnet", "japanese-zipcode")
+                   "japanese-wiktionary", "japanese-wordnet")
 
 function Get-RelativeUnixPath([string]$BasePath, [string]$TargetPath) {
     $base = (Resolve-Path -LiteralPath $BasePath).Path.TrimEnd('\') + '\'

@@ -19,7 +19,9 @@ function parse(data) {
   }
 }
 
-export function hostRequest(type, payload = {}) {
+// `files` (File objects, e.g. dropped on the page) reach the host with the
+// message, which sees their paths.
+export function hostRequest(type, payload = {}, files = []) {
   return new Promise((resolve) => {
     const requestId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
     let settled = false;
@@ -45,9 +47,16 @@ export function hostRequest(type, payload = {}) {
       return;
     }
     webview().addEventListener("message", onMessage);
-    webview().postMessage(JSON.stringify({ type, requestId, ...payload }));
-    // File dialogs (import/export) keep the host busy until the user closes them.
-    const opensDialog = ["dictionary.import", "dictionary.export", "excludedApps.browse"].includes(type);
+    const text = JSON.stringify({ type, requestId, ...payload });
+    if (files.length && webview().postMessageWithAdditionalObjects) {
+      webview().postMessageWithAdditionalObjects(text, files);
+    } else {
+      webview().postMessage(text);
+    }
+    // File dialogs (import/export) keep the host busy until the user closes
+    // them; adding postal codes takes a few seconds.
+    const opensDialog = ["dictionary.import", "dictionary.export", "excludedApps.browse",
+      "postalCodes.browse", "postalCodes.import"].includes(type);
     const timeout = opensDialog ? 600000 : 4000;
     window.setTimeout(() => finish({ ok: false, error: "", state: null }), timeout);
   });
