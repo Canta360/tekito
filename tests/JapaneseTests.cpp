@@ -956,6 +956,29 @@ void TestSpecialConversions(const RomajiTable& table, const MiniPack& pack) {
                 "half-width first, then full-width and kanji");
     }
 
+    // After digits, a phrase is learned apart: こ learned as 子 on its own
+    // leaves 3こ as 3個.
+    {
+        auto numbered = converter;
+        const auto parts = tekito::japanese::UserPartsOfSpeech::Load(std::filesystem::path(TEKITO_TEST_DATA_DIR) /
+                                                                     L"japanese-mini" / L"pos.tsv");
+        numbered.SetNumberWord(tekito::japanese::JapaneseConverter::NumberWord{parts.Number()->left, parts.Number()->right,
+                                                                              parts.Number()->cost});
+        tekito::japanese::JapaneseLearningStore learning;
+        for (int i = 0; i < 3; ++i) learning.RecordChoice(L"こ", L"子", L"子");
+        JapaneseComposer counted(&table);
+        counted.SetConverter(&numbered);
+        counted.SetLearning(&learning);
+        counted.SetHalfWidthDigits(true);
+        Type(counted, L"3ko");
+        counted.Convert();
+        const auto withCounter = counted.Preedit();
+        RequireText(withCounter, L"3個", "what こ alone was learned as does not follow a number");
+        RequireText(counted.Commit(), L"3個", "3個 is committed");
+        Require(learning.Preference(L"#こ", withCounter.substr(1)) > 0 && learning.Preference(L"こ", L"子") == 3,
+                "the counter is learned apart from こ alone");
+    }
+
     tekito::SpecialConversionOptions off;
     off.calculator = off.numbers = off.symbols = off.dates = false;
     composer.SetSpecialConversions(&special, off);
