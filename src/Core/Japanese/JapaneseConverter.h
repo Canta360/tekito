@@ -110,8 +110,8 @@ public:
     };
     // Digits (and a decimal point or comma between them) read as one number
     // word of this part of speech (japanese-core/pos.tsv, "number"), so
-    // counters join them: 3こ is 3個, 100えん 100円. Without it they are
-    // unknown characters.
+    // counters join them (3 and "ko" is three of a thing). Without it they
+    // are unknown characters.
     struct NumberWord {
         std::uint16_t left{0};
         std::uint16_t right{0};
