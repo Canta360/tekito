@@ -293,6 +293,8 @@ bool SqliteUserDictionaryRepository::LoadSettings(UserSettings& settings) const 
             loaded.japaneseDigitWidth = std::clamp(value, 0, 1);
         } else if (std::strcmp(key, "japanese_symbol_width") == 0) {
             loaded.japaneseSymbolWidth = std::clamp(value, 0, 1);
+        } else if (std::strcmp(key, "advanced_settings") == 0) {
+            loaded.advancedSettings = value != 0;
         } else if (std::strcmp(key, "japanese_prediction_enabled") == 0) {
             loaded.japanesePredictionEnabled = value != 0;
         }
@@ -380,6 +382,7 @@ bool SqliteUserDictionaryRepository::SaveSettings(const UserSettings& settings) 
     saveValue("japanese_punctuation", std::clamp(settings.japanesePunctuation, 0, 3));
     saveValue("japanese_digit_width", std::clamp(settings.japaneseDigitWidth, 0, 1));
     saveValue("japanese_symbol_width", std::clamp(settings.japaneseSymbolWidth, 0, 1));
+    saveValue("advanced_settings", settings.advancedSettings ? 1 : 0);
     saveValue("japanese_prediction_enabled", settings.japanesePredictionEnabled ? 1 : 0);
     if (statement) sqlite3_finalize(statement);
     statement = nullptr;

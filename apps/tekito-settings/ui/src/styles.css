@@ -170,6 +170,7 @@ nav { display: grid; gap: 4px; }
 .feature-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .mode-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .tile-grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.tile-grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 /* Choices that do nothing while their switch is off. */
 .tile-grid.is-muted { opacity: 0.55; }
 
@@ -181,6 +182,7 @@ nav { display: grid; gap: 4px; }
 }
 .feature-grid .tile { aspect-ratio: 1.15; }
 .feature-grid.three .tile { aspect-ratio: 1.7; }
+.feature-grid.two .tile { aspect-ratio: 2.6; }
 .mode-grid .tile { aspect-ratio: 2.4; }
 .mode-grid.three .tile { aspect-ratio: 1.6; }
 .tile:hover { transform: translateY(-2px); }

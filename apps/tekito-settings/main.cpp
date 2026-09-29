@@ -863,6 +863,8 @@ private:
         json += L",\"japanesePunctuation\":" + std::to_wstring(settings_.japanesePunctuation);
         json += L",\"japaneseDigitWidth\":" + std::to_wstring(settings_.japaneseDigitWidth);
         json += L",\"japaneseSymbolWidth\":" + std::to_wstring(settings_.japaneseSymbolWidth);
+        json += L",\"advancedSettings\":";
+        json += settings_.advancedSettings ? L"true" : L"false";
         json += L",\"japanesePredictionEnabled\":";
         json += settings_.japanesePredictionEnabled ? L"true" : L"false";
         json += L",\"uiLanguage\":" + std::to_wstring(settings_.uiLanguage);
@@ -1009,6 +1011,7 @@ private:
             else if (key == L"meaningsEnabled") settings_.meaningsEnabled = value;
             else if (key == L"japaneseEnabled") settings_.japaneseEnabled = value;
             else if (key == L"modeIndicatorEnabled") settings_.modeIndicatorEnabled = value;
+            else if (key == L"advancedSettings") settings_.advancedSettings = value;
             else if (key == L"dateConversion") settings_.dateConversion = value;
             else if (key == L"numberConversion") settings_.numberConversion = value;
             else if (key == L"symbolConversion") settings_.symbolConversion = value;

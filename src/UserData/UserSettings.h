@@ -83,6 +83,9 @@ struct UserSettings {
     bool numberConversion{true};
     bool symbolConversion{true};
     bool calculatorEnabled{true};
+    // Settings shows its finer options (and the Special conversions page);
+    // off, only what most people change.
+    bool advancedSettings{false};
     // Language of TEKITO's own windows: 0 = the Windows display language,
     // 1 = English, 2 = Japanese. See UiLanguage.h.
     int uiLanguage{0};
