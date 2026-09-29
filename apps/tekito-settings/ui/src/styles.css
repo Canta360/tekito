@@ -328,6 +328,21 @@ nav { display: grid; gap: 4px; }
 /* ---- pages --------------------------------------------------------------- */
 
 .keys { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+
+/* Special conversions: what to type, and what it offers. */
+.card-note { color: var(--ink-2); font-size: 13px; }
+.card-note + * { margin-top: 12px; }
+.example-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
+.example-group { display: grid; gap: 6px; align-content: start; padding: 12px 14px; border-radius: 14px; background: var(--recess); }
+.example-group h3 { font: 600 12px/1.3 var(--font); color: var(--ink-2); margin-bottom: 2px; }
+.example { display: grid; grid-template-columns: minmax(64px, auto) 18px 1fr; align-items: center; gap: 8px; font-size: 13px; }
+.example-typed {
+  justify-self: start; padding: 2px 8px; border-radius: 7px;
+  background: var(--glass-strong); box-shadow: inset 0 -1px 0 var(--hairline);
+  font: 600 12px/1.6 var(--font);
+}
+.example-arrow { color: var(--ink-3); text-align: center; }
+.example.is-off { opacity: 0.4; }
 .key { display: grid; gap: 7px; padding: 12px 14px; border-radius: 14px; background: var(--recess); }
 .keycaps { display: flex; gap: 5px; flex-wrap: wrap; align-items: center; }
 .key small { color: var(--ink-2); font-size: 12px; }

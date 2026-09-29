@@ -12,6 +12,7 @@ const pages = [
   { id: "candidates", icon: "candidates" },
   { id: "english", icon: "english" },
   { id: "japanese", icon: "japanese" },
+  { id: "special", icon: "special" },
   { id: "dictionary", icon: "dictionary" },
   { id: "about", icon: "about" },
 ];
@@ -43,6 +44,10 @@ const initialSettings = {
   japaneseSpaceWidth: 0,
   japanesePunctuation: 0,
   japanesePredictionEnabled: true,
+  dateConversion: true,
+  numberConversion: true,
+  symbolConversion: true,
+  calculatorEnabled: true,
   uiLanguage: 0,
   excludedApps: [],
   builtInExcludedApps: [],
@@ -55,6 +60,14 @@ const englishFeatures = [
   { key: "correctionEnabled", icon: "spelling" },
   { key: "completionEnabled", icon: "completion" },
   { key: "japanesePhoneticSuggestionsEnabled", icon: "japanese" },
+];
+
+// Special conversions (UserSettings), for English and Japanese alike.
+const specialFeatures = [
+  { key: "dateConversion", icon: "calendar" },
+  { key: "numberConversion", icon: "numbers" },
+  { key: "symbolConversion", icon: "symbols" },
+  { key: "calculatorEnabled", icon: "calculator" },
 ];
 
 // Candidate list look (UserSettings::candidateWindowStyle).
@@ -257,6 +270,7 @@ function App() {
               {current.id === "candidates" && <CandidatesPage settings={settings} setSetting={setSetting} />}
               {current.id === "english" && <EnglishPage settings={settings} setSetting={setSetting} />}
               {current.id === "japanese" && <JapanesePage settings={settings} setSetting={setSetting} />}
+              {current.id === "special" && <SpecialPage japanese={japanese} settings={settings} setSetting={setSetting} />}
               {current.id === "dictionary" && <DictionaryPage japanese={japaneseInstalled} japaneseWords={japaneseWords} learning={learning} settings={settings} setSetting={setSetting} dictionary={dictionary} setModal={setModal} setConfirm={setConfirm} runAction={runAction} />}
               {current.id === "about" && <AboutPage version={version} runtime={runtime} packs={packs} runAction={runAction} />}
             </div>
@@ -559,6 +573,59 @@ function JapanesePage({ settings, setSetting }) {
           <Key label={j.keys.letters} keys={["F9", "F10"]} />
           <Key label={j.keys.english} keys={["Shift", "A-Z"]} />
           <Key label={j.keys.back} keys={["Esc"]} />
+        </div>
+      </Glass>
+    </>
+  );
+}
+
+// Special conversions: what else becomes a candidate, in both languages.
+// Examples show today's date and time; Japanese ones only with Japanese on.
+function SpecialPage({ japanese, settings, setSetting }) {
+  const t = useText();
+  const s = t.special;
+  const now = new Date();
+  const pad = (value) => String(value).padStart(2, "0");
+  const englishDate = now.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+  const englishTime = now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  const japaneseDate = `${now.getFullYear()}/${pad(now.getMonth() + 1)}/${pad(now.getDate())}`;
+  const examples = [
+    { language: "english", typed: "today", result: englishDate, key: "dateConversion" },
+    { language: "english", typed: "now", result: englishTime, key: "dateConversion" },
+    { language: "english", typed: "(c)", result: "©", key: "symbolConversion" },
+    { language: "english", typed: "->", result: "→", key: "symbolConversion" },
+    { language: "english", typed: "1+2=", result: "3", key: "calculatorEnabled" },
+    { language: "japanese", typed: "きょう", result: japaneseDate, key: "dateConversion" },
+    { language: "japanese", typed: "1234", result: "千二百三十四", key: "numberConversion" },
+    { language: "japanese", typed: "やじるし", result: "→", key: "symbolConversion" },
+    { language: "japanese", typed: "1+2=", result: "3", key: "calculatorEnabled" },
+  ].filter((example) => japanese || example.language === "english");
+  const groups = japanese ? ["english", "japanese"] : ["english"];
+  return (
+    <>
+      <div className="tile-grid feature-grid">
+        {specialFeatures.map((feature) => (
+          <Tile key={feature.key} on={Boolean(settings[feature.key])} icon={feature.icon} title={s[feature.key].title}
+            description={s[feature.key].description} status={settings[feature.key] ? t.on : t.off}
+            onPress={() => setSetting(feature.key, !settings[feature.key])} />
+        ))}
+      </div>
+      <Glass className="card">
+        <h2 className="card-title">{s.examples.title}</h2>
+        <p className="card-note">{s.examples.description}</p>
+        <div className="example-groups">
+          {groups.map((language) => (
+            <section key={language} className="example-group">
+              <h3>{s.examples[language]}</h3>
+              {examples.filter((example) => example.language === language).map((example) => (
+                <div key={example.typed} className={`example ${settings[example.key] ? "" : "is-off"}`}>
+                  <span className="example-typed">{example.typed}</span>
+                  <span className="example-arrow" aria-hidden="true">{"→"}</span>
+                  <span className="example-result">{example.result}</span>
+                </div>
+              ))}
+            </section>
+          ))}
         </div>
       </Glass>
     </>
