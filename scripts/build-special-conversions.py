@@ -14,14 +14,18 @@ Rows that share a section, language and key keep their order.
            their ASCII spelling (English, "->" -> "→")
   emoticon Japanese emoticons (kaomoji) by reading, from Mozc's emoticon
            table; "かおもじ" lists them all
+  kanji    the single kanji read a way, all in one value, from Mozc's
+           single-kanji table (offered after a reading's words)
 
 The dates, formats, names and English symbols are written here for TEKITO.
-The Japanese symbols and emoticons come from Mozc (src/data/symbol/symbol.tsv
-and src/data/emoticon/emoticon.tsv, BSD-3-Clause).
+The Japanese symbols, emoticons and single kanji come from Mozc
+(src/data/symbol/symbol.tsv, src/data/emoticon/emoticon.tsv and
+src/data/single_kanji/single_kanji.tsv, BSD-3-Clause).
 
 Usage:
   python scripts/build-special-conversions.py --mozc-symbols <symbol.tsv> \\
-      --mozc-emoticons <emoticon.tsv> --mozc-license <Mozc LICENSE> --mozc-commit <sha>
+      --mozc-emoticons <emoticon.tsv> --mozc-single-kanji <single_kanji.tsv> \\
+      --mozc-license <Mozc LICENSE> --mozc-commit <sha>
 """
 
 from __future__ import annotations
@@ -160,6 +164,16 @@ def mozc_emoticons(path: Path) -> list[tuple[str, str]]:
     return rows
 
 
+def mozc_single_kanji(path: Path) -> list[tuple[str, str]]:
+    """(reading, its kanji as one string) from Mozc's single_kanji.tsv."""
+    rows: list[tuple[str, str]] = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        fields = line.split("\t")
+        if len(fields) == 2 and fields[0] and fields[1] and not fields[0].startswith("#"):
+            rows.append((fields[0], fields[1]))
+    return rows
+
+
 def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest().upper()
 
@@ -168,6 +182,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--mozc-symbols", type=Path, required=True, help="Mozc src/data/symbol/symbol.tsv")
     parser.add_argument("--mozc-emoticons", type=Path, required=True, help="Mozc src/data/emoticon/emoticon.tsv")
+    parser.add_argument("--mozc-single-kanji", type=Path, required=True,
+                        help="Mozc src/data/single_kanji/single_kanji.tsv")
     parser.add_argument("--mozc-license", type=Path, required=True, help="Mozc LICENSE")
     parser.add_argument("--mozc-commit", required=True, help="the Mozc commit both files are from")
     args = parser.parse_args()
@@ -183,6 +199,7 @@ def main() -> None:
     rows += [("symbol", "en", key, symbol) for key, symbol in ENGLISH_SYMBOLS]
     rows += [("symbol", "ja", reading, symbol) for reading, symbol in mozc_symbols(args.mozc_symbols)]
     rows += [("emoticon", "ja", reading, face) for reading, face in mozc_emoticons(args.mozc_emoticons)]
+    rows += [("kanji", "ja", reading, kanji) for reading, kanji in mozc_single_kanji(args.mozc_single_kanji)]
     for row in rows:
         if any("\t" in field or "\n" in field or not field for field in row):
             raise ValueError(f"bad row: {row!r}")
@@ -202,9 +219,9 @@ def main() -> None:
         "The dates, formats, names and English symbols were written for TEKITO\n"
         "and are covered by the TEKITO source license (LICENSE.md in the TEKITO\n"
         "repository).\n\n"
-        "The Japanese symbols, emoticons and their readings are from Mozc\n"
-        f"(https://github.com/google/mozc, commit {args.mozc_commit},\n"
-        "src/data/symbol/symbol.tsv and src/data/emoticon/emoticon.tsv), under\n"
+        "The Japanese symbols, emoticons, single kanji and their readings are\n"
+        f"from Mozc (https://github.com/google/mozc, commit {args.mozc_commit},\n"
+        "src/data/symbol, src/data/emoticon and src/data/single_kanji), under\n"
         "the following license:\n\n"
         + license_text,
         encoding="utf-8", newline="\n")
@@ -221,7 +238,7 @@ def main() -> None:
         "entry_count": len(rows),
         "sha256": {"file": sha256(data)},
         "license": "TEKITO-OWNED + BSD-3-Clause (Mozc)",
-        "source": "scripts/build-special-conversions.py; Japanese symbols and emoticons from "
+        "source": "scripts/build-special-conversions.py; Japanese symbols, emoticons and single kanji from "
                   f"https://github.com/google/mozc/tree/{args.mozc_commit}/src/data",
         "notice_file": "NOTICE",
     }

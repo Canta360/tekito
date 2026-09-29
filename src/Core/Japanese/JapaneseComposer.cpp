@@ -471,8 +471,9 @@ void JapaneseComposer::AddSpecial(std::wstring_view reading, std::vector<PhraseC
             break;
         }
     }
-    // Symbols and emoticons after the words ("やじるし": 矢印, やじるし,
-    // ヤジルシ, →).
+    // Single kanji the dictionary did not offer, after the words.
+    insert(candidates.size(), special_->SingleKanji(reading), {});
+    // Symbols and emoticons after them ("やじるし": 矢印, やじるし, ヤジルシ, →).
     if (specialOptions_.symbols) {
         insert(candidates.size(), special_->Symbols(SpecialConversions::Language::Japanese, reading), {});
         insert(candidates.size(), special_->Emoticons(reading), {});

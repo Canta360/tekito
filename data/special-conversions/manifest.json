@@ -7,11 +7,11 @@
   "type": "special-conversions",
   "format": "rules-tsv-v1",
   "file": "rules.tsv",
-  "entry_count": 6917,
+  "entry_count": 10643,
   "sha256": {
-    "file": "9CCC4948909859664A69CBF8559986D6B49B87C9BE312CCAF8D76E2AE33D647C"
+    "file": "0B7DCC44E9EFA4FAC64E236C17585948D98DF06F9924D2050756E5020120AA7D"
   },
   "license": "TEKITO-OWNED + BSD-3-Clause (Mozc)",
-  "source": "scripts/build-special-conversions.py; Japanese symbols and emoticons from https://github.com/google/mozc/tree/b9c3fcbd6d76b19649ef572324fa9da2559bc18e/src/data",
+  "source": "scripts/build-special-conversions.py; Japanese symbols, emoticons and single kanji from https://github.com/google/mozc/tree/b9c3fcbd6d76b19649ef572324fa9da2559bc18e/src/data",
   "notice_file": "NOTICE"
 }

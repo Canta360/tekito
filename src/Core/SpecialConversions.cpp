@@ -354,6 +354,21 @@ std::vector<std::wstring> SpecialConversions::Emoticons(std::wstring_view readin
     return faces ? *faces : std::vector<std::wstring>{};
 }
 
+std::vector<std::wstring> SpecialConversions::SingleKanji(std::wstring_view reading) const {
+    std::vector<std::wstring> out;
+    const auto* rows = Find(L"kanji", Language::Japanese, reading);
+    if (!rows) return out;
+    for (const auto& row : *rows) {
+        for (std::size_t i = 0; i < row.size(); ++i) {
+            // A kanji outside the Basic Multilingual Plane is a surrogate pair.
+            const std::size_t length = (row[i] >= 0xD800 && row[i] <= 0xDBFF) && i + 1 < row.size() ? 2 : 1;
+            out.push_back(row.substr(i, length));
+            i += length - 1;
+        }
+    }
+    return out;
+}
+
 std::wstring SpecialConversions::Kanji(std::wstring_view digits, bool daiji) const {
     const auto language = Language::Japanese;
     const std::wstring_view prefix = daiji ? L"daiji-" : L"kanji-";
