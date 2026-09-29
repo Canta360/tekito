@@ -18,6 +18,7 @@ class JapaneseLearningStore;
 class KeyConverter;
 class JapaneseUserDictionary;
 class Loanwords;
+class PostalCodes;
 class RomajiTable;
 
 // One romaji unit: the keys it took and the kana it made. Keys the table
@@ -81,6 +82,9 @@ public:
         special_ = special;
         specialOptions_ = options;
     }
+    // The addresses a postal code covers, offered for 1000001 or 100-0001
+    // along with the numbers; null for none.
+    void SetPostalCodes(const PostalCodes* postalCodes) noexcept { postalCodes_ = postalCodes; }
     // How the romaji table reads `keys` from the start, unit by unit.
     [[nodiscard]] static std::vector<RomajiToken> ParseRomaji(const RomajiTable& table, std::wstring_view keys);
     // What the user chose before puts candidates first; each commit is
@@ -224,6 +228,8 @@ private:
     void AddSpecial(std::wstring_view reading, std::vector<PhraseCandidate>& candidates) const;
     // The sum for arithmetic ending in "=" ("1+2=" -> 3, 1+2=3), or nothing.
     [[nodiscard]] std::vector<PhraseCandidate> SumCandidates(std::wstring_view reading) const;
+    // The addresses for a postal code (1000001 -> 東京都千代田区千代田), or nothing.
+    [[nodiscard]] std::vector<PhraseCandidate> PostalCandidates(std::wstring_view reading) const;
     // When the list opens: the phrase's keys with one slip undone, as more
     // candidates, so a slip the first choice kept is one pick away; for a
     // short input split into phrases, the whole input too ("hahimemashite":
@@ -252,6 +258,7 @@ private:
     const Loanwords* loanwords_{nullptr};
     const JapaneseUserDictionary* userDictionary_{nullptr};
     const SpecialConversions* special_{nullptr};
+    const PostalCodes* postalCodes_{nullptr};
     SpecialConversionOptions specialOptions_;
     JapaneseLearningStore* learning_{nullptr};
     std::vector<Unit> units_;

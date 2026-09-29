@@ -32,3 +32,5 @@ data/japanese-lm/
 # Built by scripts/build-japanese-meaning-packs.py from Wiktionary and WordNet
 data/japanese-wiktionary/
 data/japanese-wordnet/
+# Built by scripts/build-japanese-zipcode.py from Japan Post's data
+data/japanese-zipcode/

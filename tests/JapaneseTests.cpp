@@ -9,6 +9,7 @@
 #include "Core/Japanese/Loanwords.h"
 #include "Core/Japanese/KanaText.h"
 #include "Core/Japanese/Meanings.h"
+#include "Core/Japanese/PostalCodes.h"
 #include "Core/Japanese/RomajiTable.h"
 #include "Core/SpecialConversions.h"
 
@@ -994,6 +995,43 @@ void TestSpecialConversions(const RomajiTable& table, const MiniPack& pack) {
         RequireText(counted.Commit(), L"3個", "3個 is committed");
         Require(learning.Preference(L"#こ", withCounter.substr(1)) > 0 && learning.Preference(L"こ", L"子") == 3,
                 "the counter is learned apart from こ alone");
+    }
+
+    // Postal codes: the addresses they cover, from the japanese-zipcode pack.
+    {
+        using tekito::japanese::PostalCodeDigits;
+        Require(PostalCodeDigits(L"1000001") == L"1000001" && PostalCodeDigits(L"\xFF11\xFF10\xFF10\x30FC\xFF10\xFF10\xFF10\xFF11") == L"1000001",
+                "seven digits, with or without the hyphen, in either width");
+        Require(!PostalCodeDigits(L"100001") && !PostalCodeDigits(L"1000-001") && !PostalCodeDigits(L"100a001"),
+                "anything else is not a postal code");
+        const auto directory = std::filesystem::temp_directory_path() / L"tekito-zipcode-test";
+        std::filesystem::create_directories(directory);
+        std::ofstream(directory / L"zipcodes.tsv", std::ios::binary)
+            << "1000001\t" << Utf8(L"東京都千代田区千代田") << "\n1500001\t" << Utf8(L"東京都渋谷区神宮前") << "\n";
+        auto postal = std::make_unique<tekito::japanese::PostalCodes>();
+        Require(postal->Open(directory), "the postal codes open");
+        RequireText(postal->Addresses(L"1500001", 9).at(0), L"東京都渋谷区神宮前", "an address by its code");
+        JapaneseComposer typing(&table);
+        typing.SetConverter(&converter);
+        typing.SetSpecialConversions(&special);
+        typing.SetPostalCodes(postal.get());
+        typing.SetHalfWidthDigits(true);
+        Type(typing, L"100-0001");
+        typing.Convert();
+        const auto* offered = typing.FocusedCandidates();
+        Require(offered && offered->size() >= 3 && (*offered)[0].text == L"100-0001" &&
+                    (*offered)[1].text == L"東京都千代田区千代田" && (*offered)[2].text == L"\x3012" L"100-0001",
+                "a postal code offers its address and its mark after it");
+        typing.Clear();
+        Type(typing, L"1234567");
+        typing.Convert();
+        Require(typing.FocusedCandidates() && std::none_of(typing.FocusedCandidates()->begin(), typing.FocusedCandidates()->end(),
+                                                            [](const auto& c) { return c.text.starts_with(L"\x3012"); }),
+                "seven digits no address covers are only a number");
+        typing.Clear();
+        typing.SetPostalCodes(nullptr);
+        postal.reset();  // unmaps the file
+        std::filesystem::remove_all(directory);
     }
 
     // A short input brings no other words as slips.
