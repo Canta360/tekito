@@ -14,6 +14,7 @@ const en = {
     candidates: { label: "Candidate list", description: "The list of choices under what you type, in English and Japanese." },
     english: { label: "English", description: "What Auto does as you type English." },
     japanese: { label: "Japanese", description: "How romaji becomes Japanese." },
+    special: { label: "Special conversions", description: "Dates, numbers, symbols and sums, offered as candidates in English and Japanese." },
     dictionary: { label: "Dictionary & learning", description: "Your own words, and what TEKITO learns from your choices." },
     about: { label: "About", description: "Version, language data and support." },
   },
@@ -95,6 +96,18 @@ const en = {
     completionEnabled: { title: "Word completion", description: "Offer the rest of a word early." },
     candidateWindowEnabled: { title: "Candidate list", description: "Show choices while you type." },
     japanesePhoneticSuggestionsEnabled: { title: "Japanese sounds", description: "Suggest English from romaji." },
+  },
+  special: {
+    dateConversion: { title: "Dates and times", description: "“today” and “now” offer the date and time." },
+    numberConversion: { title: "Numbers", description: "In Japanese, a number converts to kanji and more." },
+    symbolConversion: { title: "Symbols", description: "Spellings like “(c)” and readings offer symbols." },
+    calculatorEnabled: { title: "Calculator", description: "A sum ending in “=” offers the answer." },
+    examples: {
+      title: "Try typing",
+      description: "They come up as candidates; what you typed stays first until you pick one.",
+      english: "English",
+      japanese: "Japanese",
+    },
   },
   styles: {
     glass: { title: "Glass list", description: "Frosted glass, with light under your choice." },
@@ -269,6 +282,7 @@ const ja = {
     candidates: { label: "候補一覧", description: "打っている文字の下に出る候補の一覧です。英語と日本語で共通です。" },
     english: { label: "英語入力", description: "Auto で英語を打つときに TEKITO がすることを選びます。" },
     japanese: { label: "日本語入力", description: "ローマ字から日本語にするときの動きを選びます。" },
+    special: { label: "特別な変換", description: "日付・数字・記号・計算を、英語と日本語の候補に出します。" },
     dictionary: { label: "辞書と学習", description: "自分の単語と、TEKITO があなたの選択から学んだこと。" },
     about: { label: "情報", description: "バージョン、言語データ、サポート。" },
   },
@@ -349,6 +363,18 @@ const ja = {
     completionEnabled: { title: "単語の補完", description: "単語の続きを早めに提案します。" },
     candidateWindowEnabled: { title: "候補リスト", description: "入力中に候補を表示します。" },
     japanesePhoneticSuggestionsEnabled: { title: "日本語の音から", description: "ローマ字から英単語を提案します。" },
+  },
+  special: {
+    dateConversion: { title: "日付と時刻", description: "「today」「now」や「きょう」「いま」で、日付と時刻を出します。" },
+    numberConversion: { title: "数字", description: "日本語で数字を変換すると、漢数字などにします。" },
+    symbolConversion: { title: "記号", description: "「(c)」のような綴りや「やじるし」のような読みで、記号を出します。" },
+    calculatorEnabled: { title: "計算", description: "「1+2=」のように「=」で終わる式で、答えを出します。" },
+    examples: {
+      title: "打ってみる",
+      description: "どれも候補に出るだけで、選ぶまでは打ったとおりのままです。",
+      english: "英語",
+      japanese: "日本語",
+    },
   },
   styles: {
     glass: { title: "グラス", description: "すりガラス風。選んでいる候補の下に光が入ります。" },
