@@ -16,6 +16,7 @@
 #include <windows.h>
 #include <atomic>
 #include <memory>
+#include <optional>
 #include <string>
 
 namespace tekito::tsf {
@@ -100,6 +101,18 @@ private:
     bool TranslateKey(WPARAM wParam, LPARAM lParam, KeyInput& input);
     // The English typing keys, whatever the mode.
     bool TranslateEnglishKey(WPARAM wParam, KeyInput& input);
+    // A character key in English: part of a word, punctuation, or anything
+    // else (which ends the word and goes on to the application).
+    bool TranslateEnglishCharacter(wchar_t character, KeyInput& input) const;
+    // A SpecialEnd key stays one only when the text before the caret, with
+    // it, ends in a spelling or sum; otherwise it becomes the key it would
+    // have been. False: the key goes on to the application untouched.
+    bool ResolveSpecialKey(ITfContext* context, KeyInput& input);
+    [[nodiscard]] std::optional<SpecialConversions::Ending> SpecialEnding(std::wstring_view preceding,
+                                                                         wchar_t character) const;
+    HRESULT HandleSpecialEnd(ITfContext* context, TfEditCookie editCookie, wchar_t character);
+    // Starts the composition over the `count` characters before the caret.
+    HRESULT StartCompositionBefore(ITfContext* context, TfEditCookie editCookie, std::size_t count);
     // Japanese mode: Shift+letter with nothing typed starts an English word
     // that works like English Auto (TextServiceJapanese.cpp).
     bool TranslateEnglishSegmentKey(WPARAM wParam, KeyInput& input);
@@ -249,6 +262,9 @@ private:
     // An English word typed with Shift in Japanese is being typed; state_
     // runs in Convert meanwhile.
     bool englishSegment_{false};
+    // The English composition is a symbol's spelling or a sum (SpecialEnd),
+    // not a word: typing on keeps it as it is, and nothing is learned.
+    bool symbolComposition_{false};
     japanese::JapaneseComposer japanese_;
     // The text the composer committed last (see CheckJapaneseContext).
     std::wstring lastJapaneseCommit_;

@@ -6,6 +6,8 @@
 #include <msctf.h>
 #include <windows.h>
 #include <atomic>
+#include <functional>
+#include <utility>
 
 namespace tekito::tsf {
 
@@ -59,6 +61,9 @@ struct KeyInput {
         InsertCharacter,
         // Not a key: show the mode by the caret (the user switched modes).
         ShowModeIndicator,
+        // English: `character` finishes a symbol's spelling or a sum before
+        // the caret ("->", "(c)", "1+2="), which becomes the composition.
+        SpecialEnd,
     } type;
     wchar_t character{0};
     japanese::KanaForm kanaForm{japanese::KanaForm::Hiragana};
@@ -67,6 +72,23 @@ struct KeyInput {
     bool englishSegment{false};
     std::size_t candidateIndex{0};
     PunctuationRole punctuationRole{PunctuationRole::ClauseSeparator};
+};
+
+// Runs `read` in a read-only session, to look at the document.
+class ReadEditSession final : public ITfEditSession {
+public:
+    explicit ReadEditSession(std::function<void(TfEditCookie)> read) : read_(std::move(read)) {}
+
+    HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void** object) override;
+    ULONG STDMETHODCALLTYPE AddRef() override { return ++refCount_; }
+    ULONG STDMETHODCALLTYPE Release() override;
+    HRESULT STDMETHODCALLTYPE DoEditSession(TfEditCookie editCookie) override;
+
+private:
+    ~ReadEditSession() = default;
+
+    std::atomic<ULONG> refCount_{1};
+    std::function<void(TfEditCookie)> read_;
 };
 
 class KeyEditSession final : public ITfEditSession {

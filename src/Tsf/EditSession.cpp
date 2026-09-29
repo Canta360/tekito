@@ -32,6 +32,28 @@ ULONG KeyEditSession::Release() {
     return value;
 }
 
+HRESULT ReadEditSession::QueryInterface(REFIID riid, void** object) {
+    if (!object) return E_INVALIDARG;
+    *object = nullptr;
+    if (riid == IID_IUnknown || riid == IID_ITfEditSession) {
+        *object = static_cast<ITfEditSession*>(this);
+        AddRef();
+        return S_OK;
+    }
+    return E_NOINTERFACE;
+}
+
+ULONG ReadEditSession::Release() {
+    const ULONG value = --refCount_;
+    if (value == 0) delete this;
+    return value;
+}
+
+HRESULT ReadEditSession::DoEditSession(TfEditCookie editCookie) {
+    if (read_) read_(editCookie);
+    return S_OK;
+}
+
 HRESULT KeyEditSession::DoEditSession(TfEditCookie editCookie) {
     return service_ ? service_->HandleKeyInEditSession(context_, editCookie, input_) : E_UNEXPECTED;
 }
