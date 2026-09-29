@@ -69,7 +69,7 @@ struct UserSettings {
     // 3 = touten and period (see japanese::PunctuationStyle).
     int japanesePunctuation{0};
     // Digits typed in Japanese: 0 = half-width (123), 1 = full-width
-    // (１２３). Converting offers the other one.
+    // (the wide forms). Converting offers the other one.
     int japaneseDigitWidth{0};
     // Words that start with what is typed, offered while typing Japanese.
     bool japanesePredictionEnabled{true};
