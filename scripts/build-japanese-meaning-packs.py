@@ -213,6 +213,22 @@ def build_wordnet() -> Senses:
     return result
 
 
+def build_slang() -> Senses:
+    path = ROOT / "scripts" / "japanese-slang-seeds.tsv"
+    result = Senses()
+    for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        if not line or line.startswith("#"):
+            continue
+        fields = line.split("\t")
+        if len(fields) != 3 or not all(fields):
+            raise ValueError(f"{path.name}:{number}: expected reading, surface and meaning")
+        reading, surface, meaning = fields
+        if not re.fullmatch(r"[ぁ-ゟー]+", reading):
+            raise ValueError(f"{path.name}:{number}: reading must be hiragana")
+        result.add(surface, reading, [clean(meaning)])
+    return result
+
+
 # ---------------------------------------------------------------------------
 # Packs
 
@@ -258,6 +274,13 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--out", type=Path, default=DATA)
     args = parser.parse_args()
+
+    slang = build_slang()
+    write_pack("japanese-slang", "Japanese Slang", slang, "TEKITO-OWNED",
+               "scripts/japanese-slang-seeds.tsv", f"""
+Japanese slang terms and original short definitions written for TEKITO from
+scripts/japanese-slang-seeds.tsv, covered by the TEKITO source license.
+""", args.out)
 
     wiktionary, entry_count = build_wiktionary()
     write_pack("japanese-wiktionary", "Japanese Meanings (Wiktionary)", wiktionary, "CC-BY-SA-4.0 OR GFDL-1.3",

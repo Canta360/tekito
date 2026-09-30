@@ -25,6 +25,7 @@ bool IsLatinWord(std::wstring_view text) noexcept {
 }  // namespace
 
 bool MeaningDictionary::Open(const std::filesystem::path& dataRoot) noexcept {
+    slang_.Open(dataRoot / L"japanese-slang" / L"meanings.tsv");
     wiktionary_.Open(dataRoot / L"japanese-wiktionary" / L"meanings.tsv");
     wordnet_.Open(dataRoot / L"japanese-wordnet" / L"meanings.tsv");
     english_.Open(dataRoot / L"dictionary-display" / L"entries.tsv");
@@ -36,7 +37,7 @@ std::optional<Meaning> MeaningDictionary::Lookup(std::wstring_view text, std::ws
     try {
         if (IsLatinWord(text)) return English(text);
         const std::wstring hiragana = ToHiragana(reading);
-        for (const SortedTsv* source : {&wiktionary_, &wordnet_}) {
+        for (const SortedTsv* source : {&slang_, &wiktionary_, &wordnet_}) {
             if (auto meaning = Japanese(*source, text, hiragana)) return meaning;
         }
     } catch (...) {
