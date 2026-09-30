@@ -19,15 +19,14 @@ struct Meaning {
     std::vector<std::wstring> senses;
 };
 
-// Word meanings from the japanese-wiktionary and japanese-wordnet packs
-// (Wiktionary first) and English meanings from the dictionary-display pack.
-// Any of them may be missing.
+// Japanese slang, Wiktionary and WordNet meanings, and English meanings from
+// the dictionary-display pack. Any pack may be missing.
 class MeaningDictionary final {
 public:
     // `dataRoot` is the folder with the Data Packs.
     bool Open(const std::filesystem::path& dataRoot) noexcept;
     [[nodiscard]] bool IsOpen() const noexcept {
-        return wiktionary_.IsOpen() || wordnet_.IsOpen() || english_.IsOpen();
+        return slang_.IsOpen() || wiktionary_.IsOpen() || wordnet_.IsOpen() || english_.IsOpen();
     }
 
     // The meaning of a candidate: English for Latin letters, Japanese
@@ -40,6 +39,7 @@ private:
                                                   std::wstring_view reading) const;
     [[nodiscard]] std::optional<Meaning> English(std::wstring_view word) const;
 
+    SortedTsv slang_;
     SortedTsv wiktionary_;
     SortedTsv wordnet_;
     SortedTsv english_;

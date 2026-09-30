@@ -113,6 +113,32 @@ def read_entries(mozc: Path):
     return entries
 
 
+def read_slang_entries(pos_names: list[str], base_entries):
+    path = ROOT / "scripts" / "japanese-slang-seeds.tsv"
+    noun_id = pos_names.index(USER_POS[0][1])
+    additions = []
+    wanted = set()
+    for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        if not line or line.startswith("#"):
+            continue
+        fields = line.split("\t")
+        if len(fields) != 3 or not all(fields):
+            raise ValueError(f"{path.name}:{number}: expected reading, surface and meaning")
+        reading, surface, _meaning = fields
+        if not re.fullmatch(r"[ぁ-ゟー]+", reading):
+            raise ValueError(f"{path.name}:{number}: reading must be hiragana")
+        key = (reading, surface)
+        if key not in wanted:
+            additions.append((reading, noun_id, noun_id, USER_WORD_COST, surface, False))
+            wanted.add(key)
+    existing = set()
+    for entry in base_entries:
+        key = (entry[0], entry[4])
+        if key in wanted:
+            existing.add(key)
+    return [entry for entry in additions if (entry[0], entry[4]) not in existing]
+
+
 def read_pos_names(mozc: Path) -> list[str]:
     names = []
     for line in (mozc / "dictionary_oss" / "id.def").read_text(encoding="utf-8").splitlines():
@@ -305,7 +331,14 @@ def write_notice(mozc: Path, out: Path, commit: str) -> None:
         "japanese-core is built from the Mozc OSS dictionary "
         f"(https://github.com/google/mozc, commit {commit}).\n\n"
         "== Mozc ==\n\n" + license_text.strip() + "\n\n"
-        "== Mozc dictionary_oss (IPAdic, Okinawa dictionary) ==\n\n" + readme.strip() + "\n",
+        "== Mozc dictionary_oss (IPAdic, Okinawa dictionary) ==\n\n" + readme.strip() + "\n\n"
+        "== TEKITO Japanese slang additions ==\n\n"
+        "The curated entries and original short definitions come from "
+        "scripts/japanese-slang-seeds.tsv and are covered by the TEKITO source license. "
+        "Term selection was cross-checked against the Agency for Cultural Affairs' "
+        "2024 survey (https://www.bunka.go.jp/koho_hodo_oshirase/hodohappyo/pdf/94274201_02.pdf) "
+        "and Mie University's 2020 Japanese-language training report "
+        "(https://www.mie-u.ac.jp/international/item/%E3%80%90%E6%9C%80%E7%B5%82%E7%89%88%E3%80%912020%E5%B9%B4%E5%BA%A6%E3%80%80%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%83%BB%E6%97%A5%E6%9C%AC%E6%96%87%E5%8C%96%E7%A0%94%E4%BF%AE%E7%95%99%E5%AD%A6%E7%94%9F%E7%A0%94%E7%A9%B6%E3%83%AC%E3%83%9D%E3%83%BC%E3%83%88%E9%9B%86.pdf).\n",
         encoding="utf-8", newline="\n")
 
 
@@ -321,6 +354,7 @@ def main() -> None:
 
     entries = read_entries(args.mozc)
     pos_names = read_pos_names(args.mozc)
+    entries.extend(read_slang_entries(pos_names, entries))
     size, costs = read_matrix(args.mozc)
     if size != len(pos_names):
         raise ValueError("id.def and the connection matrix disagree on the id count")
@@ -348,7 +382,7 @@ def main() -> None:
         "pack_id": "japanese-core",
         "display_name": "Japanese Conversion Dictionary",
         "schema_version": 1,
-        "version": f"mozc-{args.commit[:12]}",
+        "version": f"mozc-{args.commit[:12]}-slang-2026.09",
         "language": "ja-JP",
         "type": "japanese-dictionary",
         "format": "ja-dict-v1+ja-matrix-v1",
@@ -359,8 +393,9 @@ def main() -> None:
         "sha256": {"file": sha256(args.out / "dictionary.bin"),
                    "index": sha256(args.out / "connection.bin"),
                    "pos": sha256(args.out / "pos.tsv")},
-        "license": "IPAdic + BSD-3-Clause (Mozc)",
+        "license": "IPAdic + BSD-3-Clause (Mozc), TEKITO-OWNED",
         "source": f"https://github.com/google/mozc/tree/{args.commit}/src/data",
+        "supplemental_source": "scripts/japanese-slang-seeds.tsv",
         "notice_file": "NOTICE",
     }
     (args.out / "manifest.json").write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n",

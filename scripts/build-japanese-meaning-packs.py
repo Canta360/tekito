@@ -213,6 +213,22 @@ def build_wordnet() -> Senses:
     return result
 
 
+def build_slang() -> Senses:
+    path = ROOT / "scripts" / "japanese-slang-seeds.tsv"
+    result = Senses()
+    for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        if not line or line.startswith("#"):
+            continue
+        fields = line.split("\t")
+        if len(fields) != 3 or not all(fields):
+            raise ValueError(f"{path.name}:{number}: expected reading, surface and meaning")
+        reading, surface, meaning = fields
+        if not re.fullmatch(r"[ぁ-ゟー]+", reading):
+            raise ValueError(f"{path.name}:{number}: reading must be hiragana")
+        result.add(surface, reading, [clean(meaning)])
+    return result
+
+
 # ---------------------------------------------------------------------------
 # Packs
 
@@ -258,6 +274,20 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--out", type=Path, default=DATA)
     args = parser.parse_args()
+
+    slang = build_slang()
+    write_pack("japanese-slang", "Japanese Slang", slang, "TEKITO-OWNED",
+               "scripts/japanese-slang-seeds.tsv", f"""
+Japanese slang terms and original short definitions written for TEKITO from
+scripts/japanese-slang-seeds.tsv, covered by the TEKITO source license.
+
+Term selection was cross-checked against the Agency for Cultural Affairs'
+2024 language survey
+(https://www.bunka.go.jp/koho_hodo_oshirase/hodohappyo/pdf/94274201_02.pdf)
+and Mie University's 2020 Japanese-language training report
+(https://www.mie-u.ac.jp/international/item/%E3%80%90%E6%9C%80%E7%B5%82%E7%89%88%E3%80%912020%E5%B9%B4%E5%BA%A6%E3%80%80%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%83%BB%E6%97%A5%E6%9C%AC%E6%96%87%E5%8C%96%E7%A0%94%E4%BF%AE%E7%95%99%E5%AD%A6%E7%94%9F%E7%A0%94%E7%A9%B6%E3%83%AC%E3%83%9D%E3%83%BC%E3%83%88%E9%9B%86.pdf).
+The definitions are TEKITO's own concise paraphrases, not copied source text.
+""", args.out)
 
     wiktionary, entry_count = build_wiktionary()
     write_pack("japanese-wiktionary", "Japanese Meanings (Wiktionary)", wiktionary, "CC-BY-SA-4.0 OR GFDL-1.3",
