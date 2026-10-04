@@ -105,6 +105,9 @@ public:
     // Hiragana or Katakana: how new text is shown while typing.
     void SetInputForm(KanaForm form) noexcept;
     [[nodiscard]] KanaForm InputForm() const noexcept { return inputForm_; }
+    // The kana a field asks for (a katakana field), over InputForm while
+    // typing there; nothing follows InputForm.
+    void SetFieldForm(std::optional<KanaForm> form) noexcept { fieldForm_ = form; }
 
     // Live conversion: the text is converted as it is typed and shown so
     // (phrases more than kOpenPhrases back stay as they are); Space then
@@ -338,6 +341,8 @@ private:
     std::size_t caret_{0};
     std::wstring pending_;
     KanaForm inputForm_{KanaForm::Hiragana};
+    std::optional<KanaForm> fieldForm_;
+    [[nodiscard]] KanaForm TypingForm() const noexcept { return fieldForm_.value_or(inputForm_); }
     PunctuationStyle punctuation_{PunctuationStyle::ToutenKuten};
     bool halfWidthDigits_{false};
     bool halfWidthSymbols_{false};

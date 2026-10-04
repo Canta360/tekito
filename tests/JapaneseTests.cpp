@@ -210,6 +210,13 @@ void TestConversionForms(const RomajiTable& table) {
     RequireText(composer.Preedit(), L"Ｔｅｋｉｔｏ", "F9: full-width, as typed");
     composer.Transliterate(KanaForm::Katakana);
     RequireText(composer.Commit(), L"テキト", "F7: katakana, read from the keys");
+
+    composer.SetFieldForm(KanaForm::Katakana);
+    RequireText(Type(composer, L"furigana"), L"フリガナ", "a katakana field types katakana");
+    composer.Clear();
+    composer.SetFieldForm(std::nullopt);
+    RequireText(Type(composer, L"furigana"), L"ふりがな", "other fields follow the input mode");
+    composer.Clear();
 }
 
 void TestInputFormAndPunctuation(const RomajiTable& table) {

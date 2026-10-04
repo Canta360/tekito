@@ -597,7 +597,7 @@ std::vector<PhraseCandidate> JapaneseComposer::KanaCandidates(std::wstring_view 
     PhraseCandidate hiragana{std::wstring(reading), 0, PhraseCandidate::Kind::Hiragana, false};
     PhraseCandidate katakana{ToKatakana(reading), 0, PhraseCandidate::Kind::Katakana, false};
     // Space gives the other kana than the one being typed.
-    if (inputForm_ == KanaForm::Katakana) return {hiragana, katakana};
+    if (TypingForm() == KanaForm::Katakana) return {hiragana, katakana};
     return {katakana, hiragana};
 }
 
@@ -1093,7 +1093,7 @@ void JapaneseComposer::CycleKana() {
     auto& phrase = phrases_[focus_];
     if (!phrase.form || IsAlphanumeric(*phrase.form)) {
         // First press: the other kana than the one being typed.
-        phrase.form = inputForm_ == KanaForm::Katakana ? KanaForm::Hiragana : KanaForm::Katakana;
+        phrase.form = TypingForm() == KanaForm::Katakana ? KanaForm::Hiragana : KanaForm::Katakana;
     } else if (*phrase.form == KanaForm::Hiragana) {
         phrase.form = KanaForm::Katakana;
     } else if (*phrase.form == KanaForm::Katakana) {
@@ -1165,7 +1165,7 @@ std::wstring JapaneseComposer::RenderTyping(bool includePending) const {
     std::wstring kana = Reading();
     // Pending keys show at the caret, where the kana they make will go.
     if (includePending) kana.insert(ReadingOffset(caret_), halfWidthSymbols_ ? pending_ : ToFullWidthAscii(pending_));
-    return inputForm_ == KanaForm::Katakana ? ToKatakana(kana) : kana;
+    return TypingForm() == KanaForm::Katakana ? ToKatakana(kana) : kana;
 }
 
 std::wstring JapaneseComposer::FormText(KanaForm form, std::size_t begin, std::size_t length,

@@ -87,6 +87,7 @@ bool IsPassThroughInputScope(InputScope scope) {
     case IS_REGULAREXPRESSION:
     case IS_SRGS:
     case IS_XML:
+    case IS_ALPHANUMERIC_HALFWIDTH:
         return true;
     default:
         return false;
@@ -197,11 +198,12 @@ HRESULT ReplaceTrailingWhitespaceAtSelection(ITfContext* context, TfEditCookie e
     return context->SetSelection(editCookie, 1, &next);
 }
 
-bool ContextHasPassThroughInputScope(ITfContext* context, TfEditCookie editCookie) {
-    if (!context) return false;
+// The input scopes the application gives the field at the selection.
+std::vector<InputScope> ContextInputScopes(ITfContext* context, TfEditCookie editCookie) {
+    if (!context) return {};
 
     ComPtr<ITfReadOnlyProperty> property;
-    if (FAILED(context->GetAppProperty(kGuidPropInputScope, property.Put()))) return false;
+    if (FAILED(context->GetAppProperty(kGuidPropInputScope, property.Put()))) return {};
 
     TF_SELECTION selection{};
     ULONG fetched = 0;
@@ -216,28 +218,35 @@ bool ContextHasPassThroughInputScope(ITfContext* context, TfEditCookie editCooki
     HRESULT hr = property->GetValue(editCookie, range.Get(), &value);
     if (FAILED(hr) || value.vt != VT_UNKNOWN || !value.punkVal) {
         VariantClear(&value);
-        return false;
+        return {};
     }
 
     ComPtr<ITfInputScope> inputScope;
     hr = value.punkVal->QueryInterface(IID_PPV_ARGS(inputScope.Put()));
     VariantClear(&value);
-    if (FAILED(hr)) return false;
+    if (FAILED(hr)) return {};
 
     InputScope* scopes = nullptr;
     UINT count = 0;
     hr = inputScope->GetInputScopes(&scopes, &count);
-    if (FAILED(hr)) return false;
-
-    bool passThrough = false;
-    for (UINT i = 0; i < count; ++i) {
-        if (IsPassThroughInputScope(scopes[i])) {
-            passThrough = true;
-            break;
-        }
-    }
+    if (FAILED(hr)) return {};
+    std::vector<InputScope> out(scopes, scopes + count);
     CoTaskMemFree(scopes);
-    return passThrough;
+    return out;
+}
+
+bool ContextHasPassThroughInputScope(ITfContext* context, TfEditCookie editCookie) {
+    const auto scopes = ContextInputScopes(context, editCookie);
+    return std::any_of(scopes.begin(), scopes.end(), IsPassThroughInputScope);
+}
+
+// A field for katakana (a furigana field) types katakana.
+std::optional<japanese::KanaForm> FieldKanaForm(ITfContext* context, TfEditCookie editCookie) {
+    for (const auto scope : ContextInputScopes(context, editCookie)) {
+        if (scope == IS_KATAKANA_FULLWIDTH || scope == IS_KATAKANA_HALFWIDTH) return japanese::KanaForm::Katakana;
+        if (scope == IS_HIRAGANA) return japanese::KanaForm::Hiragana;
+    }
+    return std::nullopt;
 }
 
 // No document, or one the application marks read-only: keys are not ours.
@@ -1524,6 +1533,7 @@ HRESULT TextService::HandleKeyInEditSessionCore(ITfContext* context, TfEditCooki
             const HRESULT hr = CommitJapanese(context, editCookie);
             return SUCCEEDED(hr) ? S_FALSE : hr;
         }
+        if (!japanese_.IsComposing()) japanese_.SetFieldForm(FieldKanaForm(context, editCookie));
         return HandleJapaneseKey(context, editCookie, input);
     }
     if (state_.Mode() == InputMode::Direct) {
