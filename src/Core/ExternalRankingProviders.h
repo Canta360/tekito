@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Core/Japanese/SortedTsv.h"
 #include "Core/RankingData.h"
 
 #include <cstdint>
@@ -28,13 +29,10 @@ public:
     [[nodiscard]] double Score(std::wstring_view word) const noexcept override;
 
 private:
-    struct IndexRow { std::string key; std::uint64_t offset{0}; };
-    [[nodiscard]] bool LoadIndex() noexcept;
     std::filesystem::path path_;
-    std::filesystem::path indexPath_;
-    std::vector<IndexRow> index_;
-    mutable std::ifstream dataFile_;
-    mutable std::mutex dataFileMutex_;
+    // Mapped and searched in place: correction asks for hundreds of words
+    // per key, and reading each from the file took about 50 us.
+    japanese::SortedTsv table_;
     bool loaded_{false};
 };
 

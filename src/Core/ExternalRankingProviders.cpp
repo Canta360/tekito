@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <charconv>
 #include <cwctype>
 #include <fstream>
 #include <string_view>
@@ -119,29 +120,6 @@ const IndexRow* StartAt(const std::vector<IndexRow>& index, std::string_view key
     return it == index.begin() ? &index.front() : &*std::prev(it);
 }
 
-template <typename IndexRow>
-double ReadScore(std::ifstream& input, const std::vector<IndexRow>& index,
-                 std::string_view key, bool phrase) noexcept {
-    if (index.empty()) return 0.0;
-    try {
-        if (!input.is_open()) return 0.0;
-        input.clear();
-        input.seekg(static_cast<std::streamoff>(StartAt(index, key)->offset), std::ios::beg);
-        std::string line;
-        while (std::getline(input, line)) {
-            const auto firstEnd = line.find('\t');
-            const auto secondEnd = phrase ? line.find('\t', firstEnd + 1) : std::string::npos;
-            if (firstEnd == std::string::npos || (phrase && secondEnd == std::string::npos)) continue;
-            const auto rowKey = phrase ? KeyFor(line.substr(0, firstEnd), line.substr(firstEnd + 1, secondEnd - firstEnd - 1))
-                                       : line.substr(0, firstEnd);
-            if (rowKey == key) return std::stod(line.substr(phrase ? secondEnd + 1 : firstEnd + 1));
-            if (rowKey > key) break;
-        }
-    } catch (...) {
-    }
-    return 0.0;
-}
-
 struct ContextScoreEntry {
     std::string word;
     double score{0.0};
@@ -193,12 +171,8 @@ std::size_t ContextBucketBytes(std::string_view context, const std::vector<Entry
 }  // namespace
 
 ExternalFrequencyProvider::ExternalFrequencyProvider(std::filesystem::path path)
-    : path_(Absolute(std::move(path))), indexPath_(IndexPath(path_)) {
-    std::vector<std::pair<std::string, std::uint64_t>> rows;
-    dataFile_.open(path_, std::ios::binary);
-    loaded_ = !path_.empty() && static_cast<bool>(dataFile_) &&
-              LoadIndexFile(indexPath_, kFrequencyHeader, rows);
-    if (loaded_) index_ = ConvertRows<IndexRow>(rows);
+    : path_(Absolute(std::move(path))) {
+    loaded_ = !path_.empty() && table_.Open(path_);
 }
 
 std::filesystem::path ExternalFrequencyProvider::DefaultPath() {
@@ -220,8 +194,17 @@ bool ExternalFrequencyProvider::BuildIndex(const std::filesystem::path& dataPath
 }
 
 double ExternalFrequencyProvider::Score(std::wstring_view word) const noexcept {
-    std::lock_guard lock(dataFileMutex_);
-    return loaded_ ? ReadScore(dataFile_, index_, ToAscii(word), false) : 0.0;
+    if (!loaded_) return 0.0;
+    double score = 0.0;
+    try {
+        table_.ForEachRow(ToAscii(word), [&](const std::vector<std::string_view>& fields) {
+            if (fields.size() >= 2) std::from_chars(fields[1].data(), fields[1].data() + fields[1].size(), score);
+            return false;
+        });
+    } catch (...) {
+        return 0.0;
+    }
+    return score;
 }
 
 ExternalPhraseContextProvider::ExternalPhraseContextProvider(std::filesystem::path path)
