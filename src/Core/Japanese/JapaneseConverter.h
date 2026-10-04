@@ -42,6 +42,13 @@ struct Prediction {
     std::int64_t cost{0};
 };
 
+// How written text reads (for reconversion): the reading, and the words
+// it was read as, each as (length in the text, length in the reading).
+struct ReadingGuess {
+    std::wstring reading;
+    std::vector<std::pair<std::size_t, std::size_t>> pieces;
+};
+
 // One phrase (bunsetsu) of the reading and what it can be written as, most
 // likely first.
 struct Phrase {
@@ -84,6 +91,11 @@ public:
     // a character is in no word.
     [[nodiscard]] std::optional<PhraseCandidate> Best(std::wstring_view reading, std::uint16_t context = 0,
                                                       const JapaneseUserDictionary* user = nullptr) const;
+
+    // The likeliest reading of written `text` (kanji and kana), from the
+    // words it is made of; nothing when a kanji is in no word. Looks
+    // through the whole dictionary, so it is for a key press, not typing.
+    [[nodiscard]] std::optional<ReadingGuess> ReadingOf(std::wstring_view text) const;
 
     // Words whose reading starts with `reading` and is longer, likeliest
     // first. Readings shared by too many words to look through quickly give

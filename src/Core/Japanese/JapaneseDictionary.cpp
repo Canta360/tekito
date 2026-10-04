@@ -141,6 +141,17 @@ std::wstring JapaneseDictionary::Surface(const DictionaryWord& word, std::wstrin
     return out;
 }
 
+std::size_t JapaneseDictionary::PoolSurfaceLength(const DictionaryWord& word) const noexcept {
+    if (word.surface != DictionaryWord::Surface::Pool || word.surfaceOffset >= surfaceUnits_) return 0;
+    const std::uint16_t length = Read<std::uint16_t>(surfaces_ + 2ull * word.surfaceOffset);
+    return word.surfaceOffset + 1ull + length > surfaceUnits_ ? 0 : length;
+}
+
+wchar_t JapaneseDictionary::PoolSurfaceChar(const DictionaryWord& word, std::size_t i) const noexcept {
+    if (i >= PoolSurfaceLength(word)) return 0;
+    return static_cast<wchar_t>(Read<std::uint16_t>(surfaces_ + 2ull * (word.surfaceOffset + 1 + i)));
+}
+
 bool ConnectionMatrix::Open(const std::filesystem::path& file) noexcept {
     size_ = 0;
     if (!file_.Open(file)) return false;

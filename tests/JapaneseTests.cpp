@@ -663,6 +663,24 @@ void TestUndoCommit(const RomajiTable& table, const MiniPack& pack) {
             "kana committed as typed come back as typed");
 }
 
+// Reconversion: written text back in the composition.
+void TestReconvert(const RomajiTable& table, const MiniPack& pack) {
+    const tekito::japanese::JapaneseConverter converter(pack.dictionary, pack.matrix);
+    const auto guess = converter.ReadingOf(L"私の名前は中野です");
+    Require(guess && guess->reading == L"わたしのなまえはなかのです", "the reading of written text");
+    Require(!converter.ReadingOf(L"鬱"), "nothing for a kanji in no word");
+    JapaneseComposer composer(&table);
+    composer.SetConverter(&converter);
+    Require(composer.Reconvert(L"私の名前は中野です"), "reconverts");
+    Require(composer.IsConverted(), "as a conversion");
+    RequireText(composer.Preedit(), L"私の名前は中野です", "showing the text as written");
+    composer.Cancel();
+    RequireText(composer.Preedit(), L"わたしのなまえはなかのです", "Esc gives its kana");
+    composer.Clear();
+    Require(composer.Reconvert(L"なかの") && composer.IsConverted(), "kana reconvert too");
+    composer.Clear();
+}
+
 std::vector<tekito::japanese::PhraseCandidate> Candidates(std::initializer_list<const wchar_t*> texts) {
     std::vector<tekito::japanese::PhraseCandidate> out;
     for (const auto* text : texts) out.push_back({text, 0, tekito::japanese::PhraseCandidate::Kind::Dictionary, false});
@@ -1347,6 +1365,7 @@ int main(int argc, char** argv) {
     TestLiveConversion(*table, *pack);
     TestCapitals(*table, *pack);
     TestUndoCommit(*table, *pack);
+    TestReconvert(*table, *pack);
     TestLearningStore();
     TestComposerLearning(*table, *pack);
     TestContext(*table, *pack);

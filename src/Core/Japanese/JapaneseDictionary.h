@@ -57,6 +57,10 @@ public:
     template <typename Visit>
     void ForEachWord(std::uint32_t record, Visit&& word) const;
     [[nodiscard]] std::wstring Surface(const DictionaryWord& word, std::wstring_view reading) const;
+    // A pooled surface read in place (0 and 0 for the others): its length,
+    // and its character at `i`.
+    [[nodiscard]] std::size_t PoolSurfaceLength(const DictionaryWord& word) const noexcept;
+    [[nodiscard]] wchar_t PoolSurfaceChar(const DictionaryWord& word, std::size_t i) const noexcept;
 
 private:
     [[nodiscard]] std::uint32_t RecordOffset(std::uint32_t record) const noexcept;

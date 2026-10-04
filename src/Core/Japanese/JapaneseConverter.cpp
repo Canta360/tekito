@@ -13,6 +13,12 @@
 namespace tekito::japanese {
 namespace {
 
+bool IsKanaChar(wchar_t c) {
+    return (c >= 0x3041 && c <= 0x3096) || (c >= 0x30A1 && c <= 0x30F6) || c == 0x30FC;
+}
+
+bool IsIdeograph(wchar_t c) { return (c >= 0x3400 && c <= 0x9FFF) || (c >= 0xF900 && c <= 0xFAFF) || c == 0x3005; }
+
 // A character no word covers, and a run of characters the dictionary never
 // uses (letters, full-width digits): costly, so words win when they can.
 constexpr std::int64_t kUnknownCharacterCost = 10000;
@@ -609,6 +615,82 @@ std::vector<Prediction> JapaneseConverter::Predict(std::wstring_view reading, st
         if (predictions.size() > limit) predictions.resize(limit);
     }
     return predictions;
+}
+
+std::optional<ReadingGuess> JapaneseConverter::ReadingOf(std::wstring_view text) const {
+    const std::size_t n = text.size();
+    if (n == 0 || n > 256) return std::nullopt;
+    struct Edge {
+        std::size_t length;
+        std::wstring reading;
+        std::int64_t cost;
+    };
+    std::vector<std::vector<Edge>> edges(n);
+    // A longer word beats several short ones; kana read as themselves.
+    constexpr std::int64_t kPerWord = 2000;
+    constexpr std::int64_t kKana = 3000;
+    constexpr std::int64_t kOther = 20000;
+    std::vector<bool> present(0x10000, false);
+    bool written = false;
+    for (const wchar_t c : text) {
+        present[static_cast<std::uint16_t>(c)] = true;
+        written = written || !IsKanaChar(c);
+    }
+    if (written) {
+        for (std::uint32_t record = 0; record < dictionary_.KeyCount(); ++record) {
+            std::wstring reading;
+            dictionary_.ForEachWord(record, [&](const DictionaryWord& word) {
+                if (word.spellingCorrection) return true;
+                const std::size_t length = dictionary_.PoolSurfaceLength(word);
+                if (length == 0 || length > n) return true;
+                const wchar_t first = dictionary_.PoolSurfaceChar(word, 0);
+                if (!present[static_cast<std::uint16_t>(first)]) return true;
+                for (std::size_t at = 0; at + length <= n; ++at) {
+                    if (text[at] != first) continue;
+                    std::size_t i = 1;
+                    while (i < length && text[at + i] == dictionary_.PoolSurfaceChar(word, i)) ++i;
+                    if (i < length) continue;
+                    if (reading.empty()) reading = dictionary_.KeyText(record);
+                    if (reading.empty()) return false;
+                    edges[at].push_back({length, reading, word.cost + kPerWord});
+                }
+                return true;
+            });
+        }
+    }
+    for (std::size_t i = 0; i < n; ++i) {
+        const wchar_t c = text[i];
+        if (IsKanaChar(c)) {
+            edges[i].push_back({1, ToHiragana(std::wstring(1, c)), kKana});
+        } else if (!IsIdeograph(c)) {
+            edges[i].push_back({1, std::wstring(1, c), kOther});
+        }
+    }
+    constexpr std::int64_t kNone = std::numeric_limits<std::int64_t>::max();
+    std::vector<std::int64_t> best(n + 1, kNone);
+    std::vector<std::pair<std::size_t, std::size_t>> from(n + 1, {0, 0});  // (start, edge)
+    best[0] = 0;
+    for (std::size_t i = 0; i < n; ++i) {
+        if (best[i] == kNone) continue;
+        for (std::size_t e = 0; e < edges[i].size(); ++e) {
+            const auto& edge = edges[i][e];
+            const std::int64_t cost = best[i] + edge.cost;
+            if (cost < best[i + edge.length]) {
+                best[i + edge.length] = cost;
+                from[i + edge.length] = {i, e};
+            }
+        }
+    }
+    if (best[n] == kNone) return std::nullopt;
+    ReadingGuess guess;
+    std::vector<const Edge*> path;
+    for (std::size_t at = n; at > 0; at = from[at].first) path.push_back(&edges[from[at].first][from[at].second]);
+    std::reverse(path.begin(), path.end());
+    for (const auto* edge : path) {
+        guess.reading += edge->reading;
+        guess.pieces.emplace_back(edge->length, edge->reading.size());
+    }
+    return guess;
 }
 
 }  // namespace tekito::japanese

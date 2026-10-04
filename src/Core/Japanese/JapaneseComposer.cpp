@@ -9,6 +9,7 @@
 #include "Core/Japanese/RomajiTable.h"
 
 #include <algorithm>
+#include <map>
 #include <set>
 #include <cwctype>
 #include <limits>
@@ -859,7 +860,7 @@ std::vector<std::pair<PhraseCandidate, std::wstring>> JapaneseComposer::SlipRead
 void JapaneseComposer::AddSlipCandidates(PhraseState& phrase) const {
     if (phrase.slipsAdded) return;
     phrase.slipsAdded = true;
-    if (!converter_ || !table_ || HasAscii()) return;
+    if (!converter_ || !table_ || HasAscii() || reconverted_) return;
     const auto lettersOnly = [](const std::wstring& keys) {
         return std::all_of(keys.begin(), keys.end(), [](wchar_t c) { return c >= L'a' && c <= L'z'; });
     };
@@ -1318,6 +1319,73 @@ std::wstring JapaneseComposer::Commit() {
     return text;
 }
 
+bool JapaneseComposer::Reconvert(std::wstring_view text) {
+    if (!converter_ || text.empty() || IsComposing()) return false;
+    const auto guess = converter_->ReadingOf(text);
+    if (!guess || guess->reading.empty()) return false;
+    Clear();
+    lastCommit_.reset();
+    // Units as if typed: two kana together where the table has them (きょ).
+    const std::wstring& reading = guess->reading;
+    for (std::size_t at = 0; at < reading.size();) {
+        const wchar_t c = reading[at];
+        Unit unit{std::wstring(1, c), std::wstring(1, c), c < 0x80};
+        if (table_ && !unit.ascii) {
+            for (std::size_t size = std::min<std::size_t>(2, reading.size() - at); size > 0; --size) {
+                auto keys = table_->KeysFor(std::wstring_view(reading).substr(at, size));
+                if (keys.empty()) continue;
+                unit.kana = reading.substr(at, size);
+                unit.keys = std::move(keys);
+                break;
+            }
+        }
+        at += unit.kana.size();
+        units_.push_back(std::move(unit));
+    }
+    caret_ = units_.size();
+    reconverted_ = true;
+    const auto* slips = keyConverter_;
+    keyConverter_ = nullptr;
+    BuildPhrases(true);
+    keyConverter_ = slips;
+    if (phrases_.empty()) {
+        Clear();
+        return false;
+    }
+    // Where each word ends, in the reading and in the text: a phrase that
+    // starts and ends there shows the text as it was written.
+    std::map<std::size_t, std::size_t> ends{{0, 0}};
+    for (std::size_t inText = 0, inReading = 0, i = 0; i < guess->pieces.size(); ++i) {
+        inText += guess->pieces[i].first;
+        inReading += guess->pieces[i].second;
+        ends[inReading] = inText;
+    }
+    for (auto& phrase : phrases_) {
+        const auto begin = ends.find(phrase.begin);
+        const auto end = ends.find(phrase.begin + phrase.length);
+        if (begin == ends.end() || end == ends.end()) continue;
+        const std::wstring written(text.substr(begin->second, end->second - begin->second));
+        const auto found = std::find_if(phrase.candidates.begin(), phrase.candidates.end(),
+                                        [&](const PhraseCandidate& c) { return c.text == written; });
+        if (found == phrase.candidates.end()) {
+            phrase.candidates.insert(phrase.candidates.begin(), {written, 0, PhraseCandidate::Kind::Dictionary, false});
+            phrase.selected = 0;
+        } else {
+            phrase.selected = static_cast<std::size_t>(found - phrase.candidates.begin());
+        }
+    }
+    if (Preedit() != text) {
+        // The phrases do not line up with the words: the text as one phrase.
+        auto candidates = KanaCandidates(conversionReading_);
+        candidates.insert(candidates.begin(), {std::wstring(text), 0, PhraseCandidate::Kind::Dictionary, false});
+        phrases_.clear();
+        phrases_.push_back({0, conversionReading_.size(), std::move(candidates)});
+    }
+    focus_ = 0;
+    listOpen_ = false;
+    return true;
+}
+
 bool JapaneseComposer::UndoCommit() {
     if (!lastCommit_ || IsComposing()) return false;
     auto record = std::move(*lastCommit_);
@@ -1386,6 +1454,7 @@ void JapaneseComposer::Clear() noexcept {
     listOpen_ = false;
     asciiMode_ = false;
     capitals_ = 0;
+    reconverted_ = false;
     ResetLive();
 }
 

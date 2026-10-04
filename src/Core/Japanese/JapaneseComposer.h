@@ -215,6 +215,9 @@ public:
         return lastCommit_ ? &lastCommit_->text : nullptr;
     }
     bool UndoCommit();
+    // Reconversion: written `text` back in the composition, converted, with
+    // the text itself chosen (false when its reading is not known).
+    bool Reconvert(std::wstring_view text);
     void ForgetCommit() noexcept { lastCommit_.reset(); }
 
 private:
@@ -374,6 +377,8 @@ private:
     std::vector<Prediction> predictions_;
     std::optional<std::size_t> chosenPrediction_;
     std::optional<CommitRecord> lastCommit_;
+    // The keys were made up from a reading (Reconvert): no slips in them.
+    bool reconverted_{false};
 };
 
 }  // namespace tekito::japanese
