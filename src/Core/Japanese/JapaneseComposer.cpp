@@ -372,6 +372,37 @@ void JapaneseComposer::PreviousPrediction() {
     chosenPrediction_ = chosenPrediction_ ? (*chosenPrediction_ + count - 1) % count : count - 1;
 }
 
+bool JapaneseComposer::CanForgetChosen() const {
+    if (!learning_) return false;
+    if (IsTyping() && chosenPrediction_ && *chosenPrediction_ < predictions_.size()) {
+        const auto& prediction = predictions_[*chosenPrediction_];
+        return learning_->Contains(prediction.reading, prediction.text);
+    }
+    if (!IsConverted() || preview_ || !listOpen_ || focus_ >= phrases_.size()) return false;
+    const auto& phrase = phrases_[focus_];
+    if (phrase.form || phrase.selected >= phrase.candidates.size()) return false;
+    return learning_->Contains(LearningReading(conversionReading_, phrase.begin, phrase.length),
+                               phrase.candidates[phrase.selected].text);
+}
+
+bool JapaneseComposer::ForgetChosen() {
+    if (!CanForgetChosen()) return false;
+    if (IsTyping()) {
+        const auto at = static_cast<std::ptrdiff_t>(*chosenPrediction_);
+        learning_->Forget(predictions_[*chosenPrediction_].reading, predictions_[*chosenPrediction_].text);
+        predictions_.erase(predictions_.begin() + at);
+        if (predictions_.empty()) {
+            chosenPrediction_.reset();
+        } else if (*chosenPrediction_ >= predictions_.size()) {
+            chosenPrediction_ = predictions_.size() - 1;
+        }
+        return true;
+    }
+    const auto& phrase = phrases_[focus_];
+    return learning_->Forget(LearningReading(conversionReading_, phrase.begin, phrase.length),
+                             phrase.candidates[phrase.selected].text);
+}
+
 void JapaneseComposer::ChoosePrediction(std::size_t index) {
     if (index < predictions_.size()) chosenPrediction_ = index;
 }

@@ -180,6 +180,8 @@ const en = {
       letters: "The letters you typed",
       english: "Type an English word",
       back: "Back to kana",
+      undo: "Take back what you just entered",
+      forget: "Stop suggesting a learned word",
     },
   },
   learning: {
@@ -467,6 +469,8 @@ const ja = {
       letters: "打った英字のまま",
       english: "英単語を打つ",
       back: "かなに戻す",
+      undo: "確定を取り消す",
+      forget: "覚えた候補を消す",
     },
   },
   learning: {

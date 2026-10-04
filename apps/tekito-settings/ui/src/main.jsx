@@ -619,6 +619,8 @@ function JapanesePage({ advanced, settings, setSetting }) {
           <Key label={j.keys.letters} keys={["F9", "F10"]} />
           <Key label={j.keys.english} keys={["Shift", "A-Z"]} />
           <Key label={j.keys.back} keys={["Esc"]} />
+          <Key label={j.keys.undo} keys={["Ctrl", "Backspace"]} />
+          <Key label={j.keys.forget} keys={["Ctrl", "Delete"]} />
         </div>
       </Glass>
     </>

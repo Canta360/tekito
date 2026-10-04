@@ -195,6 +195,11 @@ public:
     void PreviousPrediction();
     void ChoosePrediction(std::size_t index);
     void ClearPredictionChoice() noexcept { chosenPrediction_.reset(); }
+    // Ctrl+Delete: the chosen prediction, or the candidate chosen in the
+    // open list, is no longer offered from learning (a prediction leaves
+    // the list). Only what was learned can be forgotten.
+    [[nodiscard]] bool CanForgetChosen() const;
+    bool ForgetChosen();
 
     // The text to commit (pending keys are resolved first, and a chosen
     // prediction replaces what is typed); clears the composition.

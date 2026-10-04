@@ -79,6 +79,7 @@ struct KeyCommand {
         Commit,             // Enter, or anything that ends the composition
         InsertOutside,      // types `character` with no composition (a full-width space)
         UndoCommit,         // Ctrl+Backspace right after committing: the text comes back
+        ForgetChosen,       // Ctrl+Delete: the chosen prediction or candidate is unlearned
     };
     Action action{Action::Commit};
     wchar_t character{0};

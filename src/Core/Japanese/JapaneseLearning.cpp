@@ -18,6 +18,13 @@ const JapaneseLearningEntry* JapaneseLearningStore::Find(std::wstring_view readi
     return it == entries_.end() ? nullptr : &it->second;
 }
 
+bool JapaneseLearningStore::Forget(std::wstring_view reading, std::wstring_view surface) {
+    const auto it = entries_.find(Key(reading, surface));
+    if (it == entries_.end()) return false;
+    entries_.erase(it);
+    return true;
+}
+
 void JapaneseLearningStore::RecordChoice(std::wstring_view reading, std::wstring_view chosen,
                                          std::wstring_view shownFirst) {
     if (reading.empty() || chosen.empty()) return;

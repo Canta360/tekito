@@ -36,6 +36,12 @@ public:
     // first; the rest keep their order.
     void Reorder(std::wstring_view reading, std::vector<PhraseCandidate>& candidates) const;
     [[nodiscard]] double Preference(std::wstring_view reading, std::wstring_view surface) const;
+    // Whether `surface` was learned for `reading`; Forget drops it (false if
+    // it was not learned).
+    [[nodiscard]] bool Contains(std::wstring_view reading, std::wstring_view surface) const {
+        return Find(reading, surface) != nullptr;
+    }
+    bool Forget(std::wstring_view reading, std::wstring_view surface);
     // What the user chose for readings that start with `prefix` and are
     // longer, most preferred first.
     [[nodiscard]] std::vector<JapaneseLearningEntry> StartingWith(std::wstring_view prefix,

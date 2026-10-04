@@ -1022,7 +1022,34 @@ void TestComposerLearning(const RomajiTable& table, const MiniPack& pack) {
     Type(composer, L"kikaigatomaru");
     composer.Convert();
     RequireText(composer.Segments().front().text, chosen, "the phrase chosen last time comes first");
+    Require(!composer.CanForgetChosen(), "Ctrl+Delete needs the list open");
+    composer.Convert();
+    composer.PreviousCandidate();
+    Require(composer.CanForgetChosen(), "a learned candidate can be forgotten");
+    tekito::japanese::KeyPress forget;
+    forget.key = tekito::japanese::KeyPress::Key::Delete;
+    forget.command = true;
+    forget.control = true;
+    const auto command = tekito::japanese::TranslateKey(composer, forget, {});
+    Require(command && command->action == tekito::japanese::KeyCommand::Action::ForgetChosen, "with Ctrl+Delete");
+    (void)tekito::japanese::ApplyKey(composer, *command);
     composer.Cancel();
+    composer.Clear();
+    Type(composer, L"kikaigatomaru");
+    composer.Convert();
+    RequireText(composer.Segments().front().text, first, "forgotten, the converter's order is back");
+    composer.Cancel();
+    composer.Clear();
+
+    learning.RecordChoice(L"なかのです", L"中野デス", L"中野です");
+    composer.SetPredictionEnabled(true);
+    Type(composer, L"nakano");
+    composer.NextPrediction();
+    Require(composer.Predictions().front().text == L"中野デス" && composer.CanForgetChosen(), "a learned prediction");
+    Require(composer.ForgetChosen(), "Ctrl+Delete forgets it");
+    Require(composer.Predictions().empty() || composer.Predictions().front().text != L"中野デス", "and it leaves the list");
+    Require(!learning.Contains(L"なかのです", L"中野デス"), "and the learning");
+    composer.SetPredictionEnabled(false);
     composer.Clear();
 
     composer.SetLearning(nullptr);
