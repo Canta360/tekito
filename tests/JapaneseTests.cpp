@@ -616,6 +616,46 @@ void TestCapitals(const RomajiTable& table, const MiniPack& pack) {
     RequireText(composer.Commit(), L"Google", "and commits them");
 }
 
+// Ctrl+Backspace right after committing takes the text back.
+void TestUndoCommit(const RomajiTable& table, const MiniPack& pack) {
+    using tekito::japanese::KeyCommand;
+    using tekito::japanese::KeyPress;
+    using Key = KeyPress::Key;
+    const tekito::japanese::JapaneseConverter converter(pack.dictionary, pack.matrix);
+    JapaneseComposer composer(&table);
+    composer.SetConverter(&converter);
+    const tekito::japanese::KeyOptions options;
+    KeyPress undo;
+    undo.key = Key::Backspace;
+    undo.command = true;
+    undo.control = true;
+
+    Require(!tekito::japanese::TranslateKey(composer, undo, options), "nothing to take back at first");
+    Type(composer, L"watashinonamaehanakanodesu");
+    composer.Convert();
+    composer.MoveFocus(2);
+    composer.NextCandidate();
+    const std::wstring shown = composer.Preedit();
+    RequireText(composer.Commit(), shown, "Enter commits");
+    const auto command = tekito::japanese::TranslateKey(composer, undo, options);
+    Require(command && command->action == KeyCommand::Action::UndoCommit, "Ctrl+Backspace takes it back");
+    const auto outcome = tekito::japanese::ApplyKey(composer, *command);
+    Require(outcome.uncommitted == shown, "the text to take out of the document");
+    Require(composer.IsConverted(), "back to the conversion");
+    RequireText(composer.Preedit(), shown, "with the candidates as chosen");
+    RequireText(SegmentsText(composer).substr(SegmentsText(composer).rfind(L'|') + 1, 1), L"*", "and the focus where it was");
+    Require(!composer.LastCommit(), "only once");
+
+    (void)composer.Commit();
+    Type(composer, L"a");
+    Require(!composer.LastCommit(), "typing forgets it");
+    composer.Clear();
+    Type(composer, L"nakano");
+    (void)composer.Commit();
+    Require(composer.UndoCommit() && composer.Preedit() == L"なかの" && !composer.IsConverted(),
+            "kana committed as typed come back as typed");
+}
+
 std::vector<tekito::japanese::PhraseCandidate> Candidates(std::initializer_list<const wchar_t*> texts) {
     std::vector<tekito::japanese::PhraseCandidate> out;
     for (const auto* text : texts) out.push_back({text, 0, tekito::japanese::PhraseCandidate::Kind::Dictionary, false});
@@ -1272,6 +1312,7 @@ int main(int argc, char** argv) {
     TestKeys(*table, *pack);
     TestLiveConversion(*table, *pack);
     TestCapitals(*table, *pack);
+    TestUndoCommit(*table, *pack);
     TestLearningStore();
     TestComposerLearning(*table, *pack);
     TestContext(*table, *pack);

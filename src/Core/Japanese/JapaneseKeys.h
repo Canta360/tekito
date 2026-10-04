@@ -52,6 +52,8 @@ struct KeyPress {
     bool shift{false};
     // Ctrl, Alt or Windows held: a shortcut for the application.
     bool command{false};
+    // Ctrl held (without Alt).
+    bool control{false};
 };
 
 // What a key does to the composition.
@@ -76,6 +78,7 @@ struct KeyCommand {
         Delete,
         Commit,             // Enter, or anything that ends the composition
         InsertOutside,      // types `character` with no composition (a full-width space)
+        UndoCommit,         // Ctrl+Backspace right after committing: the text comes back
     };
     Action action{Action::Commit};
     wchar_t character{0};
@@ -104,6 +107,8 @@ struct KeyOutcome {
     std::optional<std::wstring> committed;
     // Text typed with no composition.
     std::wstring outside;
+    // Text to take back out of the document, before the composition.
+    std::optional<std::wstring> uncommitted;
 };
 
 KeyOutcome ApplyKey(JapaneseComposer& composer, const KeyCommand& command);

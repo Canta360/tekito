@@ -35,6 +35,18 @@ constexpr WPARAM kVkImeOff = 0x1A;
 
 bool KeyDown(int key) { return (GetKeyState(key) & 0x8000) != 0; }
 
+bool IsModifierKey(WPARAM key) {
+    switch (key) {
+    case VK_SHIFT: case VK_LSHIFT: case VK_RSHIFT:
+    case VK_CONTROL: case VK_LCONTROL: case VK_RCONTROL:
+    case VK_MENU: case VK_LMENU: case VK_RMENU:
+    case VK_LWIN: case VK_RWIN: case VK_CAPITAL:
+        return true;
+    default:
+        return false;
+    }
+}
+
 bool HasCommandModifier() {
     return KeyDown(VK_CONTROL) || KeyDown(VK_MENU) || KeyDown(VK_LWIN) || KeyDown(VK_RWIN);
 }
@@ -355,7 +367,11 @@ bool TextService::TranslateJapaneseKey(WPARAM wParam, KeyInput& input) {
     japanese::KeyOptions options = userdata::JapaneseKeyOptions(userSettings_);
     options.pageSize = japanesePage_;
     const auto command = japanese::TranslateKey(japanese_, JapaneseKeyPressFor(wParam, userSettings_.japaneseIgnoreCapsLock), options);
-    if (!command) return false;
+    if (!command) {
+        // Any other key ends the chance to take the last commit back.
+        if (!IsModifierKey(wParam)) japanese_.ForgetCommit();
+        return false;
+    }
     // A key that only ends the text goes on to the application (LetsKeyThrough).
     input.type = command->letKeyThrough ? KeyInput::Type::EndComposition : KeyInput::Type::JapaneseKey;
     input.japaneseKey = *command;
@@ -382,6 +398,7 @@ HRESULT TextService::HandleJapaneseKey(ITfContext* context, TfEditCookie editCoo
     default:
         return S_FALSE;
     }
+    if (command.action == Action::UndoCommit) return UndoJapaneseCommit(context, editCookie);
     if (command.action == Action::Commit) {
         const HRESULT hr = CommitJapanese(context, editCookie);
         // An English word left from before a switch ends as typed.

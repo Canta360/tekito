@@ -200,6 +200,14 @@ public:
     // prediction replaces what is typed); clears the composition.
     [[nodiscard]] std::wstring Commit();
     void Clear() noexcept;
+    // Ctrl+Backspace right after committing: the text committed last comes
+    // back as it was before Enter (the caller takes it out of the
+    // document). Typing forgets it.
+    [[nodiscard]] const std::wstring* LastCommit() const noexcept {
+        return lastCommit_ ? &lastCommit_->text : nullptr;
+    }
+    bool UndoCommit();
+    void ForgetCommit() noexcept { lastCommit_.reset(); }
 
 private:
     struct Unit {
@@ -294,6 +302,23 @@ private:
     void StartPicking();
     void ResetLive() noexcept;
 
+    // What Commit cleared, for UndoCommit.
+    struct CommitRecord {
+        std::wstring text;
+        std::vector<Unit> units;
+        std::vector<PhraseState> phrases;
+        std::wstring conversionReading;
+        std::vector<std::size_t> readingKeys;
+        std::uint16_t context{0};
+        std::vector<std::wstring> contextWords;
+        std::size_t focus{0};
+        bool preview{false};
+        bool asciiMode{false};
+        int capitals{0};
+        std::size_t settledPhrases{0};
+        std::size_t settledLength{0};
+    };
+
     const RomajiTable* table_{nullptr};
     const JapaneseConverter* converter_{nullptr};
     const KeyConverter* keyConverter_{nullptr};
@@ -338,6 +363,7 @@ private:
     bool predictionEnabled_{false};
     std::vector<Prediction> predictions_;
     std::optional<std::size_t> chosenPrediction_;
+    std::optional<CommitRecord> lastCommit_;
 };
 
 }  // namespace tekito::japanese

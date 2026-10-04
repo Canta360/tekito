@@ -127,6 +127,7 @@ void JapaneseComposer::SetLiveConversion(bool on) {
 }
 
 void JapaneseComposer::Insert(wchar_t key) {
+    lastCommit_.reset();
     if (live_) {
         // Typing on after picking keeps what was picked.
         if (IsConverted() && !preview_) SettleAll();
@@ -1233,6 +1234,14 @@ std::wstring JapaneseComposer::Commit() {
     FlushAll();
     // Live: the keys that were pending are converted too.
     if (live_ && preview_) UpdateLive();
+    CommitRecord record{{}, units_, phrases_, conversionReading_, readingKeys_, context_, contextWords_, focus_,
+                        preview_, asciiMode_, capitals_, settledPhrases_, settledLength_};
+    const auto keep = [&](const std::wstring& text) {
+        lastCommit_.reset();
+        if (text.empty()) return;
+        record.text = text;
+        lastCommit_ = std::move(record);
+    };
     if (chosenPrediction_ && *chosenPrediction_ < predictions_.size() && IsTyping()) {
         const auto prediction = predictions_[*chosenPrediction_];
         if (learning_) learning_->RecordChoice(prediction.reading, prediction.text, prediction.text);
@@ -1240,6 +1249,7 @@ std::wstring JapaneseComposer::Commit() {
         context_ = 0;
         RememberWords(prediction.text);
         Clear();
+        keep(prediction.text);
         return prediction.text;
     }
     if (const auto* whole = WholeChoice()) {
@@ -1248,6 +1258,7 @@ std::wstring JapaneseComposer::Commit() {
         context_ = ContextAfter(text, whole->rightId);
         RememberWords(text);
         Clear();
+        keep(text);
         return text;
     }
     if (learning_ && IsConverted()) {
@@ -1272,7 +1283,33 @@ std::wstring JapaneseComposer::Commit() {
     context_ = ContextAfter(text, last);
     RememberWords(text);
     Clear();
+    keep(text);
     return text;
+}
+
+bool JapaneseComposer::UndoCommit() {
+    if (!lastCommit_ || IsComposing()) return false;
+    auto record = std::move(*lastCommit_);
+    lastCommit_.reset();
+    units_ = std::move(record.units);
+    caret_ = units_.size();
+    pending_.clear();
+    phrases_ = std::move(record.phrases);
+    conversionReading_ = std::move(record.conversionReading);
+    readingKeys_ = std::move(record.readingKeys);
+    // The sentence goes on from before the text, as it did then.
+    context_ = record.context;
+    contextWords_ = std::move(record.contextWords);
+    focus_ = phrases_.empty() ? 0 : std::min(record.focus, phrases_.size() - 1);
+    listOpen_ = false;
+    preview_ = record.preview;
+    kanaView_ = false;
+    asciiMode_ = record.asciiMode;
+    capitals_ = record.capitals;
+    settledPhrases_ = record.settledPhrases;
+    settledLength_ = record.settledLength;
+    UpdatePredictions();
+    return true;
 }
 
 void JapaneseComposer::AddContentWords(std::wstring_view text, std::vector<std::wstring>& words) {

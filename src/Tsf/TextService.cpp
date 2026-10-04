@@ -1083,6 +1083,7 @@ HRESULT TextService::OnPopContext(ITfContext* context) {
 }
 
 HRESULT TextService::OnSetFocus(ITfDocumentMgr* focus, ITfDocumentMgr*) {
+    japanese_.ForgetCommit();
     // Light or dark taskbar: the mode icon follows when focus moves.
     if (modeLangBarItem_) modeLangBarItem_->RefreshTheme();
     ComPtr<ITfContext> top;
@@ -2145,6 +2146,23 @@ void TextService::CheckJapaneseContext(ITfContext* context, TfEditCookie editCoo
     if (lastJapaneseCommit_.empty() || !ReadSelectionContext(context, editCookie).ends_with(lastJapaneseCommit_)) {
         japanese_.ForgetContext();
     }
+}
+
+HRESULT TextService::UndoJapaneseCommit(ITfContext* context, TfEditCookie editCookie) {
+    // Only while the caret is still right after the text.
+    const auto* last = japanese_.LastCommit();
+    if (!last || !ReadSelectionContext(context, editCookie).ends_with(*last)) {
+        japanese_.ForgetCommit();
+        return S_OK;
+    }
+    const std::wstring text = *last;
+    HRESULT hr = ReplaceTrailingWhitespaceAtSelection(context, editCookie, text.size(), std::wstring{});
+    if (FAILED(hr)) return hr;
+    japanese_.UndoCommit();
+    lastJapaneseCommit_.clear();
+    hr = EnsureComposition(context, editCookie);
+    if (FAILED(hr)) return hr;
+    return ShowJapanesePreedit(context, editCookie);
 }
 
 }  // namespace tekito::tsf

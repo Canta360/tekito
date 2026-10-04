@@ -277,6 +277,9 @@ void Refresh(Testbed& bed) {
 
 void Apply(Testbed& bed, const ja::KeyCommand& command) {
     const auto outcome = ja::ApplyKey(bed.composer, command);
+    if (outcome.uncommitted && bed.text.ends_with(*outcome.uncommitted)) {
+        bed.text.erase(bed.text.size() - outcome.uncommitted->size());
+    }
     if (outcome.committed) bed.text += *outcome.committed;
     bed.text += outcome.outside;
 }
@@ -321,6 +324,7 @@ bool OnKey(Testbed& bed, WPARAM key) {
                                           tekito::userdata::JapaneseKeyOptions(bed.settings));
     bool used = true;
     if (!command) {
+        bed.composer.ForgetCommit();
         used = PlainKey(bed, key);
     } else {
         Apply(bed, *command);

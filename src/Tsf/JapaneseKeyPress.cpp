@@ -14,6 +14,7 @@ japanese::KeyPress JapaneseKeyPressFor(WPARAM virtualKey, bool ignoreCapsLock) {
     japanese::KeyPress press;
     press.shift = KeyDown(VK_SHIFT);
     press.command = KeyDown(VK_CONTROL) || KeyDown(VK_MENU) || KeyDown(VK_LWIN) || KeyDown(VK_RWIN);
+    press.control = KeyDown(VK_CONTROL) && !KeyDown(VK_MENU);
     if (virtualKey >= '1' && virtualKey <= '9') press.digit = static_cast<int>(virtualKey - '0');
     if (virtualKey >= VK_NUMPAD1 && virtualKey <= VK_NUMPAD9) press.digit = static_cast<int>(virtualKey - VK_NUMPAD0);
     switch (virtualKey) {

@@ -38,6 +38,9 @@ bool IsCaretKey(Key key) {
 std::optional<KeyCommand> TranslateKey(const JapaneseComposer& composer, const KeyPress& key,
                                        const KeyOptions& options) {
     const bool composing = composer.IsComposing();
+    if (!composing && key.key == Key::Backspace && key.control && !key.shift && composer.LastCommit()) {
+        return Make(Action::UndoCommit);
+    }
     if (key.command) {
         // Shortcuts act on the committed text.
         if (!composing) return std::nullopt;
@@ -164,6 +167,12 @@ std::optional<KeyCommand> TranslateKey(const JapaneseComposer& composer, const K
 KeyOutcome ApplyKey(JapaneseComposer& composer, const KeyCommand& command) {
     KeyOutcome outcome;
     switch (command.action) {
+    case Action::UndoCommit:
+        if (const auto* text = composer.LastCommit()) {
+            std::wstring committed = *text;
+            if (composer.UndoCommit()) outcome.uncommitted = std::move(committed);
+        }
+        break;
     case Action::Insert:
         // After a conversion, typing on commits it and starts anew (live
         // conversion types on).
