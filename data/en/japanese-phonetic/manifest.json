@@ -1,0 +1,19 @@
+{
+  "pack_id": "japanese-phonetic",
+  "display_name": "Japanese Phonetic Suggestions",
+  "schema_version": 1,
+  "version": "2026.09",
+  "language": "en-US",
+  "type": "japanese-phonetic",
+  "format": "indexed-tsv-v1",
+  "file": "entries.tsv",
+  "index_file": "entries.tsv.idx",
+  "entry_count": 63266,
+  "sha256": {
+    "file": "46A5977C09B9DF9EE735F7CE662D4C805752EC62B3356EB546B92C4EAA658CF6",
+    "index": "9BDA78ED93BA91C7CE02AD75FC4C9D86C1B881E8243190CA7AA51CA5820BBD76"
+  },
+  "license": "CMUdict",
+  "source": "scripts/en/build-expression-packs.py from the pronunciation and frequency packs",
+  "notice_file": "NOTICE"
+}

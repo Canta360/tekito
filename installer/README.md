@@ -24,7 +24,7 @@ It writes to `artifacts\`:
   it from there when Japanese is chosen. `-JapaneseDataBaseUrl` changes where
   it is expected.
 
-The Japanese packs must be built first (`scripts\prepare-japanese-packs.ps1`).
+The Japanese packs must be built first (`scripts\ja\prepare-japanese-packs.ps1`).
 
 The setup program (`TekitoSetup.cpp`) checks for the WebView2 Runtime, shows
 the license agreement and the Japanese choice, then unpacks the ZIP to a

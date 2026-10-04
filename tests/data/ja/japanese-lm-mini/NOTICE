@@ -1,0 +1,10 @@
+Which Japanese words go together, from the Leipzig Corpora Collection:
+a few hand-written counts for the unit tests (1,000,000 sentences each), reduced to word counts
+and the pointwise mutual information of neighbor pairs by
+scripts/ja/build-japanese-lm.py.
+
+The downloadable corpora are provided under CC BY. Attribution: (c) Universitat
+Leipzig / Sachsische Akademie der Wissenschaften / InfAI.
+D. Goldhahn, T. Eckart and U. Quasthoff, "Building Large Monolingual
+Dictionaries at the Leipzig Corpora Collection", LREC 2012.
+Terms: https://www.wortschatz.uni-leipzig.de/en/usage

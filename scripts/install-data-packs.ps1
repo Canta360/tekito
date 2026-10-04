@@ -18,7 +18,11 @@ if (-not $DestinationRoot) {
 }
 
 $SourceRoot = (Resolve-Path $SourceRoot).Path
-$packDirectories = @(Get-ChildItem -LiteralPath $SourceRoot -Directory |
+# Side by side, as a release carries them, or by language (en, ja, common),
+# as the repository keeps them; they are installed side by side.
+$sourceFolders = @($SourceRoot) + @("en", "ja", "common" | ForEach-Object { Join-Path $SourceRoot $_ } |
+    Where-Object { Test-Path -LiteralPath $_ })
+$packDirectories = @($sourceFolders | ForEach-Object { Get-ChildItem -LiteralPath $_ -Directory } |
     Where-Object { Test-Path (Join-Path $_.FullName "manifest.json") })
 if ($packDirectories.Count -eq 0) {
     throw "No Data Pack manifests were found under $SourceRoot."

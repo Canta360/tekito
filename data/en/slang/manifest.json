@@ -1,0 +1,19 @@
+{
+  "pack_id": "slang",
+  "display_name": "TEKITO Slang",
+  "schema_version": 1,
+  "version": "2026.09",
+  "language": "en-US",
+  "type": "slang-abbreviation",
+  "format": "indexed-tsv-v1",
+  "file": "entries.tsv",
+  "index_file": "entries.tsv.idx",
+  "entry_count": 187,
+  "sha256": {
+    "file": "63D3C821C2686488DEFF6BC0A9CA5BC71E559E41B6ACCB57FCB531A08D07DCD4",
+    "index": "265012917A626C3675E99596064461777AC17B35BC8DF352D3B0934D22B6886E"
+  },
+  "license": "TEKITO-OWNED",
+  "source": "scripts/en/slang-seeds.tsv",
+  "notice_file": "NOTICE"
+}

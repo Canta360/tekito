@@ -13,7 +13,7 @@ namespace tekito::japanese {
 // How a katakana word sounds, loosely: hiragana, with the long-vowel mark
 // as the vowel it lengthens, small vowels full size, and sounds katakana
 // spells two ways made one (ティ and チ, ヂ and ジ). The japanese-loanwords
-// pack is keyed by it (scripts/build-expression-packs.py does the same).
+// pack is keyed by it (scripts/en/build-expression-packs.py does the same).
 [[nodiscard]] std::wstring LoanwordKey(std::wstring_view kana);
 
 // The japanese-loanwords pack: English words by how they sound in katakana

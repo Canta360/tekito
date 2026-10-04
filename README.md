@@ -217,11 +217,11 @@ and remove it again with `unregister-debug.ps1`.
 The language data lives in `data/`. The large packs are built from their
 public sources rather than kept in the repository:
 
-- `scripts\prepare-japanese-packs.ps1` builds the Japanese dictionary from
+- `scripts\ja\prepare-japanese-packs.ps1` builds the Japanese dictionary from
   Mozc, the word statistics from the Leipzig corpora, and the meanings from
   Wiktionary and the Japanese WordNet. Without them Japanese types kana but
   does not convert.
-- `scripts\prepare-full-data-packs.ps1` builds the English phrase
+- `scripts\en\prepare-full-data-packs.ps1` builds the English phrase
   statistics. TEKITO works without them.
 
 See [Data Packs](docs/data-packs.md) for every pack, its source and its
@@ -237,11 +237,12 @@ attach to the release.
 | `src/Core/Japanese` | Romaji, kana-kanji conversion, slips, predictions and meanings. No Windows code. |
 | `src/Tsf` | The TSF text service and the candidate window. |
 | `src/UserData` | Settings, the user dictionary and learning, stored in SQLite. |
-| `tests` | Unit tests for the engines and user data. |
-| `eval` | Offline accuracy measurements for English and Japanese. |
+| `tests` | Unit tests for the engines and user data (Japanese test data in `tests/data/ja`). |
+| `eval`, `benchmarks` | Offline accuracy and speed measurements, in `en` and `ja`. |
 | `apps/tekito-settings` | The Settings window: a Win32 host and a React page in WebView2. |
 | `installer` | The setup program and packaging scripts. |
-| `data` | Language data packs, each with its own manifest and NOTICE. |
+| `data` | Language data packs, each with its own manifest and NOTICE: `en` for English, `ja` for Japanese, `common` for both. |
+| `scripts` | Build, install and check scripts; the ones that build each language's data are in `en` and `ja`. |
 
 ## Working on TEKITO
 

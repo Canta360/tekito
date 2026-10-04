@@ -36,7 +36,7 @@ import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-PACK = ROOT / "data" / "special-conversions"
+PACK = ROOT / "data" / "common" / "special-conversions"
 VERSION = "2026.09"
 
 WORDS = {

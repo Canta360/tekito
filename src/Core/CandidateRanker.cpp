@@ -22,7 +22,7 @@ std::size_t RawSize(const CorrectionCandidate& candidate) {
 double CombinedScore(const CorrectionCandidate& candidate) {
     constexpr double kErrorWeight = 10.0;
     constexpr double kFrequencyWeight = 1.0;
-    // data/phrase's raw scores run roughly 3-50, versus frequency's roughly
+    // data/en/phrase's raw scores run roughly 3-50, versus frequency's roughly
     // 0-7 (both are corpus-derived but on different scales), so this must be
     // scaled down to keep context a proportionate vote alongside frequency
     // and error cost rather than one that mechanically dominates both

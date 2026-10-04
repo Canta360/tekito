@@ -33,14 +33,14 @@ $releaseRoot = Join-Path (Resolve-Path $BuildRoot).Path "Release"
 $SourceDataRoot = (Resolve-Path $SourceDataRoot).Path
 
 # Packs a release must carry; the others are included when present. phrase
-# is built locally (scripts\prepare-full-data-packs.ps1): TEKITO runs without
+# is built locally (scripts\en\prepare-full-data-packs.ps1): TEKITO runs without
 # it, but English corrections lose their context ranking.
 $requiredPacks = @("standard-english", "wikipedia-common-misspellings", "frequency", "phrase",
                    "dictionary-display", "slang", "wiktionary-slang", "pronunciation", "emoji",
                    "special-conversions")
-# Japanese input, downloaded separately; the first two are required for it.
-$japanesePacks = @("japanese-core", "japanese-romaji", "japanese-lm", "japanese-loanwords",
-                   "japanese-slang", "japanese-wiktionary", "japanese-wordnet")
+# Japanese input, downloaded separately: the packs in data\ja. These two are
+# required for it.
+$requiredJapanesePacks = @("japanese-core", "japanese-romaji")
 
 function Get-RelativeUnixPath([string]$BasePath, [string]$TargetPath) {
     $base = (Resolve-Path -LiteralPath $BasePath).Path.TrimEnd('\') + '\'
@@ -95,16 +95,27 @@ if (-not (Test-Path -LiteralPath (Join-Path $releaseRoot "settings-ui\index.html
     throw "The Settings page was not built. Run npm run build in apps\tekito-settings\ui, then rebuild."
 }
 
-$allPacks = @(Get-ChildItem -LiteralPath $SourceDataRoot -Directory |
-    Where-Object { Test-Path (Join-Path $_.FullName "manifest.json") })
-$packs = @($allPacks | Where-Object { $japanesePacks -notcontains $_.Name })
-$japaneseSources = @($allPacks | Where-Object { $japanesePacks -contains $_.Name })
+# The repository keeps packs by language: data\en, data\common, data\ja.
+function Get-Packs([string]$Folder) {
+    if (-not (Test-Path -LiteralPath $Folder)) { return @() }
+    @(Get-ChildItem -LiteralPath $Folder -Directory |
+        Where-Object { Test-Path (Join-Path $_.FullName "manifest.json") })
+}
+$stray = @(Get-Packs $SourceDataRoot)
+if ($stray.Count -gt 0) {
+    throw "Data Packs belong in data\en, data\ja or data\common, not directly in data: $($stray.Name -join ', ')"
+}
+$packs = @(Get-Packs (Join-Path $SourceDataRoot "en")) + @(Get-Packs (Join-Path $SourceDataRoot "common"))
+$japaneseSources = @(Get-Packs (Join-Path $SourceDataRoot "ja"))
+$allPacks = $packs + $japaneseSources
+$duplicates = @($allPacks | Group-Object Name | Where-Object Count -gt 1)
+if ($duplicates.Count -gt 0) { throw "Data Packs found twice: $($duplicates.Name -join ', ')" }
 foreach ($required in $requiredPacks) {
     if ($packs.Name -notcontains $required) { throw "Required Data Pack is missing: $required" }
 }
-foreach ($required in $japanesePacks[0..1]) {
+foreach ($required in $requiredJapanesePacks) {
     if ($japaneseSources.Name -notcontains $required) {
-        throw "Japanese Data Pack is missing: $required. Run scripts\prepare-japanese-packs.ps1."
+        throw "Japanese Data Pack is missing: $required. Run scripts\ja\prepare-japanese-packs.ps1."
     }
 }
 foreach ($pack in $allPacks) {

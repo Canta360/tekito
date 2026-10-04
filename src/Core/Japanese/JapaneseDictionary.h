@@ -28,7 +28,7 @@ struct DictionaryWord {
     std::uint32_t surfaceOffset{0};
 };
 
-// The japanese-core dictionary (ja-dict-v1, see scripts/build-japanese-packs.py),
+// The japanese-core dictionary (ja-dict-v1, see scripts/ja/build-japanese-packs.py),
 // mapped read-only. Every read checks its bounds, so a damaged file gives
 // fewer words, never a crash.
 class JapaneseDictionary final {

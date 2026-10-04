@@ -153,8 +153,8 @@ cmake --build --preset windows-x64-debug
 
 言語データは `data/` にあります。大きなパックはリポジトリに入れず、公開元から作ります。
 
-- `scripts\prepare-japanese-packs.ps1` は、Mozc から日本語辞書を、Leipzig のコーパスから語の統計を、Wiktionary と日本語 WordNet から意味のデータを作ります。これがないと、日本語はかなまでで漢字に変換できません。
-- `scripts\prepare-full-data-packs.ps1` は英語のフレーズ統計を作ります。なくても TEKITO は動きます。
+- `scripts\ja\prepare-japanese-packs.ps1` は、Mozc から日本語辞書を、Leipzig のコーパスから語の統計を、Wiktionary と日本語 WordNet から意味のデータを作ります。これがないと、日本語はかなまでで漢字に変換できません。
+- `scripts\en\prepare-full-data-packs.ps1` は英語のフレーズ統計を作ります。なくても TEKITO は動きます。
 
 各パックの出典とライセンスは [Data Packs](docs/data-packs.md) にまとめてあります。インストーラーを作るときは `windows-x64-release` プリセットでビルドし、`installer\package-release.ps1` を実行します。リリースに添付する日本語データの ZIP も一緒に作られます。
 
@@ -166,11 +166,12 @@ cmake --build --preset windows-x64-debug
 | `src/Core/Japanese` | ローマ字、かな漢字変換、打ち間違いの候補、予測、意味。Windows に依存しません。 |
 | `src/Tsf` | TSF テキストサービスと候補ウィンドウ。 |
 | `src/UserData` | 設定、ユーザー辞書、学習データ（SQLite）。 |
-| `tests` | エンジンとユーザーデータのテスト。 |
-| `eval` | 英語と日本語の精度をオフラインで測る仕組み。 |
+| `tests` | エンジンとユーザーデータのテスト（日本語のテスト用データは `tests/data/ja`）。 |
+| `eval`、`benchmarks` | 精度と速さをオフラインで測る仕組み。`en` と `ja` に分かれています。 |
 | `apps/tekito-settings` | 設定画面。Win32 のホストと WebView2 上の React。 |
 | `installer` | セットアップと配布物を作るスクリプト。 |
-| `data` | 言語データ。パックごとに manifest と NOTICE があります。 |
+| `data` | 言語データ。パックごとに manifest と NOTICE があります。英語は `en`、日本語は `ja`、両方で使うものは `common` にあります。 |
+| `scripts` | ビルド、インストール、確認のスクリプト。言語ごとのデータを作るものは `en` と `ja` にあります。 |
 
 ## 開発のルール
 

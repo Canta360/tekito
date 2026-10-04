@@ -719,7 +719,7 @@ void TestLanguageModel(const MiniPack& pack) {
     using tekito::japanese::LanguageModel;
     LanguageModel model;
     Require(model.Open(std::filesystem::path(TEKITO_TEST_DATA_DIR) / L"japanese-lm-mini"), "the model opens");
-    // The builder's hashes and these meet (scripts/build-japanese-lm.py --mini).
+    // The builder's hashes and these meet (scripts/ja/build-japanese-lm.py --mini).
     const auto count = model.LogCount(L"麻酔");
     Require(count && std::abs(*count - std::log(1000.0)) < 0.06, "word counts are read back");
     Require(!model.LogCount(L"xyz"), "a word the model lacks has none");

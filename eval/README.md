@@ -3,16 +3,16 @@
 Measures the real `CandidateEngine` / `AutoApplyPolicy` against two corpora
 already in `data/`:
 
-- `data/qwerty-typo-catalog` (about 23,800 rows: synthetic QWERTY slips of
+- `data/en/qwerty-typo-catalog` (about 23,800 rows: synthetic QWERTY slips of
   the 5,000 most common words, the same words typed correctly, and the chat
   abbreviations from the slang pack, which must stay as typed; each row is
   assigned to a `test` / `validation` / `train` split; built by
-  `scripts/build-expression-packs.py`).
-- `data/wikipedia-common-misspellings` (4,499 real human misspelling ->
+  `scripts/en/build-expression-packs.py`).
+- `data/en/wikipedia-common-misspellings` (4,499 real human misspelling ->
   correction pairs, CC-BY-SA-4.0, no context; treated as an eval-only `test`
   set).
 
-Neither corpus is read by the harness directly: `scripts/prepare-eval-corpus.py`
+Neither corpus is read by the harness directly: `scripts/en/prepare-eval-corpus.py`
 flattens both into one TSV (`eval/generated/eval_corpus.tsv`, gitignored,
 regenerate any time) that `tekito_core_eval` reads.
 
@@ -42,14 +42,14 @@ reaches it.
 ## Running it
 
 ```powershell
-.\scripts\run-eval.ps1
+.\scripts\en\run-eval.ps1
 ```
 
 This regenerates the TSV, configures/builds `tekito_core_eval` (Release), and
 runs it against the `test` split. Pass `-Split validation`, `-Split train`, or
 `-Split all` to run a different slice, `-LatencySample 0` to skip the
 per-keystroke pass, or `-Corpus <path>` for a custom TSV. See
-`scripts/prepare-eval-corpus.py --help` for the corpus generator's own
+`scripts/en/prepare-eval-corpus.py --help` for the corpus generator's own
 options.
 
 ## Interpreting results
@@ -82,7 +82,7 @@ words without context, this follows what Space actually does.
 ## Japanese conversion
 
 `tekito_ja_eval` measures kana-kanji conversion with the `japanese-core` pack
-on two public sets, which `scripts/prepare-japanese-eval.py` downloads at
+on two public sets, which `scripts/ja/prepare-japanese-eval.py` downloads at
 pinned commits and flattens into `eval/generated/japanese_eval.tsv`:
 
 - Mozc's `evaluation.tsv` (BSD-3-Clause): the rows whose first conversion
@@ -91,8 +91,8 @@ pinned commits and flattens into `eval/generated/japanese_eval.tsv`:
   Dataset are CC BY-SA 3.0): 200 readings with every acceptable conversion.
 
 ```powershell
-.\scripts\prepare-japanese-packs.ps1   # once, builds data\japanese-core
-.\scripts\run-ja-eval.ps1 -ShowMisses 20
+.\scripts\ja\prepare-japanese-packs.ps1   # once, builds data\ja\japanese-core
+.\scripts\ja\run-ja-eval.ps1 -ShowMisses 20
 ```
 
 Per source it reports `top1` (the first conversion is acceptable),
@@ -106,7 +106,7 @@ neighboring key, a key dropped, an extra key, two keys swapped). These run
 through the composer, as TEKITO converts on Space:
 
 ```powershell
-$keys = @("--pack", "data\japanese-core", "--romaji", "data\japanese-romaji")
+$keys = @("--pack", "data\ja\japanese-core", "--romaji", "data\ja\japanese-romaji")
 .\out\build\eval\Release\tekito_ja_eval.exe @keys --keys-corpus eval\generated\japanese_eval_keys.tsv
 .\out\build\eval\Release\tekito_ja_eval.exe @keys --keys-corpus eval\generated\japanese_eval_typo_keys.tsv
 ```
@@ -125,7 +125,7 @@ the phrases of the sentences that convert right:
 ```powershell
 .\out\build\eval\Release\tekito_ja_eval.exe @keys --keys-corpus eval\generated\japanese_eval_keys.tsv `
     --dump-phrases eval\generated\japanese_eval_phrase_keys.tsv
-python scripts\prepare-japanese-eval.py --phrases   # writes japanese_eval_phrase_typo_keys.tsv
+python scripts\ja\prepare-japanese-eval.py --phrases   # writes japanese_eval_phrase_typo_keys.tsv
 .\out\build\eval\Release\tekito_ja_eval.exe @keys --keys-corpus eval\generated\japanese_eval_phrase_keys.tsv
 .\out\build\eval\Release\tekito_ja_eval.exe @keys --keys-corpus eval\generated\japanese_eval_phrase_typo_keys.tsv
 ```
@@ -140,14 +140,14 @@ next conversion; `--no-context` starts every phrase afresh. On
 `japanese_eval_keys.tsv`, 58.9% of the sentences come out right without the
 context and 61.3% with it (61.5% when converted whole).
 
-For a larger set, `scripts/prepare-japanese-jsut-eval.py` writes
+For a larger set, `scripts/ja/prepare-japanese-jsut-eval.py` writes
 `japanese_eval_jsut.tsv` (and `_keys`): about 4,000 of the 5,000 JSUT
 basic5000 sentences, their typed readings recovered from the spoken ones
 through the Mozc dictionary (the text is CC BY-SA / CC BY and is not
 committed). Only one writing counts as right there, so `cer` says more than
 `top1`.
 
-`--lm data\japanese-lm` adds the language model, with `--lm-scale`,
+`--lm data\ja\japanese-lm` adds the language model, with `--lm-scale`,
 `--lm-penalty`, `--lm-threshold` and `--topic-scale` to tune it
 (JapaneseConverter::ModelWeights has the defaults). With it the JSUT
 sentences go from 36.9% to 38.9% (cer 6.8% to 6.5%) and the Mozc and
@@ -159,7 +159,7 @@ before count as the sentence's too: 63.0% of the Mozc and AJIMEE sentences
 and 37.7% of the JSUT ones come out right that way.
 
 `--study hints|live|register` measures ways of typing borrowed from SKK on a
-keys file (`eval/JapaneseTypingStudy.h` explains each), with the phrase
+keys file (`eval/ja/JapaneseTypingStudy.h` explains each), with the phrase
 breaks a typist would mark taken from the acceptable text:
 
 - `hints`: Space where a phrase ends, either committing there (as today) or

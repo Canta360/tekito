@@ -10,7 +10,7 @@
 
 namespace tekito::japanese {
 
-// The japanese-lm pack (ja-lm-v3, scripts/build-japanese-lm.py): how often
+// The japanese-lm pack (ja-lm-v3, scripts/ja/build-japanese-lm.py): how often
 // words occur in Japanese text, how much likelier pairs of neighbors are
 // than their words apart, and which content words share sentences. Mapped
 // and read in place.

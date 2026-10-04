@@ -23,12 +23,14 @@ eval/generated/
 third_party/webview2/tools/
 third_party/webview2/build/
 
-# Built locally by scripts/prepare-full-data-packs.ps1; too large for Git
-data/phrase/
-# Built by scripts/build-japanese-packs.py from the Mozc dictionary
-data/japanese-core/
-# Built by scripts/build-japanese-lm.py from the Leipzig corpora
-data/japanese-lm/
-# Built by scripts/build-japanese-meaning-packs.py from Wiktionary and WordNet
-data/japanese-wiktionary/
-data/japanese-wordnet/
+# Built locally by scripts/en/prepare-full-data-packs.ps1; too large for Git
+data/en/phrase/
+# Built by scripts/ja/build-japanese-packs.py from the Mozc dictionary
+data/ja/japanese-core/
+# Built by scripts/ja/build-japanese-lm.py from the Leipzig corpora
+data/ja/japanese-lm/
+# Built by scripts/ja/build-japanese-meaning-packs.py from the slang list,
+# Wiktionary and WordNet
+data/ja/japanese-slang/
+data/ja/japanese-wiktionary/
+data/ja/japanese-wordnet/

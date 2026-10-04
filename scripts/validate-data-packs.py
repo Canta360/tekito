@@ -14,7 +14,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-DATA = ROOT / "data"
+from datapacks import DATA, manifests, pack_dir  # noqa: E402
 WORD = re.compile(r"^[A-Za-z]+(?:['-][A-Za-z]+)*$")
 
 EXPECTED_CORRECTIONS = {
@@ -154,7 +154,7 @@ def validate_index(pack_id: str, data_path: Path, index_path: Path,
 
 
 def validate_sorted_tsv(pack: Path, manifest: dict) -> list[str]:
-    """Meaning packs (scripts/build-japanese-meaning-packs.py): one TSV,
+    """Meaning packs (scripts/ja/build-japanese-meaning-packs.py): one TSV,
     surface, reading, senses..., searched in place, so the rows must be in
     bytewise order of the surface (code point order is the same)."""
     pack_id = pack.name
@@ -232,7 +232,7 @@ def validate_rules(pack: Path, manifest: dict) -> list[str]:
 
 
 def validate_language_model(pack: Path, manifest: dict) -> list[str]:
-    """The japanese-lm pack (scripts/build-japanese-lm.py): one binary file,
+    """The japanese-lm pack (scripts/ja/build-japanese-lm.py): one binary file,
     mapped and checked by its reader; here it must be what the manifest
     says."""
     pack_id = pack.name
@@ -286,7 +286,7 @@ def validate_pack(pack: Path, manifest: dict) -> list[str]:
     if not isinstance(manifest["entry_count"], int) or manifest["entry_count"] <= 0:
         errors.append(f"{pack_id}: entry_count must be a positive integer")
     if manifest.get("format") == "ja-dict-v1+ja-matrix-v1":
-        # Binary, memory-mapped files (scripts/build-japanese-packs.py); the
+        # Binary, memory-mapped files (scripts/ja/build-japanese-packs.py); the
         # reader checks every offset, so here the files only need to be what
         # the manifest says.
         if data_path.read_bytes()[:4] != b"TKJD":
@@ -357,7 +357,7 @@ def validate_pack(pack: Path, manifest: dict) -> list[str]:
 
 
 def validate_social_expression() -> list[str]:
-    path = DATA / "social-expression" / "entries.tsv"
+    path = pack_dir("social-expression", DATA) / "entries.tsv"
     errors: list[str] = []
     seen = set()
     for number, line in text_lines(path):
@@ -412,7 +412,7 @@ def validate_emoji_candidates(emoji_test_path: Path | None) -> list[str]:
         return []
     sequences = read_emoji_test_sequences(emoji_test_path)
     errors = []
-    for number, line in text_lines(DATA / "emoji" / "entries.tsv"):
+    for number, line in text_lines(pack_dir("emoji", DATA) / "entries.tsv"):
         fields = line.split("\t")
         if len(fields) == 5 and fields[1].replace("\ufe0f", "") not in sequences:
             errors.append(f"emoji:{number}: candidate is absent from emoji-test data")
@@ -429,15 +429,15 @@ def coverage_report() -> list[str]:
                     result.add(fields[field].lower())
         return result
 
-    standard = keys(DATA / "standard-english" / "lexicon.txt")
+    standard = keys(pack_dir("standard-english", DATA) / "lexicon.txt")
     corroborated = (
-        keys(DATA / "frequency" / "word-scores.tsv") |
-        keys(DATA / "pronunciation" / "pronunciations.tsv") |
-        keys(DATA / "dictionary-display" / "entries.tsv", 1)
+        keys(pack_dir("frequency", DATA) / "word-scores.tsv") |
+        keys(pack_dir("pronunciation", DATA) / "pronunciations.tsv") |
+        keys(pack_dir("dictionary-display", DATA) / "entries.tsv", 1)
     )
     corrections = {
         line.split("\t")[1].lower()
-        for _, line in text_lines(DATA / "wikipedia-common-misspellings" / "misspellings.tsv")
+        for _, line in text_lines(pack_dir("wikipedia-common-misspellings", DATA) / "misspellings.tsv")
         if len(line.split("\t")) == 2
     }
     missing = sorted(corrections - standard)
@@ -452,7 +452,7 @@ def coverage_report() -> list[str]:
 
 
 def validate_corrections() -> list[str]:
-    path = DATA / "wikipedia-common-misspellings" / "misspellings.tsv"
+    path = pack_dir("wikipedia-common-misspellings", DATA) / "misspellings.tsv"
     pairs = set()
     duplicate_pairs = set()
     for _, line in text_lines(path):
@@ -474,9 +474,9 @@ def validate_corrections() -> list[str]:
                   for raw, target in sorted(duplicate_pairs))
 
     standard = {word.strip().lower()
-                for _, word in text_lines(DATA / "standard-english" / "lexicon.txt")
+                for _, word in text_lines(pack_dir("standard-english", DATA) / "lexicon.txt")
                 if word.strip()}
-    manifest = json.loads((DATA / "standard-english" / "manifest.json").read_text(encoding="utf-8"))
+    manifest = json.loads((pack_dir("standard-english", DATA) / "manifest.json").read_text(encoding="utf-8"))
     manifest_terms = set(manifest.get("supplemental_manual_review_terms", []))
     if manifest.get("supplemental_manual_review_count") != len(AUDITED_STANDARD_ADDITIONS):
         errors.append("standard-english: supplemental review count is stale")
@@ -504,8 +504,8 @@ def validate_cross_pack_coverage() -> list[str]:
                     result.add(fields[field].lower())
         return result
 
-    standard = keys(DATA / "standard-english" / "lexicon.txt")
-    frequency = keys(DATA / "frequency" / "word-scores.tsv")
+    standard = keys(pack_dir("standard-english", DATA) / "lexicon.txt")
+    frequency = keys(pack_dir("frequency", DATA) / "word-scores.tsv")
     return [f"standard words missing from frequency pack: {word}"
             for word in sorted(standard - frequency)]
 
@@ -519,7 +519,7 @@ def main() -> int:
     args = parser.parse_args()
     DATA = args.data_root.resolve()
     errors: list[str] = []
-    for manifest_path in sorted(DATA.glob("*/manifest.json")):
+    for manifest_path in manifests(DATA):
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         errors.extend(validate_pack(manifest_path.parent, manifest))
     errors.extend(validate_corrections())
@@ -529,7 +529,7 @@ def main() -> int:
     if errors:
         print("\n".join(errors), file=sys.stderr)
         return 1
-    print(f"validated {len(list(DATA.glob('*/manifest.json')))} data packs")
+    print(f"validated {len(manifests(DATA))} data packs")
     print("\n".join(coverage_report()))
     return 0
 

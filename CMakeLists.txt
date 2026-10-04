@@ -179,7 +179,7 @@ if(TEKITO_BUILD_TESTS)
     target_link_libraries(tekito_japanese_tests PRIVATE tekito_core)
     # A small dictionary built from Mozc for the conversion tests.
     target_compile_definitions(tekito_japanese_tests PRIVATE
-        TEKITO_TEST_DATA_DIR=L"${CMAKE_CURRENT_SOURCE_DIR}/tests/data")
+        TEKITO_TEST_DATA_DIR=L"${CMAKE_CURRENT_SOURCE_DIR}/tests/data/ja")
     add_test(NAME tekito_japanese_tests COMMAND tekito_japanese_tests)
     set_tests_properties(tekito_japanese_tests PROPERTIES
         ENVIRONMENT "TEKITO_DATA_PACK_DIR=${CMAKE_CURRENT_SOURCE_DIR}/data")
@@ -222,22 +222,22 @@ if(TEKITO_BUILD_TESTS)
 endif()
 
 if(TEKITO_BUILD_BENCHMARKS)
-    add_executable(tekito_core_benchmark benchmarks/CoreBenchmark.cpp)
+    add_executable(tekito_core_benchmark benchmarks/en/CoreBenchmark.cpp)
     target_compile_definitions(tekito_core_benchmark PRIVATE NOMINMAX)
     target_link_libraries(tekito_core_benchmark PRIVATE tekito_core psapi)
 
-    add_executable(tekito_ja_benchmark benchmarks/JapaneseBenchmark.cpp)
+    add_executable(tekito_ja_benchmark benchmarks/ja/JapaneseBenchmark.cpp)
     target_compile_definitions(tekito_ja_benchmark PRIVATE NOMINMAX UNICODE _UNICODE)
     target_compile_options(tekito_ja_benchmark PRIVATE ${TEKITO_WARNINGS})
     target_link_libraries(tekito_ja_benchmark PRIVATE tekito_core psapi)
 endif()
 
 if(TEKITO_BUILD_EVAL)
-    add_executable(tekito_core_eval eval/EvalHarness.cpp eval/EnglishTypingStudy.cpp)
+    add_executable(tekito_core_eval eval/en/EvalHarness.cpp eval/en/EnglishTypingStudy.cpp)
     target_compile_definitions(tekito_core_eval PRIVATE NOMINMAX)
     target_link_libraries(tekito_core_eval PRIVATE tekito_core)
 
-    add_executable(tekito_ja_eval eval/JapaneseEval.cpp eval/JapaneseTypingStudy.cpp)
+    add_executable(tekito_ja_eval eval/ja/JapaneseEval.cpp eval/ja/JapaneseTypingStudy.cpp)
     target_compile_definitions(tekito_ja_eval PRIVATE NOMINMAX)
     target_compile_options(tekito_ja_eval PRIVATE ${TEKITO_WARNINGS})
     target_link_libraries(tekito_ja_eval PRIVATE tekito_core)
