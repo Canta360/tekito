@@ -73,6 +73,8 @@ and deciding at the next word; each also gets one real word a letter away
 per sentence to see how many such slips Space puts right. `--corpus` adds a
 check that the kept words do not stop the corpus's typo corrections, and
 `--probe "<sentence>"` prints what Space does to each word and why.
+`--latency` times every key of the sentences instead, with each part of the
+engine turned off in turn, to see what the time goes to.
 
 Unlike `overall_false_correction_rate`, which asks `AutoApplyPolicy` about
 words without context, this follows what Space actually does.

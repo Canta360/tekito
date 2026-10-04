@@ -188,6 +188,8 @@ int main(int argc, char** argv) {
             study.sentences = argv[++index];
         } else if (arg == "--max-sentences" && index + 1 < argc) {
             study.maxSentences = static_cast<std::size_t>(std::stoul(argv[++index]));
+        } else if (arg == "--latency") {
+            study.latency = true;
         } else if (arg == "--probe" && index + 1 < argc) {
             study.probe = argv[++index];
         } else if (arg == "--show-examples" && index + 1 < argc) {

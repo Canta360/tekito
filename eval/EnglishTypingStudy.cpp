@@ -219,6 +219,8 @@ struct RunResult {
     std::map<std::string, std::size_t> kindWords;
     std::map<std::pair<std::wstring, std::wstring>, std::size_t> pairs;
     std::map<std::pair<std::wstring, std::wstring>, std::size_t> repeats;
+    // Rewrites of a sentence's first word, with the sentence.
+    std::vector<std::pair<std::wstring, std::wstring>> sentenceStarts;
     std::vector<double> convertUs;
     std::vector<std::wstring> kept;
 };
@@ -264,6 +266,7 @@ RunResult Run(Mode mode, const std::vector<Sentence>& sentences, const std::vect
             ++result.rewrites;
             ++result.byKind[kind];
             ++result.pairs[{word.text, after}];
+            if (kind == "sentence start") result.sentenceStarts.push_back({word.text + L" -> " + after, sentence.text});
             hit = true;
             if (undone.count(word.text)) {
                 ++result.afterUndo;
@@ -302,22 +305,39 @@ RunResult Run(Mode mode, const std::vector<Sentence>& sentences, const std::vect
     return result;
 }
 
-// Per key, as the text service converts on every key of a word.
-std::vector<double> KeyLatency(const std::vector<Sentence>& sentences, std::size_t count) {
+// Per key, as the text service converts on every key of a word; `change`
+// turns options off to see what takes the time. Also by how many letters
+// are typed so far (1, 2, 3-4, 5+).
+struct KeyTimes {
+    std::vector<double> all;
+    std::vector<double> byLength[4];
+};
+KeyTimes KeyLatency(const std::vector<Sentence>& sentences, std::size_t count,
+                    void (*change)(tekito::ConversionOptions&) = nullptr) {
     tekito::UserDictionary none;
     auto engine = tekito::CreateDefaultConversionEngine(none);
-    std::vector<double> us;
+    KeyTimes times;
     for (std::size_t s = 0; s < sentences.size() && s < count; ++s) {
         for (const auto& word : Words(sentences[s].text)) {
             for (std::size_t length = 1; length <= word.text.size(); ++length) {
-                const auto request = RequestFor(sentences[s].text, word, word.text.substr(0, length));
+                auto request = RequestFor(sentences[s].text, word, word.text.substr(0, length));
+                if (change) change(request.options);
                 const auto start = Clock::now();
                 (void)engine->Convert(request);
-                us.push_back(std::chrono::duration<double, std::micro>(Clock::now() - start).count());
+                const double us = std::chrono::duration<double, std::micro>(Clock::now() - start).count();
+                times.all.push_back(us);
+                times.byLength[length <= 2 ? length - 1 : length <= 4 ? 2 : 3].push_back(us);
             }
         }
     }
-    return us;
+    return times;
+}
+
+void PrintKeyTimes(const char* name, const KeyTimes& t) {
+    std::cout << "  " << name << ": p50=" << Percentile(t.all, 0.5) << " p95=" << Percentile(t.all, 0.95)
+              << " p99=" << Percentile(t.all, 0.99) << " us  (p95 by letters typed 1/2/3-4/5+: "
+              << Percentile(t.byLength[0], 0.95) << " / " << Percentile(t.byLength[1], 0.95) << " / "
+              << Percentile(t.byLength[2], 0.95) << " / " << Percentile(t.byLength[3], 0.95) << ")\n";
 }
 
 std::vector<std::pair<std::wstring, std::wstring>> LoadTypos(const std::filesystem::path& corpus) {
@@ -377,10 +397,26 @@ int RunEnglishStudy(const EnglishStudyOptions& options) {
         std::cerr << "no sentences in " << options.sentences.string() << "\n";
         return 2;
     }
+    if (options.latency) {
+        // What each part costs per key: everything on, then one part off.
+        std::cout << std::fixed << std::setprecision(0) << "per key over " << sentences.size() << " sentences\n";
+        const auto all = sentences.size();
+        PrintKeyTimes("as is", KeyLatency(sentences, all));
+        PrintKeyTimes("no correction", KeyLatency(sentences, all, [](auto& o) { o.correctionEnabled = false; }));
+        PrintKeyTimes("no context", KeyLatency(sentences, all, [](auto& o) { o.contextSuggestionsEnabled = false; }));
+        PrintKeyTimes("no completion", KeyLatency(sentences, all, [](auto& o) { o.completionEnabled = false; }));
+        PrintKeyTimes("no casual expressions",
+                      KeyLatency(sentences, all, [](auto& o) { o.socialExpressionRange = 0; }));
+        PrintKeyTimes("no romaji English",
+                      KeyLatency(sentences, all, [](auto& o) { o.japanesePhoneticSuggestionsEnabled = false; }));
+        PrintKeyTimes("no common misspellings",
+                      KeyLatency(sentences, all, [](auto& o) { o.commonMisspellingsEnabled = false; }));
+        return 0;
+    }
     const auto slips = MakeSlips(sentences);
     std::cout << std::fixed << std::setprecision(2) << "sentences=" << sentences.size()
               << " slips (a real word a letter away typed instead)=" << slips.size() << "\n";
-    const auto keys = KeyLatency(sentences, 300);
+    const auto keys = KeyLatency(sentences, 300).all;
     std::cout << "per key (every key of a word converts): p50=" << Percentile(keys, 0.5)
               << " p95=" << Percentile(keys, 0.95) << " p99=" << Percentile(keys, 0.99) << " us\n";
 
@@ -398,7 +434,14 @@ int RunEnglishStudy(const EnglishStudyOptions& options) {
             std::cout << "    " << kind << ": " << count << " of " << r.kindWords.at(kind) << " ("
                       << 10000.0 * count / r.kindWords.at(kind) << " per 10k)\n";
         }
-        if (mode == Mode::Today) PrintTop(r.pairs, options.showExamples);
+        if (mode == Mode::Today) {
+            PrintTop(r.pairs, options.showExamples);
+            std::cout << "  sentence starts rewritten:\n";
+            for (std::size_t i = 0; i < r.sentenceStarts.size() && i < options.showExamples; ++i) {
+                std::cout << "    " << Narrow(r.sentenceStarts[i].first) << "  | "
+                          << Narrow(r.sentenceStarts[i].second.substr(0, 90)) << "\n";
+            }
+        }
         if (mode == Mode::KeepOnUndo) {
             std::cout << "  still rewritten after being kept:\n";
             PrintTop(r.repeats, 10);

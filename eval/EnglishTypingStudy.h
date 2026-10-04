@@ -29,6 +29,8 @@ struct EnglishStudyOptions {
     std::size_t showExamples{30};
     // One sentence: prints what Space does to each word, and why.
     std::string probe;
+    // Only the time per key, with each part of the engine turned off in turn.
+    bool latency{false};
 };
 
 int RunEnglishStudy(const EnglishStudyOptions& options);
