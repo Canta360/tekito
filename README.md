@@ -134,7 +134,7 @@ for the phrase in focus.
   never have to delete and retype.
 - **Meanings beside the list.** Candidates with a meaning carry a small book
   sign, and the highlighted one's meaning appears beside the list, so you
-  can tell 初め from 始め.
+  can tell 初め from 始め. Slang such as エモい and 推し活 has one too.
 - **Katakana with its English.** Loanwords offer the English word too
   (ミーティング → meeting).
 - **It learns your way of writing.** The conversion you pick for a reading
@@ -174,7 +174,7 @@ See [the privacy notice](PRIVACY.md).
 
 ## Install
 
-Download `TEKITO-0.3.0-full-installer.exe` from
+Download `TEKITO-0.3.1-full-installer.exe` from
 [Releases](https://github.com/Canta360/tekito/releases/latest) and run it.
 
 - **Add Japanese input** (on when Windows shows Japanese) downloads the
@@ -219,7 +219,7 @@ public sources rather than kept in the repository:
 
 - `scripts\ja\prepare-japanese-packs.ps1` builds the Japanese dictionary from
   Mozc, the word statistics from the Leipzig corpora, and the meanings from
-  Wiktionary and the Japanese WordNet. Without them Japanese types kana but
+  TEKITO's slang list, Wiktionary and the Japanese WordNet. Without them Japanese types kana but
   does not convert.
 - `scripts\en\prepare-full-data-packs.ps1` builds the English phrase
   statistics. TEKITO works without them.
