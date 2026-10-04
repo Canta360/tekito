@@ -132,7 +132,7 @@ void JapaneseComposer::Insert(wchar_t key) {
         if (IsConverted() && !preview_) SettleAll();
         kanaView_ = false;
         listOpen_ = false;
-        Feed(key);
+        if (!FeedAscii(key)) Feed(key);
         UpdateLive();
         UpdatePredictions();
         return;
@@ -141,8 +141,96 @@ void JapaneseComposer::Insert(wchar_t key) {
     // typing continues from the typed kana.
     phrases_.clear();
     listOpen_ = false;
-    Feed(key);
+    if (!FeedAscii(key)) Feed(key);
     UpdatePredictions();
+}
+
+bool JapaneseComposer::FeedAscii(wchar_t key) {
+    // As in Google Japanese Input: a capital starts letters as typed, in
+    // half-width, until the text is committed. Digits and symbols stay as
+    // typed too; a small letter after two or more capitals (NHKno) goes
+    // back to kana.
+    if (!IsComposing()) {
+        asciiMode_ = false;
+        capitals_ = 0;
+    }
+    const bool capital = key >= L'A' && key <= L'Z';
+    if (capital && !asciiMode_) {
+        if (table_ && (table_->Find(std::wstring(1, key)) || table_->HasLongerInput(std::wstring(1, key)))) return false;
+        FlushAll();
+        asciiMode_ = true;
+    }
+    if (!asciiMode_) return false;
+    const bool small = key >= L'a' && key <= L'z';
+    if (small && capitals_ > 1) {
+        asciiMode_ = false;
+        capitals_ = 0;
+        return false;
+    }
+    if (key < L'!' || key > L'~') {
+        asciiMode_ = false;
+        capitals_ = 0;
+        return false;
+    }
+    capitals_ = capital ? capitals_ + 1 : 0;
+    units_.insert(units_.begin() + static_cast<std::ptrdiff_t>(caret_),
+                  Unit{std::wstring(1, key), std::wstring(1, key), true});
+    ++caret_;
+    return true;
+}
+
+std::vector<Phrase> JapaneseComposer::ConvertReading(const std::wstring& reading, std::size_t from,
+                                                    std::uint16_t context,
+                                                    const std::vector<std::wstring>& words) const {
+    // Letters typed after a capital are a phrase of their own, kept as
+    // typed; the kana around them are converted.
+    std::vector<bool> ascii(reading.size(), false);
+    for (std::size_t i = 0, at = 0; i < units_.size() && at < reading.size(); at += units_[i].kana.size(), ++i) {
+        if (units_[i].ascii) ascii[at] = true;
+    }
+    std::vector<Phrase> out;
+    for (std::size_t begin = from; begin < reading.size();) {
+        std::size_t end = begin;
+        while (end < reading.size() && ascii[end] == ascii[begin]) ++end;
+        const std::wstring piece = reading.substr(begin, end - begin);
+        if (ascii[begin]) {
+            out.push_back({begin, piece.size(), AsciiCandidates(piece)});
+        } else {
+            for (auto& phrase : converter_->Convert(piece, {}, begin == from ? context : 0, words, userDictionary_)) {
+                phrase.begin += begin;
+                out.push_back(std::move(phrase));
+            }
+        }
+        begin = end;
+    }
+    return out;
+}
+
+bool JapaneseComposer::HasAscii() const noexcept {
+    return std::any_of(units_.begin(), units_.end(), [](const Unit& unit) { return unit.ascii; });
+}
+
+std::vector<PhraseCandidate> JapaneseComposer::AsciiCandidates(std::wstring_view text) {
+    // As typed first, then the other cases and the full-width form.
+    std::vector<PhraseCandidate> out;
+    const auto add = [&](std::wstring candidate) {
+        if (std::none_of(out.begin(), out.end(), [&](const auto& c) { return c.text == candidate; })) {
+            out.push_back({std::move(candidate), 0, PhraseCandidate::Kind::Special, false});
+        }
+    };
+    const std::wstring typed(text);
+    add(typed);
+    std::wstring lower = typed, upper = typed, title = typed;
+    for (auto& ch : lower) ch = static_cast<wchar_t>(std::towlower(ch));
+    for (auto& ch : upper) ch = static_cast<wchar_t>(std::towupper(ch));
+    for (std::size_t i = 0; i < title.size(); ++i) {
+        title[i] = static_cast<wchar_t>(i == 0 ? std::towupper(title[i]) : std::towlower(title[i]));
+    }
+    add(title);
+    add(lower);
+    add(upper);
+    add(ToFullWidthAscii(typed));
+    return out;
 }
 
 void JapaneseComposer::ResetLive() noexcept {
@@ -228,8 +316,7 @@ void JapaneseComposer::UpdateLive() {
             converted.push_back({0, reading.size(), std::move(postal)});
         }
     }
-    if (converted.empty() && !rest.empty()) converted = converter_->Convert(rest, {}, context, words, userDictionary_);
-    for (auto& phrase : converted) phrase.begin += settledLength_;
+    if (converted.empty() && !rest.empty()) converted = ConvertReading(reading, settledLength_, context, words);
     const std::size_t before = phrases_.size();
     AddPhrases(std::move(converted), reading);
     if (phrases_.size() == before && !rest.empty()) {
@@ -467,11 +554,11 @@ void JapaneseComposer::Cancel() {
 }
 
 std::wstring JapaneseComposer::Reading() const {
-    std::wstring kana;
-    for (const auto& unit : units_) kana += unit.kana;
     // Keys the table did not turn into kana are full-width, as in Microsoft
-    // IME ("ｋ" while "ka" is being typed).
-    return ApplyTypingStyle(ToFullWidthAscii(kana));
+    // IME ("ｋ" while "ka" is being typed); letters after a capital are not.
+    std::wstring kana;
+    for (const auto& unit : units_) kana += unit.ascii ? unit.kana : ToFullWidthAscii(unit.kana);
+    return ApplyTypingStyle(std::move(kana));
 }
 
 std::vector<PhraseCandidate> JapaneseComposer::KanaCandidates(std::wstring_view reading) const {
@@ -514,13 +601,13 @@ void JapaneseComposer::BuildPhrases(bool convert) {
     if (convert && converter_) {
         // A slip in the keys: converted from the keys as meant. Esc still
         // goes back to what was typed.
-        if (auto conversion = keyConverter_ ? keyConverter_->Convert(Keys(false), context_, contextWords_, userDictionary_)
+        if (auto conversion = keyConverter_ && !HasAscii() ? keyConverter_->Convert(Keys(false), context_, contextWords_, userDictionary_)
                                             : std::nullopt) {
             conversionReading_ = ApplyTypingStyle(std::move(conversion->reading));
             readingKeys_ = std::move(conversion->keyAt);
             AddPhrases(std::move(conversion->phrases), conversionReading_);
         } else {
-            AddPhrases(converter_->Convert(reading, {}, context_, contextWords_, userDictionary_), reading);
+            AddPhrases(ConvertReading(reading, 0, context_, contextWords_), reading);
         }
     }
     if (phrases_.empty()) {
@@ -740,7 +827,7 @@ std::vector<std::pair<PhraseCandidate, std::wstring>> JapaneseComposer::SlipRead
 void JapaneseComposer::AddSlipCandidates(PhraseState& phrase) const {
     if (phrase.slipsAdded) return;
     phrase.slipsAdded = true;
-    if (!converter_ || !table_) return;
+    if (!converter_ || !table_ || HasAscii()) return;
     const auto lettersOnly = [](const std::wstring& keys) {
         return std::all_of(keys.begin(), keys.end(), [](wchar_t c) { return c >= L'a' && c <= L'z'; });
     };
@@ -1051,7 +1138,16 @@ std::wstring JapaneseComposer::RenderTyping(bool includePending) const {
 
 std::wstring JapaneseComposer::FormText(KanaForm form, std::size_t begin, std::size_t length,
                                         int letterCase) const {
-    const std::wstring reading = conversionReading_.substr(begin, length);
+    std::wstring reading = conversionReading_.substr(begin, length);
+    if (table_ && HasAscii() && form != KanaForm::FullWidthAlphanumeric &&
+        form != KanaForm::HalfWidthAlphanumeric) {
+        // Letters typed after a capital: F6-F8 read the keys as romaji.
+        std::wstring keys = KeysFor(begin, length);
+        for (auto& ch : keys) ch = static_cast<wchar_t>(std::towlower(ch));
+        std::wstring kana;
+        for (const auto& token : ParseRomaji(*table_, keys)) kana += token.kana;
+        reading = ApplyTypingStyle(ToFullWidthAscii(kana));
+    }
     switch (form) {
     case KanaForm::Hiragana: return ToHiragana(reading);
     case KanaForm::Katakana: return ToKatakana(reading);
@@ -1220,6 +1316,8 @@ void JapaneseComposer::Clear() noexcept {
     phrases_.clear();
     focus_ = 0;
     listOpen_ = false;
+    asciiMode_ = false;
+    capitals_ = 0;
     ResetLive();
 }
 

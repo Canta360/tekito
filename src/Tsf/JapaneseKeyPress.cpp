@@ -9,7 +9,7 @@ bool KeyDown(int key) { return (GetKeyState(key) & 0x8000) != 0; }
 
 }  // namespace
 
-japanese::KeyPress JapaneseKeyPressFor(WPARAM virtualKey) {
+japanese::KeyPress JapaneseKeyPressFor(WPARAM virtualKey, bool ignoreCapsLock) {
     using Key = japanese::KeyPress::Key;
     japanese::KeyPress press;
     press.shift = KeyDown(VK_SHIFT);
@@ -45,6 +45,7 @@ japanese::KeyPress JapaneseKeyPressFor(WPARAM virtualKey) {
     // What the key types with the keyboard layout and state now.
     BYTE keyboardState[256]{};
     if (!GetKeyboardState(keyboardState)) return press;
+    if (ignoreCapsLock) keyboardState[VK_CAPITAL] &= static_cast<BYTE>(~1u);
     wchar_t buffer[8]{};
     const UINT scanCode = MapVirtualKeyW(static_cast<UINT>(virtualKey), MAPVK_VK_TO_VSC);
     const int count = ToUnicodeEx(static_cast<UINT>(virtualKey), scanCode, keyboardState, buffer,

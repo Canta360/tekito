@@ -354,7 +354,7 @@ HRESULT TextService::HandleEnglishSegmentEnd(ITfContext* context, TfEditCookie e
 bool TextService::TranslateJapaneseKey(WPARAM wParam, KeyInput& input) {
     japanese::KeyOptions options = userdata::JapaneseKeyOptions(userSettings_);
     options.pageSize = japanesePage_;
-    const auto command = japanese::TranslateKey(japanese_, JapaneseKeyPressFor(wParam), options);
+    const auto command = japanese::TranslateKey(japanese_, JapaneseKeyPressFor(wParam, userSettings_.japaneseIgnoreCapsLock), options);
     if (!command) return false;
     // A key that only ends the text goes on to the application (LetsKeyThrough).
     input.type = command->letKeyThrough ? KeyInput::Type::EndComposition : KeyInput::Type::JapaneseKey;

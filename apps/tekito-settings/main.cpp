@@ -874,6 +874,8 @@ private:
         json += settings_.japanesePredictionEnabled ? L"true" : L"false";
         json += L",\"japaneseLiveConversion\":";
         json += settings_.japaneseLiveConversion ? L"true" : L"false";
+        json += L",\"japaneseIgnoreCapsLock\":";
+        json += settings_.japaneseIgnoreCapsLock ? L"true" : L"false";
         json += L",\"uiLanguage\":" + std::to_wstring(settings_.uiLanguage);
         json += L",\"excludedApps\":" + NameListJson(settings_.excludedApps);
         json += L",\"builtInExcludedApps\":" +
@@ -1041,6 +1043,7 @@ private:
             }
             else if (key == L"japanesePredictionEnabled") settings_.japanesePredictionEnabled = value;
             else if (key == L"japaneseLiveConversion") settings_.japaneseLiveConversion = value;
+            else if (key == L"japaneseIgnoreCapsLock") settings_.japaneseIgnoreCapsLock = value;
             else if (key == L"uiLanguage") settings_.uiLanguage = std::clamp(integerValue, 0, 2);
             else if (key == L"toggleKey") {
                 settings_.toggleKey = std::clamp(integerValue, 0, 3);

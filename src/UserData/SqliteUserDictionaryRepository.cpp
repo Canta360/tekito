@@ -299,6 +299,8 @@ bool SqliteUserDictionaryRepository::LoadSettings(UserSettings& settings) const 
             loaded.japanesePredictionEnabled = value != 0;
         } else if (std::strcmp(key, "japanese_live_conversion") == 0) {
             loaded.japaneseLiveConversion = value != 0;
+        } else if (std::strcmp(key, "japanese_ignore_caps_lock") == 0) {
+            loaded.japaneseIgnoreCapsLock = value != 0;
         }
     }
     success = success && stepResult == SQLITE_DONE;
@@ -387,6 +389,7 @@ bool SqliteUserDictionaryRepository::SaveSettings(const UserSettings& settings) 
     saveValue("advanced_settings", settings.advancedSettings ? 1 : 0);
     saveValue("japanese_prediction_enabled", settings.japanesePredictionEnabled ? 1 : 0);
     saveValue("japanese_live_conversion", settings.japaneseLiveConversion ? 1 : 0);
+    saveValue("japanese_ignore_caps_lock", settings.japaneseIgnoreCapsLock ? 1 : 0);
     if (statement) sqlite3_finalize(statement);
     statement = nullptr;
 

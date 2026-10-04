@@ -79,6 +79,8 @@ struct UserSettings {
     // Japanese shown converted while typing; Space then picks other
     // candidates for the last phrase.
     bool japaneseLiveConversion{false};
+    // Letters typed in Japanese as if Caps Lock were off.
+    bool japaneseIgnoreCapsLock{true};
     // Special conversions, in English and Japanese (the special-conversions
     // pack): dates and times for "today" and "kyou", a number's other forms,
     // symbols by reading or ASCII spelling, and the sum for "1+2=".

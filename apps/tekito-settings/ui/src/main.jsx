@@ -48,6 +48,7 @@ const initialSettings = {
   advancedSettings: false,
   japanesePredictionEnabled: true,
   japaneseLiveConversion: false,
+  japaneseIgnoreCapsLock: true,
   dateConversion: true,
   numberConversion: true,
   symbolConversion: true,
@@ -600,6 +601,9 @@ function JapanesePage({ advanced, settings, setSetting }) {
             </Row>
             <Row title={j.symbols.title} description={j.symbols.description}>
               <Segmented label={j.symbols.title} value={settings.japaneseSymbolWidth} options={symbols} onChange={(value) => setSetting("japaneseSymbolWidth", value)} />
+            </Row>
+            <Row title={j.capsLock.title} description={j.capsLock.description}>
+              <Toggle label={j.capsLock.title} checked={settings.japaneseIgnoreCapsLock} onChange={(value) => setSetting("japaneseIgnoreCapsLock", value)} />
             </Row>
           </>
         )}

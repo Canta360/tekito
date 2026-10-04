@@ -205,6 +205,7 @@ private:
     struct Unit {
         std::wstring keys;  // what was typed
         std::wstring kana;  // what the table wrote for it
+        bool ascii{false};  // typed after a capital: letters as typed, half-width
     };
     struct PhraseState {
         std::size_t begin{0};
@@ -221,6 +222,14 @@ private:
     };
 
     void Feed(wchar_t key);
+    // Letters after a capital stay letters; whether `key` was taken so.
+    bool FeedAscii(wchar_t key);
+    [[nodiscard]] bool HasAscii() const noexcept;
+    // reading from `from` on, converted (letters after a capital as typed).
+    [[nodiscard]] std::vector<Phrase> ConvertReading(const std::wstring& reading, std::size_t from,
+                                                     std::uint16_t context,
+                                                     const std::vector<std::wstring>& words) const;
+    [[nodiscard]] static std::vector<PhraseCandidate> AsciiCandidates(std::wstring_view text);
     // Splits the unit around reading position `offset` so a unit boundary
     // falls there; returns the index of the unit that starts there.
     std::size_t SplitAt(std::size_t offset);
@@ -302,6 +311,10 @@ private:
     PunctuationStyle punctuation_{PunctuationStyle::ToutenKuten};
     bool halfWidthDigits_{false};
     bool halfWidthSymbols_{false};
+    // A capital started letters as typed (Google Japanese Input's "Shift
+    // for alphanumeric"); the capitals typed in a row.
+    bool asciiMode_{false};
+    int capitals_{0};
     std::vector<PhraseState> phrases_;
     // The reading the phrases were converted from: the typed one, or the
     // corrected one after a romaji correction (Esc still goes back to what

@@ -209,7 +209,7 @@ void TestConversionForms(const RomajiTable& table) {
     composer.Transliterate(KanaForm::FullWidthAlphanumeric);
     RequireText(composer.Preedit(), L"Ｔｅｋｉｔｏ", "F9: full-width, as typed");
     composer.Transliterate(KanaForm::Katakana);
-    RequireText(composer.Commit(), L"Ｔエキト", "F7: katakana, the capital stays a letter");
+    RequireText(composer.Commit(), L"テキト", "F7: katakana, read from the keys");
 }
 
 void TestInputFormAndPunctuation(const RomajiTable& table) {
@@ -586,6 +586,34 @@ void TestLiveConversion(const RomajiTable& table, const MiniPack& pack) {
     const std::wstring before = composer.Preedit();
     RequireText(composer.Commit(), before, "Enter commits what is shown");
     Require(!composer.IsComposing(), "and clears it");
+}
+
+// Shift+letter: letters as typed, in half-width, until committed.
+void TestCapitals(const RomajiTable& table, const MiniPack& pack) {
+    const tekito::japanese::JapaneseConverter converter(pack.dictionary, pack.matrix);
+    JapaneseComposer composer(&table);
+    composer.SetConverter(&converter);
+    RequireText(Type(composer, L"Google"), L"Google", "letters after a capital stay letters");
+    composer.Convert();
+    const auto* candidates = composer.FocusedCandidates();
+    Require(candidates && candidates->size() >= 3, "Space offers the other forms");
+    RequireText(composer.Preedit(), L"Google", "as typed first");
+    RequireText(composer.Commit(), L"Google", "and commits as typed");
+    RequireText(Type(composer, L"ka"), L"か", "committing goes back to kana");
+    composer.Clear();
+    RequireText(Type(composer, L"NHKno"), L"NHKの", "a small letter after two capitals goes back to kana");
+    composer.Convert();
+    Require(composer.Segments().front().text == L"NHK", "the letters are one phrase");
+    composer.Clear();
+    RequireText(Type(composer, L"Windows11"), L"Windows11", "digits after a capital stay half-width");
+    composer.Clear();
+    RequireText(Type(composer, L"kyouhaMac"), L"きょうはMac", "a capital in the middle starts letters there");
+    composer.Clear();
+    RequireText(Type(composer, L"kA"), L"ｋA", "a pending key settles before the capital");
+    composer.Clear();
+    composer.SetLiveConversion(true);
+    RequireText(Type(composer, L"Google"), L"Google", "live conversion shows them as typed");
+    RequireText(composer.Commit(), L"Google", "and commits them");
 }
 
 std::vector<tekito::japanese::PhraseCandidate> Candidates(std::initializer_list<const wchar_t*> texts) {
@@ -1243,6 +1271,7 @@ int main(int argc, char** argv) {
     TestComposerConversion(*table, *pack);
     TestKeys(*table, *pack);
     TestLiveConversion(*table, *pack);
+    TestCapitals(*table, *pack);
     TestLearningStore();
     TestComposerLearning(*table, *pack);
     TestContext(*table, *pack);

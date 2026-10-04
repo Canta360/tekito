@@ -317,7 +317,7 @@ bool OnKey(Testbed& bed, WPARAM key) {
         Refresh(bed);
         return true;
     }
-    const auto command = ja::TranslateKey(bed.composer, tekito::tsf::JapaneseKeyPressFor(key),
+    const auto command = ja::TranslateKey(bed.composer, tekito::tsf::JapaneseKeyPressFor(key, bed.settings.japaneseIgnoreCapsLock),
                                           tekito::userdata::JapaneseKeyOptions(bed.settings));
     bool used = true;
     if (!command) {
