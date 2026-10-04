@@ -1,5 +1,7 @@
 #include "Core/ExternalLexiconProvider.h"
 
+#include "Core/DataPackPath.h"
+
 #include <algorithm>
 #include <array>
 #include <cctype>
@@ -210,12 +212,16 @@ std::filesystem::path ExternalLexiconProvider::DataPackRoot() {
     return ResolveDataPackRoot();
 }
 
+std::filesystem::path ExternalLexiconProvider::PackDirectory(std::wstring_view packId) {
+    return FindDataPack(ResolveDataPackRoot(), packId);
+}
+
 std::filesystem::path ExternalLexiconProvider::DefaultPath() {
     const auto root = ResolveDataPackRoot();
     const auto configured = ReadConfiguredLexiconPath(root);
     if (!configured.empty()) return configured;
     if (root.empty()) return {};
-    return root / L"standard-english" / L"lexicon.txt";
+    return FindDataPack(root, L"standard-english") / L"lexicon.txt";
 }
 
 std::filesystem::path ExternalLexiconProvider::IndexPath(

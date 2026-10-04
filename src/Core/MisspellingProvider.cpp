@@ -1,5 +1,6 @@
 #include "Core/MisspellingProvider.h"
 
+#include "Core/DataPackPath.h"
 #include "Core/ExternalLexiconProvider.h"
 
 #include <algorithm>
@@ -95,7 +96,7 @@ WikipediaCommonMisspellingsProvider::WikipediaCommonMisspellingsProvider(
 std::filesystem::path WikipediaCommonMisspellingsProvider::DefaultPath() {
     const auto root = ExternalLexiconProvider::DataPackRoot();
     if (root.empty()) return {};
-    return root / L"wikipedia-common-misspellings" / L"misspellings.tsv";
+    return FindDataPack(root, L"wikipedia-common-misspellings") / L"misspellings.tsv";
 }
 
 std::filesystem::path WikipediaCommonMisspellingsProvider::IndexPath(

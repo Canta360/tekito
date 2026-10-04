@@ -1,6 +1,7 @@
 #include "Core/BuiltinLexicon.h"
 #include "Core/CandidateRanker.h"
 #include "Core/CandidateEngine.h"
+#include "Core/DataPackPath.h"
 #include "Core/ExternalLexiconProvider.h"
 #include "Core/ExternalSlangProvider.h"
 #include "Core/ExternalRankingProviders.h"
@@ -47,7 +48,7 @@ void Require(bool condition, const char* message) {
 // installed; every other pack is required.
 bool OptionalPackInstalled(const wchar_t* packId) {
     const bool installed = std::filesystem::exists(
-        tekito::ExternalLexiconProvider::DataPackRoot() / packId / L"manifest.json");
+        tekito::ExternalLexiconProvider::PackDirectory(packId) / L"manifest.json");
     if (!installed) {
         std::wcout << L"skipped: checks that need the " << packId << L" pack\n";
     }
@@ -979,7 +980,7 @@ void TestInstalledDataPacks() {
     }
 
     const tekito::ExternalSlangProvider social(
-        tekito::ExternalLexiconProvider::DataPackRoot() / L"social-expression" / L"entries.tsv",
+        tekito::ExternalLexiconProvider::PackDirectory(L"social-expression") / L"entries.tsv",
         tekito::CandidateSourceSocialExpression);
     Require(social.IsLoaded(), "Social Expressions Data Pack loads through its index");
     bool socialFound = false;
@@ -993,7 +994,7 @@ void TestInstalledDataPacks() {
     Require(socialFound, "Social Expressions provider serves chat candidates without auto policy");
 
     const tekito::ExternalSlangProvider phonetic(
-        tekito::ExternalLexiconProvider::DataPackRoot() / L"japanese-phonetic" / L"entries.tsv",
+        tekito::ExternalLexiconProvider::PackDirectory(L"japanese-phonetic") / L"entries.tsv",
         tekito::CandidateSourceJapanesePhonetic);
     Require(phonetic.IsLoaded(), "Japanese Phonetic Data Pack loads through its index");
     bool phoneticFound = false;
@@ -1224,7 +1225,7 @@ void TestLocalDataPackProviders() {
 
     const auto dataRoot = tekito::ExternalLexiconProvider::DataPackRoot();
     const tekito::ExternalSlangProvider wiktionary(
-        dataRoot / L"wiktionary-slang" / L"entries.tsv",
+        tekito::FindDataPack(dataRoot, L"wiktionary-slang") / L"entries.tsv",
         tekito::CandidateSourceWiktionary);
     bool foundAbbreviation = false;
     wiktionary.Find({tekito::LexiconQuery::Kind::Exact, L"brb"}, [&](const auto& entry) {
@@ -1236,7 +1237,7 @@ void TestLocalDataPackProviders() {
 
     {
         const tekito::ExternalSlangProvider proper(
-            dataRoot / L"proper-nouns" / L"entries.tsv",
+            tekito::FindDataPack(dataRoot, L"proper-nouns") / L"entries.tsv",
             tekito::CandidateSourceProperNoun);
         bool foundTokyo = false;
         proper.Find({tekito::LexiconQuery::Kind::Exact, L"tokyo"}, [&](const auto& entry) {
@@ -1248,7 +1249,7 @@ void TestLocalDataPackProviders() {
     }
 
     const tekito::ExternalSlangProvider emoji(
-        dataRoot / L"emoji" / L"entries.tsv", tekito::CandidateSourceEmoji);
+        tekito::FindDataPack(dataRoot, L"emoji") / L"entries.tsv", tekito::CandidateSourceEmoji);
     bool foundEmoji = false;
     emoji.Find({tekito::LexiconQuery::Kind::Exact, L"grinning"}, [&](const auto& entry) {
         foundEmoji = foundEmoji ||
@@ -1640,7 +1641,7 @@ void TestDataPackValidation() {
                              L"qwerty-typo-catalog", L"special-conversions"}) {
         if (IsOptionalPack(pack) && !OptionalPackInstalled(pack)) continue;
         tekito::userdata::DataPackStatus status;
-        const bool valid = tekito::userdata::ValidateDataPack(dataRoot / pack, status);
+        const bool valid = tekito::userdata::ValidateDataPack(tekito::FindDataPack(dataRoot, pack), status);
         if (!valid) std::wcerr << L"[pack validation] " << pack << L": " << status.reason << L"\n";
         Require(valid &&
                     status.valid && !status.packId.empty() && !status.version.empty(),

@@ -198,7 +198,7 @@ LocalTime LocalTime::Now() {
 const SpecialConversions& SpecialConversions::Installed() {
     static const SpecialConversions installed = [] {
         SpecialConversions loaded;
-        loaded.Load(ExternalLexiconProvider::DataPackRoot() / L"special-conversions" / L"rules.tsv");
+        loaded.Load(ExternalLexiconProvider::PackDirectory(L"special-conversions") / L"rules.tsv");
         return loaded;
     }();
     return installed;

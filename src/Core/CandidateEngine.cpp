@@ -46,20 +46,15 @@ struct SharedProviders {
     SharedProviders()
         : externalProvider(ExternalLexiconProvider::DefaultPath()),
           slangProvider(ExternalSlangProvider::DefaultPath()),
-          wiktionarySlangProvider(ExternalLexiconProvider::DataPackRoot() /
-                                      L"wiktionary-slang" / L"entries.tsv",
+          wiktionarySlangProvider(ExternalLexiconProvider::PackDirectory(L"wiktionary-slang") / L"entries.tsv",
                                   CandidateSourceWiktionary),
-          properNounProvider(ExternalLexiconProvider::DataPackRoot() /
-                                 L"proper-nouns" / L"entries.tsv",
+          properNounProvider(ExternalLexiconProvider::PackDirectory(L"proper-nouns") / L"entries.tsv",
                              CandidateSourceProperNoun),
-          emojiProvider(ExternalLexiconProvider::DataPackRoot() /
-                            L"emoji" / L"entries.tsv",
+          emojiProvider(ExternalLexiconProvider::PackDirectory(L"emoji") / L"entries.tsv",
                         CandidateSourceEmoji),
-          socialExpressionProvider(ExternalLexiconProvider::DataPackRoot() /
-                                       L"social-expression" / L"entries.tsv",
+          socialExpressionProvider(ExternalLexiconProvider::PackDirectory(L"social-expression") / L"entries.tsv",
                                    CandidateSourceSocialExpression),
-          japanesePhoneticProvider(ExternalLexiconProvider::DataPackRoot() /
-                                       L"japanese-phonetic" / L"entries.tsv",
+          japanesePhoneticProvider(ExternalLexiconProvider::PackDirectory(L"japanese-phonetic") / L"entries.tsv",
                                    CandidateSourceJapanesePhonetic),
           wikipediaProvider(WikipediaCommonMisspellingsProvider::DefaultPath()),
           frequencyProvider(ExternalFrequencyProvider::DefaultPath()),

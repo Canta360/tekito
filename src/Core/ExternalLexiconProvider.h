@@ -10,6 +10,7 @@
 #include <mutex>
 #include <span>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace tekito {
@@ -21,6 +22,8 @@ public:
     explicit ExternalLexiconProvider(std::filesystem::path path);
 
     [[nodiscard]] static std::filesystem::path DataPackRoot();
+    // The folder of a Data Pack under DataPackRoot() (FindDataPack).
+    [[nodiscard]] static std::filesystem::path PackDirectory(std::wstring_view packId);
     [[nodiscard]] static std::filesystem::path DefaultPath();
     [[nodiscard]] static std::filesystem::path IndexPath(
         const std::filesystem::path& wordListPath);

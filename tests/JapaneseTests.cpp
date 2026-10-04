@@ -1,3 +1,4 @@
+#include "Core/DataPackPath.h"
 #include "Core/ExternalLexiconProvider.h"
 #include "Core/Japanese/JapaneseComposer.h"
 #include "Core/Japanese/JapaneseConverter.h"
@@ -63,7 +64,7 @@ void RequireText(std::wstring_view actual, std::wstring_view expected, const cha
 }
 
 std::unique_ptr<RomajiTable> LoadTable() {
-    auto table = RomajiTable::Load(tekito::ExternalLexiconProvider::DataPackRoot() / L"japanese-romaji");
+    auto table = RomajiTable::Load(tekito::ExternalLexiconProvider::PackDirectory(L"japanese-romaji"));
     Require(table != nullptr, "the japanese-romaji pack loads");
     return table;
 }
@@ -235,7 +236,7 @@ struct MiniPack {
 
 std::unique_ptr<MiniPack> LoadMiniPack() {
     auto pack = std::make_unique<MiniPack>();
-    const std::filesystem::path root = std::filesystem::path(TEKITO_TEST_DATA_DIR) / L"japanese-mini";
+    const std::filesystem::path root = tekito::FindDataPack(TEKITO_TEST_DATA_DIR, L"japanese-mini");
     Require(pack->dictionary.Open(root / L"dictionary.bin"), "the test dictionary opens");
     Require(pack->matrix.Open(root / L"connection.bin"), "the test connection matrix opens");
     return pack;
@@ -458,7 +459,7 @@ void TestLoanwords(const RomajiTable& table, const MiniPack& pack) {
     RequireText(LoanwordKey(L"ファイル"), L"ふあいる", "small vowels are full size");
 
     tekito::japanese::Loanwords loanwords;
-    Require(loanwords.Open(tekito::ExternalLexiconProvider::DataPackRoot() / L"japanese-loanwords"),
+    Require(loanwords.Open(tekito::ExternalLexiconProvider::PackDirectory(L"japanese-loanwords")),
             "the loanwords pack opens");
     const auto meeting = loanwords.Words(L"ミーティング", 2);
     Require(!meeting.empty() && meeting.front() == L"meeting", "ミーティング is meeting");
@@ -828,7 +829,7 @@ void TestSpecialConversions(const RomajiTable& table, const MiniPack& pack) {
     using tekito::SpecialConversions;
     using Language = SpecialConversions::Language;
     SpecialConversions special;
-    Require(special.Load(tekito::ExternalLexiconProvider::DataPackRoot() / L"special-conversions" / L"rules.tsv"),
+    Require(special.Load(tekito::ExternalLexiconProvider::PackDirectory(L"special-conversions") / L"rules.tsv"),
             "the special-conversions pack loads");
 
     const LocalTime morning{2026, 9, 29, 6, 5};  // a Tuesday

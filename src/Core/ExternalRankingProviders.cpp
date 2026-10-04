@@ -1,5 +1,6 @@
 #include "Core/ExternalRankingProviders.h"
 
+#include "Core/DataPackPath.h"
 #include "Core/ExternalLexiconProvider.h"
 
 #include <algorithm>
@@ -177,7 +178,7 @@ ExternalFrequencyProvider::ExternalFrequencyProvider(std::filesystem::path path)
 
 std::filesystem::path ExternalFrequencyProvider::DefaultPath() {
     const auto root = ExternalLexiconProvider::DataPackRoot();
-    return root.empty() ? std::filesystem::path{} : root / L"frequency" / L"word-scores.tsv";
+    return root.empty() ? std::filesystem::path{} : FindDataPack(root, L"frequency") / L"word-scores.tsv";
 }
 
 std::filesystem::path ExternalFrequencyProvider::IndexPath(const std::filesystem::path& dataPath) {
@@ -227,7 +228,7 @@ std::filesystem::path ExternalPhraseContextProvider::RuntimeIndexPath(
 
 std::filesystem::path ExternalPhraseContextProvider::DefaultPath() {
     const auto root = ExternalLexiconProvider::DataPackRoot();
-    return root.empty() ? std::filesystem::path{} : root / L"phrase" / L"context-scores.tsv";
+    return root.empty() ? std::filesystem::path{} : FindDataPack(root, L"phrase") / L"context-scores.tsv";
 }
 
 std::filesystem::path ExternalPhraseContextProvider::IndexPath(const std::filesystem::path& dataPath) {

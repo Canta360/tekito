@@ -4,6 +4,7 @@
 #include "Core/AutoApplyPolicy.h"
 #include "Core/ConversionEngine.h"
 #include "Core/CandidateEngine.h"
+#include "Core/DataPackPath.h"
 #include "Core/ExternalLexiconProvider.h"
 #include "EnglishTypingStudy.h"
 
@@ -207,7 +208,7 @@ int main(int argc, char** argv) {
 
     const auto dataPackRoot = tekito::ExternalLexiconProvider::DataPackRoot();
     if (dataPackRoot.empty() ||
-        !std::filesystem::exists(dataPackRoot / "standard-english" / "lexicon.txt")) {
+        !std::filesystem::exists(tekito::FindDataPack(dataPackRoot, L"standard-english") / L"lexicon.txt")) {
         std::cerr << "TEKITO_DATA_PACK_DIR does not point at a valid data pack directory ("
                   << dataPackRoot << "). Set it to the repository's data/ directory.\n";
         return 2;

@@ -1,5 +1,6 @@
 #include "Core/Japanese/Meanings.h"
 
+#include "Core/DataPackPath.h"
 #include "Core/Japanese/KanaText.h"
 
 #include <algorithm>
@@ -25,10 +26,10 @@ bool IsLatinWord(std::wstring_view text) noexcept {
 }  // namespace
 
 bool MeaningDictionary::Open(const std::filesystem::path& dataRoot) noexcept {
-    slang_.Open(dataRoot / L"japanese-slang" / L"meanings.tsv");
-    wiktionary_.Open(dataRoot / L"japanese-wiktionary" / L"meanings.tsv");
-    wordnet_.Open(dataRoot / L"japanese-wordnet" / L"meanings.tsv");
-    english_.Open(dataRoot / L"dictionary-display" / L"entries.tsv");
+    slang_.Open(FindDataPack(dataRoot, L"japanese-slang") / L"meanings.tsv");
+    wiktionary_.Open(FindDataPack(dataRoot, L"japanese-wiktionary") / L"meanings.tsv");
+    wordnet_.Open(FindDataPack(dataRoot, L"japanese-wordnet") / L"meanings.tsv");
+    english_.Open(FindDataPack(dataRoot, L"dictionary-display") / L"entries.tsv");
     return IsOpen();
 }
 

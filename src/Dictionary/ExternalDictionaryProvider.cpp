@@ -1,5 +1,6 @@
 #include "Dictionary/ExternalDictionaryProvider.h"
 
+#include "Core/DataPackPath.h"
 #include "Core/ExternalLexiconProvider.h"
 
 #include <algorithm>
@@ -82,7 +83,7 @@ std::filesystem::path ExternalDictionaryProvider::DataPackRoot() {
 
 std::filesystem::path ExternalDictionaryProvider::DefaultPath() {
     const auto root = DataPackRoot();
-    return root.empty() ? std::filesystem::path{} : root / L"dictionary-display" / L"entries.tsv";
+    return root.empty() ? std::filesystem::path{} : FindDataPack(root, L"dictionary-display") / L"entries.tsv";
 }
 
 std::filesystem::path ExternalDictionaryProvider::IndexPath(
@@ -195,7 +196,7 @@ ExternalPronunciationProvider::ExternalPronunciationProvider(std::filesystem::pa
 std::filesystem::path ExternalPronunciationProvider::DefaultPath() {
     const auto root = ExternalDictionaryProvider::DataPackRoot();
     return root.empty() ? std::filesystem::path{}
-                        : root / L"pronunciation" / L"pronunciations.tsv";
+                        : FindDataPack(root, L"pronunciation") / L"pronunciations.tsv";
 }
 
 bool ExternalPronunciationProvider::LoadIndex() noexcept {

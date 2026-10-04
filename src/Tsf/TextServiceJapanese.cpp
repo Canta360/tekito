@@ -58,8 +58,7 @@ bool IsCaretKey(WPARAM key) {
 // Loaded once per process: the table is a few kilobytes.
 const japanese::RomajiTable* ProcessRomajiTable() {
     static const std::unique_ptr<japanese::RomajiTable> table = [] {
-        auto loaded = japanese::RomajiTable::Load(ExternalLexiconProvider::DataPackRoot() /
-                                                  L"japanese-romaji");
+        auto loaded = japanese::RomajiTable::Load(ExternalLexiconProvider::PackDirectory(L"japanese-romaji"));
         if (!loaded) Trace(L"Japanese romaji table unavailable");
         return loaded;
     }();
@@ -86,14 +85,13 @@ struct JapaneseData {
 const JapaneseData* ProcessJapaneseData() {
     static const std::unique_ptr<JapaneseData> data = [] {
         auto loaded = std::make_unique<JapaneseData>();
-        const auto root = ExternalLexiconProvider::DataPackRoot();
-        if (!loaded->dictionary.Open(root / L"japanese-core" / L"dictionary.bin") ||
-            !loaded->matrix.Open(root / L"japanese-core" / L"connection.bin")) {
+        const auto core = ExternalLexiconProvider::PackDirectory(L"japanese-core");
+        if (!loaded->dictionary.Open(core / L"dictionary.bin") || !loaded->matrix.Open(core / L"connection.bin")) {
             Trace(L"Japanese dictionary unavailable");
             return std::unique_ptr<JapaneseData>{};
         }
         loaded->converter = std::make_unique<japanese::JapaneseConverter>(loaded->dictionary, loaded->matrix);
-        if (loaded->model.Open(root / L"japanese-lm")) {
+        if (loaded->model.Open(ExternalLexiconProvider::PackDirectory(L"japanese-lm"))) {
             loaded->converter->SetLanguageModel(&loaded->model);
         } else {
             Trace(L"Japanese language model unavailable");
@@ -102,8 +100,10 @@ const JapaneseData* ProcessJapaneseData() {
             loaded->keys = std::make_unique<japanese::KeyConverter>(loaded->dictionary, loaded->matrix,
                                                                     *loaded->converter, *table);
         }
-        if (!loaded->loanwords.Open(root / L"japanese-loanwords")) Trace(L"Japanese loanwords unavailable");
-        loaded->userParts = japanese::UserPartsOfSpeech::Load(root / L"japanese-core" / L"pos.tsv");
+        if (!loaded->loanwords.Open(ExternalLexiconProvider::PackDirectory(L"japanese-loanwords"))) {
+            Trace(L"Japanese loanwords unavailable");
+        }
+        loaded->userParts = japanese::UserPartsOfSpeech::Load(core / L"pos.tsv");
         if (loaded->userParts.Empty()) Trace(L"Japanese user word parts of speech unavailable");
         if (const auto number = loaded->userParts.Number()) {
             loaded->converter->SetNumberWord(japanese::JapaneseConverter::NumberWord{number->left, number->right, number->cost});
@@ -121,7 +121,7 @@ std::shared_ptr<const japanese::PostalCodes> ProcessPostalCodes() {
     static std::shared_ptr<const japanese::PostalCodes> cached;
     static std::filesystem::file_time_type stamp;
     std::lock_guard lock(mutex);
-    const auto directory = ExternalLexiconProvider::DataPackRoot() / L"japanese-zipcode";
+    const auto directory = ExternalLexiconProvider::PackDirectory(L"japanese-zipcode");
     std::error_code error;
     const auto written = std::filesystem::last_write_time(directory / L"zipcodes.tsv", error);
     if (error || !std::filesystem::exists(directory / L"manifest.json", error)) {

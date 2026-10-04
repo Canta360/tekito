@@ -11,6 +11,7 @@
 #define NOMINMAX
 #endif
 
+#include "Core/DataPackPath.h"
 #include "Core/ExternalLexiconProvider.h"
 #include "Dictionary/ExternalDictionaryProvider.h"
 #include "UserData/DataPackValidation.h"
@@ -701,9 +702,9 @@ private:
         std::wstring json = L"[";
         const auto add = [&](const DataPackInfo& pack, const wchar_t* group, bool& valid) {
             tekito::userdata::DataPackStatus status;
-            valid = tekito::userdata::ValidateDataPack(root / pack.folder, status);
+            valid = tekito::userdata::ValidateDataPack(tekito::FindDataPack(root, pack.folder), status);
             if (json.size() > 1) json += L',';
-            const auto path = status.packPath.empty() ? root / pack.folder : status.packPath;
+            const auto path = status.packPath.empty() ? tekito::FindDataPack(root, pack.folder) : status.packPath;
             const auto name = status.displayName.empty() ? std::wstring(pack.label) : status.displayName;
             json += L"{\"displayName\":\"" + JsonEscape(name) + L"\",\"group\":\"" + group +
                     L"\",\"valid\":" + std::wstring(valid ? L"true" : L"false") + L",\"version\":\"" +
@@ -1283,7 +1284,7 @@ private:
     }
 
     static std::filesystem::path PostalCodeDirectory() {
-        return tekito::ExternalLexiconProvider::DataPackRoot() / L"japanese-zipcode";
+        return tekito::ExternalLexiconProvider::PackDirectory(L"japanese-zipcode");
     }
 
     std::wstring PostalCodesJson() const {
@@ -1375,7 +1376,7 @@ private:
         text += L"\r\n\r\nData Packs";
         for (const auto& pack : kDataPacks) {
             tekito::userdata::DataPackStatus status;
-            const bool valid = tekito::userdata::ValidateDataPack(root / pack.folder, status);
+            const bool valid = tekito::userdata::ValidateDataPack(tekito::FindDataPack(root, pack.folder), status);
             text += L"\r\n" + std::wstring(pack.folder) + L": " +
                     (valid ? status.version : L"Unavailable (" + status.reason + L")");
         }

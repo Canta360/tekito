@@ -1,5 +1,6 @@
 #include "Core/ExternalSlangProvider.h"
 
+#include "Core/DataPackPath.h"
 #include "Core/ExternalLexiconProvider.h"
 
 #include <algorithm>
@@ -150,7 +151,7 @@ ExternalSlangProvider::ExternalSlangProvider(std::filesystem::path path,
 
 std::filesystem::path ExternalSlangProvider::DefaultPath() {
     const auto root = ExternalLexiconProvider::DataPackRoot();
-    return root.empty() ? std::filesystem::path{} : root / L"slang" / L"entries.tsv";
+    return root.empty() ? std::filesystem::path{} : FindDataPack(root, L"slang") / L"entries.tsv";
 }
 
 std::span<const LexiconEntry> ExternalSlangProvider::Entries() const noexcept {

@@ -11,6 +11,7 @@
 //
 // Needs the Data Packs (TEKITO_DATA_PACK_DIR) and a visible desktop.
 #include "Core/ConversionEngine.h"
+#include "Core/DataPackPath.h"
 #include "Core/InputStateMachine.h"
 #include "Core/Japanese/JapaneseComposer.h"
 #include "Core/Japanese/JapaneseConverter.h"
@@ -254,15 +255,15 @@ int wmain(int argc, wchar_t** argv) {
         const auto root = DataRoot();
         ja::JapaneseDictionary dictionary;
         ja::ConnectionMatrix matrix;
-        if (!dictionary.Open(root / L"japanese-core" / L"dictionary.bin") ||
-            !matrix.Open(root / L"japanese-core" / L"connection.bin")) {
+        if (!dictionary.Open(tekito::FindDataPack(root, L"japanese-core") / L"dictionary.bin") ||
+            !matrix.Open(tekito::FindDataPack(root, L"japanese-core") / L"connection.bin")) {
             return 1;
         }
-        const auto table = ja::RomajiTable::Load(root / L"japanese-romaji");
+        const auto table = ja::RomajiTable::Load(tekito::FindDataPack(root, L"japanese-romaji"));
         if (!table) return 1;
         ja::JapaneseConverter converter(dictionary, matrix);
         ja::LanguageModel model;
-        if (model.Open(root / L"japanese-lm")) converter.SetLanguageModel(&model);
+        if (model.Open(tekito::FindDataPack(root, L"japanese-lm"))) converter.SetLanguageModel(&model);
         const ja::KeyConverter keys(dictionary, matrix, converter, *table);
         ja::Loanwords loanwords;
         ja::MeaningDictionary meanings;
@@ -270,7 +271,7 @@ int wmain(int argc, wchar_t** argv) {
         ja::JapaneseComposer composer(table.get());
         composer.SetConverter(&converter);
         composer.SetKeyConverter(&keys);
-        if (loanwords.Open(root / L"japanese-loanwords")) composer.SetLoanwords(&loanwords);
+        if (loanwords.Open(tekito::FindDataPack(root, L"japanese-loanwords"))) composer.SetLoanwords(&loanwords);
 
         constexpr std::size_t kPage = 9;
         const auto render = [&] {
