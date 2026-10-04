@@ -514,6 +514,80 @@ void TestKeys(const RomajiTable& table, const MiniPack& pack) {
             "a click on a prediction commits it");
 }
 
+// Live conversion (Settings): the text is shown converted while typing.
+void TestLiveConversion(const RomajiTable& table, const MiniPack& pack) {
+    using tekito::japanese::KeyCommand;
+    using tekito::japanese::KeyPress;
+    using Action = KeyCommand::Action;
+    using Key = KeyPress::Key;
+    const tekito::japanese::JapaneseConverter converter(pack.dictionary, pack.matrix);
+    JapaneseComposer composer(&table);
+    composer.SetConverter(&converter);
+    composer.SetLiveConversion(true);
+    const tekito::japanese::KeyOptions options;
+    const auto press = [](Key key) {
+        KeyPress p;
+        p.key = key;
+        return p;
+    };
+    const auto action = [&](const KeyPress& key) {
+        const auto command = tekito::japanese::TranslateKey(composer, key, options);
+        return command ? std::optional<Action>(command->action) : std::nullopt;
+    };
+
+    RequireText(Type(composer, L"watashinonamaehanakanodesu"), L"私の名前は中野です", "typing shows the conversion");
+    Require(composer.IsLivePreview() && composer.IsTyping() && !composer.CommitsBeforeTyping(),
+            "it is still being typed");
+    RequireText(SegmentsText(composer), L"私の|名前は|中野です", "no phrase is focused while typing");
+    RequireText(Type(composer, L"k"), L"私の名前は中野ですｋ", "a pending key shows as typed");
+    composer.Backspace();
+    RequireText(composer.Preedit(), L"私の名前は中野です", "Backspace drops the pending key");
+    composer.Backspace();
+    RequireText(composer.Preedit().substr(0, 5), L"私の名前は", "Backspace drops a kana and converts again");
+    Type(composer, L"su");
+    RequireText(composer.Preedit(), L"私の名前は中野です", "and typing it back gives the same");
+
+    Require(action(press(Key::Left)) == Action::MoveFocus, "Left steps into the phrases");
+    composer.MoveFocus(-1);
+    RequireText(SegmentsText(composer), L"私の|名前は|*中野です", "starting from the last one");
+    composer.MoveFocus(-1);
+    RequireText(SegmentsText(composer), L"私の|*名前は|中野です", "and moving on");
+    composer.Cancel();
+    RequireText(composer.Preedit(), L"わたしのなまえはなかのです", "Esc shows the kana");
+    Require(composer.IsComposing() && !composer.IsConverted(), "and keeps the text");
+    composer.Cancel();
+    Require(!composer.IsComposing(), "a second Esc drops it");
+
+    Type(composer, L"kikaigatomaru");
+    const std::wstring shown = composer.Preedit();
+    composer.Convert();
+    Require(!composer.IsLivePreview() && composer.IsConverted(), "Space starts picking");
+    const auto* candidates = composer.FocusedCandidates();
+    Require(candidates && candidates->size() >= 2, "the last phrase has candidates");
+    Require(composer.FocusedSelection() == 1, "Space picks its next candidate");
+    Require(!composer.IsCandidateListOpen(), "without the list");
+    const std::wstring picked = composer.Preedit();
+    Require(picked != shown, "the shown text changes");
+    composer.Convert();
+    Require(composer.IsCandidateListOpen(), "the second Space opens the list");
+    composer.PreviousCandidate();
+    composer.SelectCandidate(composer.FocusedSelection());
+    RequireText(composer.Preedit(), picked, "back to the picked one");
+    Require(action(press(Key::Escape)) == Action::Cancel, "Esc while picking");
+
+    KeyPress letter;
+    letter.key = Key::Character;
+    letter.character = L'n';
+    const auto typed = tekito::japanese::ApplyKey(composer, *tekito::japanese::TranslateKey(composer, letter, options));
+    Require(!typed.committed, "typing after Space does not commit");
+    Type(composer, L"o");
+    Require(composer.Preedit().starts_with(picked), "and keeps what was picked");
+    Require(composer.IsLivePreview(), "the rest is shown converted");
+    const std::wstring before = composer.Preedit();
+    RequireText(composer.Commit(), before, "Enter commits what is shown");
+    Require(!composer.IsComposing(), "and clears it");
+}
+
 std::vector<tekito::japanese::PhraseCandidate> Candidates(std::initializer_list<const wchar_t*> texts) {
     std::vector<tekito::japanese::PhraseCandidate> out;
     for (const auto* text : texts) out.push_back({text, 0, tekito::japanese::PhraseCandidate::Kind::Dictionary, false});
@@ -1168,6 +1242,7 @@ int main(int argc, char** argv) {
     TestConversion(*pack);
     TestComposerConversion(*table, *pack);
     TestKeys(*table, *pack);
+    TestLiveConversion(*table, *pack);
     TestLearningStore();
     TestComposerLearning(*table, *pack);
     TestContext(*table, *pack);

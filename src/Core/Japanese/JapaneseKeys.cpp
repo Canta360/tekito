@@ -45,6 +45,24 @@ std::optional<KeyCommand> TranslateKey(const JapaneseComposer& composer, const K
         command.letKeyThrough = true;
         return command;
     }
+    // Predictions while typing (also while the live conversion is shown).
+    if (composer.IsTyping() && !composer.Predictions().empty()) {
+        const bool chosen = composer.ChosenPrediction().has_value();
+        switch (key.key) {
+        case Key::Tab:
+            return Make(key.shift ? Action::PreviousPrediction : Action::NextPrediction);
+        case Key::Down:
+            return Make(Action::NextPrediction);
+        case Key::Up:
+            if (chosen) return Make(Action::PreviousPrediction);
+            break;
+        case Key::Escape:
+            if (chosen) return Make(Action::ClearPrediction);
+            break;
+        default:
+            break;
+        }
+    }
     if (composer.IsConverted()) {
         switch (key.key) {
         case Key::Space:
@@ -70,23 +88,6 @@ std::optional<KeyCommand> TranslateKey(const JapaneseComposer& composer, const K
                 command.index = index;
                 return command;
             }
-        }
-    }
-    if (composing && !composer.IsConverted() && !composer.Predictions().empty()) {
-        const bool chosen = composer.ChosenPrediction().has_value();
-        switch (key.key) {
-        case Key::Tab:
-            return Make(key.shift ? Action::PreviousPrediction : Action::NextPrediction);
-        case Key::Down:
-            return Make(Action::NextPrediction);
-        case Key::Up:
-            if (chosen) return Make(Action::PreviousPrediction);
-            break;
-        case Key::Escape:
-            if (chosen) return Make(Action::ClearPrediction);
-            break;
-        default:
-            break;
         }
     }
     if (composing && !composer.IsConverted()) {
@@ -164,8 +165,9 @@ KeyOutcome ApplyKey(JapaneseComposer& composer, const KeyCommand& command) {
     KeyOutcome outcome;
     switch (command.action) {
     case Action::Insert:
-        // After a conversion, typing on commits it and starts anew.
-        if (composer.IsConverted()) outcome.committed = composer.Commit();
+        // After a conversion, typing on commits it and starts anew (live
+        // conversion types on).
+        if (composer.CommitsBeforeTyping()) outcome.committed = composer.Commit();
         composer.Insert(command.character);
         break;
     case Action::Backspace:
@@ -199,7 +201,7 @@ KeyOutcome ApplyKey(JapaneseComposer& composer, const KeyCommand& command) {
         composer.SelectCandidate(command.index);
         break;
     case Action::ChooseRow:
-        if (!composer.IsConverted()) {
+        if (composer.IsTyping()) {
             // A click on a prediction commits it.
             composer.ChoosePrediction(command.index);
             outcome.committed = composer.Commit();
@@ -236,7 +238,7 @@ CandidateList CandidateListFor(const JapaneseComposer& composer, std::size_t pag
     pageSize = std::max<std::size_t>(pageSize, 1);
     CandidateList list;
     const auto& predictions = composer.Predictions();
-    if (!composer.IsConverted() && !predictions.empty()) {
+    if (composer.IsTyping() && !predictions.empty()) {
         list.kind = CandidateList::Kind::Predictions;
         for (std::size_t i = 0; i < predictions.size(); ++i) {
             list.rows.push_back({predictions[i].text, predictions[i].reading, static_cast<std::uint32_t>(i + 1)});

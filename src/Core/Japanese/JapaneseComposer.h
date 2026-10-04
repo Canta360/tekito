@@ -106,9 +106,28 @@ public:
     void SetInputForm(KanaForm form) noexcept;
     [[nodiscard]] KanaForm InputForm() const noexcept { return inputForm_; }
 
+    // Live conversion: the text is converted as it is typed and shown so
+    // (phrases more than kOpenPhrases back stay as they are); Space then
+    // picks another candidate for the last phrase, typing on after it keeps
+    // the choice, Enter commits what is shown and Esc shows the kana. Off,
+    // Space converts as in Microsoft IME.
+    void SetLiveConversion(bool on);
+    [[nodiscard]] bool LiveConversion() const noexcept { return live_; }
+    static constexpr std::size_t kOpenPhrases = 4;
+
     [[nodiscard]] bool IsComposing() const noexcept { return !units_.empty() || !pending_.empty(); }
-    // True once converted (Space, Muhenkan, F6-F10): typing on commits.
+    // True once converted (Space, Muhenkan, F6-F10), and while live
+    // conversion shows the text converted.
     [[nodiscard]] bool IsConverted() const noexcept { return !phrases_.empty(); }
+    // Live conversion is showing the text converted as typed, with no
+    // phrase picked.
+    [[nodiscard]] bool IsLivePreview() const noexcept { return preview_ && !phrases_.empty(); }
+    // Typing, rather than picking candidates: before conversion, or while
+    // the live conversion is shown.
+    [[nodiscard]] bool IsTyping() const noexcept { return IsComposing() && (!IsConverted() || preview_); }
+    // Whether typing a key commits the conversion first (Microsoft IME);
+    // live conversion types on instead.
+    [[nodiscard]] bool CommitsBeforeTyping() const noexcept { return IsConverted() && !live_; }
 
     // Types a key at the caret.
     void Insert(wchar_t key);
@@ -254,6 +273,17 @@ private:
     [[nodiscard]] static std::uint16_t ContextAfter(std::wstring_view text, std::uint16_t rightId) noexcept;
     // Keeps the content words of committed `text` for the next conversions.
     void RememberWords(std::wstring_view text);
+    // Adds the content words of `text` (runs of kanji or katakana) to `words`.
+    static void AddContentWords(std::wstring_view text, std::vector<std::wstring>& words);
+
+    // Live conversion: the typed kana converted again, the settled phrases
+    // kept as they are, and all but the last kOpenPhrases settled.
+    void UpdateLive();
+    // Back to typing after picking: every phrase stays as picked.
+    void SettleAll();
+    // From the live conversion to picking, on the last phrase.
+    void StartPicking();
+    void ResetLive() noexcept;
 
     const RomajiTable* table_{nullptr};
     const JapaneseConverter* converter_{nullptr};
@@ -284,6 +314,14 @@ private:
     std::vector<std::wstring> contextWords_;
     std::size_t focus_{0};
     bool listOpen_{false};
+    bool live_{false};
+    // phrases_ is the live conversion shown while typing.
+    bool preview_{false};
+    // Esc showed the kana: typing brings the live conversion back.
+    bool kanaView_{false};
+    // The first phrases, and the reading they cover, that stay as they are.
+    std::size_t settledPhrases_{0};
+    std::size_t settledLength_{0};
     bool predictionEnabled_{false};
     std::vector<Prediction> predictions_;
     std::optional<std::size_t> chosenPrediction_;

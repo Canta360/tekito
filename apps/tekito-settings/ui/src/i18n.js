@@ -168,6 +168,7 @@ const en = {
     punctuation: { title: "Punctuation", description: "The comma and period marks." },
     digits: { title: "Digits", description: "The width of the numbers you type." },
     symbols: { title: "Letters and symbols", description: "The width of letters and symbols like ! and ( )." },
+    live: { title: "Live conversion" },
     prediction: { title: "Predict words", description: "Suggest words as you type. Pick one with Tab." },
     keys: {
       convert: "Convert, then next candidate",
@@ -453,6 +454,7 @@ const ja = {
     punctuation: { title: "句読点", description: "句読点の形です。" },
     digits: { title: "数字", description: "打った数字の幅です。" },
     symbols: { title: "英字と記号", description: "英字と、！や（）などの記号の幅です。" },
+    live: { title: "ライブ変換" },
     prediction: { title: "予測候補", description: "打っている途中で、続きの言葉を出します。Tab で選べます。" },
     keys: {
       convert: "変換、次の候補",

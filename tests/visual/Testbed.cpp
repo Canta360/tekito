@@ -8,7 +8,8 @@
 //
 // --defaults types with the default settings and no user words or learning.
 // TEKITO_DATA_PACK_DIR picks other Data Packs (the repository's data folder,
-// say); otherwise the installed ones are used. Ctrl+L clears the page.
+// say); otherwise the installed ones are used. Ctrl+L clears the page; F12
+// turns live conversion on or off.
 //
 // What it cannot show is how applications treat a composition: caret
 // placement, Word or a browser. Check those with the input method registered.
@@ -122,6 +123,7 @@ std::wstring StatusLine(const Testbed& bed) {
         line += L"  |  missing:";
         for (const auto part : missing) line += L" " + std::wstring(part);
     }
+    line += bed.composer.LiveConversion() ? L"  |  live conversion on (F12)" : L"  |  live conversion off (F12)";
     line += L"  |  Ctrl+L clears";
     return line;
 }
@@ -310,6 +312,11 @@ bool PlainKey(Testbed& bed, WPARAM key) {
 
 // Whether the key was used; one that was not goes on to Windows (Alt+F4).
 bool OnKey(Testbed& bed, WPARAM key) {
+    if (key == VK_F12) {
+        bed.composer.SetLiveConversion(!bed.composer.LiveConversion());
+        Refresh(bed);
+        return true;
+    }
     const auto command = ja::TranslateKey(bed.composer, tekito::tsf::JapaneseKeyPressFor(key),
                                           tekito::userdata::JapaneseKeyOptions(bed.settings));
     bool used = true;

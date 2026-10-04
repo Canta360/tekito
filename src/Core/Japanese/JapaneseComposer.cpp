@@ -119,7 +119,24 @@ void JapaneseComposer::SetInputForm(KanaForm form) noexcept {
     inputForm_ = form == KanaForm::Katakana ? KanaForm::Katakana : KanaForm::Hiragana;
 }
 
+void JapaneseComposer::SetLiveConversion(bool on) {
+    if (on == live_) return;
+    live_ = on;
+    if (preview_) phrases_.clear();
+    ResetLive();
+}
+
 void JapaneseComposer::Insert(wchar_t key) {
+    if (live_) {
+        // Typing on after picking keeps what was picked.
+        if (IsConverted() && !preview_) SettleAll();
+        kanaView_ = false;
+        listOpen_ = false;
+        Feed(key);
+        UpdateLive();
+        UpdatePredictions();
+        return;
+    }
     // The caller commits a converted text before typing on; if it did not,
     // typing continues from the typed kana.
     phrases_.clear();
@@ -128,10 +145,112 @@ void JapaneseComposer::Insert(wchar_t key) {
     UpdatePredictions();
 }
 
+void JapaneseComposer::ResetLive() noexcept {
+    preview_ = false;
+    kanaView_ = false;
+    settledPhrases_ = 0;
+    settledLength_ = 0;
+}
+
+void JapaneseComposer::SettleAll() {
+    // A reading corrected for a slip, or the whole input read again, is not
+    // what was typed: start over from the typed kana.
+    if (conversionReading_ != Reading() || WholeChoice()) {
+        phrases_.clear();
+        ResetLive();
+        return;
+    }
+    settledPhrases_ = phrases_.size();
+    settledLength_ = conversionReading_.size();
+    preview_ = true;
+    listOpen_ = false;
+}
+
+void JapaneseComposer::StartPicking() {
+    if (!preview_) return;
+    // The keys still pending become kana first, as Space would.
+    if (!pending_.empty()) {
+        FlushAll();
+        UpdateLive();
+    }
+    preview_ = false;
+    predictions_.clear();
+    chosenPrediction_.reset();
+    focus_ = phrases_.empty() ? 0 : phrases_.size() - 1;
+}
+
+void JapaneseComposer::UpdateLive() {
+    const std::wstring reading = Reading();  // the keys still pending stay as typed
+    if (!live_ || kanaView_ || !converter_ || reading.empty()) {
+        phrases_.clear();
+        const bool kana = kanaView_;
+        ResetLive();
+        kanaView_ = kana;
+        conversionReading_.clear();
+        readingKeys_.clear();
+        return;
+    }
+    // Phrases the reading no longer covers (Backspace) are no longer settled.
+    while (settledPhrases_ > 0 &&
+           phrases_[settledPhrases_ - 1].begin + phrases_[settledPhrases_ - 1].length > reading.size()) {
+        --settledPhrases_;
+    }
+    settledLength_ = settledPhrases_ ? phrases_[settledPhrases_ - 1].begin + phrases_[settledPhrases_ - 1].length : 0;
+    std::vector<PhraseState> settled(phrases_.begin(), phrases_.begin() + static_cast<std::ptrdiff_t>(settledPhrases_));
+
+    conversionReading_ = reading;
+    readingKeys_.assign(reading.size() + 1, std::wstring::npos);
+    for (std::size_t offset = 0, key = 0, i = 0;; ++i) {
+        if (offset < readingKeys_.size()) readingKeys_[offset] = key;
+        if (i == units_.size()) break;
+        offset += units_[i].kana.size();
+        key += units_[i].keys.size();
+    }
+
+    // The rest goes on from the settled phrases, as from committed text.
+    std::uint16_t context = context_;
+    std::vector<std::wstring> words = contextWords_;
+    if (!settled.empty()) {
+        std::wstring text;
+        for (const auto& phrase : settled) text += PhraseText(phrase);
+        const auto& last = settled.back();
+        const bool chosen = !last.form && last.selected < last.candidates.size();
+        context = ContextAfter(text, chosen ? last.candidates[last.selected].rightId : 0);
+        AddContentWords(text, words);
+    }
+    phrases_ = std::move(settled);
+    const std::wstring rest = reading.substr(settledLength_);
+    std::vector<Phrase> converted;
+    if (settledLength_ == 0) {
+        if (auto sum = SumCandidates(reading); !sum.empty()) {
+            converted.push_back({0, reading.size(), std::move(sum)});
+        } else if (auto postal = PostalCandidates(reading); !postal.empty()) {
+            converted.push_back({0, reading.size(), std::move(postal)});
+        }
+    }
+    if (converted.empty() && !rest.empty()) converted = converter_->Convert(rest, {}, context, words, userDictionary_);
+    for (auto& phrase : converted) phrase.begin += settledLength_;
+    const std::size_t before = phrases_.size();
+    AddPhrases(std::move(converted), reading);
+    if (phrases_.size() == before && !rest.empty()) {
+        // Nothing reads it: shown as typed.
+        PhraseCandidate hiragana{rest, 0, PhraseCandidate::Kind::Hiragana, false};
+        PhraseCandidate katakana{ToKatakana(rest), 0, PhraseCandidate::Kind::Katakana, false};
+        phrases_.push_back({settledLength_, rest.size(), {hiragana, katakana}});
+    }
+    if (phrases_.size() > settledPhrases_ + kOpenPhrases) {
+        settledPhrases_ = phrases_.size() - kOpenPhrases;
+        settledLength_ = phrases_[settledPhrases_ - 1].begin + phrases_[settledPhrases_ - 1].length;
+    }
+    preview_ = true;
+    focus_ = phrases_.size() - 1;
+    listOpen_ = false;
+}
+
 void JapaneseComposer::UpdatePredictions() {
     predictions_.clear();
     chosenPrediction_.reset();
-    if (!predictionEnabled_ || IsConverted()) return;
+    if (!predictionEnabled_ || !IsTyping()) return;
     // Complete kana only (no key waiting to become one), at least two of
     // them, typed at the end.
     const std::wstring reading = Reading();
@@ -288,6 +407,26 @@ void JapaneseComposer::Delete() {
 }
 
 void JapaneseComposer::Backspace() {
+    if (live_ && IsConverted()) {
+        // Live: one kana less, and the rest converted again.
+        if (!preview_) SettleAll();
+        if (!pending_.empty()) {
+            pending_.pop_back();
+        } else if (caret_ > 0) {
+            auto& last = units_[caret_ - 1];
+            last.kana.pop_back();
+            if (last.kana.empty()) {
+                units_.erase(units_.begin() + static_cast<std::ptrdiff_t>(caret_) - 1);
+                --caret_;
+            } else {
+                auto keys = table_ ? table_->KeysFor(last.kana) : std::wstring{};
+                last.keys = keys.empty() ? last.kana : std::move(keys);
+            }
+        }
+        UpdateLive();
+        UpdatePredictions();
+        return;
+    }
     if (IsConverted()) {
         Cancel();
         return;
@@ -316,6 +455,12 @@ void JapaneseComposer::Cancel() {
     if (IsConverted()) {
         phrases_.clear();
         listOpen_ = false;
+        if (live_) {
+            // Live: the kana, until typing brings the conversion back.
+            ResetLive();
+            kanaView_ = true;
+            UpdatePredictions();
+        }
         return;
     }
     Clear();
@@ -528,6 +673,16 @@ std::vector<PhraseCandidate> JapaneseComposer::PostalCandidates(std::wstring_vie
 
 void JapaneseComposer::Convert() {
     if (!IsComposing()) return;
+    if (live_ && preview_) {
+        // Live: the last phrase's next candidate; the next Space opens the list.
+        StartPicking();
+        if (!IsConverted()) return;
+        auto& phrase = phrases_[focus_];
+        AddSlipCandidates(phrase);
+        if (!phrase.candidates.empty()) phrase.selected = (phrase.selected + 1) % phrase.candidates.size();
+        phrase.form.reset();
+        return;
+    }
     if (!IsConverted()) {
         BuildPhrases(true);
         return;
@@ -736,6 +891,7 @@ void JapaneseComposer::NextCandidate() {
         Convert();
         return;
     }
+    StartPicking();
     auto& phrase = phrases_[focus_];
     AddSlipCandidates(phrase);
     if (phrase.candidates.empty()) {
@@ -751,6 +907,7 @@ void JapaneseComposer::PreviousCandidate() {
         Convert();
         return;
     }
+    StartPicking();
     auto& phrase = phrases_[focus_];
     AddSlipCandidates(phrase);
     if (phrase.candidates.empty()) {
@@ -775,11 +932,15 @@ void JapaneseComposer::MoveFocus(int delta) {
     if (!IsConverted()) return;
     listOpen_ = false;
     const auto count = static_cast<int>(phrases_.size());
-    focus_ = static_cast<std::size_t>(std::clamp(static_cast<int>(focus_) + delta, 0, count - 1));
+    // From the live conversion the caret is after the last phrase.
+    const int from = preview_ ? count : static_cast<int>(focus_);
+    StartPicking();
+    focus_ = static_cast<std::size_t>(std::clamp(from + delta, 0, count - 1));
 }
 
 void JapaneseComposer::ResizeFocus(int delta) {
     if (!IsConverted() || !converter_) return;
+    StartPicking();
     const std::wstring reading = conversionReading_;
     const auto& focused = phrases_[focus_];
     const auto length = static_cast<long long>(focused.length) + delta;
@@ -804,6 +965,11 @@ void JapaneseComposer::ResizeFocus(int delta) {
 
 void JapaneseComposer::CycleKana() {
     if (!IsComposing()) return;
+    // From the live conversion: the whole text, as before conversion.
+    if (preview_) {
+        phrases_.clear();
+        ResetLive();
+    }
     if (!IsConverted()) BuildPhrases(false);
     auto& phrase = phrases_[focus_];
     if (!phrase.form || IsAlphanumeric(*phrase.form)) {
@@ -821,6 +987,11 @@ void JapaneseComposer::CycleKana() {
 
 void JapaneseComposer::Transliterate(KanaForm form) {
     if (!IsComposing()) return;
+    // From the live conversion: the whole text, as before conversion.
+    if (preview_) {
+        phrases_.clear();
+        ResetLive();
+    }
     if (!IsConverted()) BuildPhrases(false);
     auto& phrase = phrases_[focus_];
     phrase.letterCase = IsAlphanumeric(form) && phrase.form == form ? (phrase.letterCase + 1) % 4 : 0;
@@ -900,7 +1071,7 @@ std::wstring JapaneseComposer::PhraseText(const PhraseState& phrase) const {
 }
 
 const PhraseCandidate* JapaneseComposer::WholeChoice() const noexcept {
-    if (!IsConverted()) return nullptr;
+    if (!IsConverted() || preview_) return nullptr;
     const auto& phrase = phrases_[focus_];
     if (phrase.form || phrase.selected >= phrase.candidates.size()) return nullptr;
     const auto& candidate = phrase.candidates[phrase.selected];
@@ -912,6 +1083,7 @@ std::wstring JapaneseComposer::Preedit() const {
     if (const auto* whole = WholeChoice()) return whole->text;
     std::wstring text;
     for (const auto& phrase : phrases_) text += PhraseText(phrase);
+    if (preview_) text += halfWidthSymbols_ ? pending_ : ToFullWidthAscii(pending_);
     return text;
 }
 
@@ -923,8 +1095,10 @@ std::vector<PreeditSegment> JapaneseComposer::Segments() const {
     if (const auto* whole = WholeChoice()) return {{whole->text, true, true}};
     std::vector<PreeditSegment> segments;
     for (std::size_t i = 0; i < phrases_.size(); ++i) {
-        segments.push_back({PhraseText(phrases_[i]), true, i == focus_});
+        segments.push_back({PhraseText(phrases_[i]), true, !preview_ && i == focus_});
     }
+    // Live: the keys still pending follow, as typed.
+    if (preview_ && !pending_.empty()) segments.push_back({halfWidthSymbols_ ? pending_ : ToFullWidthAscii(pending_), false, false});
     return segments;
 }
 
@@ -961,7 +1135,9 @@ std::vector<std::wstring> JapaneseComposer::PhraseKeys() const {
 
 std::wstring JapaneseComposer::Commit() {
     FlushAll();
-    if (chosenPrediction_ && *chosenPrediction_ < predictions_.size() && !IsConverted()) {
+    // Live: the keys that were pending are converted too.
+    if (live_ && preview_) UpdateLive();
+    if (chosenPrediction_ && *chosenPrediction_ < predictions_.size() && IsTyping()) {
         const auto prediction = predictions_[*chosenPrediction_];
         if (learning_) learning_->RecordChoice(prediction.reading, prediction.text, prediction.text);
         // A prediction's part of speech is not known here.
@@ -1003,7 +1179,7 @@ std::wstring JapaneseComposer::Commit() {
     return text;
 }
 
-void JapaneseComposer::RememberWords(std::wstring_view text) {
+void JapaneseComposer::AddContentWords(std::wstring_view text, std::vector<std::wstring>& words) {
     const auto content = [](wchar_t c) {
         return (c >= 0x4E00 && c <= 0x9FFF) || c == 0x3005 || (c >= 0x30A1 && c <= 0x30FA) || c == 0x30FC;
     };
@@ -1014,9 +1190,13 @@ void JapaneseComposer::RememberWords(std::wstring_view text) {
         }
         std::size_t end = i;
         while (end < text.size() && content(text[end])) ++end;
-        if (end - i >= 2) contextWords_.emplace_back(text.substr(i, end - i));
+        if (end - i >= 2) words.emplace_back(text.substr(i, end - i));
         i = end;
     }
+}
+
+void JapaneseComposer::RememberWords(std::wstring_view text) {
+    AddContentWords(text, contextWords_);
     if (contextWords_.size() > kContextWords) {
         contextWords_.erase(contextWords_.begin(),
                             contextWords_.end() - static_cast<std::ptrdiff_t>(kContextWords));
@@ -1040,6 +1220,7 @@ void JapaneseComposer::Clear() noexcept {
     phrases_.clear();
     focus_ = 0;
     listOpen_ = false;
+    ResetLive();
 }
 
 }  // namespace tekito::japanese

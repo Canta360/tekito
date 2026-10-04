@@ -47,6 +47,7 @@ const initialSettings = {
   japaneseSymbolWidth: 0,
   advancedSettings: false,
   japanesePredictionEnabled: true,
+  japaneseLiveConversion: false,
   dateConversion: true,
   numberConversion: true,
   symbolConversion: true,
@@ -580,6 +581,9 @@ function JapanesePage({ advanced, settings, setSetting }) {
   return (
     <>
       <Glass className="card">
+        <Row title={j.live.title}>
+          <Toggle label={j.live.title} checked={settings.japaneseLiveConversion} onChange={(value) => setSetting("japaneseLiveConversion", value)} />
+        </Row>
         <Row title={j.prediction.title} description={j.prediction.description}>
           <Toggle label={j.prediction.title} checked={settings.japanesePredictionEnabled} onChange={(value) => setSetting("japanesePredictionEnabled", value)} />
         </Row>

@@ -47,6 +47,7 @@ inline void ApplyJapaneseSettings(japanese::JapaneseComposer& composer, const Us
     composer.SetHalfWidthSymbols(settings.japaneseSymbolWidth == 1);
     composer.SetLearning(settings.learningEnabled ? learning : nullptr);
     composer.SetPredictionEnabled(settings.japanesePredictionEnabled);
+    composer.SetLiveConversion(settings.japaneseLiveConversion);
     composer.SetSpecialConversions(&SpecialConversions::Installed(), SpecialOptionsFor(settings));
 }
 

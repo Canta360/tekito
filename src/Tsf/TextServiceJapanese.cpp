@@ -391,8 +391,9 @@ HRESULT TextService::HandleJapaneseKey(ITfContext* context, TfEditCookie editCoo
         return hr;
     }
     if (command.action == Action::Insert) {
-        // After a conversion, typing on commits it and starts anew.
-        if (japanese_.IsConverted()) {
+        // After a conversion, typing on commits it and starts anew (live
+        // conversion types on).
+        if (japanese_.CommitsBeforeTyping()) {
             const HRESULT hr = CommitJapanese(context, editCookie);
             if (FAILED(hr)) return hr;
         }

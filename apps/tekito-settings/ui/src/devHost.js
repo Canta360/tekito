@@ -48,6 +48,7 @@ function initialState() {
       japaneseSymbolWidth: 0,
       advancedSettings: false,
       japanesePredictionEnabled: true,
+      japaneseLiveConversion: false,
       uiLanguage: 0,
       excludedApps: ["Code.exe"],
       builtInExcludedApps: ["WindowsTerminal.exe", "OpenConsole.exe", "conhost.exe", "cmd.exe", "powershell.exe", "pwsh.exe"],
