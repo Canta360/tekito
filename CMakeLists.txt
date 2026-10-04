@@ -214,6 +214,21 @@ if(TEKITO_BUILD_TESTS)
     target_link_libraries(tekito_typing_demo PRIVATE
         tekito_core ole32 oleaut32 advapi32 user32 gdi32 ${TEKITO_CANDIDATE_WINDOW_LIBS})
 
+    # A window to try Japanese typing in without registering the input
+    # method: the text service's key handling, the real candidate window.
+    add_executable(tekito_testbed WIN32
+        tests/visual/Testbed.cpp
+        src/Tsf/CandidateWindow.cpp
+        src/Tsf/JapaneseKeyPress.cpp
+        assets/tekito_tsf.rc
+    )
+    target_include_directories(tekito_testbed PRIVATE src ${CMAKE_SOURCE_DIR})
+    target_compile_definitions(tekito_testbed PRIVATE
+        ${TEKITO_WINDOWS_DEFINES} TEKITO_CANDIDATE_WINDOW_PREVIEW)
+    target_compile_options(tekito_testbed PRIVATE ${TEKITO_WARNINGS})
+    target_link_libraries(tekito_testbed PRIVATE
+        tekito_userdata tekito_core imm32 ole32 oleaut32 advapi32 user32 gdi32 ${TEKITO_CANDIDATE_WINDOW_LIBS})
+
     # Renders one setup screen without elevation and saves a screenshot.
     add_executable(tekito_setup_preview WIN32 installer/TekitoSetup.cpp installer/TekitoSetup.rc)
     target_include_directories(tekito_setup_preview PRIVATE third_party/webview2/include)

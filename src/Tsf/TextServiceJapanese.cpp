@@ -352,8 +352,7 @@ HRESULT TextService::HandleEnglishSegmentEnd(ITfContext* context, TfEditCookie e
 }
 
 bool TextService::TranslateJapaneseKey(WPARAM wParam, KeyInput& input) {
-    japanese::KeyOptions options;
-    options.fullWidthSpace = userSettings_.japaneseSpaceWidth != 1;
+    japanese::KeyOptions options = userdata::JapaneseKeyOptions(userSettings_);
     options.pageSize = japanesePage_;
     const auto command = japanese::TranslateKey(japanese_, JapaneseKeyPressFor(wParam), options);
     if (!command) return false;

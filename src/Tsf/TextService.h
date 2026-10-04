@@ -8,6 +8,7 @@
 #include "Tsf/EditSession.h"
 #include "Tsf/TekitoGuids.h"
 #include "Tsf/ModeLangBarItem.h"
+#include "UserData/JapaneseSettings.h"
 #include "UserData/UserDataRepository.h"
 #include "UserData/RuntimeModeState.h"
 
@@ -172,10 +173,7 @@ private:
     // Whether Japanese is a mode here: the Japanese profile, with Japanese
     // input turned on in Settings.
     bool JapaneseModeAvailable() const noexcept { return japaneseProfile_ && userSettings_.japaneseEnabled; }
-    SpecialConversionOptions SpecialOptions() const noexcept {
-        return {userSettings_.dateConversion, userSettings_.numberConversion, userSettings_.symbolConversion,
-                userSettings_.calculatorEnabled};
-    }
+    SpecialConversionOptions SpecialOptions() const noexcept { return userdata::SpecialOptionsFor(userSettings_); }
     bool TranslateJapaneseKey(WPARAM wParam, KeyInput& input);
     HRESULT HandleJapaneseKey(ITfContext* context, TfEditCookie editCookie, const KeyInput& input);
     // Puts committed Japanese `text` in place of the composition and ends it.
