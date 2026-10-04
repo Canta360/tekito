@@ -178,6 +178,8 @@ private:
     }
     bool TranslateJapaneseKey(WPARAM wParam, KeyInput& input);
     HRESULT HandleJapaneseKey(ITfContext* context, TfEditCookie editCookie, const KeyInput& input);
+    // Puts committed Japanese `text` in place of the composition and ends it.
+    HRESULT WriteJapaneseCommit(ITfContext* context, TfEditCookie editCookie, const std::wstring& text);
     HRESULT ShowJapanesePreedit(ITfContext* context, TfEditCookie editCookie);
     // The composition text as the composer's segments, each underlined by
     // what it is.

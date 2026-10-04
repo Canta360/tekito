@@ -2,6 +2,7 @@
 #include "Core/ExternalLexiconProvider.h"
 #include "Core/Japanese/JapaneseComposer.h"
 #include "Core/Japanese/JapaneseConverter.h"
+#include "Core/Japanese/JapaneseKeys.h"
 #include "Core/Japanese/JapaneseDictionary.h"
 #include "Core/Japanese/JapaneseLearning.h"
 #include "Core/Japanese/JapaneseUserDictionary.h"
@@ -415,6 +416,102 @@ void TestComposerConversion(const RomajiTable& table, const MiniPack& pack) {
     Require(candidates && candidates->size() >= 3, "the focused phrase has candidates");
     composer.Insert(L'a');
     Require(!composer.IsConverted(), "typing after a conversion starts typing again");
+}
+
+// What each key does in Japanese mode (JapaneseKeys.h), as the text service
+// and the testbed carry it out.
+void TestKeys(const RomajiTable& table, const MiniPack& pack) {
+    using tekito::japanese::KeyCommand;
+    using tekito::japanese::KeyPress;
+    using Action = KeyCommand::Action;
+    using Key = KeyPress::Key;
+    const tekito::japanese::JapaneseConverter converter(pack.dictionary, pack.matrix);
+    JapaneseComposer composer(&table);
+    composer.SetConverter(&converter);
+    const tekito::japanese::KeyOptions options;
+    const auto press = [](Key key, bool shift = false) {
+        KeyPress p;
+        p.key = key;
+        p.shift = shift;
+        return p;
+    };
+    const auto type = [](wchar_t character) {
+        KeyPress p;
+        p.key = Key::Character;
+        p.character = character;
+        if (character >= L'1' && character <= L'9') p.digit = character - L'0';
+        return p;
+    };
+    // Carries out what `key` does; whether it did anything.
+    const auto hit = [&](const KeyPress& key, tekito::japanese::KeyOutcome* outcome = nullptr) {
+        const auto command = tekito::japanese::TranslateKey(composer, key, options);
+        if (!command) return false;
+        const auto result = tekito::japanese::ApplyKey(composer, *command);
+        if (outcome) *outcome = result;
+        return true;
+    };
+    const auto action = [&](const KeyPress& key) {
+        const auto command = tekito::japanese::TranslateKey(composer, key, options);
+        return command ? std::optional<Action>(command->action) : std::nullopt;
+    };
+
+    Require(!action(press(Key::Enter)), "Enter with nothing typed is the application's");
+    Require(!action(press(Key::Backspace)), "so is Backspace");
+    Require(action(press(Key::Space)) == Action::InsertOutside, "Space with nothing typed types a full-width space");
+    Require(!action(press(Key::Space, true)), "Shift+Space types the application's half-width one");
+    tekito::japanese::KeyOutcome outcome;
+    Require(hit(press(Key::Space), &outcome) && outcome.outside == L"\x3000", "the space is full-width");
+
+    for (const wchar_t key : std::wstring_view(L"watashinonamaehanakanodesu")) Require(hit(type(key)), "letters type");
+    RequireText(composer.Preedit(), L"わたしのなまえはなかのです", "letters become kana");
+    Require(action(press(Key::Left)) == Action::MoveCaret, "Left moves the caret before conversion");
+    KeyPress shortcut = type(L'c');
+    shortcut.command = true;
+    const auto commitAndPass = tekito::japanese::TranslateKey(composer, shortcut, options);
+    Require(commitAndPass && commitAndPass->action == Action::Commit && commitAndPass->letKeyThrough,
+            "a shortcut commits the text and goes on to the application");
+
+    Require(hit(press(Key::Space)), "Space converts");
+    RequireText(SegmentsText(composer), L"*私の|名前は|中野です", "into phrases");
+    Require(tekito::japanese::CandidateListFor(composer, 9).kind == tekito::japanese::CandidateList::Kind::None,
+            "the first Space shows no list");
+    Require(action(press(Key::Left)) == Action::MoveFocus, "Left moves between phrases once converted");
+    Require(action(press(Key::Left, true)) == Action::Resize, "Shift+Left resizes the phrase");
+    Require(action(press(Key::Space, true)) == Action::PreviousCandidate, "Shift+Space goes back");
+    Require(hit(press(Key::Space)), "Space again");
+    const auto list = tekito::japanese::CandidateListFor(composer, 9);
+    Require(list.kind == tekito::japanese::CandidateList::Kind::Candidates && list.selected == 1u &&
+                list.pageStart == 0 && list.count == std::min<std::size_t>(9, list.rows.size()) &&
+                list.rows.front().number == 1,
+            "the second Space opens the list on the next candidate");
+    Require(hit(type(L'1')), "1 chooses from the list");
+    Require(!composer.IsCandidateListOpen() && composer.FocusedSelection() == 0, "the first row");
+    Require(hit(type(L'k'), &outcome) && outcome.committed == L"私の名前は中野です",
+            "typing on commits the conversion");
+    RequireText(composer.Preedit(), L"ｋ", "and starts anew");
+    Require(hit(press(Key::Escape)) && !composer.IsComposing(), "Esc drops what was typed");
+
+    for (const wchar_t key : std::wstring_view(L"nakano")) hit(type(key));
+    Require(action(press(Key::Up)) == Action::Commit, "Up before conversion commits");
+    Require(tekito::japanese::TranslateKey(composer, press(Key::Up), options)->letKeyThrough,
+            "and moves on in the application");
+    Require(hit(press(Key::Enter), &outcome) && outcome.committed == L"なかの" && !composer.IsComposing(),
+            "Enter commits the kana");
+
+    composer.SetPredictionEnabled(true);
+    for (const wchar_t key : std::wstring_view(L"ariga")) hit(type(key));
+    Require(action(press(Key::Tab)) == Action::NextPrediction, "Tab steps into the predictions");
+    hit(press(Key::Tab));
+    const auto predictions = tekito::japanese::CandidateListFor(composer, 9);
+    Require(predictions.kind == tekito::japanese::CandidateList::Kind::Predictions && predictions.selected == 0u,
+            "the list shows the predictions with the first chosen");
+    Require(action(press(Key::Escape)) == Action::ClearPrediction, "Esc steps out of the predictions first");
+    KeyCommand click;
+    click.action = Action::ChooseRow;
+    click.index = 0;
+    outcome = tekito::japanese::ApplyKey(composer, click);
+    Require(outcome.committed == predictions.rows.front().text && !composer.IsComposing(),
+            "a click on a prediction commits it");
 }
 
 std::vector<tekito::japanese::PhraseCandidate> Candidates(std::initializer_list<const wchar_t*> texts) {
@@ -1070,6 +1167,7 @@ int main(int argc, char** argv) {
     TestDamagedPacks();
     TestConversion(*pack);
     TestComposerConversion(*table, *pack);
+    TestKeys(*table, *pack);
     TestLearningStore();
     TestComposerLearning(*table, *pack);
     TestContext(*table, *pack);

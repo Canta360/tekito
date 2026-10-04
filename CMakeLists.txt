@@ -36,7 +36,9 @@ add_library(tekito_core STATIC
     src/Core/InputStateMachine.cpp
     src/Core/Japanese/JapaneseComposer.cpp
     src/Core/Japanese/JapaneseConverter.cpp
+    src/Core/Japanese/JapaneseData.cpp
     src/Core/Japanese/JapaneseDictionary.cpp
+    src/Core/Japanese/JapaneseKeys.cpp
     src/Core/Japanese/JapaneseLearning.cpp
     src/Core/Japanese/JapaneseUserDictionary.cpp
     src/Core/Japanese/KanaText.cpp
@@ -98,6 +100,7 @@ add_library(Tekito.Tsf SHARED
     src/Tsf/DisplayAttributes.cpp
     src/Tsf/DllMain.cpp
     src/Tsf/EditSession.cpp
+    src/Tsf/JapaneseKeyPress.cpp
     src/Tsf/TextServiceJapanese.cpp
     src/Tsf/ModeLangBarItem.cpp
     src/Tsf/Registration.cpp

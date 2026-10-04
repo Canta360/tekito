@@ -3,15 +3,11 @@
 
 #include "Tsf/TextService.h"
 
-#include "Core/ExternalLexiconProvider.h"
-#include "Core/Japanese/JapaneseConverter.h"
-#include "Core/Japanese/JapaneseDictionary.h"
+#include "Core/Japanese/JapaneseData.h"
+#include "Core/Japanese/JapaneseUserDictionary.h"
 #include "Core/Japanese/Meanings.h"
-#include "Core/Japanese/KeyConverter.h"
-#include "Core/Japanese/LanguageModel.h"
-#include "Core/Japanese/Loanwords.h"
 #include "Core/Japanese/PostalCodes.h"
-#include "Core/Japanese/RomajiTable.h"
+#include "Tsf/JapaneseKeyPress.h"
 #include "Tsf/Compartments.h"
 #include "Tsf/DisplayAttributes.h"
 #include "Tsf/Diagnostics.h"
@@ -22,6 +18,7 @@
 #include <iterator>
 #include <memory>
 #include <mutex>
+#include <string>
 
 namespace tekito::tsf {
 namespace {
@@ -42,115 +39,17 @@ bool HasCommandModifier() {
     return KeyDown(VK_CONTROL) || KeyDown(VK_MENU) || KeyDown(VK_LWIN) || KeyDown(VK_RWIN);
 }
 
-// Keys that move the caret or focus: they settle the text and go on to the
-// application.
-bool IsCaretKey(WPARAM key) {
-    switch (key) {
-    case VK_LEFT: case VK_RIGHT: case VK_UP: case VK_DOWN:
-    case VK_HOME: case VK_END: case VK_PRIOR: case VK_NEXT:
-    case VK_DELETE: case VK_INSERT: case VK_TAB:
-        return true;
-    default:
-        return false;
-    }
-}
-
-// Loaded once per process: the table is a few kilobytes.
-const japanese::RomajiTable* ProcessRomajiTable() {
-    static const std::unique_ptr<japanese::RomajiTable> table = [] {
-        auto loaded = japanese::RomajiTable::Load(ExternalLexiconProvider::PackDirectory(L"japanese-romaji"));
-        if (!loaded) Trace(L"Japanese romaji table unavailable");
-        return loaded;
-    }();
-    return table.get();
-}
-
-// The japanese-core pack (and the language model and the loanwords for
-// katakana), mapped once per process: mapping takes well under a
-// millisecond and the pages are shared with every other process. Without
-// japanese-core, Japanese still types kana, and Space switches kana;
-// without the language model, conversion goes by the parts of speech alone;
-// without the loanwords, katakana has no English candidates.
-struct JapaneseData {
-    japanese::JapaneseDictionary dictionary;
-    japanese::ConnectionMatrix matrix;
-    japanese::LanguageModel model;
-    japanese::Loanwords loanwords;
-    // The parts of speech of the user's words (japanese-core/pos.tsv).
-    japanese::UserPartsOfSpeech userParts;
-    std::unique_ptr<japanese::JapaneseConverter> converter;
-    std::unique_ptr<japanese::KeyConverter> keys;
-};
-
-const JapaneseData* ProcessJapaneseData() {
-    static const std::unique_ptr<JapaneseData> data = [] {
-        auto loaded = std::make_unique<JapaneseData>();
-        const auto core = ExternalLexiconProvider::PackDirectory(L"japanese-core");
-        if (!loaded->dictionary.Open(core / L"dictionary.bin") || !loaded->matrix.Open(core / L"connection.bin")) {
-            Trace(L"Japanese dictionary unavailable");
-            return std::unique_ptr<JapaneseData>{};
+// The process's Japanese data for `composer`; what is missing is noted once.
+void AttachJapanese(japanese::JapaneseComposer& composer) {
+    composer.SetTable(japanese::ProcessRomajiTable());
+    japanese::AttachJapaneseData(composer);
+    static std::once_flag noted;
+    std::call_once(noted, [] {
+        for (const auto missing : japanese::MissingJapaneseData()) {
+            const std::wstring line = L"Japanese " + std::wstring(missing) + L" unavailable";
+            Trace(line.c_str());
         }
-        loaded->converter = std::make_unique<japanese::JapaneseConverter>(loaded->dictionary, loaded->matrix);
-        if (loaded->model.Open(ExternalLexiconProvider::PackDirectory(L"japanese-lm"))) {
-            loaded->converter->SetLanguageModel(&loaded->model);
-        } else {
-            Trace(L"Japanese language model unavailable");
-        }
-        if (const auto* table = ProcessRomajiTable()) {
-            loaded->keys = std::make_unique<japanese::KeyConverter>(loaded->dictionary, loaded->matrix,
-                                                                    *loaded->converter, *table);
-        }
-        if (!loaded->loanwords.Open(ExternalLexiconProvider::PackDirectory(L"japanese-loanwords"))) {
-            Trace(L"Japanese loanwords unavailable");
-        }
-        loaded->userParts = japanese::UserPartsOfSpeech::Load(core / L"pos.tsv");
-        if (loaded->userParts.Empty()) Trace(L"Japanese user word parts of speech unavailable");
-        if (const auto number = loaded->userParts.Number()) {
-            loaded->converter->SetNumberWord(japanese::JapaneseConverter::NumberWord{number->left, number->right, number->cost});
-        }
-        return loaded;
-    }();
-    return data.get();
-}
-
-// The japanese-zipcode pack, which the user adds in Settings: opened again
-// whenever its file changed (added, replaced or removed). Text services keep
-// the copy they were given until they ask again.
-std::shared_ptr<const japanese::PostalCodes> ProcessPostalCodes() {
-    static std::mutex mutex;
-    static std::shared_ptr<const japanese::PostalCodes> cached;
-    static std::filesystem::file_time_type stamp;
-    std::lock_guard lock(mutex);
-    const auto directory = ExternalLexiconProvider::PackDirectory(L"japanese-zipcode");
-    std::error_code error;
-    const auto written = std::filesystem::last_write_time(directory / L"zipcodes.tsv", error);
-    if (error || !std::filesystem::exists(directory / L"manifest.json", error)) {
-        cached.reset();
-        return cached;
-    }
-    if (!cached || written != stamp) {
-        auto opened = std::make_shared<japanese::PostalCodes>();
-        cached = opened->Open(directory) ? std::move(opened) : nullptr;
-        stamp = written;
-    }
-    return cached;
-}
-
-// The meaning packs, mapped on first use; lookups read them in place.
-const japanese::MeaningDictionary& ProcessMeanings() {
-    static const std::unique_ptr<japanese::MeaningDictionary> meanings = [] {
-        auto opened = std::make_unique<japanese::MeaningDictionary>();
-        if (!opened->Open(ExternalLexiconProvider::DataPackRoot())) Trace(L"Meaning packs unavailable");
-        return opened;
-    }();
-    return *meanings;
-}
-
-void AttachJapaneseData(japanese::JapaneseComposer& composer) {
-    const auto* data = ProcessJapaneseData();
-    composer.SetConverter(data ? data->converter.get() : nullptr);
-    composer.SetKeyConverter(data ? data->keys.get() : nullptr);
-    composer.SetLoanwords(data && data->loanwords.IsOpen() ? &data->loanwords : nullptr);
+    });
 }
 
 }  // namespace
@@ -194,20 +93,19 @@ void TextService::UpdateActiveProfile() {
     }
     japaneseProfile_ = japanese;
     if (japanese) {
-        japanese_.SetTable(ProcessRomajiTable());
-        AttachJapaneseData(japanese_);
+        AttachJapanese(japanese_);
         RefreshJapaneseUserWords();
     }
 }
 
 void TextService::RefreshJapaneseUserWords() {
-    const auto* data = ProcessJapaneseData();
-    if (!data) {
+    const auto* parts = japanese::ProcessUserParts();
+    if (!parts) {
         japanese_.SetUserDictionary(nullptr);
         return;
     }
-    japaneseUserDictionary_.Set(japaneseUserWords_, data->userParts);
-    postalCodes_ = ProcessPostalCodes();
+    japaneseUserDictionary_.Set(japaneseUserWords_, *parts);
+    postalCodes_ = japanese::ProcessPostalCodes();
     japanese_.SetPostalCodes(postalCodes_.get());
     japanese_.SetUserDictionary(japaneseUserDictionary_.Empty() ? nullptr : &japaneseUserDictionary_);
 }
@@ -219,8 +117,7 @@ void TextService::SetJapaneseProfile(bool japanese) {
     japaneseProfile_ = japanese;
     activationSettling_ = japanese;
     if (japanese) {
-        japanese_.SetTable(ProcessRomajiTable());
-        AttachJapaneseData(japanese_);
+        AttachJapanese(japanese_);
         RefreshJapaneseUserWords();
     }
     SetInputMode(SharedMode());
@@ -455,157 +352,46 @@ HRESULT TextService::HandleEnglishSegmentEnd(ITfContext* context, TfEditCookie e
 }
 
 bool TextService::TranslateJapaneseKey(WPARAM wParam, KeyInput& input) {
-    const bool composing = japanese_.IsComposing();
-    if (HasCommandModifier()) {
-        // Shortcuts act on the committed text.
-        if (!composing) return false;
-        input.type = KeyInput::Type::EndComposition;
-        return true;
-    }
-    if (japanese_.IsConverted()) {
-        const bool shift = KeyDown(VK_SHIFT);
-        switch (wParam) {
-        case VK_SPACE:
-            input.type = shift ? KeyInput::Type::JapanesePreviousCandidate : KeyInput::Type::JapaneseConvert;
-            return true;
-        case VK_DOWN:
-            input.type = KeyInput::Type::JapaneseNextCandidate;
-            return true;
-        case VK_UP:
-            input.type = KeyInput::Type::JapanesePreviousCandidate;
-            return true;
-        case VK_LEFT:
-        case VK_RIGHT:
-            input.type = shift ? KeyInput::Type::JapaneseResize : KeyInput::Type::JapaneseMoveFocus;
-            input.delta = wParam == VK_LEFT ? -1 : 1;
-            return true;
-        default:
-            break;
-        }
-        // With the list open, 1-9 choose from the page shown.
-        const bool digit = (wParam >= '1' && wParam <= '9') || (wParam >= VK_NUMPAD1 && wParam <= VK_NUMPAD9);
-        if (digit && japanese_.IsCandidateListOpen() && !shift) {
-            const std::size_t number = wParam >= VK_NUMPAD1 ? wParam - VK_NUMPAD1 : wParam - '1';
-            const std::size_t page = japanese_.FocusedSelection() / japanesePage_ * japanesePage_;
-            const auto* candidates = japanese_.FocusedCandidates();
-            if (candidates && page + number < candidates->size()) {
-                input.type = KeyInput::Type::JapaneseSelectCandidate;
-                input.candidateIndex = page + number;
-                return true;
-            }
-        }
-    }
-    if (composing && !japanese_.IsConverted() && !japanese_.Predictions().empty()) {
-        const bool chosen = japanese_.ChosenPrediction().has_value();
-        switch (wParam) {
-        case VK_TAB:
-            input.type = KeyDown(VK_SHIFT) ? KeyInput::Type::JapanesePreviousPrediction
-                                           : KeyInput::Type::JapaneseNextPrediction;
-            return true;
-        case VK_DOWN:
-            input.type = KeyInput::Type::JapaneseNextPrediction;
-            return true;
-        case VK_UP:
-            if (!chosen) break;
-            input.type = KeyInput::Type::JapanesePreviousPrediction;
-            return true;
-        case VK_ESCAPE:
-            if (!chosen) break;
-            input.type = KeyInput::Type::JapaneseClearPrediction;
-            return true;
-        default:
-            break;
-        }
-    }
-    if (composing && !japanese_.IsConverted()) {
-        // Before conversion the arrows edit the typed text, as in Microsoft IME.
-        switch (wParam) {
-        case VK_LEFT:
-        case VK_RIGHT:
-        case VK_HOME:
-        case VK_END:
-            input.type = KeyInput::Type::JapaneseMoveCaret;
-            input.delta = wParam == VK_LEFT ? -1 : wParam == VK_RIGHT ? 1 : wParam == VK_HOME ? -100000 : 100000;
-            return true;
-        case VK_DELETE:
-            input.type = KeyInput::Type::JapaneseDelete;
-            return true;
-        default:
-            break;
-        }
-    }
-    switch (wParam) {
-    case VK_SPACE:
-    case VK_CONVERT:
-        if (composing) {
-            input.type = KeyInput::Type::JapaneseConvert;
-            return true;
-        }
-        if (wParam == VK_SPACE) {
-            bool fullWidth = userSettings_.japaneseSpaceWidth != 1;
-            if (KeyDown(VK_SHIFT)) fullWidth = !fullWidth;
-            // A half-width space is the application's own.
-            if (!fullWidth) return false;
-            input.type = KeyInput::Type::InsertCharacter;
-            input.character = L'　';
-            return true;
-        }
-        return false;
-    case VK_NONCONVERT:
-        if (!composing) return false;
-        input.type = KeyInput::Type::JapaneseCycleKana;
-        return true;
-    case VK_RETURN:
-        if (!composing) return false;
-        input.type = KeyInput::Type::Enter;
-        return true;
-    case VK_BACK:
-        if (!composing) return false;
-        input.type = KeyInput::Type::Backspace;
-        return true;
-    case VK_ESCAPE:
-        if (!composing) return false;
-        input.type = KeyInput::Type::Cancel;
-        return true;
-    case VK_F6:
-    case VK_F7:
-    case VK_F8:
-    case VK_F9:
-    case VK_F10: {
-        if (!composing) return false;
-        constexpr japanese::KanaForm forms[] = {
-            japanese::KanaForm::Hiragana, japanese::KanaForm::Katakana,
-            japanese::KanaForm::HalfWidthKatakana, japanese::KanaForm::FullWidthAlphanumeric,
-            japanese::KanaForm::HalfWidthAlphanumeric};
-        input.type = KeyInput::Type::JapaneseTransliterate;
-        input.kanaForm = forms[wParam - VK_F6];
-        return true;
-    }
-    default:
-        break;
-    }
-    if (IsCaretKey(wParam)) {
-        if (!composing) return false;
-        input.type = KeyInput::Type::EndComposition;
-        return true;
-    }
-
-    BYTE keyboardState[256]{};
-    if (!GetKeyboardState(keyboardState)) return false;
-    wchar_t buffer[8]{};
-    const UINT scanCode = MapVirtualKeyW(static_cast<UINT>(wParam), MAPVK_VK_TO_VSC);
-    const int count = ToUnicodeEx(static_cast<UINT>(wParam), scanCode, keyboardState, buffer,
-                                  static_cast<int>(std::size(buffer)), 0, GetKeyboardLayout(0));
-    if (count != 1 || buffer[0] <= 0x20 || buffer[0] == 0x7F) return false;
-    input.type = KeyInput::Type::Printable;
-    input.character = buffer[0];
+    japanese::KeyOptions options;
+    options.fullWidthSpace = userSettings_.japaneseSpaceWidth != 1;
+    options.pageSize = japanesePage_;
+    const auto command = japanese::TranslateKey(japanese_, JapaneseKeyPressFor(wParam), options);
+    if (!command) return false;
+    // A key that only ends the text goes on to the application (LetsKeyThrough).
+    input.type = command->letKeyThrough ? KeyInput::Type::EndComposition : KeyInput::Type::JapaneseKey;
+    input.japaneseKey = *command;
     return true;
 }
 
 HRESULT TextService::HandleJapaneseKey(ITfContext* context, TfEditCookie editCookie,
                                        const KeyInput& input) {
+    using Action = japanese::KeyCommand::Action;
+    japanese::KeyCommand command;
     switch (input.type) {
-    case KeyInput::Type::Printable: {
+    case KeyInput::Type::JapaneseKey:
+        command = input.japaneseKey;
+        break;
+    case KeyInput::Type::CandidateSelection:
+        command.action = Action::ChooseRow;
+        command.index = input.candidateIndex;
+        break;
+    case KeyInput::Type::Enter:
+    case KeyInput::Type::JapaneseCommit:
+    case KeyInput::Type::EndComposition:
+        command.action = Action::Commit;
+        break;
+    default:
+        return S_FALSE;
+    }
+    if (command.action == Action::Commit) {
+        const HRESULT hr = CommitJapanese(context, editCookie);
+        // An English word left from before a switch ends as typed.
+        candidateWindow_.Hide();
+        state_.Reset();
+        rawText_.clear();
+        return hr;
+    }
+    if (command.action == Action::Insert) {
         // After a conversion, typing on commits it and starts anew.
         if (japanese_.IsConverted()) {
             const HRESULT hr = CommitJapanese(context, editCookie);
@@ -614,77 +400,15 @@ HRESULT TextService::HandleJapaneseKey(ITfContext* context, TfEditCookie editCoo
         if (!japanese_.IsComposing()) CheckJapaneseContext(context, editCookie);
         const HRESULT hr = EnsureComposition(context, editCookie);
         if (FAILED(hr)) return hr;
-        japanese_.Insert(input.character);
-        return ShowJapanesePreedit(context, editCookie);
     }
-    case KeyInput::Type::Backspace:
-        japanese_.Backspace();
-        return ShowJapanesePreedit(context, editCookie);
-    case KeyInput::Type::Cancel:
-        japanese_.Cancel();
-        return ShowJapanesePreedit(context, editCookie);
-    case KeyInput::Type::JapaneseConvert:
-        japanese_.Convert();
-        return ShowJapanesePreedit(context, editCookie);
-    case KeyInput::Type::JapaneseCycleKana:
-        japanese_.CycleKana();
-        return ShowJapanesePreedit(context, editCookie);
-    case KeyInput::Type::JapaneseTransliterate:
-        japanese_.Transliterate(input.kanaForm);
-        return ShowJapanesePreedit(context, editCookie);
-    case KeyInput::Type::JapaneseNextCandidate:
-        japanese_.NextCandidate();
-        return ShowJapanesePreedit(context, editCookie);
-    case KeyInput::Type::JapanesePreviousCandidate:
-        japanese_.PreviousCandidate();
-        return ShowJapanesePreedit(context, editCookie);
-    case KeyInput::Type::JapaneseMoveFocus:
-        japanese_.MoveFocus(input.delta);
-        return ShowJapanesePreedit(context, editCookie);
-    case KeyInput::Type::JapaneseResize:
-        japanese_.ResizeFocus(input.delta);
-        return ShowJapanesePreedit(context, editCookie);
-    case KeyInput::Type::JapaneseSelectCandidate:
-        japanese_.SelectCandidate(input.candidateIndex);
-        return ShowJapanesePreedit(context, editCookie);
-    case KeyInput::Type::CandidateSelection:
-        if (!japanese_.IsConverted()) {
-            // A click on a prediction commits it.
-            japanese_.ChoosePrediction(input.candidateIndex);
-            return CommitJapanese(context, editCookie);
-        }
-        japanese_.SelectCandidate(input.candidateIndex);
-        return ShowJapanesePreedit(context, editCookie);
-    case KeyInput::Type::JapaneseNextPrediction:
-        japanese_.NextPrediction();
-        return ShowJapanesePreedit(context, editCookie);
-    case KeyInput::Type::JapanesePreviousPrediction:
-        japanese_.PreviousPrediction();
-        return ShowJapanesePreedit(context, editCookie);
-    case KeyInput::Type::JapaneseClearPrediction:
-        japanese_.ClearPredictionChoice();
-        return ShowJapanesePreedit(context, editCookie);
-    case KeyInput::Type::JapaneseMoveCaret:
-        japanese_.MoveCaret(input.delta);
-        return ShowJapanesePreedit(context, editCookie);
-    case KeyInput::Type::JapaneseDelete:
-        japanese_.Delete();
-        return ShowJapanesePreedit(context, editCookie);
-    case KeyInput::Type::Enter:
-    case KeyInput::Type::JapaneseCommit:
-    case KeyInput::Type::EndComposition: {
-        const HRESULT hr = CommitJapanese(context, editCookie);
-        // An English word left from before a switch ends as typed.
+    const auto outcome = japanese::ApplyKey(japanese_, command);
+    if (!outcome.outside.empty()) return InsertAtSelection(context, editCookie, outcome.outside);
+    if (outcome.committed) {
+        // A prediction chosen with a click.
         candidateWindow_.Hide();
-        state_.Reset();
-        rawText_.clear();
-        return hr;
+        return WriteJapaneseCommit(context, editCookie, *outcome.committed);
     }
-    case KeyInput::Type::InsertCharacter:
-        return InsertAtSelection(context, editCookie, std::wstring(1, input.character));
-    default:
-        return S_FALSE;
-    }
+    return ShowJapanesePreedit(context, editCookie);
 }
 
 HRESULT TextService::ShowJapanesePreedit(ITfContext* context, TfEditCookie editCookie) {
@@ -778,7 +502,7 @@ RECT TextService::JapaneseCandidateAnchor(ITfContext* context, TfEditCookie edit
 
 CandidateDetail TextService::MeaningFor(std::wstring_view text, std::wstring_view reading) const {
     if (!userSettings_.meaningsEnabled || text.empty()) return {};
-    const auto meaning = ProcessMeanings().Lookup(text, reading);
+    const auto meaning = japanese::ProcessMeanings().Lookup(text, reading);
     if (!meaning) return {};
     return {meaning->headword, meaning->senses};
 }
@@ -786,7 +510,7 @@ CandidateDetail TextService::MeaningFor(std::wstring_view text, std::wstring_vie
 void TextService::MarkMeanings(std::vector<Candidate>& candidates, std::size_t first, std::size_t count,
                                std::wstring_view reading) const {
     if (!userSettings_.meaningsEnabled) return;
-    const auto& meanings = ProcessMeanings();
+    const auto& meanings = japanese::ProcessMeanings();
     for (std::size_t i = first; i < candidates.size() && i < first + count; ++i) {
         candidates[i].hasMeaning = meanings.Lookup(candidates[i].text, reading).has_value();
     }
@@ -805,68 +529,51 @@ CandidateDetail TextService::SelectedEnglishMeaning() const {
 }
 
 void TextService::ShowJapaneseCandidates(ITfContext* context, TfEditCookie editCookie) {
-    const auto& predictions = japanese_.Predictions();
+    using Kind = japanese::CandidateList::Kind;
+    const auto list = japanese::CandidateListFor(japanese_, japanesePage_);
     if (TraceEnabled()) {
         wchar_t line[96]{};
         swprintf_s(line, L"Japanese list converted=%d open=%d predictions=%zu", japanese_.IsConverted() ? 1 : 0,
-                   japanese_.IsCandidateListOpen() ? 1 : 0, predictions.size());
+                   japanese_.IsCandidateListOpen() ? 1 : 0, japanese_.Predictions().size());
         Trace(line);
     }
-    if (!japanese_.IsConverted() && !predictions.empty() && userSettings_.candidateWindowEnabled) {
-        std::vector<Candidate> rows;
-        for (std::size_t i = 0; i < predictions.size(); ++i) {
-            Candidate row;
-            row.text = predictions[i].text;
-            row.id = static_cast<std::uint32_t>(i + 1);
-            rows.push_back(std::move(row));
-        }
-        for (std::size_t i = 0; i < rows.size(); ++i) {
-            rows[i].hasMeaning = userSettings_.meaningsEnabled &&
-                                 ProcessMeanings().Lookup(predictions[i].text, predictions[i].reading).has_value();
-        }
-        const auto chosen = japanese_.ChosenPrediction();
-        const RECT anchor = GetCandidateAnchor(context, editCookie);
-        candidateAnchor_ = anchor;
-        candidateWindow_.SetStyle(userSettings_.candidateWindowStyle);
-        candidateWindow_.SetJapanese(userdata::UseJapaneseUi(userSettings_.uiLanguage));
-        const CandidateDetail detail =
-            chosen && *chosen < predictions.size()
-                ? MeaningFor(predictions[*chosen].text, predictions[*chosen].reading)
-                : CandidateDetail{};
-        candidateWindow_.Show(anchor, rows, chosen ? *chosen : CandidateWindow::kNoSelection, 0, rows.size(),
-                              detail);
-        return;
-    }
-    const auto* candidates = japanese_.FocusedCandidates();
-    if (!userSettings_.candidateWindowEnabled || !japanese_.IsCandidateListOpen() || !candidates ||
-        candidates->empty()) {
+    if (list.kind == Kind::None || !userSettings_.candidateWindowEnabled) {
         candidateWindow_.Hide();
         return;
     }
-    const std::size_t selected = std::min(japanese_.FocusedSelection(), candidates->size() - 1);
-    const std::size_t page = selected / japanesePage_ * japanesePage_;
     std::vector<Candidate> rows;
-    rows.reserve(candidates->size());
-    for (std::size_t i = 0; i < candidates->size(); ++i) {
+    rows.reserve(list.rows.size());
+    for (std::size_t i = 0; i < list.rows.size(); ++i) {
         Candidate row;
-        row.text = (*candidates)[i].text;
-        row.id = static_cast<std::uint32_t>(i % japanesePage_ + 1);
-        if ((*candidates)[i].slip || (*candidates)[i].spellingCorrection) row.label = SemanticLabel::Suggestion;
+        row.text = list.rows[i].text;
+        row.id = list.rows[i].number;
+        if (list.rows[i].suggestion) row.label = SemanticLabel::Suggestion;
+        // Only the rows on the page shown are looked up.
+        row.hasMeaning = userSettings_.meaningsEnabled && i >= list.pageStart && i < list.pageStart + list.count &&
+                         japanese::ProcessMeanings().Lookup(list.rows[i].text, list.rows[i].reading).has_value();
         rows.push_back(std::move(row));
     }
-    MarkMeanings(rows, page, japanesePage_, japanese_.FocusedReading());
-    const RECT anchor = JapaneseCandidateAnchor(context, editCookie);
+    const auto& selected = list.selected;
+    const CandidateDetail detail = selected && *selected < list.rows.size()
+                                       ? MeaningFor(list.rows[*selected].text, list.rows[*selected].reading)
+                                       : CandidateDetail{};
+    // Predictions follow the caret; candidates go under their phrase.
+    const RECT anchor = list.kind == Kind::Predictions ? GetCandidateAnchor(context, editCookie)
+                                                       : JapaneseCandidateAnchor(context, editCookie);
     candidateAnchor_ = anchor;
     candidateWindow_.SetStyle(userSettings_.candidateWindowStyle);
     candidateWindow_.SetJapanese(userdata::UseJapaneseUi(userSettings_.uiLanguage));
-    candidateWindow_.Show(anchor, rows, selected, page, std::min(japanesePage_, rows.size() - page),
-                          MeaningFor((*candidates)[selected].text, japanese_.FocusedReading()));
+    candidateWindow_.Show(anchor, rows, selected ? *selected : CandidateWindow::kNoSelection, list.pageStart,
+                          list.count, detail);
 }
 
 HRESULT TextService::CommitJapanese(ITfContext* context, TfEditCookie editCookie) {
     candidateWindow_.Hide();
     if (!japanese_.IsComposing()) return EndComposition(editCookie);
-    const std::wstring text = japanese_.Commit();
+    return WriteJapaneseCommit(context, editCookie, japanese_.Commit());
+}
+
+HRESULT TextService::WriteJapaneseCommit(ITfContext* context, TfEditCookie editCookie, const std::wstring& text) {
     lastJapaneseCommit_ = text;
     if (!composition_) {
         return text.empty() ? S_OK : InsertAtSelection(context, editCookie, text);
