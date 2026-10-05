@@ -2178,7 +2178,8 @@ HRESULT TextService::ReconvertJapanese(ITfContext* context, TfEditCookie editCoo
     }
     // A short piece of one line only (a longer selection may not be read whole).
     constexpr std::size_t kLongest = 64;
-    if (text.size() > kLongest || text.find_first_of(L"\r\n\t") != std::wstring::npos) return S_OK;
+    // An embedded object (a picture in Word) shows as U+FFFC: never replaced.
+    if (text.size() > kLongest || text.find_first_of(L"\r\n\t\xFFFC") != std::wstring::npos) return S_OK;
     if (!japanese_.Reconvert(text)) return S_OK;
     japanese_.ForgetCommit();
     lastJapaneseCommit_.clear();

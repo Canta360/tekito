@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <fstream>
 #include <iterator>
+#include <set>
 #include <string>
 
 #ifndef NOMINMAX
@@ -139,12 +140,11 @@ std::optional<ImportedImeWords> ReadImeDictionary(const std::filesystem::path& f
 }
 
 std::size_t MergeImeWords(std::vector<UserWord>& words, const std::vector<UserWord>& imported) {
+    std::set<std::pair<std::wstring, std::wstring>> known;
+    for (const auto& word : words) known.emplace(word.reading, word.surface);
     std::size_t added = 0;
     for (const auto& word : imported) {
-        const bool known = std::any_of(words.begin(), words.end(), [&](const UserWord& w) {
-            return w.reading == word.reading && w.surface == word.surface;
-        });
-        if (known) continue;
+        if (!known.emplace(word.reading, word.surface).second) continue;
         words.push_back(word);
         ++added;
     }

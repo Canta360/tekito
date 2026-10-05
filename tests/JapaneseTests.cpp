@@ -593,6 +593,16 @@ void TestLiveConversion(const RomajiTable& table, const MiniPack& pack) {
     const std::wstring before = composer.Preedit();
     RequireText(composer.Commit(), before, "Enter commits what is shown");
     Require(!composer.IsComposing(), "and clears it");
+
+    // Left with a key still pending: it becomes kana first, and the focus
+    // lands on a phrase that exists.
+    Type(composer, L"nakanon");
+    composer.MoveFocus(-1);
+    Require(composer.IsConverted() && !composer.IsLivePreview(), "Left with a pending key starts picking");
+    const auto segments = composer.Segments();
+    Require(std::count_if(segments.begin(), segments.end(), [](const auto& s) { return s.focused; }) == 1,
+            "one phrase is focused");
+    composer.Clear();
 }
 
 // Shift+letter: letters as typed, in half-width, until committed.

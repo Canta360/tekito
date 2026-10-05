@@ -198,7 +198,13 @@ std::vector<Phrase> JapaneseComposer::ConvertReading(const std::wstring& reading
         if (ascii[begin]) {
             out.push_back({begin, piece.size(), AsciiCandidates(piece)});
         } else {
-            for (auto& phrase : converter_->Convert(piece, {}, begin == from ? context : 0, words, userDictionary_)) {
+            auto phrases = converter_->Convert(piece, {}, begin == from ? context : 0, words, userDictionary_);
+            // Every part of the reading has a phrase, or it would drop out of
+            // the text: a piece nothing reads stays as typed.
+            std::size_t covered = 0;
+            for (const auto& phrase : phrases) covered += phrase.candidates.empty() ? 0 : phrase.length;
+            if (covered != piece.size()) phrases = {{0, piece.size(), KanaCandidates(piece)}};
+            for (auto& phrase : phrases) {
                 phrase.begin += begin;
                 out.push_back(std::move(phrase));
             }
@@ -1051,10 +1057,13 @@ void JapaneseComposer::SelectCandidate(std::size_t index) {
 void JapaneseComposer::MoveFocus(int delta) {
     if (!IsConverted()) return;
     listOpen_ = false;
-    const auto count = static_cast<int>(phrases_.size());
-    // From the live conversion the caret is after the last phrase.
-    const int from = preview_ ? count : static_cast<int>(focus_);
+    // From the live conversion the caret is after the last phrase (picking
+    // may change the phrases: the pending keys become kana first).
+    const bool fromLive = preview_;
     StartPicking();
+    if (phrases_.empty()) return;
+    const auto count = static_cast<int>(phrases_.size());
+    const int from = fromLive ? count : static_cast<int>(focus_);
     focus_ = static_cast<std::size_t>(std::clamp(from + delta, 0, count - 1));
 }
 
