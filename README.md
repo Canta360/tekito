@@ -120,9 +120,13 @@ for the phrase in focus.
 | Tab, ↓ | Picks one of the predicted words shown while you type. |
 | Enter | Commits what is shown. |
 | Esc | After converting, goes back to the kana; before, clears what you typed. |
+| PageUp, PageDown | Pages through the open list. |
 | F6–F8 | Hiragana, katakana, half-width katakana. |
 | F9, F10 | The letters you typed, full-width or as typed. |
-| Shift+letter | Starts an English word inside Japanese. |
+| Shift+letter | Starts an English word inside Japanese. In the middle of Japanese, the letters that follow stay as typed (NHKの, Windows11). |
+| Henkan | With nothing typed, converts the selected text again (or what you just entered). |
+| Ctrl+Backspace | Right after entering text, takes it back to the conversion. |
+| Ctrl+Delete | Stops suggesting a word TEKITO learned (the prediction or candidate picked). |
 
 - **The whole sentence counts.** Conversion weighs which words go together,
   learned from Japanese news and Wikipedia text, and carries on from what you
@@ -148,6 +152,16 @@ for the phrase in focus.
   a reading's words.
 - **Postal codes.** Add Japan Post's postal code data under
   **Settings → Dictionary & learning**, and 1000001 converts to its address.
+- **Live conversion.** Turn it on in **Settings → Japanese** to see the
+  text converted as you type; Space then picks another candidate for the
+  last phrase.
+- **Emoji.** Readings offer emoji after the symbols: ねこ gives 🐱.
+- **Words from your old IME.** Words exported as text from Microsoft IME,
+  Google Japanese Input or ATOK can be imported under
+  **Settings → Dictionary & learning**.
+- **Everywhere you type.** TEKITO works in the Start menu's search,
+  Settings and Store apps too, and a katakana field (furigana) types
+  katakana.
 
 ## Settings
 
@@ -174,11 +188,11 @@ See [the privacy notice](PRIVACY.md).
 
 ## Install
 
-Download `TEKITO-0.3.1-full-installer.exe` from
+Download `TEKITO-0.4.0-full-installer.exe` from
 [Releases](https://github.com/Canta360/tekito/releases/latest) and run it.
 
 - **Add Japanese input** (on when Windows shows Japanese) downloads the
-  Japanese dictionary and language data, about 45 MB, from the same release,
+  Japanese dictionary and language data, about 48 MB, from the same release,
   and checks it against the checksum the installer carries. TEKITO then
   appears in the Japanese keyboard list; its Auto and Direct cover English,
   so it leaves the English list unless you keep it there under **Options**.
