@@ -11,7 +11,7 @@
   "sha256": {
     "file": "686BF508C5EC15ADAA32BAFB5D1B21986141903BF5D6D341D214F65FB33B0860"
   },
-  "license": "TEKITO-OWNED + BSD-3-Clause (Mozc)",
+  "license": "TEKITO-OWNED + BSD-3-Clause (Mozc) + Unicode-3.0 (emoji)",
   "source": "scripts/build-special-conversions.py; Japanese symbols, emoji, emoticons and single kanji from https://github.com/google/mozc/tree/b9c3fcbd6d76b19649ef572324fa9da2559bc18e/src/data",
   "notice_file": "NOTICE"
 }

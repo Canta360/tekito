@@ -217,6 +217,8 @@ def main() -> None:
     parser.add_argument("--mozc-single-kanji", type=Path, required=True,
                         help="Mozc src/data/single_kanji/single_kanji.tsv")
     parser.add_argument("--mozc-license", type=Path, required=True, help="Mozc LICENSE")
+    parser.add_argument("--unicode-license", type=Path, required=True,
+                        help="Unicode License V3 (Mozc builds its emoji table from Unicode data)")
     parser.add_argument("--mozc-commit", required=True, help="the Mozc commit both files are from")
     args = parser.parse_args()
 
@@ -258,9 +260,11 @@ def main() -> None:
         "The Japanese symbols, emoji, emoticons, single kanji and their readings\n"
         f"are from Mozc (https://github.com/google/mozc, commit {args.mozc_commit},\n"
         "src/data/symbol, src/data/emoji, src/data/emoticon and src/data/single_kanji),\n"
-        "under "
-        "the following license:\n\n"
-        + license_text,
+        "under the following license:\n\n"
+        + license_text
+        + "\n\nMozc builds its emoji table from Unicode's emoji data; for the emoji\n"
+        "and their names the Unicode License V3 also applies:\n\n"
+        + args.unicode_license.read_text(encoding="utf-8"),
         encoding="utf-8", newline="\n")
 
     manifest = {
@@ -274,7 +278,7 @@ def main() -> None:
         "file": "rules.tsv",
         "entry_count": len(rows),
         "sha256": {"file": sha256(data)},
-        "license": "TEKITO-OWNED + BSD-3-Clause (Mozc)",
+        "license": "TEKITO-OWNED + BSD-3-Clause (Mozc) + Unicode-3.0 (emoji)",
         "source": "scripts/build-special-conversions.py; Japanese symbols, emoji, emoticons and single kanji from "
                   f"https://github.com/google/mozc/tree/{args.mozc_commit}/src/data",
         "notice_file": "NOTICE",

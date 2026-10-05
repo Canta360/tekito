@@ -191,7 +191,8 @@ def write_pack(out: Path, kept: dict[int, int], word_scores: dict[int, int], top
     (out / "NOTICE").write_text(f"""Which Japanese words go together, from the Leipzig Corpora Collection:
 {source} (1,000,000 sentences each), reduced to word counts
 and the pointwise mutual information of neighbor pairs by
-scripts/ja/build-japanese-lm.py.
+scripts/ja/build-japanese-lm.py. The pack holds these statistics only; it
+contains no sentences from the corpora.
 
 The downloadable corpora are provided under CC BY. Attribution: (c) Universitat
 Leipzig / Sachsische Akademie der Wissenschaften / InfAI.

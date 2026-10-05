@@ -18,12 +18,23 @@ a word, and in Japanese, which conversion you pick for a reading. It does not
 store sentences or a history of what you typed. To read a sentence as a
 whole, Japanese conversion keeps the last few words you committed in memory
 only, while you go on typing right after them; they are dropped once the
-caret moves elsewhere and are never saved. The
+caret moves elsewhere and are never saved. The text you just entered is also
+kept in memory so that Ctrl+Backspace can take it back, until you type on.
+Reconversion (Henkan on selected text) reads the selected text on your
+computer only, and importing words from another IME reads the file you
+choose on your computer only; neither sends anything. The
 diagnostic log and **Copy diagnostics** in Settings record events, timings
 and error codes, never text.
 
 The database is not encrypted; treat it like any other private file in your
 profile.
+
+So that TEKITO also works in the Start menu's search, Settings and Store
+apps, the setup program lets those sandboxed apps read the program folder
+(`%LOCALAPPDATA%\Programs\TEKITO`) and the language data
+(`%LOCALAPPDATA%\TEKITO\data`). They get read access only, and not to
+`user.db`: your dictionary and what TEKITO has learned stay out of their
+reach, and there TEKITO types with the default settings.
 
 ## Your controls
 
@@ -66,7 +77,9 @@ and add in Settings is read on your computer.
 
 TEKITO の処理はすべて PC の中で行われます。入力した内容、ユーザー辞書、学習した内容をどこにも送りません。アカウント、テレメトリ、更新確認はなく、入力の処理経路でネットワークを使うこともありません。
 
-- 設定・ユーザー辞書・学習内容は `%LOCALAPPDATA%\TEKITO\user.db` に保存されます。学習しているのは「どの単語でどの候補を選んだか」と、日本語では「どの読みにどの変換を選んだか」の回数だけで、文章や入力履歴は保存しません。日本語の変換は文全体を読むために直前に確定した数語をメモリーにだけ持ちますが、続けて打っている間だけ使い、カーソルがほかへ移ると忘れます。保存はしません。
+- 設定・ユーザー辞書・学習内容は `%LOCALAPPDATA%\TEKITO\user.db` に保存されます。学習しているのは「どの単語でどの候補を選んだか」と、日本語では「どの読みにどの変換を選んだか」の回数だけで、文章や入力履歴は保存しません。日本語の変換は文全体を読むために直前に確定した数語をメモリーにだけ持ちますが、続けて打っている間だけ使い、カーソルがほかへ移ると忘れます。保存はしません。Ctrl+Backspace で確定を取り消せるよう、確定したばかりの文字も次に打ち始めるまでメモリーにだけ持ちます。
+- 再変換（文字を選んで変換キー）は選んだ文字をこの PC の中で読むだけで、ほかの IME の単語の読み込みは選んだファイルをこの PC の中で取り込むだけです。どちらも何も送りません。
+- スタートメニューの検索、設定アプリ、ストアアプリでも使えるように、インストーラーはこれらのサンドボックスのアプリに、プログラムのフォルダ（`%LOCALAPPDATA%\Programs\TEKITO`）と言語データ（`%LOCALAPPDATA%\TEKITO\data`）の読み取りだけを許可します。`user.db` は対象外なので、辞書や学習内容は読めません。そこでは TEKITO は既定の設定で動きます。
 - インストール時に日本語を選ぶと、日本語データを GitHub の TEKITO のリリースからダウンロードし、チェックサムを確かめます。ネットワークを使うのはこのときだけです。自分でダウンロードした ZIP から入れる場合（`install.ps1 -JapaneseDataPath`）は通信しません。
 - 郵便番号のデータは、TEKITO はダウンロードしません。設定の「日本郵便のページを開く」はブラウザでページを開くだけで、自分でダウンロードしたファイルを設定に入れると、この PC の中で取り込みます。
 - 診断ログ（`%TEMP%\TekitoTsf.log`、トレース用ビルドか `TEKITO_TSF_TRACE=1` のときだけ作られます）と設定画面の「Copy diagnostics」には、イベント・時間・エラーコードだけが含まれ、入力した文字は含まれません。

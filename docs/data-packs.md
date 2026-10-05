@@ -22,7 +22,7 @@ download that setup fetches when Japanese is chosen.
 | `emoji` | Emoji and their names | Unicode CLDR | Unicode License v3 |
 | `social-expression` | Emoji, emoticons, kaomoji, symbols and short forms for chat words | Written for TEKITO (`scripts/en/social-expression-seeds.tsv`) | TEKITO (see `LICENSE.md`) |
 | `japanese-phonetic` | English words from how they sound in romaji ("konpyuutaa" → computer) | Generated from CMUdict; words chosen by Leipzig frequency | CMUdict license |
-| `special-conversions` | Dates and times for words like "today" and "きょう", symbols by ASCII spelling ("->" → →) or Japanese reading ("やじるし" → →), emoji by Japanese reading ("ねこ" → 🐱), Japanese emoticons ("にこにこ" → (^^)), single kanji by reading, and the kanji for numbers | Written for TEKITO (`scripts/build-special-conversions.py`); Japanese symbols, emoji, emoticons and single kanji from Mozc (`src/data/symbol`, `src/data/emoji`, `src/data/emoticon`, `src/data/single_kanji`) | TEKITO (see `LICENSE.md`), BSD-3-Clause |
+| `special-conversions` | Dates and times for words like "today" and "きょう", symbols by ASCII spelling ("->" → →) or Japanese reading ("やじるし" → →), emoji by Japanese reading ("ねこ" → 🐱), Japanese emoticons ("にこにこ" → (^^)), single kanji by reading, and the kanji for numbers | Written for TEKITO (`scripts/build-special-conversions.py`); Japanese symbols, emoji, emoticons and single kanji from Mozc (`src/data/symbol`, `src/data/emoji`, `src/data/emoticon`, `src/data/single_kanji`) | TEKITO (see `LICENSE.md`), BSD-3-Clause, Unicode License V3 (emoji) |
 | `qwerty-typo-catalog` | Synthetic typos of common words, for evaluation only | Generated for TEKITO | TEKITO (see `LICENSE.md`) |
 | `japanese-romaji` | How typed keys become kana in Japanese input | Written for TEKITO (`scripts/ja/build-japanese-romaji.py`) | TEKITO (see `LICENSE.md`) |
 | `japanese-core` | Words, readings and how they join, for kana-kanji conversion | Mozc OSS dictionary (IPAdic, Okinawa dictionary) plus TEKITO slang entries | IPAdic license, BSD-3-Clause, TEKITO source license |
@@ -85,7 +85,7 @@ dates, formats, names and English symbols in the script and Mozc's symbol,
 emoticon and single-kanji tables at a pinned commit:
 
 ```powershell
-python scripts\build-special-conversions.py --mozc-symbols <symbol.tsv> --mozc-emoji <emoji_data.tsv> --mozc-emoticons <emoticon.tsv> --mozc-single-kanji <single_kanji.tsv> --mozc-license <LICENSE> --mozc-commit <sha>
+python scripts\build-special-conversions.py --mozc-symbols <symbol.tsv> --mozc-emoji <emoji_data.tsv> --mozc-emoticons <emoticon.tsv> --mozc-single-kanji <single_kanji.tsv> --mozc-license <LICENSE> --unicode-license <Unicode LICENSE> --mozc-commit <sha>
 ```
 
 The same script builds `japanese-lm` (about 43 MB) with

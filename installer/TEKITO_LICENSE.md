@@ -24,7 +24,7 @@ If you got TEKITO through a store (such as the Microsoft Store), the store's own
 
 Unless the law allows it despite this agreement, you may not:
 
-- sell, rent, lend, sublicense, or distribute TEKITO or its setup program, data, icons, or other files, except by linking to our official download page;
+- sell, rent, lend, sublicense, or distribute TEKITO or its setup program, data, icons, or other files, except by linking to our official download page, or as far as the license of that data or part allows (see section 4);
 - distribute modified versions of TEKITO, or present anything as TEKITO or as coming from Capitata that did not come from us;
 - remove or change copyright, license, or attribution notices; or
 - get around any measure that limits access to a paid feature.

@@ -22,6 +22,9 @@ SCOWL is derived from many sources, most of which are in the Public Domain.
 The source distribution also documents the included source credits and terms.
 This NOTICE must remain with redistributed copies and derivatives.
 
+The word list is SCOWL, under the terms above. Only the supplemental entries
+described below are under CC BY-SA 4.0.
+
 Supplemental validated correction targets were derived from Wikipedia's common-misspellings list, revision 1199637275, and included only when corroborated by TEKITO's local frequency, pronunciation, or WordNet data.
 Source: https://en.wikipedia.org/wiki/Wikipedia:Lists_of_common_misspellings/For_machines
 License: https://creativecommons.org/licenses/by-sa/4.0/

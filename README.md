@@ -163,6 +163,10 @@ for the phrase in focus.
   Settings and Store apps too, and a katakana field (furigana) types
   katakana.
 
+Microsoft IME, Google Japanese Input and ATOK are trademarks of their
+owners; they are named here only to say which files TEKITO reads. TEKITO
+is not affiliated with them.
+
 ## Settings
 
 ![TEKITO Settings](docs/images/settings.png)
