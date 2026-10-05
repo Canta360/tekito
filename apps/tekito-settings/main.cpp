@@ -16,6 +16,7 @@
 #include "Dictionary/ExternalDictionaryProvider.h"
 #include "UserData/DataPackValidation.h"
 #include "UserData/KeyboardLayout.h"
+#include "UserData/ImeDictionaryImport.h"
 #include "UserData/PostalCodeImport.h"
 #include "UserData/RuntimeModeState.h"
 #include "UserData/UiLanguage.h"
@@ -1154,6 +1155,29 @@ private:
             std::wstring error;
             const bool saved = SaveJapaneseWordFromMessage(message, error);
             Reply(requestId, saved, error);
+        } else if (type == L"japaneseWords.import" || type == L"japaneseWords.browse") {
+            const auto source = type == L"japaneseWords.browse" ? ChooseImeDictionaryFile() : droppedFile_;
+            if (source.empty()) {
+                Reply(requestId, type == L"japaneseWords.browse");  // the dialog was closed
+                return;
+            }
+            const auto imported = tekito::userdata::ReadImeDictionary(source);
+            if (!imported) {
+                Reply(requestId, false, Text(L"No words were found in this file.", L"このファイルから単語を読み込めませんでした。"));
+                return;
+            }
+            auto words = japaneseWords_;
+            const auto added = tekito::userdata::MergeImeWords(words, imported->words);
+            if (added > 0 && !repository_->SaveJapaneseUserWords(words)) {
+                Reply(requestId, false, Text(L"The words could not be saved.", L"単語を保存できませんでした。"));
+                return;
+            }
+            japaneseWords_ = std::move(words);
+            if (added > 0) runtime_->NotifyDictionaryChanged();
+            const auto count = std::to_wstring(added);
+            const std::wstring text = Text((L"Added " + count + (added == 1 ? L" word." : L" words.")).c_str(),
+                                           (count + L" 語を追加しました。").c_str());
+            Reply(requestId, true, {}, L",\"text\":\"" + JsonEscape(text) + L"\"");
         } else if (type == L"japaneseWords.delete") {
             auto words = japaneseWords_;
             const auto reading = message.String(L"reading");
@@ -1335,6 +1359,19 @@ private:
         std::filesystem::path result(path);
         CoTaskMemFree(path);
         return result;
+    }
+
+    std::filesystem::path ChooseImeDictionaryFile() {
+        wchar_t buffer[MAX_PATH]{};
+        OPENFILENAMEW dialog{sizeof(dialog)};
+        dialog.hwndOwner = hwnd_;
+        dialog.lpstrFile = buffer;
+        dialog.nMaxFile = MAX_PATH;
+        dialog.lpstrFilter = L"Text (*.txt)\0*.txt;*.tsv;*.csv\0All files\0*.*\0";
+        dialog.lpstrTitle = Text(L"Choose a user dictionary exported from another input method",
+                                 L"ほかの IME から書き出したユーザー辞書を選ぶ");
+        dialog.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_NOCHANGEDIR;
+        return GetOpenFileNameW(&dialog) ? std::filesystem::path(buffer) : std::filesystem::path{};
     }
 
     std::filesystem::path ChoosePostalCodeFile() {

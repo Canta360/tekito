@@ -19,6 +19,7 @@
 #include "UserData/SqliteUserDictionaryRepository.h"
 #include "UserData/UserDictionaryFile.h"
 #include "UserData/DataPackValidation.h"
+#include "UserData/ImeDictionaryImport.h"
 #include "UserData/PostalCodeImport.h"
 #include "sqlite3.h"
 #include "UserData/RuntimeModeState.h"
@@ -1587,6 +1588,50 @@ void TestSqliteUserLearningRepository() {
 }
 
 // Postal codes added in Settings: Japan Post's CSV becomes a sorted pack.
+void TestImeDictionaryImport() {
+    using tekito::japanese::UserWordAction;
+    using tekito::japanese::UserWordKind;
+    // Microsoft IME's export: UTF-16 with a byte order mark and "!" headers.
+    const std::wstring microsoft =
+        L"!Microsoft IME Dictionary Tool\r\n!Version:\r\n!Format:WORDLIST\r\n\r\n"
+        L"てきと\tTEKITO\t固有名詞\r\n"
+        L"やまだ\t山田\t姓\r\n"
+        L"たろう\t太郎\t名\r\n"
+        L"ヘンカン\t返還\t抑制単語\r\n"
+        L"abc\tABC\t名詞\r\n";
+    std::string bytes = "\xFF\xFE";
+    for (const wchar_t c : microsoft) {
+        bytes.push_back(static_cast<char>(c & 0xFF));
+        bytes.push_back(static_cast<char>(c >> 8));
+    }
+    const auto ms = tekito::userdata::ParseImeDictionary(bytes);
+    Require(ms && ms->words.size() == 4 && ms->skipped == 1, "Microsoft IME's export is read, its headers skipped");
+    Require(ms->words[0].reading == L"てきと" && ms->words[0].surface == L"TEKITO" &&
+                ms->words[0].kind == UserWordKind::ProperNoun,
+            "a proper noun");
+    Require(ms->words[1].kind == UserWordKind::Surname && ms->words[2].kind == UserWordKind::GivenName,
+            "surnames and given names");
+    Require(ms->words[3].reading == L"へんかん" && ms->words[3].action == UserWordAction::Suppress,
+            "a katakana reading becomes hiragana; a suppressed word stays suppressed");
+
+    // Google Japanese Input's export: UTF-8, with a comment column.
+    const std::string google = "とうきょうえき\t東京駅\t地名\tメモ\nかおもじ\t(^^)\t顔文字\n";
+    const auto g = tekito::userdata::ParseImeDictionary(google);
+    Require(g && g->words.size() == 2 && g->words[0].kind == UserWordKind::Place &&
+                g->words[1].kind == UserWordKind::Symbol,
+            "Google Japanese Input's export is read");
+
+    // ATOK's parts of speech end in "*".
+    const auto atok = tekito::userdata::ParseImeDictionary("!!ATOK_TANGO_TEXT_HEADER_1\nさとう\t佐藤\t固有人名*\n");
+    Require(atok && atok->words.size() == 1 && atok->words[0].kind == UserWordKind::Person, "ATOK's export is read");
+
+    Require(!tekito::userdata::ParseImeDictionary("not a dictionary"), "other files give nothing");
+
+    std::vector<tekito::japanese::UserWord> words{{L"てきと", L"TEKITO", UserWordKind::Noun, UserWordAction::First}};
+    Require(tekito::userdata::MergeImeWords(words, ms->words) == 3 && words.size() == 4,
+            "words already there are not added twice");
+}
+
 void TestPostalCodeImport() {
     using tekito::userdata::PostalCodeImportError;
     const auto directory = std::filesystem::temp_directory_path() / L"tekito-postal-test";
@@ -2198,6 +2243,7 @@ int main() {
     TestSqliteUserLearningRepository();
     TestDataPackValidation();
     TestPostalCodeImport();
+    TestImeDictionaryImport();
     TestRankingDataBoundaries();
     TestCompositeLexiconProvider();
     TestPolicyEngineBoundary();

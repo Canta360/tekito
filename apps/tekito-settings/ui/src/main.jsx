@@ -208,7 +208,9 @@ function App() {
     const response = await hostRequest(type, payload, files);
     if (response.ok) {
       applyState(response.state);
-      if (successMessage) showNotice(successMessage);
+      // A message, or one made from the host's reply ("Added 3 words.").
+      const message = typeof successMessage === "function" ? successMessage(response) : successMessage;
+      if (message) showNotice(message);
     } else {
       showNotice(response.error || t.failed, "negative");
     }
@@ -744,6 +746,20 @@ function Key({ label, keys }) {
 // Dictionary and learning: your words, and what TEKITO learned from you.
 function DictionaryPage({ japanese, postalCodes, japaneseWords, learning, settings, setSetting, dictionary, setModal, setConfirm, runAction }) {
   const t = useText();
+  // Words from another input method's exported dictionary, chosen or dropped.
+  const [dragging, setDragging] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const importJapanese = async (type, files) => {
+    setImporting(true);
+    await runAction(type, {}, (response) => response.text, files);
+    setImporting(false);
+  };
+  const dropJapanese = (event) => {
+    event.preventDefault();
+    setDragging(false);
+    const file = event.dataTransfer.files[0];
+    if (file && !importing) importJapanese("japaneseWords.import", [file]);
+  };
   const [query, setQuery] = useState("");
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -840,7 +856,9 @@ function DictionaryPage({ japanese, postalCodes, japaneseWords, learning, settin
       </Glass>
 
       {japanese && (
-        <Glass className="card">
+        <Glass className={`card ${dragging ? "is-dragging" : ""}`}
+          onDragOver={(event) => { event.preventDefault(); setDragging(true); }}
+          onDragLeave={() => setDragging(false)} onDrop={dropJapanese}>
           <div className="card-head">
             <div>
               <h2 className="card-title">{t.japaneseWords.title}</h2>
@@ -867,6 +885,9 @@ function DictionaryPage({ japanese, postalCodes, japaneseWords, learning, settin
             ))}
           </ul>
           {japaneseWords.length === 0 && <div className="empty">{t.japaneseWords.empty}</div>}
+          <div className="card-foot">
+            <Button variant="quiet" icon="import" disabled={importing} onClick={() => importJapanese("japaneseWords.browse")}>{t.japaneseWords.importOther}</Button>
+          </div>
         </Glass>
       )}
       {japanese && <PostalCodes postalCodes={postalCodes} runAction={runAction} />}

@@ -56,7 +56,7 @@ export function hostRequest(type, payload = {}, files = []) {
     // File dialogs (import/export) keep the host busy until the user closes
     // them; adding postal codes takes a few seconds.
     const opensDialog = ["dictionary.import", "dictionary.export", "excludedApps.browse",
-      "postalCodes.browse", "postalCodes.import"].includes(type);
+      "postalCodes.browse", "postalCodes.import", "japaneseWords.browse", "japaneseWords.import"].includes(type);
     const timeout = opensDialog ? 600000 : 4000;
     window.setTimeout(() => finish({ ok: false, error: "", state: null }), timeout);
   });

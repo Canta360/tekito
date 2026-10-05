@@ -149,6 +149,14 @@ export function installMockHost() {
       } else if (type === "postalCodes.remove") {
         state.postalCodes = { installed: false };
       }
+      if (type === "japaneseWords.import" || type === "japaneseWords.browse") {
+        state.japaneseWords = [...state.japaneseWords,
+          { reading: "やまだ", surface: "山田", kind: "surname", action: "first" },
+          { reading: "とうきょうえき", surface: "東京駅", kind: "place", action: "first" }];
+        const data = JSON.stringify({ requestId, ok: true, error: "", state, text: "2 語を追加しました。" });
+        window.setTimeout(() => listeners.forEach((listener) => listener({ data })), 60);
+        return;
+      }
       if (type === "license.get") {
         const data = JSON.stringify({ requestId, ok: true, error: "", state, text: "# TEKITO License Agreement\n\nVersion 0.1 (preview)\n\n## In short\n\n- You may install TEKITO on the computers you use.\n- What you type is yours.\n\n## 1. What you may do\n\nWe give you a personal license to use TEKITO." });
         window.setTimeout(() => listeners.forEach((listener) => listener({ data })), 60);

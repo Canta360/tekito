@@ -227,6 +227,7 @@ const en = {
   japaneseWords: {
     title: "Japanese words",
     description: "Add names and words the dictionary lacks.",
+    importOther: "Import from another IME",
     empty: "No words yet. Add a name or a word the dictionary does not have.",
     addTitle: "Add a Japanese word",
     editTitle: "Edit the Japanese word",
@@ -516,6 +517,7 @@ const ja = {
   japaneseWords: {
     title: "日本語の単語",
     description: "名前や、辞書にない言葉を登録できます。",
+    importOther: "ほかの IME から読み込む",
     empty: "まだ単語がありません。名前や、辞書にない言葉を追加できます。",
     addTitle: "日本語の単語を追加",
     editTitle: "日本語の単語を編集",
