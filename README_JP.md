@@ -135,7 +135,7 @@ TEKITO の処理はすべて PC の中で行います。入力した内容をど
 
 ## インストール
 
-[Releases](https://github.com/Canta360/tekito/releases/latest) から `TEKITO-0.4.0-full-installer.exe` をダウンロードして実行します。
+[Releases](https://github.com/Canta360/tekito/releases/latest) から `TEKITO-0.4.1-full-installer.exe` をダウンロードして実行します。
 
 - **日本語入力を追加する**（Windows が日本語表示ならオン）を選ぶと、日本語の辞書と言語データ（約 48 MB）を同じリリースからダウンロードし、インストーラーが持っているチェックサムと照合します。TEKITO は日本語のキーボード一覧に入ります。英語は Auto と Direct で打てるので、英語の一覧からは外れます（**オプション**で残すこともできます）。
 - 日本語を選ばない場合は、英語のキーボード一覧に Auto と Direct の TEKITO が入ります。あとからインストーラーを実行し直せば日本語を追加できます。

@@ -192,7 +192,7 @@ See [the privacy notice](PRIVACY.md).
 
 ## Install
 
-Download `TEKITO-0.4.0-full-installer.exe` from
+Download `TEKITO-0.4.1-full-installer.exe` from
 [Releases](https://github.com/Canta360/tekito/releases/latest) and run it.
 
 - **Add Japanese input** (on when Windows shows Japanese) downloads the
