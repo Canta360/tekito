@@ -94,6 +94,12 @@ TEKITO leaves alone words it recognizes, chat abbreviations like “brb”,
 anything you capitalize yourself, anything that looks like code, URLs and
 addresses, and fields marked as passwords, numbers or email.
 
+Space also writes English the usual way: “i” becomes “I”, “dont” and
+“youre” get their apostrophes, “ofthe” keeps both words, and days, months,
+languages and names like “iPhone” get their capitals. Where the word you
+typed is a word too, like “cant” or “march”, it stays, and the other way of
+writing it comes right after it in the list.
+
 A few things come up as choices too: “today” and “now” offer the date and
 time, “(c)” and “->” offer © and →, and “1+2=” offers 3. What you typed
 stays first, so nothing changes unless you pick one.

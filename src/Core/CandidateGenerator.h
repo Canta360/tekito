@@ -9,6 +9,7 @@
 #include "Core/TypoModel.h"
 
 #include <string_view>
+#include <unordered_set>
 #include <vector>
 
 namespace tekito {
@@ -52,6 +53,14 @@ private:
     // this input is only offered from then on.
     [[nodiscard]] std::uint32_t Offered(std::wstring_view lowerRaw, std::wstring_view candidate,
                                         std::uint32_t flags) const;
+    // How English is written whatever the spelling search found: "I",
+    // contractions typed without the apostrophe (dont), two words typed
+    // without the space (ofthe), names written with capitals (monday,
+    // iphone) and a second capital typed by mistake (THe).
+    void ApplyWritingRules(std::vector<Candidate>& output, std::unordered_set<std::wstring>& seen,
+                           std::wstring_view rawText, std::wstring_view lower, bool exact,
+                           const ConversionOptions& options) const;
+    [[nodiscard]] bool IsWord(std::wstring_view lower) const;
 
     const ILexiconProvider& lexiconProvider_;
     const ILexiconProvider* supplementaryProvider_{nullptr};

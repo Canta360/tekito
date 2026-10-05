@@ -15,6 +15,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
+#include <cstdlib>
 #include <iostream>
 #include <map>
 #include <numeric>
@@ -235,6 +236,16 @@ int main(int argc, char** argv) {
     fullWordLatencyUs.reserve(rows.size());
 
     std::size_t latencyRowsSampled = 0;
+    // TEKITO_EVAL_MISSES=<file>: each row not converted as expected, to
+    // compare two builds row by row.
+    std::wofstream misses;
+    if (const char* missesPath = std::getenv("TEKITO_EVAL_MISSES"); missesPath && *missesPath) {
+        misses.open(missesPath, std::ios::binary);
+    }
+    const auto noteMiss = [&](const Row& row, std::wstring_view got) {
+        if (!misses.is_open()) return;
+        misses << Wide(row.source) << L'\t' << row.rawToken << L'\t' << row.expectedToken << L'\t' << got << L'\n';
+    };
     const auto runStarted = Clock::now();
     for (std::size_t rowIndex = 0; rowIndex < rows.size(); ++rowIndex) {
         const auto& row = rows[rowIndex];
@@ -280,6 +291,7 @@ int main(int argc, char** argv) {
             } else {
                 const auto rank = std::distance(result.candidates.begin(), match);
                 if (rank == 0) bucket.top1 += 1;
+                else noteMiss(row, result.candidates.front().text);
                 if (rank < 9) bucket.top9 += 1;
                 else bucket.rankedLow += 1;
             }
@@ -287,7 +299,10 @@ int main(int argc, char** argv) {
             auto& bucket = safety[BucketKey(row)];
             bucket.total += 1;
             const auto selected = autoApply.SelectForBoundary(row.rawToken, result.candidates);
-            if (selected) bucket.falseCorrections += 1;
+            if (selected) {
+                bucket.falseCorrections += 1;
+                noteMiss(row, result.candidates[*selected].text);
+            }
         }
 
         if (latencyRowsSampled < latencySampleSize && !row.rawToken.empty()) {

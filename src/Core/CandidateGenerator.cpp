@@ -90,6 +90,97 @@ bool IsCapitalized(std::wstring_view value) {
            });
 }
 
+// A word typed with a second capital by mistake: "THe", "MOnday" (two
+// capitals, then only small letters).
+bool HasTwoInitialCapitals(std::wstring_view value) {
+    if (value.size() < 3 || !std::iswupper(value[0]) || !std::iswupper(value[1])) return false;
+    return std::all_of(value.begin() + 2, value.end(), [](wchar_t ch) { return std::iswlower(ch) != 0; });
+}
+
+struct CasingRule {
+    std::wstring_view lower;
+    std::wstring_view written;
+    bool automatic;
+};
+
+// Words always written with capitals: days, months, languages and
+// nationalities, holidays and a few product names. Those that are also
+// everyday small words (march, may, august, polish, china, turkey) are
+// only offered.
+constexpr CasingRule kCasingRules[] = {
+    {L"monday", L"Monday", true}, {L"tuesday", L"Tuesday", true}, {L"wednesday", L"Wednesday", true},
+    {L"thursday", L"Thursday", true}, {L"friday", L"Friday", true}, {L"saturday", L"Saturday", true},
+    {L"sunday", L"Sunday", true},
+    {L"january", L"January", true}, {L"february", L"February", true}, {L"march", L"March", false},
+    {L"april", L"April", true}, {L"may", L"May", false}, {L"june", L"June", true}, {L"july", L"July", true},
+    {L"august", L"August", false}, {L"september", L"September", true}, {L"october", L"October", true},
+    {L"november", L"November", true}, {L"december", L"December", true},
+    {L"english", L"English", true}, {L"japanese", L"Japanese", true}, {L"chinese", L"Chinese", true},
+    {L"korean", L"Korean", true}, {L"french", L"French", true}, {L"german", L"German", true},
+    {L"spanish", L"Spanish", true}, {L"italian", L"Italian", true}, {L"russian", L"Russian", true},
+    {L"portuguese", L"Portuguese", true}, {L"dutch", L"Dutch", true}, {L"arabic", L"Arabic", true},
+    {L"hindi", L"Hindi", true}, {L"thai", L"Thai", true}, {L"vietnamese", L"Vietnamese", true},
+    {L"indonesian", L"Indonesian", true}, {L"greek", L"Greek", true}, {L"swedish", L"Swedish", true},
+    {L"norwegian", L"Norwegian", true}, {L"danish", L"Danish", true}, {L"finnish", L"Finnish", true},
+    {L"turkish", L"Turkish", true}, {L"hebrew", L"Hebrew", true}, {L"latin", L"Latin", true},
+    {L"polish", L"Polish", false}, {L"american", L"American", true}, {L"british", L"British", true},
+    {L"european", L"European", true}, {L"asian", L"Asian", true}, {L"african", L"African", true},
+    {L"canadian", L"Canadian", true}, {L"australian", L"Australian", true}, {L"mexican", L"Mexican", true},
+    {L"brazilian", L"Brazilian", true}, {L"indian", L"Indian", true}, {L"irish", L"Irish", true},
+    {L"scottish", L"Scottish", true}, {L"welsh", L"Welsh", true},
+    {L"japan", L"Japan", true}, {L"china", L"China", false}, {L"turkey", L"Turkey", false},
+    {L"christmas", L"Christmas", true}, {L"easter", L"Easter", true}, {L"halloween", L"Halloween", true},
+    {L"iphone", L"iPhone", true}, {L"ipad", L"iPad", true}, {L"ipod", L"iPod", true}, {L"imac", L"iMac", true},
+    {L"macos", L"macOS", true}, {L"youtube", L"YouTube", true}, {L"github", L"GitHub", true},
+    {L"linkedin", L"LinkedIn", true}, {L"paypal", L"PayPal", true}, {L"ebay", L"eBay", true},
+    {L"javascript", L"JavaScript", true}, {L"typescript", L"TypeScript", true},
+    {L"powerpoint", L"PowerPoint", true}, {L"playstation", L"PlayStation", true},
+    {L"whatsapp", L"WhatsApp", true}, {L"tiktok", L"TikTok", true},
+    {L"mcdonalds", L"McDonald's", true}, {L"mcdonald's", L"McDonald's", true},
+};
+
+// The written form for a small-letter word, with a plural or possessive
+// ending kept (mondays, january's).
+std::optional<std::pair<std::wstring, bool>> WrittenForm(std::wstring_view lower) {
+    for (const auto& rule : kCasingRules) {
+        if (lower == rule.lower) return std::pair{std::wstring(rule.written), rule.automatic};
+    }
+    for (const std::wstring_view ending : {std::wstring_view(L"'s"), std::wstring_view(L"s")}) {
+        if (lower.size() <= ending.size() || !lower.ends_with(ending)) continue;
+        const auto base = lower.substr(0, lower.size() - ending.size());
+        for (const auto& rule : kCasingRules) {
+            if (base == rule.lower && !rule.written.ends_with(L"'s")) {
+                return std::pair{std::wstring(rule.written) + std::wstring(ending), rule.automatic};
+            }
+        }
+    }
+    return std::nullopt;
+}
+
+// `text` in the case `raw` was typed in; "I" stays a capital.
+std::wstring WithCaseOf(std::wstring_view raw, std::wstring text) {
+    const bool allUpper = std::any_of(raw.begin(), raw.end(), [](wchar_t ch) { return std::iswupper(ch) != 0; }) &&
+                          std::none_of(raw.begin(), raw.end(), [](wchar_t ch) { return std::iswlower(ch) != 0; });
+    if (allUpper && raw.size() > 1) {
+        for (auto& ch : text) ch = static_cast<wchar_t>(std::towupper(ch));
+    } else if (!raw.empty() && std::iswupper(raw.front()) && !text.empty()) {
+        text.front() = static_cast<wchar_t>(std::towupper(text.front()));
+    }
+    return text;
+}
+
+// Takes `text` out of `output`, keeping what is known about it (it is put
+// back elsewhere); a new candidate when it was not there.
+Candidate TakeOut(std::vector<Candidate>& output, const std::wstring& text) {
+    const auto found = std::find_if(output.begin(), output.end(),
+                                    [&](const Candidate& candidate) { return !candidate.isOriginal && candidate.text == text; });
+    if (found == output.end()) return Candidate{text, SemanticLabel::None, false, 0.0, false, CandidatePolicyNone,
+                                                CandidateSourceNone};
+    Candidate candidate = std::move(*found);
+    output.erase(found);
+    return candidate;
+}
+
 bool IsProtectedToken(std::wstring_view value) {
     bool hasUpper = false;
     bool hasLower = false;
@@ -325,7 +416,7 @@ std::vector<Candidate> CandidateGenerator::Generate(std::wstring_view rawText,
 
     if (rawText.empty()) return output;
 
-    if (IsProtectedToken(rawText)) {
+    if (IsProtectedToken(rawText) && !HasTwoInitialCapitals(rawText)) {
         AddOriginal(output, seen, rawText, SemanticLabel::ProperNoun, 100.0, true,
                     CandidatePolicyProtect | CandidatePolicySuggestOnly,
                     CandidateSourceProtectedPattern);
@@ -649,8 +740,177 @@ std::vector<Candidate> CandidateGenerator::Generate(std::wstring_view rawText,
     }
 
     if (!HasOriginal(output)) AddOriginal(output, seen, rawText);
+    ApplyWritingRules(output, seen, rawText, lower, exact && !exactHasWeakFrequency, options);
     FinalizeCandidates(output, rawText);
     return output;
+}
+
+bool CandidateGenerator::IsWord(std::wstring_view lower) const {
+    bool found = false;
+    lexiconProvider_.Find({LexiconQuery::Kind::Exact, lower}, [&](const auto& entry) {
+        found = found || entry.spellcheckWord;
+    });
+    return found;
+}
+
+void CandidateGenerator::ApplyWritingRules(std::vector<Candidate>& output, std::unordered_set<std::wstring>& seen,
+                                           std::wstring_view rawText, std::wstring_view lower, bool exact,
+                                           const ConversionOptions& options) const {
+    // A word the user keeps as typed, or a name or code they capitalized,
+    // stays as it is.
+    const auto original = std::find_if(output.begin(), output.end(),
+                                       [](const Candidate& candidate) { return candidate.isOriginal; });
+    if (original != output.end() && original->isProtected) return;
+    if (std::any_of(rawText.begin(), rawText.end(), [](wchar_t ch) { return std::iswdigit(ch) != 0; })) return;
+
+    struct Rule {
+        std::wstring text;
+        bool automatic;
+    };
+    std::optional<Rule> first;   // replaces the word on Space
+    std::vector<std::wstring> offered;  // right after the word as typed
+    const bool typedSmall = IsAllLower(rawText);
+
+    if (HasTwoInitialCapitals(rawText)) {
+        // "THe": one capital was meant, when the word is a common one.
+        const bool common = rawText.size() > 3 || frequencyProvider_.Score(lower) >= 5.0;
+        if (IsWord(lower) && common) {
+            std::wstring text = Lower(rawText);
+            text.front() = static_cast<wchar_t>(std::towupper(text.front()));
+            first = Rule{std::move(text), true};
+        }
+    } else if (rawText == L"i") {
+        first = Rule{L"I", true};
+    } else if (typedSmall) {
+        if (const auto written = WrittenForm(lower)) {
+            if (written->second) {
+                first = Rule{written->first, true};
+            } else {
+                offered.push_back(written->first);
+            }
+        }
+    }
+
+    // A contraction without its apostrophe (dont, youre, theyre).
+    if (!first && lower.find(L'\'') == std::wstring_view::npos && lower.size() >= 2) {
+        constexpr std::wstring_view kEndings[] = {L"n't", L"'re", L"'ve", L"'ll", L"'d", L"'s", L"'m"};
+        std::optional<std::wstring> contraction;
+        for (std::size_t at = 1; at < lower.size() && !contraction; ++at) {
+            std::wstring text = std::wstring(lower.substr(0, at)) + L"'" + std::wstring(lower.substr(at));
+            const bool shaped = text == L"y'all" || std::any_of(std::begin(kEndings), std::end(kEndings), [&](auto ending) {
+                return text.ends_with(ending) && text.size() - ending.size() + ending.find(L'\'') == at;
+            });
+            if (shaped && IsWord(text)) contraction = std::move(text);
+        }
+        if (contraction) {
+            if (contraction->starts_with(L"i'")) contraction->front() = L'I';
+            auto text = WithCaseOf(rawText, *contraction);
+            // Already put first by the word lists ("im" to "I'm"): kept so.
+            const bool listed = !output.empty() && !output.front().isOriginal && output.front().text == text &&
+                                (output.front().policyFlags & (CandidatePolicyCorrect | CandidatePolicyNormalize)) != 0;
+            // "'s" after a name or noun is a possessive the user may not mean
+            // (heros, churchs): only offered.
+            constexpr std::wstring_view kIsWords[] = {L"he's", L"she's", L"it's", L"that's", L"what's", L"where's",
+                                                      L"who's", L"there's", L"here's", L"how's", L"when's", L"why's",
+                                                      L"let's", L"everyone's", L"someone's", L"nobody's",
+                                                      L"everything's", L"something's", L"nothing's"};
+            const bool possessive = contraction->ends_with(L"'s") &&
+                                    std::find(std::begin(kIsWords), std::end(kIsWords), *contraction) == std::end(kIsWords);
+            if (listed || (!exact && !possessive)) {
+                first = Rule{std::move(text), true};
+            } else if (!exact) {
+                offered.push_back(std::move(text));
+            } else if (frequencyProvider_.Score(*contraction) >= frequencyProvider_.Score(lower) + 0.7) {
+                // A word of its own too (cant, wont): kept, and the
+                // contraction offered first.
+                offered.push_back(std::move(text));
+            }
+        }
+    }
+
+    // Two words typed without the space between them (ofthe, alot).
+    if (!first && !exact && typedSmall && lower.size() >= 4 &&
+        std::all_of(lower.begin(), lower.end(), [](wchar_t ch) { return std::iswalpha(ch) != 0; })) {
+        double best = 0.0;
+        std::wstring split;
+        // "a" run into the next word, where that is the usual phrase.
+        constexpr std::pair<std::wstring_view, std::wstring_view> kPhrases[] = {
+            {L"alot", L"a lot"}, {L"abit", L"a bit"}, {L"alittle", L"a little"}, {L"afew", L"a few"}};
+        for (const auto& [typed, phrase] : kPhrases) {
+            if (lower == typed) {
+                split = std::wstring(phrase);
+                best = 9.0;
+            }
+        }
+        for (std::size_t at = 1; at + 1 < lower.size(); ++at) {
+            const auto left = lower.substr(0, at);
+            const auto right = lower.substr(at);
+            if (at == 1) continue;
+            // Two-letter halves only among the everyday words (not "st", "co").
+            constexpr std::wstring_view kShortWords[] = {L"of", L"in", L"on", L"at", L"to", L"is", L"it", L"be", L"by",
+                                                         L"as", L"an", L"or", L"if", L"so", L"no", L"do", L"go", L"he",
+                                                         L"me", L"my", L"we", L"up", L"us", L"am"};
+            const auto everyday = [&](std::wstring_view half) {
+                return half.size() != 2 || std::find(std::begin(kShortWords), std::end(kShortWords), half) != std::end(kShortWords);
+            };
+            if (!everyday(left) || !everyday(right)) continue;
+            const double score = std::min<double>(frequencyProvider_.Score(left), frequencyProvider_.Score(right));
+            if (score > best && IsWord(left) && IsWord(right)) {
+                best = score;
+                split = (left == L"i" ? std::wstring(L"I") : std::wstring(left)) + L" " + std::wstring(right);
+            }
+        }
+        // Both halves common words; applied as below, otherwise offered.
+        constexpr double kCommonWord = 4.0;
+        if (!split.empty() && best >= kCommonWord) {
+            const auto correction = std::find_if(output.begin(), output.end(), [](const Candidate& candidate) {
+                return !candidate.isOriginal && (candidate.policyFlags & CandidatePolicyCorrect) != 0;
+            });
+            // A closest word that is one of the halves would drop the other.
+            const auto closestText = correction == output.end() ? std::wstring() : Lower(correction->text);
+            const bool dropsWord = !closestText.empty() && (split.ends_with(L" " + closestText) ||
+                                                            split.starts_with(closestText + L" "));
+            // Otherwise the closest word is as likely meant (powerfull is
+            // powerful, not "power full"), or the word is a compound the
+            // lexicon lacks (offseason, wellbeing): the split is only offered.
+            if (dropsWord || best >= 9.0) {
+                first = Rule{std::move(split), true};
+            } else {
+                offered.push_back(std::move(split));
+            }
+        }
+    }
+
+    if (!first && offered.empty()) return;
+    const auto automatic = [&](const std::wstring& text) {
+        return options.correctionEnabled ? Offered(lower, Lower(text), CandidatePolicyNormalize)
+                                         : CandidatePolicySuggestOnly;
+    };
+    auto originalAt = [&] {
+        return std::find_if(output.begin(), output.end(), [](const Candidate& candidate) { return candidate.isOriginal; });
+    };
+    for (auto it = offered.rbegin(); it != offered.rend(); ++it) {
+        auto candidate = TakeOut(output, *it);
+        seen.insert(*it);
+        candidate.policyFlags = CandidatePolicySuggestOnly;
+        const auto at = originalAt();
+        output.insert(at == output.end() ? output.begin() : at + 1, std::move(candidate));
+    }
+    if (first) {
+        auto candidate = TakeOut(output, first->text);
+        seen.insert(first->text);
+        // Only this one is applied: the rest are offered.
+        for (auto& other : output) {
+            if (!other.isOriginal && (other.policyFlags & (CandidatePolicyCorrect | CandidatePolicyNormalize)) != 0) {
+                other.policyFlags = (other.policyFlags & ~(CandidatePolicyCorrect | CandidatePolicyNormalize)) |
+                                        CandidatePolicySuggestOnly;
+            }
+        }
+        candidate.policyFlags = automatic(first->text);
+        candidate.sourceFlags |= CandidateSourceSingleEdit;
+        if (candidate.label == SemanticLabel::ProperNoun) candidate.label = SemanticLabel::None;
+        output.insert(output.begin(), std::move(candidate));
+    }
 }
 
 }  // namespace tekito

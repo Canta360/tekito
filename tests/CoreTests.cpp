@@ -1142,6 +1142,48 @@ void TestTargetTextCandidateDiagnostics() {
     }
 }
 
+// How English is written, whatever the spelling search finds: "I",
+// contractions without the apostrophe, two words run together, names
+// written with capitals, a second capital by mistake.
+void TestEnglishWritingRules() {
+    const auto engine = tekito::CreateDefaultConversionEngine();
+    const tekito::SpaceBoundaryPolicy space;
+    const auto spaceGives = [&](std::wstring_view raw, std::wstring_view context = L"so ") {
+        tekito::ConversionRequest request;
+        request.rawText = std::wstring(raw);
+        request.context.precedingText = std::wstring(context);
+        const auto candidates = engine->Convert(request).candidates;
+        const auto selected = space.SelectCorrection(raw, candidates);
+        return selected ? candidates[*selected].text : std::wstring(raw);
+    };
+    const auto offers = [&](std::wstring_view raw, std::wstring_view text) {
+        tekito::ConversionRequest request;
+        request.rawText = std::wstring(raw);
+        request.context.precedingText = L"so ";
+        const auto candidates = engine->Convert(request).candidates;
+        return candidates.size() > 1 && candidates[1].text == text;
+    };
+    Require(spaceGives(L"i") == L"I", "i is written I");
+    Require(spaceGives(L"dont") == L"don't", "dont gets its apostrophe");
+    Require(spaceGives(L"youre") == L"you're", "youre is you're, not your");
+    Require(spaceGives(L"theyre") == L"they're", "theyre is they're, not there");
+    Require(spaceGives(L"thats") == L"that's", "thats is that's");
+    Require(spaceGives(L"im") == L"I'm", "im is I'm");
+    Require(spaceGives(L"cant") == L"cant" && offers(L"cant", L"can't"),
+            "cant is a word too: kept, with can't offered first");
+    Require(spaceGives(L"heros") != L"hero's", "a plural typo is not made a possessive");
+    Require(spaceGives(L"ofthe") == L"of the", "ofthe keeps both words");
+    Require(spaceGives(L"alot") == L"a lot", "alot is a lot");
+    Require(spaceGives(L"powerfull") != L"power full", "a typo is not split into two words");
+    Require(spaceGives(L"monday") == L"Monday", "days are written with a capital");
+    Require(spaceGives(L"japanese") == L"Japanese", "languages are written with a capital");
+    Require(spaceGives(L"iphone") == L"iPhone", "a product name keeps its capitals");
+    Require(spaceGives(L"march") == L"march" && offers(L"march", L"March"),
+            "march is a word too: kept, with March offered");
+    Require(spaceGives(L"THe") == L"The", "a second capital by mistake is taken back");
+    Require(spaceGives(L"NASA") == L"NASA", "an acronym stays as typed");
+}
+
 class TestDictionaryProvider final : public tekito::dictionary::IDictionaryProvider {
 public:
     [[nodiscard]] std::optional<tekito::dictionary::DictionaryEntry> Find(
@@ -2244,6 +2286,7 @@ int main() {
     TestDataPackValidation();
     TestPostalCodeImport();
     TestImeDictionaryImport();
+    TestEnglishWritingRules();
     TestRankingDataBoundaries();
     TestCompositeLexiconProvider();
     TestPolicyEngineBoundary();
