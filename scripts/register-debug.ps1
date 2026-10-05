@@ -34,6 +34,15 @@ if (-not (Test-Path -LiteralPath $appPath)) {
 
 & (Join-Path $PSScriptRoot "unregister-debug.ps1") -DllPath $resolvedDll
 
+# As install.ps1 does: apps in an app container (the Start menu's search,
+# Settings, Store apps) load the input method and read its Data Packs.
+foreach ($folder in @((Split-Path $resolvedDll -Parent), (Join-Path $env:LOCALAPPDATA "TEKITO\data"))) {
+    if (-not (Test-Path -LiteralPath $folder)) { continue }
+    foreach ($sid in @("*S-1-15-2-1", "*S-1-15-2-2")) {
+        & icacls.exe $folder /grant "${sid}:(OI)(CI)(RX)" /Q | Out-Null
+    }
+}
+
 Write-Host "Registering $resolvedDll"
 $regsvr32 = Join-Path $env:WINDIR "System32\regsvr32.exe"
 $process = Start-Process -FilePath $regsvr32 -ArgumentList @('/s', $resolvedDll) -WindowStyle Hidden -Wait -PassThru

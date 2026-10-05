@@ -41,6 +41,17 @@ function Invoke-Regsvr32([string[]]$Arguments) {
 # Apps that take text input keep the input method DLL loaded, so it cannot
 # be deleted while they run. It can be renamed, though: move such files out
 # of the way and let the next install or uninstall remove them.
+function Grant-AppContainerRead([string]$Folder) {
+    # Store apps, Settings and the Start menu's search run in an app
+    # container; the input method loads in them and needs to read the
+    # program and its Data Packs (never user.db, which they cannot open).
+    if (-not (Test-Path -LiteralPath $Folder)) { return }
+    foreach ($sid in @("*S-1-15-2-1", "*S-1-15-2-2")) {
+        & icacls.exe $Folder /grant "${sid}:(OI)(CI)(RX)" /Q | Out-Null
+        if ($LASTEXITCODE -ne 0) { Write-Warning "Could not let apps read $Folder (icacls returned $LASTEXITCODE)." }
+    }
+}
+
 function Remove-InstalledFiles([string]$Root) {
     if (-not (Test-Path -LiteralPath $Root)) { return }
     foreach ($file in @(Get-ChildItem -LiteralPath $Root -File -Recurse -Force)) {
@@ -195,6 +206,8 @@ try {
     Remove-InstalledFiles $installRoot
     New-Item -ItemType Directory -Path $installRoot -Force | Out-Null
     Copy-Item -Path (Join-Path $stagingRoot "*") -Destination $installRoot -Recurse -Force
+    Grant-AppContainerRead $installRoot
+    Grant-AppContainerRead (Join-Path $env:LOCALAPPDATA "TEKITO\data")
 
     if (-not $SkipRegistration) {
         $code = Invoke-Regsvr32 @('/s', $installedDll)

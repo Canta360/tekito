@@ -78,6 +78,10 @@ std::vector<Profile> Profiles() {
 const GUID* const kCategories[] = {
     &GUID_TFCAT_TIP_KEYBOARD,
     &GUID_TFCAT_TIPCAP_SYSTRAYSUPPORT,
+    // Windows offers TEKITO in the Start menu's search, Settings and Store
+    // apps too (they run in an app container: the installer lets them read
+    // the program and its Data Packs).
+    &GUID_TFCAT_TIPCAP_IMMERSIVESUPPORT,
     &GUID_TFCAT_DISPLAYATTRIBUTEPROVIDER,
     // Windows shows the Japanese profile's mode from the conversion-mode
     // compartment.
