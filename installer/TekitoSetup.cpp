@@ -488,6 +488,10 @@ std::wstring FailureMessage(int code) {
 }
 
 void StartInstall(Wizard& wizard) {
+    // The installing screen has no buttons: what the mouse was over is gone.
+    wizard.hover = -1;
+    wizard.focus = 0;
+    wizard.pressed = false;
 #ifdef TEKITO_SETUP_PREVIEW
     wizard.screen = Screen::Installing;  // the preview never installs
     SetTimer(wizard.window, kAnimationTimer, 16, nullptr);
@@ -1095,6 +1099,13 @@ void Paint(Wizard& wizard) {
 // ---------------------------------------------------------------------------
 // Interaction.
 
+// Whether `index` is an enabled control of the screen shown (an index kept
+// from another screen is not).
+bool OnEnabledControl(const Wizard& wizard, int index) {
+    const auto controls = Controls(wizard);
+    return index >= 0 && index < static_cast<int>(controls.size()) && controls[static_cast<std::size_t>(index)].enabled;
+}
+
 void Go(Wizard& wizard, Screen screen) {
     wizard.screen = screen;
     wizard.hover = -1;
@@ -1234,7 +1245,7 @@ LRESULT CALLBACK WizardProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
         const int hover = HitTest(*wizard, ToDips(*wizard, lParam));
         if (hover != wizard->hover) {
             wizard->hover = hover;
-            SetCursor(LoadCursorW(nullptr, hover >= 0 && Controls(*wizard)[hover].enabled ? IDC_HAND : IDC_ARROW));
+            SetCursor(LoadCursorW(nullptr, OnEnabledControl(*wizard, hover) ? IDC_HAND : IDC_ARROW));
             InvalidateRect(window, nullptr, FALSE);
         }
         TRACKMOUSEEVENT track{sizeof(track), TME_LEAVE, window, 0};
@@ -1243,8 +1254,7 @@ LRESULT CALLBACK WizardProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
     }
     case WM_SETCURSOR:
         if (LOWORD(lParam) == HTCLIENT) {
-            const bool onControl = wizard->hover >= 0 && Controls(*wizard)[wizard->hover].enabled;
-            SetCursor(LoadCursorW(nullptr, onControl ? IDC_HAND : IDC_ARROW));
+            SetCursor(LoadCursorW(nullptr, OnEnabledControl(*wizard, wizard->hover) ? IDC_HAND : IDC_ARROW));
             return TRUE;
         }
         break;
