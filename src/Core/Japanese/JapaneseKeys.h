@@ -65,8 +65,8 @@ struct KeyCommand {
         Convert,            // Space, Henkan: convert, then the next candidate
         CycleKana,          // Muhenkan
         Transliterate,      // F6-F10, to `form`
-        NextCandidate,
-        PreviousCandidate,
+        NextCandidate,      // `delta` candidates on (one when 0)
+        PreviousCandidate,  // `delta` candidates back (one when 0)
         MoveFocus,          // to the phrase `delta` away
         Resize,             // the focused phrase by `delta`
         SelectCandidate,    // `index` in the focused phrase's list

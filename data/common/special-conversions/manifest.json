@@ -2,16 +2,16 @@
   "pack_id": "special-conversions",
   "display_name": "Special Conversions",
   "schema_version": 1,
-  "version": "2026.09",
+  "version": "2026.10",
   "language": "en-US+ja-JP",
   "type": "special-conversions",
   "format": "rules-tsv-v1",
   "file": "rules.tsv",
-  "entry_count": 10643,
+  "entry_count": 19554,
   "sha256": {
-    "file": "0B7DCC44E9EFA4FAC64E236C17585948D98DF06F9924D2050756E5020120AA7D"
+    "file": "686BF508C5EC15ADAA32BAFB5D1B21986141903BF5D6D341D214F65FB33B0860"
   },
   "license": "TEKITO-OWNED + BSD-3-Clause (Mozc)",
-  "source": "scripts/build-special-conversions.py; Japanese symbols, emoticons and single kanji from https://github.com/google/mozc/tree/b9c3fcbd6d76b19649ef572324fa9da2559bc18e/src/data",
+  "source": "scripts/build-special-conversions.py; Japanese symbols, emoji, emoticons and single kanji from https://github.com/google/mozc/tree/b9c3fcbd6d76b19649ef572324fa9da2559bc18e/src/data",
   "notice_file": "NOTICE"
 }

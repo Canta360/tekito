@@ -69,7 +69,7 @@ Testbed* g_bed = nullptr;
 // One character laid out on the page, and how it is underlined.
 enum class Style { Committed, Input, Converted, Focused };
 struct Cell {
-    wchar_t ch;
+    std::wstring text;  // one character as drawn (an emoji may take several units)
     Style style;
     RECT rect;
 };
@@ -137,7 +137,27 @@ std::vector<Cell> Layout(const Testbed& bed, HDC dc, int top, int width, std::si
         const Style style = !segment.converted ? Style::Input : segment.focused ? Style::Focused : Style::Converted;
         for (const wchar_t ch : segment.text) chars.push_back({ch, style});
     }
-    caretCell = bed.composer.IsComposing() ? compositionStart + bed.composer.CaretOffset() : chars.size();
+    const std::size_t caretUnit = bed.composer.IsComposing() ? compositionStart + bed.composer.CaretOffset() : chars.size();
+    // Units drawn together: surrogate pairs, variation selectors, joined
+    // emoji and skin tones.
+    const auto joins = [&](std::size_t i) {
+        const wchar_t c = chars[i].first;
+        const wchar_t before = chars[i - 1].first;
+        if (c >= 0xDC00 && c <= 0xDFFF) return true;
+        if (c == 0xFE0E || c == 0xFE0F || c == 0x200D || c == 0x20E3) return true;
+        if (before == 0x200D) return true;
+        return c == 0xD83C && i + 1 < chars.size() && chars[i + 1].first >= 0xDFFB && chars[i + 1].first <= 0xDFFF;
+    };
+    std::vector<std::pair<std::wstring, Style>> clusters;
+    caretCell = 0;
+    for (std::size_t i = 0; i < chars.size(); ++i) {
+        if (i > 0 && !clusters.empty() && joins(i)) {
+            clusters.back().first += chars[i].first;
+            continue;
+        }
+        if (i < caretUnit) caretCell = clusters.size() + 1;
+        clusters.push_back({std::wstring(1, chars[i].first), chars[i].second});
+    }
 
     TEXTMETRICW metrics{};
     GetTextMetricsW(dc, &metrics);
@@ -145,24 +165,24 @@ std::vector<Cell> Layout(const Testbed& bed, HDC dc, int top, int width, std::si
     std::vector<Cell> cells;
     int x = kMargin;
     int y = top;
-    for (const auto& [ch, style] : chars) {
-        if (ch == L'\n') {
-            cells.push_back({ch, style, {x, y, x, y + metrics.tmHeight}});
+    for (const auto& [text, style] : clusters) {
+        if (text == L"\n") {
+            cells.push_back({text, style, {x, y, x, y + metrics.tmHeight}});
             x = kMargin;
             y += lineHeight;
             continue;
         }
         SIZE size{};
-        GetTextExtentPoint32W(dc, &ch, 1, &size);
+        GetTextExtentPoint32W(dc, text.c_str(), static_cast<int>(text.size()), &size);
         if (x + size.cx > width - kMargin && x > kMargin) {
             x = kMargin;
             y += lineHeight;
         }
-        cells.push_back({ch, style, {x, y, x + size.cx, y + metrics.tmHeight}});
+        cells.push_back({text, style, {x, y, x + size.cx, y + metrics.tmHeight}});
         x += size.cx;
     }
     // Where the caret goes after the last character.
-    cells.push_back({0, Style::Committed, {x, y, x, y + metrics.tmHeight}});
+    cells.push_back({{}, Style::Committed, {x, y, x, y + metrics.tmHeight}});
     return cells;
 }
 
@@ -194,8 +214,8 @@ void Paint(Testbed& bed, HDC target) {
     RECT focus{};
     for (std::size_t i = 0; i + 1 < cells.size(); ++i) {
         const auto& cell = cells[i];
-        if (cell.ch == L'\n') continue;
-        TextOutW(dc, cell.rect.left, cell.rect.top, &cell.ch, 1);
+        if (cell.text == L"\n") continue;
+        TextOutW(dc, cell.rect.left, cell.rect.top, cell.text.c_str(), static_cast<int>(cell.text.size()));
         if (cell.style == Style::Committed) continue;
         HPEN pen = cell.style == Style::Focused ? thick : cell.style == Style::Converted ? thin : dotted;
         HGDIOBJ oldPen = SelectObject(dc, pen);

@@ -77,6 +77,12 @@ std::optional<KeyCommand> TranslateKey(const JapaneseComposer& composer, const K
             return Make(Action::NextCandidate);
         case Key::Up:
             return Make(Action::PreviousCandidate);
+        case Key::PageDown:
+        case Key::PageUp:
+            // With the list open, a page at a time.
+            if (!composer.IsCandidateListOpen()) break;
+            return WithDelta(key.key == Key::PageDown ? Action::NextCandidate : Action::PreviousCandidate,
+                             static_cast<int>(std::max<std::size_t>(options.pageSize, 1)));
         case Key::Left:
         case Key::Right:
             return WithDelta(key.shift ? Action::Resize : Action::MoveFocus, key.key == Key::Left ? -1 : 1);
@@ -205,10 +211,10 @@ KeyOutcome ApplyKey(JapaneseComposer& composer, const KeyCommand& command) {
         composer.Transliterate(command.form);
         break;
     case Action::NextCandidate:
-        composer.NextCandidate();
+        for (int i = 0; i < std::max(command.delta, 1); ++i) composer.NextCandidate();
         break;
     case Action::PreviousCandidate:
-        composer.PreviousCandidate();
+        for (int i = 0; i < std::max(command.delta, 1); ++i) composer.PreviousCandidate();
         break;
     case Action::MoveFocus:
         composer.MoveFocus(command.delta);
