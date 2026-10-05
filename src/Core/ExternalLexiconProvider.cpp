@@ -13,6 +13,15 @@
 #include <string_view>
 #include <utility>
 
+#if defined(_WIN32)
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#include <userenv.h>
+#pragma comment(lib, "userenv.lib")
+#endif
+
 namespace tekito {
 namespace {
 
@@ -111,10 +120,35 @@ std::filesystem::path WindowsEnvironmentPath(const wchar_t* name) {
     return {};
 }
 
+#if defined(_WIN32)
+// In an app container (the Start menu's search, Store apps) LOCALAPPDATA
+// is the app's own folder: the user's is found from the profile instead.
+std::filesystem::path AppContainerLocalAppData() {
+    HANDLE token = nullptr;
+    if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token)) return {};
+    std::filesystem::path result;
+    DWORD inContainer = 0;
+    DWORD size = 0;
+    if (GetTokenInformation(token, TokenIsAppContainer, &inContainer, sizeof(inContainer), &size) && inContainer) {
+        wchar_t profile[MAX_PATH]{};
+        DWORD length = MAX_PATH;
+        if (GetUserProfileDirectoryW(token, profile, &length)) {
+            result = std::filesystem::path(profile) / L"AppData" / L"Local";
+        }
+    }
+    CloseHandle(token);
+    return result;
+}
+#endif
+
 std::filesystem::path ResolveDataPackRoot() {
 #if defined(_WIN32)
     const auto configured = WindowsEnvironmentPath(L"TEKITO_DATA_PACK_DIR");
     if (!configured.empty()) return AbsoluteFrom(configured, {});
+    static const auto user = AppContainerLocalAppData();
+    if (!user.empty()) {
+        return AbsoluteFrom(user / L"TEKITO" / L"data", {});
+    }
     const auto localAppData = WindowsEnvironmentPath(L"LOCALAPPDATA");
     if (localAppData.empty()) return {};
     return AbsoluteFrom(localAppData / L"TEKITO" / L"data", {});
