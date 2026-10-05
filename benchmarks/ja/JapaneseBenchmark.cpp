@@ -194,6 +194,25 @@ int wmain(int argc, wchar_t** argv) {
         const std::string name = "convert_" + std::to_string(target) + "_chars";
         Print(name.c_str(), Summarize(samples));
     }
+    // Reconversion: the reading of each expected text, and whether it is
+    // the input's.
+    std::vector<double> readings;
+    std::size_t readingTotal = 0, readingHit = 0;
+    for (const auto& row : rows) {
+        if (row.command != "Conversion Expected" || readingTotal >= 200) continue;
+        ++readingTotal;
+        const auto start = Clock::now();
+        const auto guess = converter.ReadingOf(row.argument);
+        readings.push_back(Microseconds(Clock::now() - start));
+        if (guess && guess->reading == row.input) {
+            ++readingHit;
+        } else if (showMisses) {
+            std::cout << "reading " << Narrow(row.argument) << " -> " << (guess ? Narrow(guess->reading) : "?")
+                      << " (want " << Narrow(row.input) << ")\n";
+        }
+    }
+    std::cout << "reading_exact " << readingHit << "/" << readingTotal << "\n";
+    Print("reading_of", Summarize(readings));
     std::cout << "working_set_kib base=" << baseKiB << " after=" << WorkingSetKiB() << "\n";
     return 0;
 }

@@ -399,6 +399,7 @@ HRESULT TextService::HandleJapaneseKey(ITfContext* context, TfEditCookie editCoo
         return S_FALSE;
     }
     if (command.action == Action::UndoCommit) return UndoJapaneseCommit(context, editCookie);
+    if (command.action == Action::Reconvert) return ReconvertJapanese(context, editCookie);
     if (command.action == Action::Commit) {
         const HRESULT hr = CommitJapanese(context, editCookie);
         // An English word left from before a switch ends as typed.

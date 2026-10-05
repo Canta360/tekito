@@ -276,6 +276,14 @@ void Refresh(Testbed& bed) {
 }
 
 void Apply(Testbed& bed, const ja::KeyCommand& command) {
+    if (command.action == ja::KeyCommand::Action::Reconvert) {
+        // No selection here: Henkan takes back the text just committed.
+        const auto* last = bed.composer.LastCommit();
+        if (!last || !bed.text.ends_with(*last)) return;
+        const std::wstring text = *last;
+        if (bed.composer.Reconvert(text)) bed.text.erase(bed.text.size() - text.size());
+        return;
+    }
     const auto outcome = ja::ApplyKey(bed.composer, command);
     if (outcome.uncommitted && bed.text.ends_with(*outcome.uncommitted)) {
         bed.text.erase(bed.text.size() - outcome.uncommitted->size());

@@ -188,6 +188,8 @@ private:
     void CheckJapaneseContext(ITfContext* context, TfEditCookie editCookie);
     // Ctrl+Backspace right after a Japanese commit: the text back in the composition.
     HRESULT UndoJapaneseCommit(ITfContext* context, TfEditCookie editCookie);
+    // Henkan with nothing typed: the selection (or the text just committed) converted again.
+    HRESULT ReconvertJapanese(ITfContext* context, TfEditCookie editCookie);
     // What the candidate means, for the pane beside the list; empty when
     // meanings are off or unknown.
     CandidateDetail MeaningFor(std::wstring_view text, std::wstring_view reading = {}) const;

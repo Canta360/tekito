@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <map>
 #include <optional>
 
 namespace tekito::japanese {
@@ -620,22 +621,21 @@ std::vector<Prediction> JapaneseConverter::Predict(std::wstring_view reading, st
 std::optional<ReadingGuess> JapaneseConverter::ReadingOf(std::wstring_view text) const {
     const std::size_t n = text.size();
     if (n == 0 || n > 256) return std::nullopt;
-    struct Edge {
+    struct Word {
         std::size_t length;
         std::wstring reading;
+        std::uint16_t left;
+        std::uint16_t right;
         std::int64_t cost;
     };
-    std::vector<std::vector<Edge>> edges(n);
-    // A longer word beats several short ones; kana read as themselves.
-    constexpr std::int64_t kPerWord = 2000;
-    constexpr std::int64_t kKana = 3000;
-    constexpr std::int64_t kOther = 20000;
+    std::vector<std::vector<Word>> words(n);
     std::vector<bool> present(0x10000, false);
     bool written = false;
     for (const wchar_t c : text) {
         present[static_cast<std::uint16_t>(c)] = true;
         written = written || !IsKanaChar(c);
     }
+    // Words written with kanji: one pass over the dictionary.
     if (written) {
         for (std::uint32_t record = 0; record < dictionary_.KeyCount(); ++record) {
             std::wstring reading;
@@ -652,43 +652,80 @@ std::optional<ReadingGuess> JapaneseConverter::ReadingOf(std::wstring_view text)
                     if (i < length) continue;
                     if (reading.empty()) reading = dictionary_.KeyText(record);
                     if (reading.empty()) return false;
-                    edges[at].push_back({length, reading, word.cost + kPerWord});
+                    words[at].push_back({length, reading, word.left, word.right, word.cost});
                 }
                 return true;
             });
         }
     }
-    for (std::size_t i = 0; i < n; ++i) {
-        const wchar_t c = text[i];
-        if (IsKanaChar(c)) {
-            edges[i].push_back({1, ToHiragana(std::wstring(1, c)), kKana});
-        } else if (!IsIdeograph(c)) {
-            edges[i].push_back({1, std::wstring(1, c), kOther});
-        }
+    // Words written in kana: looked up by their reading.
+    const std::wstring hiragana = ToHiragana(text);
+    const ReadingCodes codes = dictionary_.Encode(hiragana);
+    for (std::size_t at = 0; at < n; ++at) {
+        if (!IsKanaChar(text[at])) continue;
+        dictionary_.CommonPrefixSearch(ReadingCodesView(codes).substr(at), [&](std::size_t length, std::uint32_t record) {
+            if (at + length > n) return;
+            const std::wstring_view written(text.data() + at, length);
+            const std::wstring reading = hiragana.substr(at, length);
+            dictionary_.ForEachWord(record, [&](const DictionaryWord& word) {
+                if (word.spellingCorrection || word.surface == DictionaryWord::Surface::Pool) return;
+                if (dictionary_.Surface(word, reading) != written) return;
+                words[at].push_back({length, reading, word.left, word.right, word.cost});
+            });
+        });
     }
-    constexpr std::int64_t kNone = std::numeric_limits<std::int64_t>::max();
-    std::vector<std::int64_t> best(n + 1, kNone);
-    std::vector<std::pair<std::size_t, std::size_t>> from(n + 1, {0, 0});  // (start, edge)
-    best[0] = 0;
-    for (std::size_t i = 0; i < n; ++i) {
-        if (best[i] == kNone) continue;
-        for (std::size_t e = 0; e < edges[i].size(); ++e) {
-            const auto& edge = edges[i][e];
-            const std::int64_t cost = best[i] + edge.cost;
-            if (cost < best[i + edge.length]) {
-                best[i + edge.length] = cost;
-                from[i + edge.length] = {i, e};
+    // Anything else reads as itself, at a price.
+    constexpr std::int64_t kUnknownKana = 6000;
+    constexpr std::int64_t kUnknownOther = 12000;
+    for (std::size_t at = 0; at < n; ++at) {
+        const wchar_t c = text[at];
+        if (IsIdeograph(c)) continue;
+        words[at].push_back({1, IsKanaChar(c) ? ToHiragana(std::wstring(1, c)) : std::wstring(1, c),
+                             dictionary_.UnknownId(), dictionary_.UnknownId(),
+                             IsKanaChar(c) ? kUnknownKana : kUnknownOther});
+    }
+    // The cheapest path, with the words' connection costs.
+    struct State {
+        std::int64_t cost;
+        std::size_t from;     // position the word starts at
+        std::uint16_t prior;  // right id before it
+        std::size_t word;     // index in words[from]
+    };
+    std::vector<std::map<std::uint16_t, State>> best(n + 1);
+    best[0][0] = {0, 0, 0, 0};
+    for (std::size_t at = 0; at < n; ++at) {
+        for (const auto& [right, state] : best[at]) {
+            for (std::size_t w = 0; w < words[at].size(); ++w) {
+                const auto& word = words[at][w];
+                const std::int64_t cost = state.cost + matrix_.Cost(right, word.left) + word.cost;
+                auto& slot = best[at + word.length];
+                const auto found = slot.find(word.right);
+                if (found == slot.end() || cost < found->second.cost) slot[word.right] = {cost, at, right, w};
             }
         }
     }
-    if (best[n] == kNone) return std::nullopt;
-    ReadingGuess guess;
-    std::vector<const Edge*> path;
-    for (std::size_t at = n; at > 0; at = from[at].first) path.push_back(&edges[from[at].first][from[at].second]);
+    if (best[n].empty()) return std::nullopt;
+    std::uint16_t right = 0;
+    std::int64_t total = std::numeric_limits<std::int64_t>::max();
+    for (const auto& [id, state] : best[n]) {
+        const std::int64_t cost = state.cost + matrix_.Cost(id, 0);
+        if (cost < total) {
+            total = cost;
+            right = id;
+        }
+    }
+    std::vector<const Word*> path;
+    for (std::size_t at = n; at > 0;) {
+        const State& state = best[at].at(right);
+        path.push_back(&words[state.from][state.word]);
+        right = state.prior;
+        at = state.from;
+    }
     std::reverse(path.begin(), path.end());
-    for (const auto* edge : path) {
-        guess.reading += edge->reading;
-        guess.pieces.emplace_back(edge->length, edge->reading.size());
+    ReadingGuess guess;
+    for (const auto* word : path) {
+        guess.reading += word->reading;
+        guess.pieces.emplace_back(word->length, word->reading.size());
     }
     return guess;
 }

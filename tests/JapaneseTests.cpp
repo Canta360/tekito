@@ -679,6 +679,11 @@ void TestReconvert(const RomajiTable& table, const MiniPack& pack) {
     composer.Clear();
     Require(composer.Reconvert(L"なかの") && composer.IsConverted(), "kana reconvert too");
     composer.Clear();
+    tekito::japanese::KeyPress henkan;
+    henkan.key = tekito::japanese::KeyPress::Key::Convert;
+    const auto command = tekito::japanese::TranslateKey(composer, henkan, {});
+    Require(command && command->action == tekito::japanese::KeyCommand::Action::Reconvert,
+            "Henkan with nothing typed asks for reconversion");
 }
 
 std::vector<tekito::japanese::PhraseCandidate> Candidates(std::initializer_list<const wchar_t*> texts) {

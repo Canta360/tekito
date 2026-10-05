@@ -2158,6 +2158,39 @@ void TextService::CheckJapaneseContext(ITfContext* context, TfEditCookie editCoo
     }
 }
 
+HRESULT TextService::ReconvertJapanese(ITfContext* context, TfEditCookie editCookie) {
+    TF_SELECTION selection{};
+    ULONG fetched = 0;
+    if (FAILED(context->GetSelection(editCookie, TF_DEFAULT_SELECTION, 1, &selection, &fetched)) || fetched != 1 ||
+        !selection.range) {
+        return S_OK;
+    }
+    ComPtr<ITfRange> range;
+    range.Attach(selection.range);
+    std::wstring text = ReadRangeText(range.Get(), editCookie);
+    // Nothing selected: the text just committed, while the caret is after it.
+    const bool committed = text.empty();
+    if (committed) {
+        if (lastJapaneseCommit_.empty() || !ReadSelectionContext(context, editCookie).ends_with(lastJapaneseCommit_)) {
+            return S_OK;
+        }
+        text = lastJapaneseCommit_;
+    }
+    // A short piece of one line only (a longer selection may not be read whole).
+    constexpr std::size_t kLongest = 64;
+    if (text.size() > kLongest || text.find_first_of(L"\r\n\t") != std::wstring::npos) return S_OK;
+    if (!japanese_.Reconvert(text)) return S_OK;
+    japanese_.ForgetCommit();
+    lastJapaneseCommit_.clear();
+    const HRESULT hr = committed ? StartCompositionBefore(context, editCookie, text.size())
+                                 : EnsureComposition(context, editCookie);
+    if (FAILED(hr)) {
+        japanese_.Clear();
+        return hr;
+    }
+    return ShowJapanesePreedit(context, editCookie);
+}
+
 HRESULT TextService::UndoJapaneseCommit(ITfContext* context, TfEditCookie editCookie) {
     // Only while the caret is still right after the text.
     const auto* last = japanese_.LastCommit();

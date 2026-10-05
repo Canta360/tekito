@@ -80,6 +80,7 @@ struct KeyCommand {
         InsertOutside,      // types `character` with no composition (a full-width space)
         UndoCommit,         // Ctrl+Backspace right after committing: the text comes back
         ForgetChosen,       // Ctrl+Delete: the chosen prediction or candidate is unlearned
+        Reconvert,          // Henkan with nothing typed: the selected text, converted again
     };
     Action action{Action::Commit};
     wchar_t character{0};

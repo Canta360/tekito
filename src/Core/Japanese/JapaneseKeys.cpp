@@ -117,6 +117,8 @@ std::optional<KeyCommand> TranslateKey(const JapaneseComposer& composer, const K
     case Key::Space:
     case Key::Convert:
         if (composing) return Make(Action::Convert);
+        // The caller finds the text (JapaneseComposer::Reconvert).
+        if (key.key == Key::Convert) return Make(Action::Reconvert);
         if (key.key == Key::Space) {
             const bool fullWidth = options.fullWidthSpace != key.shift;
             // A half-width space is the application's own.
@@ -170,6 +172,8 @@ std::optional<KeyCommand> TranslateKey(const JapaneseComposer& composer, const K
 KeyOutcome ApplyKey(JapaneseComposer& composer, const KeyCommand& command) {
     KeyOutcome outcome;
     switch (command.action) {
+    case Action::Reconvert:
+        break;
     case Action::ForgetChosen:
         composer.ForgetChosen();
         break;
