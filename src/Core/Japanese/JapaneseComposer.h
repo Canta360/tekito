@@ -168,6 +168,9 @@ public:
     // Space converts as in Microsoft IME.
     void SetLiveConversion(bool on);
     [[nodiscard]] bool LiveConversion() const noexcept { return live_; }
+    // Live conversion as it applies: not in Mix, where Space judges and
+    // converts each chunk.
+    [[nodiscard]] bool Live() const noexcept { return live_ && !chunkJudge_; }
     static constexpr std::size_t kOpenPhrases = 4;
 
     [[nodiscard]] bool IsComposing() const noexcept { return !units_.empty() || !pending_.empty(); }
@@ -182,7 +185,7 @@ public:
     [[nodiscard]] bool IsTyping() const noexcept { return IsComposing() && (!IsConverted() || preview_); }
     // Whether typing a key commits the conversion first (Microsoft IME);
     // live conversion types on instead.
-    [[nodiscard]] bool CommitsBeforeTyping() const noexcept { return IsConverted() && !live_; }
+    [[nodiscard]] bool CommitsBeforeTyping() const noexcept { return IsConverted() && !Live(); }
 
     // Types a key at the caret.
     void Insert(wchar_t key);

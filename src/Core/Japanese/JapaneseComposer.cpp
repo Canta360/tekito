@@ -144,7 +144,7 @@ void JapaneseComposer::SetLiveConversion(bool on) {
 
 void JapaneseComposer::Insert(wchar_t key) {
     lastCommit_.reset();
-    if (live_) {
+    if (Live()) {
         // Typing on after picking keeps what was picked.
         if (IsConverted() && !preview_) SettleAll();
         kanaView_ = false;
@@ -292,7 +292,7 @@ void JapaneseComposer::StartPicking() {
 
 void JapaneseComposer::UpdateLive() {
     const std::wstring reading = Reading();  // the keys still pending stay as typed
-    if (!live_ || kanaView_ || !converter_ || reading.empty()) {
+    if (!Live() || kanaView_ || !converter_ || reading.empty()) {
         phrases_.clear();
         const bool kana = kanaView_;
         ResetLive();
@@ -548,7 +548,7 @@ void JapaneseComposer::Delete() {
 }
 
 void JapaneseComposer::Backspace() {
-    if (live_ && IsConverted()) {
+    if (Live() && IsConverted()) {
         // Live: one kana less, and the rest converted again.
         if (!preview_) SettleAll();
         if (!pending_.empty()) {
@@ -596,7 +596,7 @@ void JapaneseComposer::Cancel() {
     if (IsConverted()) {
         phrases_.clear();
         listOpen_ = false;
-        if (live_) {
+        if (Live()) {
             // Live: the kana, until typing brings the conversion back.
             ResetLive();
             kanaView_ = true;
@@ -1098,7 +1098,7 @@ std::vector<PhraseCandidate> JapaneseComposer::PostalCandidates(std::wstring_vie
 
 void JapaneseComposer::Convert() {
     if (!IsComposing()) return;
-    if (live_ && preview_) {
+    if (Live() && preview_) {
         // Live: the last phrase's next candidate; the next Space opens the list.
         StartPicking();
         if (!IsConverted()) return;
@@ -1575,16 +1575,19 @@ std::vector<std::wstring> JapaneseComposer::PhraseKeys() const {
 std::wstring JapaneseComposer::Commit() {
     FlushAll();
     // Live: the keys that were pending are converted too.
-    if (live_ && preview_) UpdateLive();
+    if (Live() && preview_) UpdateLive();
     // A URL, address, path or mention is committed as typed on Enter too.
     if (IsComposing() && !IsConverted() && !HasAscii() && !chosenPrediction_ && IsProtectedSpan(Keys(false))) {
         BuildPhrases(true);
     }
     // Mixed typing: Enter before Space takes the chunk as Space would.
     if (chunkJudge_ && IsComposing() && !IsConverted() && !HasAscii() && !chosenPrediction_) {
-        const auto chunk = chunkJudge_->Judge(Keys(false), englishRun_, japaneseInSentence_, englishSpelling_,
-                                              englishText_);
-        if (chunk.english) BuildPhrases(true);
+        const std::wstring keys = Keys(false);
+        std::size_t word = keys.size();
+        while (word > 0 && std::wstring_view(L".,!?").find(keys[word - 1]) != std::wstring_view::npos) --word;
+        const auto chunk = chunkJudge_->Judge(std::wstring_view(keys).substr(0, word), englishRun_, japaneseInSentence_,
+                                              englishSpelling_, englishText_);
+        if (chunk.english && word > 0) BuildPhrases(true);
     }
     if (chunkJudge_) {
         const bool english = ChoseEnglish();
