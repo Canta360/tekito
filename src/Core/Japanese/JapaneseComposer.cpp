@@ -1414,7 +1414,6 @@ std::wstring JapaneseComposer::Commit() {
     }
     if (chunkJudge_) {
         const bool english = ChoseEnglish();
-        const bool spaced = english && englishRun_ > 0;
         englishRun_ = english ? englishRun_ + 1 : 0;
         if (english) {
             auto text = Preedit();
@@ -1425,13 +1424,18 @@ std::wstring JapaneseComposer::Commit() {
                                             phrase.candidates.front().text);
                 }
             }
-            if (spaced) text.insert(0, 1, L' ');
+            text.push_back(L' ');
             context_ = englishContext_;
             sentenceStart_ = false;
+            spaceAfterEnglish_ = true;
+            dropSpaceBefore_ = false;
             Clear();
             lastCommit_.reset();
             return text;
         }
+        // Japanese after English takes its space back.
+        dropSpaceBefore_ = spaceAfterEnglish_;
+        spaceAfterEnglish_ = false;
     }
     CommitRecord record{{}, units_, phrases_, conversionReading_, readingKeys_, context_, contextWords_, focus_,
                         preview_, asciiMode_, capitals_, settledPhrases_, settledLength_};

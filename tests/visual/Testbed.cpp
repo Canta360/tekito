@@ -436,7 +436,13 @@ void Apply(Testbed& bed, const ja::KeyCommand& command) {
     if (outcome.uncommitted && bed.text.ends_with(*outcome.uncommitted)) {
         bed.text.erase(bed.text.size() - outcome.uncommitted->size());
     }
-    if (outcome.committed) bed.text += *outcome.committed;
+    if (outcome.committed) {
+        // Mix: Japanese after English takes back the space after it.
+        if (bed.composer.TakeSpaceBefore() && !outcome.committed->empty() && bed.text.ends_with(L' ')) {
+            bed.text.pop_back();
+        }
+        bed.text += *outcome.committed;
+    }
     bed.text += outcome.outside;
 }
 
@@ -942,7 +948,9 @@ void SwitchMode(Testbed& bed) {
     if (bed.english) {
         FinishWord(bed);
     } else {
-        bed.text += bed.composer.Commit();
+        const auto committed = bed.composer.Commit();
+        if (bed.composer.TakeSpaceBefore() && !committed.empty() && bed.text.ends_with(L' ')) bed.text.pop_back();
+        bed.text += committed;
         bed.composer.ForgetCommit();
         bed.composer.ForgetContext();
     }

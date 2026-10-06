@@ -304,8 +304,12 @@ int RunChunks(const ConnectionMatrix& matrix, const JapaneseDictionary& dictiona
             }
             for (const wchar_t key : chunk) composer.Insert(key);
             composer.Convert();
-            output += composer.Commit();
+            const auto committed = composer.Commit();
+            if (composer.TakeSpaceBefore() && !committed.empty() && output.ends_with(L' ')) output.pop_back();
+            output += committed;
         }
+        // English last leaves its space after it.
+        while (!output.empty() && output.back() == L' ') output.pop_back();
         const auto [distance, length] = ja_eval::Closest(output, row.expected);
         for (ChunkTotals* t : {&totals[row.source], &totals["all"]}) {
             ++t->rows;

@@ -2175,6 +2175,29 @@ void TextService::CheckJapaneseContext(ITfContext* context, TfEditCookie editCoo
     }
 }
 
+void TextService::TakeBackSpaceBefore(ITfContext* context, TfEditCookie editCookie) {
+    ComPtr<ITfRange> space;
+    if (composition_) {
+        ComPtr<ITfRange> range;
+        if (FAILED(composition_->GetRange(range.Put())) || FAILED(range->Clone(space.Put()))) return;
+    } else {
+        TF_SELECTION selection{};
+        ULONG fetched = 0;
+        if (FAILED(context->GetSelection(editCookie, TF_DEFAULT_SELECTION, 1, &selection, &fetched)) ||
+            fetched != 1 || !selection.range) {
+            return;
+        }
+        space.Attach(selection.range);
+    }
+    LONG moved = 0;
+    if (FAILED(space->Collapse(editCookie, TF_ANCHOR_START)) ||
+        FAILED(space->ShiftStart(editCookie, -1, &moved, nullptr)) || moved != -1 ||
+        ReadRangeText(space.Get(), editCookie) != L" ") {
+        return;
+    }
+    (void)space->SetText(editCookie, 0, L"", 0);
+}
+
 HRESULT TextService::ReconvertJapanese(ITfContext* context, TfEditCookie editCookie) {
     TF_SELECTION selection{};
     ULONG fetched = 0;

@@ -77,8 +77,9 @@ public:
     void SetLoanwords(const Loanwords* loanwords) noexcept { loanwords_ = loanwords; }
     // Mixed typing: Space (and Enter) takes what was typed as one chunk of
     // English or Japanese (ChunkJudge). English stays English, written as
-    // it is (GitHub), with a space before it after English, and the other
-    // language comes next in the list. Japanese after English reads on from
+    // it is (GitHub), and is committed with a space after it, as English is
+    // typed; Japanese that follows takes that space back (TakeSpaceBefore).
+    // The other language comes next in the list. Japanese after English reads on from
     // `englishContext`, the part of speech of a noun. nullptr: off.
     void SetMixedTyping(const ChunkJudge* judge, std::uint16_t englishContext = 0) noexcept {
         chunkJudge_ = judge;
@@ -179,6 +180,16 @@ public:
         context_ = 0;
         contextWords_.clear();
         englishRun_ = 0;
+        spaceAfterEnglish_ = false;
+        dropSpaceBefore_ = false;
+    }
+    // Mixed typing: whether the text just committed follows English whose
+    // space it takes back (Helloは, not Hello は). The caller removes the
+    // space before it; asking clears it.
+    [[nodiscard]] bool TakeSpaceBefore() noexcept {
+        const bool drop = dropSpaceBefore_;
+        dropSpaceBefore_ = false;
+        return drop;
     }
     [[nodiscard]] std::uint16_t Context() const noexcept { return context_; }
     // Space and Henkan: converts, then steps through the candidates.
@@ -380,6 +391,9 @@ private:
     // Mixed typing: English chunks committed in a row, just before.
     std::size_t englishRun_{0};
     bool sentenceStart_{true};
+    // English was committed last, with its space after it.
+    bool spaceAfterEnglish_{false};
+    bool dropSpaceBefore_{false};
     const JapaneseUserDictionary* userDictionary_{nullptr};
     const SpecialConversions* special_{nullptr};
     const PostalCodes* postalCodes_{nullptr};

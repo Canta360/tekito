@@ -603,6 +603,8 @@ HRESULT TextService::CommitJapanese(ITfContext* context, TfEditCookie editCookie
 
 HRESULT TextService::WriteJapaneseCommit(ITfContext* context, TfEditCookie editCookie, const std::wstring& text) {
     lastJapaneseCommit_ = text;
+    // Mix: Japanese after English takes back the space typed after it.
+    if (japanese_.TakeSpaceBefore() && !text.empty()) TakeBackSpaceBefore(context, editCookie);
     if (!composition_) {
         return text.empty() ? S_OK : InsertAtSelection(context, editCookie, text);
     }

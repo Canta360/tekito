@@ -795,7 +795,7 @@ void TestMixedTyping(const RomajiTable& table, const MiniPack& pack) {
     composer.SetMixedTyping(&judge);
     Type(composer, L"push");
     composer.Convert();
-    RequireText(composer.Commit(), L"Push", "English that starts a sentence gets a capital");
+    RequireText(composer.Commit(), L"Push ", "English that starts a sentence gets a capital, and a space after");
     composer.ForgetContext();
     composer.SetSentenceStart(false);
     Type(composer, L"github");
@@ -804,16 +804,19 @@ void TestMixedTyping(const RomajiTable& table, const MiniPack& pack) {
     Require(candidates && candidates->front().text == L"github" &&
                 candidates->front().kind == tekito::japanese::PhraseCandidate::Kind::English,
             "an English chunk converts to itself");
-    RequireText(composer.Commit(), L"github", "and is committed so");
+    RequireText(composer.Commit(), L"github ", "and is committed so, with a space after it");
+    Require(!composer.TakeSpaceBefore(), "English keeps the space before it");
     Type(composer, L"push");
     composer.Convert();
-    RequireText(composer.Commit(), L" push", "English after English gets a space");
+    RequireText(composer.Commit(), L"push ", "English after English: the space is already there");
     Type(composer, L"kikai");
     composer.Convert();
     const auto japanese = composer.Commit();
-    Require(!japanese.empty() && japanese.front() >= 0x3000, "Japanese after English has no space");
+    Require(!japanese.empty() && japanese.front() >= 0x3000 && composer.TakeSpaceBefore(),
+            "Japanese after English takes the space back");
+    Require(!composer.TakeSpaceBefore(), "asking clears it");
     Type(composer, L"push");
-    RequireText(composer.Commit(), L"push", "Enter takes an English chunk as Space would");
+    RequireText(composer.Commit(), L"push ", "Enter takes an English chunk as Space would");
 
     composer.SetMixedTyping(nullptr);
     Type(composer, L"push");
