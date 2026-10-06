@@ -322,6 +322,10 @@ private:
     // Punctuation keys typed after an English word (you.), as English
     // writes them in an English sentence and as Japanese does otherwise.
     [[nodiscard]] std::wstring MarksAfterEnglish(std::wstring_view keys) const;
+    // Mixed typing: Japanese keys run into an English word with no Space
+    // (kyouhagoogle, korehagithub): the Japanese converted and the word,
+    // when the keys leave letters romaji cannot read.
+    [[nodiscard]] std::optional<std::wstring> RunTogetherEnglish() const;
     // Mixed typing: whether what is chosen is English (to space it and
     // read on from it).
     [[nodiscard]] bool ChoseEnglish() const noexcept;

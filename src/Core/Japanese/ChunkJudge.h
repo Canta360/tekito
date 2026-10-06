@@ -56,6 +56,8 @@ public:
         std::wstring written;
         // It reads as either language: the other one is as likely.
         bool either{false};
+        // A known English word or name (not just keys that make no kana).
+        bool word{false};
     };
     // `keys`: lower-case letters. `englishBefore`: English chunks right
     // before this one. `japaneseInSentence`: the sentence so far has

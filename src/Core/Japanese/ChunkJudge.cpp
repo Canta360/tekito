@@ -35,6 +35,7 @@ ChunkJudge::Judgement ChunkJudge::Judge(std::wstring_view keys, std::size_t engl
                       (c == L'c' && (i + 1 == keys.size() || keys[i + 1] != L'h'));
     }
     const double score = english_.Score(keys);
+    judgement.word = score >= thresholds_.knownWord;
     // A well-known name, and how it is written (github: GitHub).
     bool name = false;
     if (names_) {
@@ -44,6 +45,7 @@ ChunkJudge::Judgement ChunkJudge::Judge(std::wstring_view keys, std::size_t engl
             const bool capitals = std::any_of(spelling.english.begin() + 1, spelling.english.end(),
                                               [](wchar_t c) { return std::iswupper(c) != 0; });
             name = capitals || spelling.score >= thresholds_.knownName;
+            judgement.word = judgement.word || name;
             // A name English news does not write (Qiita) as the pack does.
             if (capitals && score <= 0.0) judgement.written = spelling.english;
         }

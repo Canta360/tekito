@@ -10,6 +10,7 @@
 #include "Core/Japanese/RomajiTable.h"
 
 #include <algorithm>
+#include <regex>
 #include <map>
 #include <set>
 #include <cwctype>
@@ -80,6 +81,15 @@ constexpr std::size_t kLoanwordParticle = 2;
 
 bool IsAlphanumeric(KanaForm form) {
     return form == KanaForm::FullWidthAlphanumeric || form == KanaForm::HalfWidthAlphanumeric;
+}
+
+// Keys that write a URL, an email address, a path or a mention, which
+// stay as typed: https://…, www.…, name@example.com, @name, ./src, ~/x,
+// /home/x, C:\x.
+bool IsProtectedSpan(std::wstring_view keys) {
+    static const std::wregex pattern(
+        LR"(^(?:(?:https?|ftp)://\S+|www\.\S+\.\S+|[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}|@[A-Za-z0-9_][A-Za-z0-9_.\-]*|(?:\./|\.\./|~/)\S*|/[A-Za-z0-9_.\-]+(?:/\S*)?|[A-Za-z]:\\\S*)$)");
+    return !keys.empty() && std::regex_match(keys.begin(), keys.end(), pattern);
 }
 
 bool IsDigit(wchar_t c) {
@@ -666,6 +676,17 @@ void JapaneseComposer::BuildPhrases(bool convert) {
     focus_ = 0;
     listOpen_ = false;
     if (reading.empty()) return;
+    // A URL, address, path or mention stays as typed.
+    if (convert && !HasAscii()) {
+        const std::wstring keys = Keys(false);
+        if (IsProtectedSpan(keys)) {
+            std::vector<PhraseCandidate> candidates{{keys, 0, PhraseCandidate::Kind::English, false}};
+            candidates.push_back({ToFullWidthAscii(keys), 0, PhraseCandidate::Kind::Hiragana, false});
+            candidates.push_back({reading, 0, PhraseCandidate::Kind::Hiragana, false});
+            phrases_.push_back({0, reading.size(), std::move(candidates)});
+            return;
+        }
+    }
     // Mixed typing: the chunk may be English, with punctuation typed after
     // it (you., hello,), or be only punctuation after English.
     std::optional<ChunkJudge::Judgement> chunk;
@@ -680,6 +701,16 @@ void JapaneseComposer::BuildPhrases(bool convert) {
         }
         if (word > 0) {
             chunk = chunkJudge_->Judge(std::wstring_view(keys).substr(0, word), englishRun_, japaneseInSentence_);
+            // Keys that are no word may be Japanese run into one (korehagithub).
+            if (chunk->english && !chunk->word && word == keys.size()) {
+                if (const auto split = RunTogetherEnglish()) {
+                    std::vector<PhraseCandidate> candidates{{*split, 0, PhraseCandidate::Kind::Dictionary, false}};
+                    candidates.push_back({keys, 0, PhraseCandidate::Kind::English, false});
+                    candidates.push_back({reading, 0, PhraseCandidate::Kind::Hiragana, false});
+                    phrases_.push_back({0, reading.size(), std::move(candidates)});
+                    return;
+                }
+            }
             if (chunk->english) {
                 phrases_.push_back({0, reading.size(),
                                     EnglishCandidates(EnglishAsWritten(chunk->written) + marks, reading)});
@@ -717,6 +748,13 @@ void JapaneseComposer::BuildPhrases(bool convert) {
             AddSpecial(reading, phrases_.back().candidates);
         }
     }
+    if (chunk && !chunk->english && !phrases_.empty()) {
+        if (auto split = RunTogetherEnglish()) {
+            PhraseCandidate whole{std::move(*split), 0, PhraseCandidate::Kind::Dictionary, false};
+            whole.reading = Reading();
+            phrases_.front().candidates.insert(phrases_.front().candidates.begin(), std::move(whole));
+        }
+    }
     // Japanese, but it reads as English too: the English for the whole
     // chunk is the next choice.
     if (chunk && chunk->either && !phrases_.front().candidates.empty()) {
@@ -726,6 +764,34 @@ void JapaneseComposer::BuildPhrases(bool convert) {
         english.reading = conversionReading_;
         candidates.insert(candidates.begin() + 1, std::move(english));
     }
+}
+
+std::optional<std::wstring> JapaneseComposer::RunTogetherEnglish() const {
+    // As typed: a slip correction may take the leftover letters away.
+    const bool leftover = std::any_of(units_.begin(), units_.end(), [](const Unit& unit) {
+        return !unit.ascii && LeftoverLetters(ToFullWidthAscii(unit.kana)) > 0;
+    });
+    if (!chunkJudge_ || !converter_ || !table_ || !leftover) return std::nullopt;
+    const std::wstring keys = Keys(false);
+    constexpr std::size_t kShortestWord = 3;
+    for (std::size_t at = 1; at + kShortestWord <= keys.size(); ++at) {
+        std::wstring kana;
+        bool readable = true;
+        for (const auto& token : ParseRomaji(*table_, std::wstring_view(keys).substr(0, at))) {
+            readable = readable && !token.leftover;
+            kana += token.kana;
+        }
+        if (!readable || kana.empty()) continue;
+        const auto english = chunkJudge_->Judge(std::wstring_view(keys).substr(at), englishRun_, japaneseInSentence_);
+        if (!english.english || !english.word) continue;
+        std::wstring japanese;
+        for (const auto& phrase : ConvertReading(ApplyTypingStyle(kana), 0, context_, contextWords_)) {
+            if (phrase.candidates.empty()) return std::nullopt;
+            japanese += phrase.candidates.front().text;
+        }
+        return japanese + english.written;
+    }
+    return std::nullopt;
 }
 
 std::vector<PhraseCandidate> JapaneseComposer::EnglishCandidates(const std::wstring& written,
@@ -1428,6 +1494,10 @@ std::wstring JapaneseComposer::Commit() {
     FlushAll();
     // Live: the keys that were pending are converted too.
     if (live_ && preview_) UpdateLive();
+    // A URL, address, path or mention is committed as typed on Enter too.
+    if (IsComposing() && !IsConverted() && !HasAscii() && !chosenPrediction_ && IsProtectedSpan(Keys(false))) {
+        BuildPhrases(true);
+    }
     // Mixed typing: Enter before Space takes the chunk as Space would.
     if (chunkJudge_ && IsComposing() && !IsConverted() && !HasAscii() && !chosenPrediction_) {
         const auto chunk = chunkJudge_->Judge(Keys(false), englishRun_, japaneseInSentence_);
@@ -1450,7 +1520,10 @@ std::wstring JapaneseComposer::Commit() {
             const bool japaneseMark = !text.empty() && text.back() >= 0x3000;
             if (!japaneseMark) text.push_back(L' ');
             context_ = englishContext_;
-            dropSpaceBefore_ = spaceAfterEnglish_ && !text.empty() && std::wstring_view(L".,!?。、．，！？").find(text.front()) != std::wstring_view::npos;
+            // Only punctuation after English (a "." of its own) goes in
+            // place of the space after it; ./src does not.
+            const auto marks = std::wstring_view(text).substr(0, text.find_last_not_of(L' ') + 1);
+            dropSpaceBefore_ = spaceAfterEnglish_ && !marks.empty() && marks.find_first_not_of(L".,!?。、．，！？") == std::wstring_view::npos;
             spaceAfterEnglish_ = !japaneseMark;
             SetSentenceStart(EndsSentence(text));
             Clear();
