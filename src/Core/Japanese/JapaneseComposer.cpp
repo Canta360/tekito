@@ -144,6 +144,19 @@ void JapaneseComposer::SetLiveConversion(bool on) {
 
 void JapaneseComposer::Insert(wchar_t key) {
     lastCommit_.reset();
+    // Mixed typing: a capital is a letter of the chunk like any other; the
+    // chunk keeps it for when it is English.
+    if (chunkJudge_) {
+        if (!IsComposing()) {
+            typedCase_.clear();
+            typedCaseKept_ = true;
+        }
+        if (caret_ != units_.size()) typedCaseKept_ = false;
+        // Keys taken back since (Backspace) are no longer typed.
+        typedCase_.resize(std::min(typedCase_.size(), Keys(true).size()));
+        typedCase_.push_back(key);
+        if (key >= L'A' && key <= L'Z') key = static_cast<wchar_t>(key - L'A' + L'a');
+    }
     if (Live()) {
         // Typing on after picking keeps what was picked.
         if (IsConverted() && !preview_) SettleAll();
@@ -547,7 +560,22 @@ void JapaneseComposer::Delete() {
     next.keys = keys.empty() ? next.kana : std::move(keys);
 }
 
+std::optional<std::wstring> JapaneseComposer::TypedWithCapitals(std::wstring_view keys) const {
+    if (!chunkJudge_ || !typedCaseKept_ || typedCase_.size() < keys.size()) return std::nullopt;
+    const std::wstring_view typed = std::wstring_view(typedCase_).substr(0, keys.size());
+    bool capital = false;
+    for (std::size_t i = 0; i < keys.size(); ++i) {
+        const bool upper = typed[i] >= L'A' && typed[i] <= L'Z';
+        capital = capital || upper;
+        if ((upper ? static_cast<wchar_t>(typed[i] - L'A' + L'a') : typed[i]) != keys[i]) return std::nullopt;
+    }
+    if (!capital) return std::nullopt;
+    return std::wstring(typed);
+}
+
 void JapaneseComposer::Backspace() {
+    // Mixed typing: what was typed after the caret is kept no longer.
+    if (chunkJudge_ && caret_ != units_.size()) typedCaseKept_ = false;
     if (Live() && IsConverted()) {
         // Live: one kana less, and the rest converted again.
         if (!preview_) SettleAll();
@@ -702,6 +730,18 @@ void JapaneseComposer::BuildPhrases(bool convert) {
         if (word > 0) {
             chunk = chunkJudge_->Judge(std::wstring_view(keys).substr(0, word), englishRun_, japaneseInSentence_,
                                        englishSpelling_, englishText_);
+            // A capital typed in it: English, as typed (I, Have), or as the
+            // name is written when only its first letter was (Github: GitHub).
+            if (const auto typed = TypedWithCapitals(std::wstring_view(keys).substr(0, word))) {
+                const bool firstOnly = std::none_of(typed->begin() + 1, typed->end(),
+                                                    [](wchar_t c) { return c >= L'A' && c <= L'Z'; });
+                const bool named = chunk->english && std::any_of(chunk->written.begin() + 1, chunk->written.end(),
+                                                                 [](wchar_t c) { return c >= L'A' && c <= L'Z'; });
+                if (!(firstOnly && named)) chunk->written = *typed;
+                chunk->english = true;
+                chunk->word = true;
+                chunk->meant.clear();
+            }
             // A slip of a particle (dr): the particle, then the keys as typed.
             if (!chunk->english && !chunk->meant.empty() && table_ && converter_) {
                 std::wstring kana;
@@ -1587,7 +1627,8 @@ std::wstring JapaneseComposer::Commit() {
         while (word > 0 && std::wstring_view(L".,!?").find(keys[word - 1]) != std::wstring_view::npos) --word;
         const auto chunk = chunkJudge_->Judge(std::wstring_view(keys).substr(0, word), englishRun_, japaneseInSentence_,
                                               englishSpelling_, englishText_);
-        if (chunk.english && word > 0) BuildPhrases(true);
+        const bool capitals = TypedWithCapitals(std::wstring_view(keys).substr(0, word)).has_value();
+        if ((chunk.english || capitals) && word > 0) BuildPhrases(true);
     }
     if (chunkJudge_) {
         const bool english = ChoseEnglish();

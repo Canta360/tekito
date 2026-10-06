@@ -314,6 +314,8 @@ wchar_t TypedCharacter(WPARAM wParam) {
 }
 
 bool TextService::TranslateEnglishSegmentKey(WPARAM wParam, KeyInput& input) {
+    // Mix takes capitals into its chunks itself (I, GitHub).
+    if (mode_ == InputMode::Mixed && !englishSegment_) return false;
     if (HasCommandModifier()) {
         if (!englishSegment_ || !TranslateEnglishKey(wParam, input)) return false;
         input.englishSegment = true;

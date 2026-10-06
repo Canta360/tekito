@@ -814,6 +814,9 @@ void TestMixedTyping(const RomajiTable& table, const MiniPack& pack) {
     RequireText(composer.Commit(), L"Push ", "English that starts a sentence gets a capital, and a space after");
     composer.ForgetContext();
     composer.SetSentenceStart(false);
+    Type(composer, L"Kikai");
+    composer.Convert();
+    RequireText(composer.Commit(), L"Kikai ", "a capital typed in a chunk makes it English, as typed");
     Type(composer, L"push.");
     composer.Convert();
     RequireText(composer.Commit(), L"push. ", "punctuation after English stays English");

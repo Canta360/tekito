@@ -432,6 +432,13 @@ private:
     const ChunkJudge* chunkJudge_{nullptr};
     const EnglishSpelling* englishSpelling_{nullptr};
     const ChunkJudge* splitter_{nullptr};
+    // Mixed typing: the chunk's keys as typed, capitals kept (they go into
+    // the composer in lower case); empty once the caret moved inside it.
+    std::wstring typedCase_;
+    bool typedCaseKept_{true};
+    // Mixed typing: the chunk as typed when a capital was typed in it (I,
+    // GitHub): it is English, as typed.
+    [[nodiscard]] std::optional<std::wstring> TypedWithCapitals(std::wstring_view keys) const;
     std::uint16_t englishContext_{0};
     // Mixed typing: English chunks committed in a row, just before, and
     // their text (context for English Auto's spelling).
