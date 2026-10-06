@@ -1,6 +1,7 @@
 #include "Tsf/JapaneseKeyPress.h"
 
 #include <iterator>
+#include <utility>
 
 namespace tekito::tsf {
 namespace {
@@ -41,6 +42,19 @@ japanese::KeyPress JapaneseKeyPressFor(WPARAM virtualKey, bool ignoreCapsLock) {
     case VK_F9: press.key = Key::F9; return press;
     case VK_F10: press.key = Key::F10; return press;
     default: break;
+    }
+    // Ctrl+U, I, O, P and T as F6 to F10, as in Microsoft IME (for
+    // keyboards without function keys); outside a composition they are
+    // the application's.
+    if (press.control && !press.shift) {
+        constexpr std::pair<WPARAM, Key> kForms[] = {{'U', Key::F6}, {'I', Key::F7}, {'O', Key::F8}, {'P', Key::F9},
+                                                     {'T', Key::F10}};
+        for (const auto& [letter, key] : kForms) {
+            if (virtualKey != letter) continue;
+            press.key = key;
+            press.command = false;
+            return press;
+        }
     }
     if (press.command) return press;
     // What the key types with the keyboard layout and state now.
