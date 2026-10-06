@@ -43,6 +43,12 @@ public:
         // corrects more slips and no sentence typed right).
         std::int64_t earlyPercent{100};
         std::int64_t latePercent{70};
+        // The first key typed twice (kkouenni: っ公園に), in percent of
+        // `typo`, when at least `doubledFirstKeys` keys are typed: a phrase
+        // hardly starts with っ, but a short one may be meant so (kka: っか,
+        // put into text being edited).
+        std::int64_t doubledFirstPercent{20};
+        std::size_t doubledFirstKeys{6};
     };
 
     KeyConverter(const JapaneseDictionary& dictionary, const ConnectionMatrix& matrix,

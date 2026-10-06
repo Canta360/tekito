@@ -117,6 +117,9 @@ std::optional<KeyConversion> KeyConverter::Convert(std::wstring_view keys, std::
         return costs_.typo * percent / 100;
     };
     const std::uint16_t unknown = dictionary_.UnknownId();
+    // The first key typed twice, in keys long enough to be a phrase.
+    const bool doubledFirst = n >= costs_.doubledFirstKeys && keys[0] == keys[1] &&
+                              std::wstring_view(L"aiueon").find(keys[0]) == std::wstring_view::npos;
 
     std::vector<Node> nodes;
     std::vector<std::vector<int>> beginningAt(n + 1), endingAt(n + 1);
@@ -134,7 +137,7 @@ std::optional<KeyConversion> KeyConverter::Convert(std::wstring_view keys, std::
     // likeliest forms only.
     std::set<std::tuple<std::size_t, std::size_t, std::wstring>> corrections;
     const auto addWords = [&](std::size_t i, const std::wstring& kana, const std::vector<std::size_t>& keyAfter,
-                              bool corrected, std::size_t shortest) {
+                              bool corrected, std::size_t shortest, std::int64_t slipCost = 0) {
         dictionary_.CommonPrefixSearch(dictionary_.Encode(kana), [&](std::size_t length, std::uint32_t record) {
             const std::size_t end = keyAfter[length];
             if (end == kNoKey || length < shortest) return;
@@ -142,8 +145,7 @@ std::optional<KeyConversion> KeyConverter::Convert(std::wstring_view keys, std::
             std::size_t forms = 0;
             dictionary_.ForEachWord(record, [&](const DictionaryWord& word) {
                 add({static_cast<std::uint32_t>(i), static_cast<std::uint32_t>(end), word.left, word.right,
-                     word.cost + (word.spellingCorrection ? kSpellingCorrectionPenalty : 0) +
-                         (corrected ? SlipCost(i) : 0),
+                     word.cost + (word.spellingCorrection ? kSpellingCorrectionPenalty : 0) + slipCost,
                      NodeKind::Japanese, kana.substr(0, length), corrected});
                 return !corrected || ++forms < kCorrectedForms;
             });
@@ -256,7 +258,10 @@ std::optional<KeyConversion> KeyConverter::Convert(std::wstring_view keys, std::
                         if (shortest == kNoKey && slip.Covered(meant)) shortest = kana.size();
                     }
                     if (shortest == kNoKey) continue;
-                    addWords(bounds[start], kana, keyAfter, true, shortest);
+                    const bool firstTwice = doubledFirst && slip.kind == Slip::Kind::Added && fromKey + slip.at <= 1;
+                    const std::int64_t slipCost =
+                        firstTwice ? costs_.typo * costs_.doubledFirstPercent / 100 : SlipCost(bounds[start]);
+                    addWords(bounds[start], kana, keyAfter, true, shortest, slipCost);
                     if (start != from) continue;
                     // Earlier starts: the units before, as typed.
                     for (std::size_t earlier = from; earlier-- > 0;) {
@@ -267,7 +272,7 @@ std::optional<KeyConversion> KeyConverter::Convert(std::wstring_view keys, std::
                         for (std::size_t c = 1; c < unitKana.size(); ++c) front.push_back(kNoKey);
                         keyAfter.insert(keyAfter.begin(), front.begin(), front.end());
                         shortest += unitKana.size();
-                        addWords(bounds[earlier], kana, keyAfter, true, shortest);
+                        addWords(bounds[earlier], kana, keyAfter, true, shortest, SlipCost(bounds[earlier]));
                     }
                 }
             }

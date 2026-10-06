@@ -877,6 +877,16 @@ void TestRomajiCorrection(const RomajiTable& table, const MiniPack& pack) {
     composer.Convert();
     RequireText(composer.Preedit(), meant, "a slip inside a sentence");
     composer.Clear();
+    // The first key typed twice: a phrase does not start with っ, but a
+    // short input may be meant so.
+    Type(composer, L"sshigotoga");
+    composer.Convert();
+    RequireText(composer.Preedit().substr(0, 2), L"仕事", "sshigotoga converts as しごとが");
+    composer.Clear();
+    Type(composer, L"kka");
+    composer.Convert();
+    RequireText(composer.Preedit().substr(0, 1), L"っ", "kka stays っか");
+    composer.Clear();
 
     // A slip the first choice keeps (a dropped consonant reads as other
     // kana) is one pick away once the list opens, marked as a slip.
