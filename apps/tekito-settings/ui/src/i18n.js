@@ -86,6 +86,7 @@ const en = {
     us: "US",
   },
   language: { title: "Language", description: "The language of these settings.", system: "Match Windows" },
+  bracketPairs: { title: "Close brackets", description: "Type a closing bracket with the opening one, the cursor between them." },
   excluded: {
     title: "Apps where TEKITO stays off",
     description: "TEKITO does nothing in these apps.",
@@ -390,6 +391,7 @@ const ja = {
     us: "英語（US）",
   },
   language: { title: "表示言語", description: "この設定画面の言語です。", system: "Windows に合わせる" },
+  bracketPairs: { title: "かっこを閉じる", description: "開きかっこを打つと閉じかっこも入り、間にカーソルが入ります。" },
   excluded: {
     title: "TEKITO をオフにするアプリ",
     description: "ここに入れたアプリでは、TEKITO は何もしません。",

@@ -282,6 +282,8 @@ bool SqliteUserDictionaryRepository::LoadSettings(UserSettings& settings) const 
             loaded.doubleSpacePeriod = value != 0;
         } else if (std::strcmp(key, "smart_punctuation") == 0) {
             loaded.smartPunctuation = value != 0;
+        } else if (std::strcmp(key, "bracket_pairs") == 0) {
+            loaded.bracketPairs = value != 0;
         } else if (std::strcmp(key, "ui_language") == 0) {
             loaded.uiLanguage = std::clamp(value, 0, 2);
         } else if (std::strcmp(key, "keyboard_type") == 0) {
@@ -397,6 +399,7 @@ bool SqliteUserDictionaryRepository::SaveSettings(const UserSettings& settings) 
     saveValue("recheck_previous_word", settings.recheckPreviousWord ? 1 : 0);
     saveValue("double_space_period", settings.doubleSpacePeriod ? 1 : 0);
     saveValue("smart_punctuation", settings.smartPunctuation ? 1 : 0);
+    saveValue("bracket_pairs", settings.bracketPairs ? 1 : 0);
     saveValue("ui_language", std::clamp(settings.uiLanguage, 0, 2));
     saveValue("keyboard_type", std::clamp(settings.keyboardType, 0, 2));
     saveValue("last_japanese_profile_mode", static_cast<int>(settings.lastJapaneseProfileMode));

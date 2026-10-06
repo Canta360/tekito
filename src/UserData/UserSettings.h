@@ -55,6 +55,9 @@ struct UserSettings {
     bool doubleSpacePeriod{false};
     // English: curly quotes and apostrophes, and "--" as an em dash.
     bool smartPunctuation{false};
+    // Both languages: an opening bracket comes with its closing one, the
+    // caret between them (「」, ()).
+    bool bracketPairs{false};
     // The physical keyboard: 0 = as Windows reports it, 1 = Japanese (JIS,
     // 106/109 keys), 2 = US (101/102 keys). Decides the switch keys and the
     // layout the English profile uses. See KeyboardLayout.h.

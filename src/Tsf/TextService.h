@@ -193,6 +193,9 @@ private:
     // Mix: removes the space right before the composition (or the caret),
     // the one English was committed with, when it is there.
     void TakeBackSpaceBefore(ITfContext* context, TfEditCookie editCookie);
+    // Inserts `open` and `close` at the selection with the caret between.
+    HRESULT InsertPairAtSelection(ITfContext* context, TfEditCookie editCookie, const std::wstring& open,
+                                  const std::wstring& close);
     // The text before the composition, or before the caret without one.
     std::wstring CommitContext(ITfContext* context, TfEditCookie editCookie) const;
     // Mix: the period on Enter after an English sentence.

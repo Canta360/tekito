@@ -429,6 +429,18 @@ HRESULT TextService::HandleJapaneseKey(ITfContext* context, TfEditCookie editCoo
         rawText_.clear();
         return hr;
     }
+    // An opening bracket with its closing one, the caret between; what was
+    // being typed is committed first.
+    if (command.action == Action::Insert && userSettings_.bracketPairs) {
+        if (const auto pair = japanese_.BracketPair(command.character)) {
+            if (japanese_.IsComposing()) {
+                const HRESULT hr = CommitJapanese(context, editCookie);
+                if (FAILED(hr)) return hr;
+            }
+            candidateWindow_.Hide();
+            return InsertPairAtSelection(context, editCookie, pair->first, pair->second);
+        }
+    }
     if (command.action == Action::Insert) {
         // After a conversion, typing on commits it and starts anew (live
         // conversion types on).

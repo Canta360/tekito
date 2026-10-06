@@ -831,6 +831,25 @@ void JapaneseComposer::AddTypedEnglish() {
     }
 }
 
+std::optional<std::pair<std::wstring, std::wstring>> JapaneseComposer::BracketPair(wchar_t key) const {
+    if (!table_) return std::nullopt;
+    constexpr std::pair<wchar_t, wchar_t> kPairs[] = {
+        {L'\x300C', L'\x300D'}, {L'\x300E', L'\x300F'}, {L'\xFF08', L'\xFF09'}, {L'\x3010', L'\x3011'},
+        {L'\xFF3B', L'\xFF3D'}, {L'\xFF5B', L'\xFF5D'}, {L'\x3008', L'\x3009'}, {L'\x300A', L'\x300B'},
+        {L'\x3014', L'\x3015'}, {L'(', L')'},           {L'[', L']'},           {L'{', L'}'}};
+    std::wstring typed;
+    for (const auto& token : ParseRomaji(*table_, std::wstring(1, key))) {
+        if (token.leftover) return std::nullopt;
+        typed += token.kana;
+    }
+    typed = ApplyTypingStyle(ToFullWidthAscii(typed));
+    if (typed.size() != 1) return std::nullopt;
+    for (const auto& [open, close] : kPairs) {
+        if (typed.front() == open) return std::pair{typed, std::wstring(1, close)};
+    }
+    return std::nullopt;
+}
+
 std::optional<std::wstring> JapaneseComposer::RunTogetherEnglish() const {
     const ChunkJudge* splitter = chunkJudge_ ? chunkJudge_ : splitter_;
     if (!splitter || !converter_ || !table_) return std::nullopt;

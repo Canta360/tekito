@@ -799,6 +799,12 @@ void TestMixedTyping(const RomajiTable& table, const MiniPack& pack) {
     Require(pieces && pieces->size() == 2 && (*pieces)[0].english && (*pieces)[0].text == L"push" && !(*pieces)[1].english,
             "English run into Japanese without a space is split off");
     Require(!judge.Split(L"pushin"), "two keys after it that are no particle are not Japanese");
+    {
+        JapaneseComposer brackets(&table);
+        const auto pair = brackets.BracketPair(L'[');
+        Require(pair && pair->first == L"「" && pair->second == L"」", "[ opens 「 and is closed by 」");
+        Require(!brackets.BracketPair(L'a'), "a letter opens no bracket");
+    }
 
     JapaneseComposer composer(&table);
     composer.SetConverter(&converter);

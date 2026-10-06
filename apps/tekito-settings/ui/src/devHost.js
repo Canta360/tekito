@@ -47,6 +47,7 @@ function initialState() {
       nextWordPrediction: true,
       doubledWordCheck: true,
       recheckPreviousWord: true,
+      bracketPairs: false,
       doubleSpacePeriod: false,
       smartPunctuation: false,
       japaneseSpaceWidth: 0,

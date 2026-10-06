@@ -877,6 +877,8 @@ private:
         json += settings_.recheckPreviousWord ? L"true" : L"false";
         json += L",\"doubleSpacePeriod\":";
         json += settings_.doubleSpacePeriod ? L"true" : L"false";
+        json += L",\"bracketPairs\":";
+        json += settings_.bracketPairs ? L"true" : L"false";
         json += L",\"smartPunctuation\":";
         json += settings_.smartPunctuation ? L"true" : L"false";
         json += L",\"japaneseSpaceWidth\":" + std::to_wstring(settings_.japaneseSpaceWidth);
@@ -1043,6 +1045,7 @@ private:
             else if (key == L"recheckPreviousWord") settings_.recheckPreviousWord = value;
             else if (key == L"doubleSpacePeriod") settings_.doubleSpacePeriod = value;
             else if (key == L"smartPunctuation") settings_.smartPunctuation = value;
+            else if (key == L"bracketPairs") settings_.bracketPairs = value;
             else if (key == L"meaningsEnabled") settings_.meaningsEnabled = value;
             else if (key == L"japaneseEnabled") settings_.japaneseEnabled = value;
             else if (key == L"modeIndicatorEnabled") settings_.modeIndicatorEnabled = value;

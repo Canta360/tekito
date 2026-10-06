@@ -49,6 +49,9 @@ struct KeyInput {
         // English with curly quotes on: `character` (" ' or -) typed with no
         // word being typed, written as a curly quote or a dash.
         SmartPunctuation,
+        // English: `character` opens a bracket that comes with its closing
+        // one (UserSettings::bracketPairs).
+        BracketPair,
         // Mix: Enter after an English sentence with the period on Enter on:
         // the period goes in place of its space, and Enter goes on.
         MixedEnterPeriod,

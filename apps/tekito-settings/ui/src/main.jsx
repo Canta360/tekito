@@ -44,6 +44,7 @@ const initialSettings = {
   nextWordPrediction: true,
   doubledWordCheck: true,
   recheckPreviousWord: true,
+  bracketPairs: false,
   doubleSpacePeriod: false,
   smartPunctuation: false,
   japaneseSpaceWidth: 0,
@@ -398,6 +399,9 @@ function GeneralPage({ advanced, mode, japanese, japaneseInstalled, settings, ch
         </Row>
         <Row title={t.language.title} description={t.language.description}>
           <Segmented label={t.language.title} value={settings.uiLanguage} options={languages} onChange={(value) => setSetting("uiLanguage", value)} />
+        </Row>
+        <Row title={t.bracketPairs.title} description={t.bracketPairs.description}>
+          <Toggle label={t.bracketPairs.title} checked={settings.bracketPairs} onChange={(value) => setSetting("bracketPairs", value)} />
         </Row>
         {advanced && (
           <Row title={t.restoreMode.title} description={japanese ? t.restoreMode.descriptionJapanese : t.restoreMode.description}>

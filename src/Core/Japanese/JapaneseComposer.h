@@ -98,6 +98,9 @@ public:
     // reflectされた), found with `splitter` in Japanese mode too: first when
     // the keys make no kana, otherwise the next choice. nullptr: off.
     void SetRunTogether(const ChunkJudge* splitter) noexcept { splitter_ = splitter; }
+    // What `key` types when it types an opening bracket on its own (「 for
+    // [ , in the width set), with the bracket that closes it.
+    [[nodiscard]] std::optional<std::pair<std::wstring, std::wstring>> BracketPair(wchar_t key) const;
     // Mixed typing: whether what is typed next starts a sentence, so English
     // there starts with a capital. The text service says so from the text
     // before the caret; committing keeps it up to date.

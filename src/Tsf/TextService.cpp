@@ -1309,6 +1309,11 @@ bool TextService::TranslateEnglishKey(WPARAM wParam, KeyInput& input) {
 }
 
 bool TextService::TranslateEnglishCharacter(wchar_t character, KeyInput& input) const {
+    if (userSettings_.bracketPairs && std::wstring_view(L"([{").find(character) != std::wstring_view::npos) {
+        input.type = KeyInput::Type::BracketPair;
+        input.character = character;
+        return true;
+    }
     if (userSettings_.smartPunctuation && (character == L'"' || character == L'\'')) {
         const bool inWord = state_.IsActive() && state_.State() == CompositionState::Composing;
         if (inWord && character == L'"') {
@@ -1575,6 +1580,21 @@ HRESULT TextService::HandleKeyInEditSessionCore(ITfContext* context, TfEditCooki
     if (input.type == KeyInput::Type::SpecialEnd) return HandleSpecialEnd(context, editCookie, input.character);
     if (input.type == KeyInput::Type::SmartPunctuation) {
         return HandleSmartPunctuation(context, editCookie, input.character);
+    }
+    if (input.type == KeyInput::Type::BracketPair) {
+        // The word being typed ends as it is shown.
+        if (composition_) {
+            const HRESULT hr = EndComposition(editCookie);
+            if (FAILED(hr)) return hr;
+        }
+        candidateWindow_.Hide();
+        state_.Reset();
+        rawText_.clear();
+        constexpr std::wstring_view kOpen = L"([{";
+        constexpr std::wstring_view kClose = L")]}";
+        const auto at = kOpen.find(input.character);
+        return InsertPairAtSelection(context, editCookie, std::wstring(1, input.character),
+                                     std::wstring(1, kClose[at]));
     }
     // A spelling or sum: typing on keeps it as typed; Backspace takes its
     // last character and keeps the rest.
@@ -2030,6 +2050,31 @@ HRESULT TextService::EndComposition(TfEditCookie editCookie) {
     }
     composition->Release();
     return hr;
+}
+
+HRESULT TextService::InsertPairAtSelection(ITfContext* context, TfEditCookie editCookie, const std::wstring& open,
+                                           const std::wstring& close) {
+    ComPtr<ITfInsertAtSelection> insertAtSelection;
+    HRESULT hr = context->QueryInterface(IID_PPV_ARGS(insertAtSelection.Put()));
+    if (FAILED(hr)) return hr;
+    const std::wstring text = open + close;
+    ComPtr<ITfRange> inserted;
+    hr = insertAtSelection->InsertTextAtSelection(editCookie, 0, text.c_str(), static_cast<LONG>(text.size()),
+                                                  inserted.Put());
+    if (FAILED(hr) || !inserted) return hr;
+    // The caret after the opening bracket.
+    LONG moved = 0;
+    if (FAILED(inserted->Collapse(editCookie, TF_ANCHOR_START)) ||
+        FAILED(inserted->ShiftStart(editCookie, static_cast<LONG>(open.size()), &moved, nullptr)) ||
+        FAILED(inserted->Collapse(editCookie, TF_ANCHOR_START))) {
+        return S_OK;
+    }
+    TF_SELECTION selection{};
+    selection.range = inserted.Get();
+    selection.style.ase = TF_AE_END;
+    selection.style.fInterimChar = FALSE;
+    (void)context->SetSelection(editCookie, 1, &selection);
+    return S_OK;
 }
 
 HRESULT TextService::InsertAtSelection(ITfContext* context, TfEditCookie editCookie,
