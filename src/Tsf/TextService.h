@@ -264,7 +264,7 @@ private:
     std::uint32_t runtimeDictionaryGeneration_{0};
     std::uint32_t runtimeLearningGeneration_{0};
     // Atoms of the English underline and the three Japanese ones.
-    TfGuidAtom displayAttributeAtoms_[4]{TF_INVALID_GUIDATOM, TF_INVALID_GUIDATOM,
+    TfGuidAtom displayAttributeAtoms_[5]{TF_INVALID_GUIDATOM, TF_INVALID_GUIDATOM, TF_INVALID_GUIDATOM,
                                          TF_INVALID_GUIDATOM, TF_INVALID_GUIDATOM};
     bool processIsElevated_{false};
     bool processPrefersPassThrough_{false};

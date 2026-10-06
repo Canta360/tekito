@@ -52,6 +52,7 @@ const GUID& JapaneseUnderlineGuid(JapaneseUnderline underline) noexcept {
     switch (underline) {
     case JapaneseUnderline::Converted: return GUID_TekitoDisplayAttributeConverted;
     case JapaneseUnderline::Focused: return GUID_TekitoDisplayAttributeFocused;
+    case JapaneseUnderline::Settled: return GUID_TekitoDisplayAttributeSettled;
     case JapaneseUnderline::Input: break;
     }
     return GUID_TekitoDisplayAttributeInput;
@@ -79,6 +80,16 @@ ITfDisplayAttributeInfo* CreateJapaneseUnderline(JapaneseUnderline underline) {
         attribute.fBoldLine = TRUE;
         attribute.bAttr = TF_ATTR_TARGET_CONVERTED;
         description = L"TEKITO Japanese phrase being converted";
+        break;
+    case JapaneseUnderline::Settled:
+        // A light marker with dark text, readable on light and dark pages.
+        attribute.lsStyle = TF_LS_NONE;
+        attribute.crText.type = TF_CT_COLORREF;
+        attribute.crText.cr = RGB(32, 32, 32);
+        attribute.crBk.type = TF_CT_COLORREF;
+        attribute.crBk.cr = RGB(255, 236, 160);
+        attribute.bAttr = TF_ATTR_CONVERTED;
+        description = L"TEKITO Mix sentence held until Enter";
         break;
     }
     return new (std::nothrow) DisplayAttributeInfo(JapaneseUnderlineGuid(underline), description, attribute);

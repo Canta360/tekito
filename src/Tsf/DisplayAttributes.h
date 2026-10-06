@@ -34,8 +34,9 @@ private:
 
 // The three Japanese underlines, in the order input, converted, focused;
 // new references the caller releases.
-enum class JapaneseUnderline { Input, Converted, Focused };
-inline constexpr int kJapaneseUnderlineCount = 3;
+// Settled: Mix chunks held until Enter, marked like a highlighter.
+enum class JapaneseUnderline { Input, Converted, Focused, Settled };
+inline constexpr int kJapaneseUnderlineCount = 4;
 [[nodiscard]] const GUID& JapaneseUnderlineGuid(JapaneseUnderline underline) noexcept;
 [[nodiscard]] ITfDisplayAttributeInfo* CreateJapaneseUnderline(JapaneseUnderline underline);
 

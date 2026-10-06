@@ -22,6 +22,7 @@ extern const GUID GUID_TekitoDisplayAttributeInput;
 extern const GUID GUID_TekitoDisplayAttributeConverted;
 // {04CA9009-05C3-440D-B34F-9D1CE12362D5}
 extern const GUID GUID_TekitoDisplayAttributeFocused;
+extern const GUID GUID_TekitoDisplayAttributeSettled;
 
 // {3B1E7A52-9C4D-4E0B-8F21-6A5D2C9E4B17}
 extern const GUID GUID_TekitoToggleKey;

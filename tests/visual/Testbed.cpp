@@ -114,7 +114,7 @@ struct Testbed {
 Testbed* g_bed = nullptr;
 
 // One character laid out on the page, and how it is underlined.
-enum class Style { Committed, Input, Converted, Focused };
+enum class Style { Committed, Input, Converted, Focused, Settled };
 struct Cell {
     std::wstring text;  // one character as drawn (an emoji may take several units)
     Style style;
@@ -239,7 +239,10 @@ std::vector<Cell> Layout(const Testbed& bed, HDC dc, int top, int width, std::si
         for (const wchar_t ch : bed.en.composition) chars.push_back({ch, Style::Input});
     } else {
         for (const auto& segment : bed.composer.Segments()) {
-            const Style style = !segment.converted ? Style::Input : segment.focused ? Style::Focused : Style::Converted;
+            const Style style = segment.settled     ? Style::Settled
+                                : !segment.converted ? Style::Input
+                                : segment.focused    ? Style::Focused
+                                                     : Style::Converted;
             for (const wchar_t ch : segment.text) chars.push_back({ch, style});
         }
     }
@@ -323,8 +326,14 @@ void Paint(Testbed& bed, HDC target) {
     for (std::size_t i = 0; i + 1 < cells.size(); ++i) {
         const auto& cell = cells[i];
         if (cell.text == L"\n") continue;
+        // Mix: the sentence held until Enter, behind a marker.
+        if (cell.style == Style::Settled) {
+            HBRUSH marker = CreateSolidBrush(RGB(255, 236, 160));
+            FillRect(dc, &cell.rect, marker);
+            DeleteObject(marker);
+        }
         TextOutW(dc, cell.rect.left, cell.rect.top, cell.text.c_str(), static_cast<int>(cell.text.size()));
-        if (cell.style == Style::Committed) continue;
+        if (cell.style == Style::Committed || cell.style == Style::Settled) continue;
         HPEN pen = cell.style == Style::Focused ? thick : cell.style == Style::Converted ? thin : dotted;
         HGDIOBJ oldPen = SelectObject(dc, pen);
         const int y = cell.rect.bottom + Scale(bed, 1);

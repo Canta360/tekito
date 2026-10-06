@@ -501,7 +501,8 @@ HRESULT TextService::ReplaceJapaneseComposition(ITfContext* context, TfEditCooki
             SUCCEEDED(part->Collapse(editCookie, TF_ANCHOR_START)) &&
             SUCCEEDED(part->ShiftEnd(editCookie, offset + length, &moved, nullptr)) &&
             SUCCEEDED(part->ShiftStart(editCookie, offset, &moved, nullptr))) {
-            const auto underline = !segment.converted ? JapaneseUnderline::Input
+            const auto underline = segment.settled    ? JapaneseUnderline::Settled
+                                   : !segment.converted ? JapaneseUnderline::Input
                                    : segment.focused  ? JapaneseUnderline::Focused
                                                       : JapaneseUnderline::Converted;
             (void)ApplyDisplayAttribute(context, editCookie, part.Get(), JapaneseUnderlineGuid(underline));
