@@ -278,12 +278,15 @@ int RunChunks(const ConnectionMatrix& matrix, const JapaneseDictionary& dictiona
     struct ChunkTotals {
         std::size_t rows{0}, exact{0}, errors{0}, characters{0};
         std::size_t chunks{0}, english{0}, englishRight{0}, japanese{0}, japaneseRight{0};
+        // Sentences whose every chunk was taken as the right language.
+        std::size_t judgedRows{0};
     };
     std::map<std::string, ChunkTotals> totals;
     std::size_t shownMisses = 0, shownChunks = 0;
     for (const auto& row : LoadCorpus(corpus)) {
         std::wstring output;
         std::size_t englishBefore = 0;
+        bool japaneseInSentence = false;
         composer.ForgetContext();
         composer.SetSentenceStart(true);
         std::vector<std::pair<bool, bool>> judged;  // English meant, English said
@@ -291,9 +294,15 @@ int RunChunks(const ConnectionMatrix& matrix, const JapaneseDictionary& dictiona
         for (std::wstring chunk; words >> chunk;) {
             const bool meant = chunk.back() == L'*';
             if (meant) chunk.pop_back();
-            const auto judgement = judge.Judge(chunk, englishBefore);
+            // As the composer does: punctuation after the word is not judged.
+            std::wstring word = chunk;
+            while (!word.empty() && std::wstring_view(L".,!?").find(word.back()) != std::wstring_view::npos) word.pop_back();
+            const auto judgement = word.empty() ? tekito::japanese::ChunkJudge::Judgement{englishBefore > 0, chunk, false}
+                                                : judge.Judge(word, englishBefore, japaneseInSentence);
             const bool said = judgement.english;
             englishBefore = said ? englishBefore + 1 : 0;
+            if (!said) japaneseInSentence = true;
+            if (std::wstring_view(L".!?").find(chunk.back()) != std::wstring_view::npos) japaneseInSentence = false;
             judged.push_back({meant, said});
             if (shownChunks < options.showChunks) {
                 ++shownChunks;
@@ -311,9 +320,12 @@ int RunChunks(const ConnectionMatrix& matrix, const JapaneseDictionary& dictiona
         // English last leaves its space after it.
         while (!output.empty() && output.back() == L' ') output.pop_back();
         const auto [distance, length] = ja_eval::Closest(output, row.expected);
+        const bool allJudged = std::all_of(judged.begin(), judged.end(),
+                                           [](const auto& pair) { return pair.first == pair.second; });
         for (ChunkTotals* t : {&totals[row.source], &totals["all"]}) {
             ++t->rows;
             if (distance == 0) ++t->exact;
+            if (allJudged) ++t->judgedRows;
             t->errors += distance;
             t->characters += length;
             for (const auto& [meant, said] : judged) {
@@ -336,6 +348,7 @@ int RunChunks(const ConnectionMatrix& matrix, const JapaneseDictionary& dictiona
     std::cout << std::fixed << std::setprecision(1);
     for (const auto& [source, t] : totals) {
         std::cout << source << ": rows=" << t.rows << " top1=" << 100.0 * t.exact / t.rows << "%"
+                  << " judged_rows=" << 100.0 * t.judgedRows / t.rows << "%"
                   << " cer=" << (t.characters ? 100.0 * t.errors / t.characters : 0.0) << "%"
                   << " english_chunks=" << t.english << " judged_english="
                   << (t.english ? 100.0 * t.englishRight / t.english : 0.0) << "%"

@@ -11,7 +11,8 @@
 
 namespace tekito::japanese {
 
-ChunkJudge::Judgement ChunkJudge::Judge(std::wstring_view keys, std::size_t englishBefore) const {
+ChunkJudge::Judgement ChunkJudge::Judge(std::wstring_view keys, std::size_t englishBefore,
+                                        bool japaneseInSentence) const {
     Judgement judgement;
     judgement.written = std::wstring(keys);
     const bool letters = !keys.empty() && std::all_of(keys.begin(), keys.end(), [](wchar_t c) {
@@ -62,12 +63,16 @@ ChunkJudge::Judgement ChunkJudge::Judge(std::wstring_view keys, std::size_t engl
     // English noun (Stack Overflowで, GitHubに); to (と) only in an English
     // sentence (nice to meet you).
     constexpr std::size_t kEnglishSentence = 2;
+    // English so far with no Japanese: an English sentence.
+    const bool englishSentence = englishBefore >= kEnglishSentence || (englishBefore > 0 && !japaneseInSentence);
     if (keys.size() <= 2 && readable) {
         constexpr std::wstring_view kParticles[] = {L"de", L"ga", L"ni", L"wo", L"ha", L"wa", L"no", L"mo", L"ka",
                                                     L"ya", L"ne", L"yo", L"na", L"da", L"e", L"he", L"te"};
         const bool particle = std::find(std::begin(kParticles), std::end(kParticles), keys) != std::end(kParticles);
-        const std::size_t needed = keys == L"to" ? kEnglishSentence : 1;
-        judgement.english = !particle && englishBefore >= needed && score >= thresholds_.knownWord;
+        // English before, or the start of a sentence (do you, so far).
+        const bool sentenceStart = englishBefore == 0 && !japaneseInSentence;
+        const bool after = keys == L"to" ? englishSentence : englishBefore > 0 || sentenceStart;
+        judgement.english = !particle && after && score >= thresholds_.commonWord;
         if (!judgement.english) judgement.written = std::wstring(keys);
         return judgement;
     }
@@ -81,9 +86,16 @@ ChunkJudge::Judgement ChunkJudge::Judge(std::wstring_view keys, std::size_t engl
         judgement.english = true;
         return judgement;
     }
+    // A dictionary word reads naturally, however short (あれ); a loanword
+    // the dictionary writes in katakana (アマゾン) is the English itself.
     const auto best = converter_.Best(kana);
-    const bool japaneseOdd = !best || kana.empty() ||
-                             best->cost >= thresholds_.costPerKana * static_cast<std::int64_t>(kana.size());
+    const bool katakana = best && !best->text.empty() && std::all_of(best->text.begin(), best->text.end(), [](wchar_t c) {
+        return (c >= L'\x30A1' && c <= L'\x30FA') || c == L'\x30FC' || c == L'\x30FB';
+    });
+    const bool japaneseWord = !katakana && converter_.IsWord(kana);
+    const bool japaneseOdd = !japaneseWord &&
+                             (!best || kana.empty() || katakana ||
+                              best->cost >= thresholds_.costPerKana * static_cast<std::int64_t>(kana.size()));
     // Whether Japanese text writes it in Latin letters (API, Amazon), or
     // hardly ever (take, same). Without the counts, as if it does.
     const auto inJapanese = names_ ? names_->InJapaneseText(keys) : std::nullopt;
@@ -92,17 +104,18 @@ ChunkJudge::Judgement ChunkJudge::Judge(std::wstring_view keys, std::size_t engl
     // A common English word is English when its romaji is no Japanese
     // word (issue: いっすえ), or when Japanese text writes it in Latin
     // letters; take stays 竹.
-    const bool japaneseWord = converter_.IsWord(kana);
     if ((japaneseOdd && name) ||
         (score >= thresholds_.commonWord && (!japaneseWord || (japaneseOdd && writtenInJapanese)))) {
         judgement.english = true;
         return judgement;
     }
     // Reads both ways (kara, take, amazon): as the sentence goes.
+    // In an English sentence English (my name, come here); otherwise
+    // English when Japanese text writes it so and it is no Japanese word.
     if (name || score >= thresholds_.knownWord) {
         judgement.either = true;
-        judgement.english = englishBefore >= kEnglishSentence ||
-                            (inJapanese && *inJapanese >= thresholds_.inJapaneseText);
+        judgement.english = englishSentence ||
+                            (!japaneseWord && inJapanese && *inJapanese >= thresholds_.inJapaneseText);
     }
     if (!judgement.english) judgement.written = std::wstring(keys);
     return judgement;

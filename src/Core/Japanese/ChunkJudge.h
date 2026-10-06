@@ -58,8 +58,11 @@ public:
         bool either{false};
     };
     // `keys`: lower-case letters. `englishBefore`: English chunks right
-    // before this one.
-    [[nodiscard]] Judgement Judge(std::wstring_view keys, std::size_t englishBefore) const;
+    // before this one. `japaneseInSentence`: the sentence so far has
+    // Japanese in it; without, English chunks before make it an English
+    // sentence (do you, nice to).
+    [[nodiscard]] Judgement Judge(std::wstring_view keys, std::size_t englishBefore,
+                                  bool japaneseInSentence = true) const;
 
 private:
     const RomajiTable& table_;

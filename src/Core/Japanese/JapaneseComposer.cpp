@@ -679,7 +679,7 @@ void JapaneseComposer::BuildPhrases(bool convert) {
             return;
         }
         if (word > 0) {
-            chunk = chunkJudge_->Judge(std::wstring_view(keys).substr(0, word), englishRun_);
+            chunk = chunkJudge_->Judge(std::wstring_view(keys).substr(0, word), englishRun_, japaneseInSentence_);
             if (chunk->english) {
                 phrases_.push_back({0, reading.size(),
                                     EnglishCandidates(EnglishAsWritten(chunk->written) + marks, reading)});
@@ -1430,7 +1430,7 @@ std::wstring JapaneseComposer::Commit() {
     if (live_ && preview_) UpdateLive();
     // Mixed typing: Enter before Space takes the chunk as Space would.
     if (chunkJudge_ && IsComposing() && !IsConverted() && !HasAscii() && !chosenPrediction_) {
-        const auto chunk = chunkJudge_->Judge(Keys(false), englishRun_);
+        const auto chunk = chunkJudge_->Judge(Keys(false), englishRun_, japaneseInSentence_);
         if (chunk.english) BuildPhrases(true);
     }
     if (chunkJudge_) {
