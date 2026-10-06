@@ -23,6 +23,7 @@
 // error rate against the closest acceptable text, how often an acceptable
 // text is among the first phrase-by-phrase choices, and conversion time.
 
+#include "Core/ExternalRankingProviders.h"
 #include "Core/Japanese/JapaneseComposer.h"
 #include "Core/Japanese/JapaneseConverter.h"
 #include "Core/Japanese/JapaneseDictionary.h"
@@ -216,6 +217,133 @@ int RunKeys(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary
     return 0;
 }
 
+
+// --chunks: Japanese and English typed in chunks, a Space after each (the
+// mixed typing mode). Each chunk is judged English or Japanese, Japanese is
+// converted and committed, English kept; English after English gets a
+// space. A chunk ending in "*" in the corpus is English (the answer).
+struct ChunkOptions {
+    std::filesystem::path englishScores;
+    // An English word at least this common (log10 score) is English when
+    // its romaji reads as Japanese only at this cost per kana or more.
+    double englishScore{4.0};
+    double japaneseCost{2300.0};
+    std::size_t showChunks{0};
+};
+
+int RunChunks(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary, const JapaneseConverter& converter,
+              const std::filesystem::path& corpus, const std::filesystem::path& romaji,
+              tekito::japanese::KeyConverter::Costs costs, std::size_t showMisses, const ChunkOptions& options) {
+    const auto table = tekito::japanese::RomajiTable::Load(romaji);
+    if (!table) {
+        std::cerr << "could not open the romaji table\n";
+        return 1;
+    }
+    const tekito::ExternalFrequencyProvider english(options.englishScores);
+    if (!english.IsLoaded()) {
+        std::cerr << "could not open the English word scores\n";
+        return 1;
+    }
+    const tekito::japanese::KeyConverter keyConverter(dictionary, matrix, converter, *table, costs);
+    tekito::japanese::JapaneseComposer composer(table.get());
+    composer.SetConverter(&converter);
+    composer.SetKeyConverter(&keyConverter);
+
+    struct ChunkTotals {
+        std::size_t rows{0}, exact{0}, errors{0}, characters{0};
+        std::size_t chunks{0}, english{0}, englishRight{0}, japanese{0}, japaneseRight{0};
+    };
+    std::map<std::string, ChunkTotals> totals;
+    std::size_t shownMisses = 0, shownChunks = 0;
+    for (const auto& row : LoadCorpus(corpus)) {
+        std::wstring output;
+        bool lastEnglish = false;
+        composer.ForgetContext();
+        std::vector<std::pair<bool, bool>> judged;  // English meant, English said
+        std::wistringstream words(row.reading);
+        for (std::wstring chunk; words >> chunk;) {
+            const bool meant = chunk.back() == L'*';
+            if (meant) chunk.pop_back();
+            // How the chunk reads as romaji.
+            std::wstring kana;
+            bool readable = true;
+            for (const auto& token : tekito::japanese::JapaneseComposer::ParseRomaji(*table, chunk)) {
+                readable = readable && !token.leftover;
+                kana += token.kana;
+            }
+            // Letters romaji uses only for small kana and ヴ (la, xtu, vi):
+            // English when the chunk is an English word.
+            bool rareLetters = false;
+            for (std::size_t i = 0; i < chunk.size(); ++i) {
+                const wchar_t c = chunk[i];
+                rareLetters = rareLetters || c == L'l' || c == L'q' || c == L'x' || c == L'v' ||
+                              (c == L'c' && (i + 1 == chunk.size() || chunk[i + 1] != L'h'));
+            }
+            const double score = english.Score(chunk);
+            const auto best = readable ? converter.Best(kana) : std::nullopt;
+            const double perKana = best && !kana.empty() ? static_cast<double>(best->cost) / kana.size() : 1e9;
+            // Two letters or fewer are particles (to, de, na), not English.
+            constexpr double kKnownWord = 2.5;
+            // Keys that make no kana: an English word, or Japanese with a slip
+            // when undoing it reads as Japanese; otherwise a name (chatgpt).
+            constexpr double kListedWord = 0.9;
+            const bool slip = !readable && score < kListedWord && keyConverter.Convert(chunk).has_value();
+            const bool said = (!readable && !slip) || (chunk.size() > 2 && rareLetters && score >= kKnownWord) ||
+                              (chunk.size() > 2 && score >= options.englishScore && perKana >= options.japaneseCost);
+            judged.push_back({meant, said});
+            if (shownChunks < options.showChunks) {
+                ++shownChunks;
+                std::cout << "chunk " << Narrow(chunk) << (meant ? " E" : " J") << " said=" << (said ? "E" : "J")
+                          << " readable=" << readable << " english=" << score << " ja_per_kana=" << perKana
+                          << " kana=" << Narrow(kana) << (meant != said ? "  WRONG" : "") << "\n";
+            }
+            if (said) {
+                if (lastEnglish) output += L' ';
+                output += chunk;
+                lastEnglish = true;
+                continue;
+            }
+            composer.Clear();
+            for (const wchar_t key : chunk) composer.Insert(key);
+            composer.Convert();
+            output += composer.Commit();
+            lastEnglish = false;
+        }
+        const auto [distance, length] = ja_eval::Closest(output, row.expected);
+        for (ChunkTotals* t : {&totals[row.source], &totals["all"]}) {
+            ++t->rows;
+            if (distance == 0) ++t->exact;
+            t->errors += distance;
+            t->characters += length;
+            for (const auto& [meant, said] : judged) {
+                ++t->chunks;
+                if (meant) {
+                    ++t->english;
+                    if (said) ++t->englishRight;
+                } else {
+                    ++t->japanese;
+                    if (!said) ++t->japaneseRight;
+                }
+            }
+        }
+        if (distance != 0 && shownMisses < showMisses) {
+            ++shownMisses;
+            std::cout << "miss " << row.source << ":" << row.id << "  " << Narrow(output) << "  (want "
+                      << Narrow(row.expected.front()) << ")\n";
+        }
+    }
+    std::cout << std::fixed << std::setprecision(1);
+    for (const auto& [source, t] : totals) {
+        std::cout << source << ": rows=" << t.rows << " top1=" << 100.0 * t.exact / t.rows << "%"
+                  << " cer=" << (t.characters ? 100.0 * t.errors / t.characters : 0.0) << "%"
+                  << " english_chunks=" << t.english << " judged_english="
+                  << (t.english ? 100.0 * t.englishRight / t.english : 0.0) << "%"
+                  << " japanese_chunks=" << t.japanese << " judged_japanese="
+                  << (t.japanese ? 100.0 * t.japaneseRight / t.japanese : 0.0) << "%\n";
+    }
+    return 0;
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -226,6 +354,8 @@ int main(int argc, char** argv) {
     JapaneseConverter::ModelWeights weights;
     std::size_t showMisses = 0;
     TypingStudyOptions study;
+    ChunkOptions chunks;
+    std::filesystem::path chunkCorpus;
     tekito::japanese::KeyConverter::Costs costs;
     for (int i = 1; i < argc; ++i) {
         const std::string_view arg = argv[i];
@@ -246,11 +376,31 @@ int main(int argc, char** argv) {
         else if (arg == "--study" && i + 1 < argc) study.study = argv[++i];
         else if (arg == "--join" && i + 1 < argc) study.join = std::stoul(argv[++i]);
         else if (arg == "--sample" && i + 1 < argc) study.sample = std::stoul(argv[++i]);
+        else if (arg == "--chunks" && i + 1 < argc) chunkCorpus = argv[++i];
+        else if (arg == "--english-scores" && i + 1 < argc) chunks.englishScores = argv[++i];
+        else if (arg == "--english-score" && i + 1 < argc) chunks.englishScore = std::stod(argv[++i]);
+        else if (arg == "--japanese-cost" && i + 1 < argc) chunks.japaneseCost = std::stod(argv[++i]);
+        else if (arg == "--show-chunks" && i + 1 < argc) chunks.showChunks = std::stoul(argv[++i]);
     }
     tekito::japanese::LanguageModel model;
     if (!modelPack.empty() && !model.Open(modelPack)) {
         std::cerr << "could not open the language model at " << modelPack.string() << "\n";
         return 1;
+    }
+    if (!pack.empty() && !keysCorpus.empty() && !chunkCorpus.empty()) keysCorpus.clear();
+    if (!pack.empty() && !chunkCorpus.empty()) {
+#if defined(_WIN32)
+        SetConsoleOutputCP(CP_UTF8);
+#endif
+        JapaneseDictionary dictionary;
+        ConnectionMatrix matrix;
+        if (!dictionary.Open(pack / "dictionary.bin") || !matrix.Open(pack / "connection.bin")) {
+            std::cerr << "could not open the japanese-core pack at " << pack.string() << "\n";
+            return 1;
+        }
+        JapaneseConverter converter(dictionary, matrix);
+        if (model.IsOpen()) converter.SetLanguageModel(&model, weights);
+        return RunChunks(matrix, dictionary, converter, chunkCorpus, romaji, costs, showMisses, chunks);
     }
     if (!pack.empty() && !keysCorpus.empty()) {
 #if defined(_WIN32)

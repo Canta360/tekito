@@ -1,0 +1,77 @@
+chunk-english	1	korewoatode github* ni push* suru	これを後でGitHubにpushする	これを後でGitHubにプッシュする	これを後でgithubにpushする	これを後でgithubにプッシュする	これをあとでGitHubにpushする	これをあとでGitHubにプッシュする	これをあとでgithubにpushする	これをあとでgithubにプッシュする
+chunk-english	2	kyouha google* de kensakusita	今日はGoogleで検索した	今日はgoogleで検索した
+chunk-english	3	slack* de houkokusimasu	Slackで報告します	slackで報告します
+chunk-english	4	zoom* no kaigini irimasu	Zoomの会議に入ります	zoomの会議に入ります
+chunk-english	5	excel* no fairuwo okurimasu	Excelのファイルを送ります	excelのファイルを送ります
+chunk-english	6	python* de script* wo kaita	Pythonでscriptを書いた	Pythonでスクリプトを書いた	pythonでscriptを書いた	pythonでスクリプトを書いた
+chunk-english	7	docker* wo tukatteimasu	Dockerを使っています	dockerを使っています
+chunk-english	8	mail* wo kakunowo wasureta	mailを書くのを忘れた	メールを書くのを忘れた
+chunk-english	9	commit* sitekara push* site	commitしてからpushして	commitしてからプッシュして	コミットしてからpushして	コミットしてからプッシュして
+chunk-english	10	branch* wo kiru hituyougaaru	branchを切る必要がある	ブランチを切る必要がある
+chunk-english	11	review* wo onegaisimasu	reviewをお願いします	レビューをお願いします
+chunk-english	12	bug* wo naosita	bugを直した	バグを直した
+chunk-english	13	test* ga toorimasita	testが通りました	テストが通りました
+chunk-english	14	deploy* ha asitano yoteidesu	deployは明日の予定です	デプロイは明日の予定です
+chunk-english	15	chatgpt* ni kiitemita	ChatGPTに聞いてみた	chatgptに聞いてみた
+chunk-english	16	iphone* wo kaikaeta	iPhoneを買い替えた	iphoneを買い替えた
+chunk-english	17	windows* no update* ga owaranai	Windowsのupdateが終わらない	Windowsのアップデートが終わらない	windowsのupdateが終わらない	windowsのアップデートが終わらない
+chunk-english	18	chrome* ga omoi	Chromeが重い	chromeが重い
+chunk-english	19	twitter* de mita nyuusu	Twitterで見たニュース	twitterで見たニュース
+chunk-english	20	json* wo parse* suru	JSONをparseする	JSONをパースする	jsonをparseする	jsonをパースする
+chunk-english	21	server* wo saikidousita	serverを再起動した	サーバーを再起動した
+chunk-english	22	password* wo wasureta	passwordを忘れた	パスワードを忘れた
+chunk-english	23	link* wo okurune	linkを送るね	リンクを送るね
+chunk-english	24	download* sitekudasai	downloadしてください	ダウンロードしてください
+chunk-english	25	schedule* wo chouseisimasu	scheduleを調整します	スケジュールを調整します
+chunk-english	26	meeting* no maeni siryouwo yomu	meetingの前に資料を読む	ミーティングの前に資料を読む
+chunk-english	27	figma* de dezainnsita	Figmaでデザインした	figmaでデザインした
+chunk-english	28	friday* ni kaigiga aru	Fridayに会議がある	fridayに会議がある
+chunk-english	29	sorry* osokunatta	sorry遅くなった	ソーリー遅くなった
+chunk-english	30	check* siteoite	checkしておいて	チェックしておいて
+chunk-english	31	spreadsheet* ni kakikonde	spreadsheetに書き込んで	スプレッドシートに書き込んで
+chunk-english	32	backup* wo toru	backupを取る	バックアップを取る
+chunk-english	33	qiita* ni kijiwo kaita	Qiitaに記事を書いた	qiitaに記事を書いた
+chunk-english	34	stack* overflow* de sirabeta	Stack Overflowで調べた	stack overflowで調べた
+chunk-english	35	vscode* wo kidousuru	VS Codeを起動する	vscodeを起動する
+chunk-english	36	github* actions* ga ugokanai	GitHub Actionsが動かない	github actionsが動かない	GitHub actionsが動かない
+chunk-english	37	pull* request* wo dasita	pull requestを出した	プルリクエストを出した
+chunk-english	38	merge* sitemo iidesuka	mergeしてもいいですか	マージしてもいいですか
+chunk-english	39	thanks* matanee	thanksまたねー	サンクスまたねー	thanksまたねえ	サンクスまたねえ
+chunk-english	40	happy* birthday* omedetou	happy birthdayおめでとう	Happy birthdayおめでとう
+chunk-english	41	weekend* ha nanisuru	weekendは何する	ウィークエンドは何する
+chunk-english	42	file* wo share* simasu	fileをshareします	fileをシェアします	ファイルをshareします	ファイルをシェアします
+chunk-english	43	screenshot* wo tottekudasai	screenshotを撮ってください	スクリーンショットを撮ってください
+chunk-english	44	discord* ni sankasita	Discordに参加した	discordに参加した
+chunk-english	45	spotify* de kiiteru	Spotifyで聞いてる	spotifyで聞いてる
+chunk-both	1	api* wo tatakuto	APIを叩くと	apiを叩くと
+chunk-both	2	notion* ni memosita	Notionにメモした	notionにメモした
+chunk-both	3	youtube* de mita	YouTubeで見た	youtubeで見た
+chunk-both	4	data* wo kousinsuru	dataを更新する	データを更新する
+chunk-both	5	game* wo suru	gameをする	ゲームをする
+chunk-both	6	online* de sankasuru	onlineで参加する	オンラインで参加する
+chunk-both	7	line* deno tyakusin	LINEでの着信	lineでの着信
+chunk-both	8	token* wo hakkousuru	tokenを発行する	トークンを発行する
+chunk-both	9	amazon* de katta	Amazonで買った	amazonで買った
+chunk-both	10	ruby* no baajon	Rubyのバージョン	rubyのバージョン
+chunk-both	11	home* wo hiraku	homeを開く	ホームを開く
+chunk-both	12	menu* de erabu	menuで選ぶ	メニューで選ぶ
+chunk-ja	1	kokomade kita	ここまで来た
+chunk-ja	2	sakewo nomu	酒を飲む
+chunk-ja	3	takenokowo tabeta	筍を食べた	たけのこを食べた	タケノコを食べた
+chunk-ja	4	samega oyogu	鮫が泳ぐ	サメが泳ぐ
+chunk-ja	5	anohitoha dare	あの人は誰
+chunk-ja	6	imamade arigatou	今までありがとう
+chunk-ja	7	namaewo kaite	名前を書いて
+chunk-ja	8	tanakasanto aimasu	田中さんと会います
+chunk-ja	9	kinouha amedesita	昨日は雨でした
+chunk-ja	10	soreha mou naidesu	それはもうないです
+chunk-ja	11	made	まで
+chunk-ja	12	sake	酒
+chunk-ja	13	take	竹	武
+chunk-ja	14	mine	峰	ミネ
+chunk-ja	15	same	鮫	サメ
+chunk-ja	16	tone	トーン	利根
+chunk-ja	17	hide	秀	ひで
+chunk-ja	18	kite	来て	着て
+chunk-ja	19	ane	姉
+chunk-ja	20	hate	果て
