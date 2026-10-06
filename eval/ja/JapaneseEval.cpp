@@ -264,6 +264,9 @@ struct ChunkOptions {
     bool englishEngine{false};
     // English typed into Japanese without spaces is looked for (--no-run-together: not).
     bool runTogether{true};
+    // Also judge each sentence as a whole (ChunkJudge::JudgeSentence) and
+    // count the sentences it gets right.
+    bool sentenceJudge{false};
     std::filesystem::path writeChunks;
 };
 
@@ -340,6 +343,7 @@ int RunChunks(const ConnectionMatrix& matrix, const JapaneseDictionary& dictiona
         std::size_t judgedRows{0};
     };
     std::map<std::string, ChunkTotals> totals;
+    std::map<std::string, std::size_t> sentenceRows, sentenceRight;
     std::size_t shownMisses = 0, shownChunks = 0;
     for (const auto& row : LoadCorpus(corpus)) {
         std::wstring output;
@@ -397,6 +401,31 @@ int RunChunks(const ConnectionMatrix& matrix, const JapaneseDictionary& dictiona
         const auto [distance, length] = ja_eval::Closest(output, row.expected);
         const bool allJudged = std::all_of(judged.begin(), judged.end(),
                                            [](const auto& pair) { return pair.first == pair.second; });
+        if (options.sentenceJudge) {
+            std::vector<std::wstring> keys;
+            std::vector<bool> meant;
+            std::wistringstream again(row.reading);
+            for (std::wstring chunk; again >> chunk;) {
+                meant.push_back(chunk.back() == L'*');
+                if (meant.back()) chunk.pop_back();
+                while (!chunk.empty() && std::wstring_view(L".,!?").find(chunk.back()) != std::wstring_view::npos) chunk.pop_back();
+                keys.push_back(chunk);
+            }
+            const auto whole = judge.JudgeSentence(keys, spelling.get());
+            bool right = true;
+            for (std::size_t i = 0; i < whole.size(); ++i) {
+                // Punctuation alone is as before.
+                if (keys[i].empty()) continue;
+                right = right && whole[i].english == meant[i];
+            }
+            for (const auto* name : {row.source.c_str(), "all"}) {
+                ++sentenceRows[name];
+                if (right) ++sentenceRight[name];
+            }
+            if (right != allJudged && shownChunks < options.showChunks) {
+                std::cout << (right ? "BETTER " : "WORSE  ") << Narrow(row.reading) << "\n";
+            }
+        }
         for (ChunkTotals* t : {&totals[row.source], &totals["all"]}) {
             ++t->rows;
             if (distance == 0) ++t->exact;
@@ -429,6 +458,9 @@ int RunChunks(const ConnectionMatrix& matrix, const JapaneseDictionary& dictiona
                   << (t.english ? 100.0 * t.englishRight / t.english : 0.0) << "%"
                   << " japanese_chunks=" << t.japanese << " judged_japanese="
                   << (t.japanese ? 100.0 * t.japaneseRight / t.japanese : 0.0) << "%\n";
+    }
+    for (const auto& [source, rows] : sentenceRows) {
+        std::cout << source << ": sentence_judged_rows=" << 100.0 * sentenceRight[source] / rows << "%\n";
     }
     return 0;
 }
@@ -489,6 +521,7 @@ int main(int argc, char** argv) {
         else if (arg == "--no-slips") chunks.slips = false;
         else if (arg == "--english-engine") chunks.englishEngine = true;
         else if (arg == "--no-run-together") chunks.runTogether = false;
+        else if (arg == "--sentence-judge") chunks.sentenceJudge = true;
         else if (arg == "--write-chunks" && i + 1 < argc) chunks.writeChunks = argv[++i];
     }
     tekito::japanese::LanguageModel model;

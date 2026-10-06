@@ -340,6 +340,54 @@ std::optional<std::vector<ChunkJudge::Piece>> ChunkJudge::Split(std::wstring_vie
     return pieces;
 }
 
+std::vector<ChunkJudge::Judgement> ChunkJudge::JudgeSentence(const std::vector<std::wstring>& chunks,
+                                                             const EnglishSpelling* spelling) const {
+    std::vector<Judgement> judged;
+    judged.reserve(chunks.size());
+    // As typed: left to right.
+    std::size_t run = 0;
+    bool japanese = false;
+    std::wstring englishText;
+    for (const auto& keys : chunks) {
+        auto judgement = Judge(keys, run, japanese, spelling, englishText);
+        if (judgement.english) {
+            ++run;
+            englishText += judgement.written + L" ";
+        } else {
+            run = 0;
+            japanese = true;
+        }
+        judged.push_back(std::move(judgement));
+    }
+    // Again, each with the whole sentence around it, until nothing changes.
+    constexpr int kRounds = 3;
+    for (int round = 0; round < kRounds; ++round) {
+        bool changed = false;
+        for (std::size_t i = 0; i < chunks.size(); ++i) {
+            // English right before and right after it; Japanese anywhere
+            // else; the sentence's other English.
+            std::size_t around = 0;
+            for (std::size_t j = i; j-- > 0 && judged[j].english;) ++around;
+            for (std::size_t j = i + 1; j < chunks.size() && judged[j].english; ++j) ++around;
+            bool otherJapanese = false;
+            std::wstring others;
+            for (std::size_t j = 0; j < chunks.size(); ++j) {
+                if (j == i) continue;
+                if (judged[j].english) {
+                    others += judged[j].written + L" ";
+                } else {
+                    otherJapanese = true;
+                }
+            }
+            auto again = Judge(chunks[i], around, otherJapanese, spelling, others);
+            if (again.english != judged[i].english) changed = true;
+            judged[i] = std::move(again);
+        }
+        if (!changed) break;
+    }
+    return judged;
+}
+
 bool ChunkJudge::EnglishThenJapanese(std::wstring_view keys) const {
     if (english_.Score(keys) >= thresholds_.knownWord) return false;
     if (names_ && !names_->ForEnglish(keys, 1).empty()) return false;

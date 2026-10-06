@@ -89,6 +89,13 @@ public:
     };
     [[nodiscard]] std::optional<std::vector<Piece>> Split(std::wstring_view keys) const;
 
+    // A whole sentence typed in chunks (keys without the punctuation after
+    // them), judged as a whole: first left to right as typed, then each
+    // chunk again with the English and Japanese on both sides of it (my
+    // name is tanaka, ここに急に English wo).
+    [[nodiscard]] std::vector<Judgement> JudgeSentence(const std::vector<std::wstring>& chunks,
+                                                       const EnglishSpelling* spelling = nullptr) const;
+
 private:
     // How English writes `word` (GitHub, Google, nice).
     [[nodiscard]] std::wstring WrittenAs(std::wstring_view word) const;
