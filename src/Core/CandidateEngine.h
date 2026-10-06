@@ -27,6 +27,8 @@ public:
     ~CandidateEngine();
 
     [[nodiscard]] ConversionResult Convert(const ConversionRequest& request) const override;
+    [[nodiscard]] std::optional<std::wstring> Recheck(std::wstring_view word, std::wstring_view precedingText,
+                                                      std::wstring_view followingText) const override;
     void RefreshUserDictionary() override;
     [[nodiscard]] std::vector<Candidate> Generate(std::wstring_view rawText) const;
 

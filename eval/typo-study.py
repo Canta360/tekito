@@ -124,6 +124,7 @@ def main() -> int:
     parser.add_argument("--limit", type=int, default=100)
     parser.add_argument("--no-english-engine", action="store_true", help="Mix as before English Auto spelled it")
     parser.add_argument("--ja-args", default="", help="more arguments for tekito_ja_eval (--typo-dropped 60)")
+    parser.add_argument("--next-word", action="store_true", help="English: look at each word again at the next")
     args = parser.parse_args()
     args.work.mkdir(parents=True, exist_ok=True)
 
@@ -147,8 +148,10 @@ def main() -> int:
 
     def run_en(sentences: Path, out: Path) -> None:
         env = dict(os.environ, TEKITO_DATA_PACK_DIR=str(args.en_data))
-        subprocess.run([str(args.bin / "tekito_core_eval.exe"), "--typed", str(sentences), "--write-words", str(out)],
-                       check=True, env=env, stdout=subprocess.DEVNULL)
+        command = [str(args.bin / "tekito_core_eval.exe"), "--typed", str(sentences), "--write-words", str(out)]
+        if args.next_word:
+            command.append("--next-word")
+        subprocess.run(command, check=True, env=env, stdout=subprocess.DEVNULL)
 
     results = []
     for name, mode, keys in args.chunks:

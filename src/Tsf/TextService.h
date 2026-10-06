@@ -232,6 +232,13 @@ private:
     DWORD activateFlags_{0};
 
     std::wstring rawText_;
+    // English: the word Space last left as typed, to look at again once
+    // the next word is typed (UserSettings::recheckPreviousWord).
+    std::wstring keptWord_;
+    // Puts the word kept as typed before the composition right when the
+    // word after it (`following`) shows it was a slip.
+    void RecheckPreviousWord(ITfContext* context, TfEditCookie editCookie, const std::wstring& word,
+                             const std::wstring& following);
     CapitalizationOrigin capitalizationOrigin_{CapitalizationOrigin::Unknown};
     bool sentenceStart_{false};
     InputStateMachine state_;

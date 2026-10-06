@@ -47,6 +47,10 @@ struct UserSettings {
     bool nextWordPrediction{true};
     // English: a word typed twice in a row ("the the") is taken out on Space.
     bool doubledWordCheck{true};
+    // English: a word kept as typed is looked at again once the next word
+    // is typed, and put right when the words around it say it was a slip
+    // (have to urn the: run).
+    bool recheckPreviousWord{true};
     // English: Space twice after a word ends the sentence with a period.
     bool doubleSpacePeriod{false};
     // English: curly quotes and apostrophes, and "--" as an em dash.

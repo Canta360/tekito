@@ -384,19 +384,44 @@ int RunTyped(const EnglishStudyOptions& options) {
         // so the next word sees the text as it now is.
         const auto words = Words(text);
         std::ptrdiff_t shift = 0;
+        // Per word: where it is now, as typed, what it became, its choices.
+        struct Done {
+            std::size_t begin;
+            std::wstring typed;
+            std::wstring after;
+            std::vector<std::wstring> choices;
+        };
+        std::vector<Done> done;
         for (std::size_t w = 0; w < words.size(); ++w) {
             Word word = words[w];
             word.begin = static_cast<std::size_t>(static_cast<std::ptrdiff_t>(word.begin) + shift);
             const auto candidates = engine->Convert(RequestFor(text, word, word.text)).candidates;
             const auto after = AfterSpace(state, word.text, candidates);
-            out << id << '\t' << w << '\t' << Narrow(word.text) << '\t' << Narrow(after) << '\t';
-            for (std::size_t c = 0; c < candidates.size() && c < 9; ++c) {
-                if (c) out << '\x1f';
-                out << Narrow(candidates[c].text);
-            }
-            out << '\n';
+            std::vector<std::wstring> choices;
+            for (std::size_t c = 0; c < candidates.size() && c < 9; ++c) choices.push_back(candidates[c].text);
             text.replace(word.begin, word.text.size(), after);
             shift += static_cast<std::ptrdiff_t>(after.size()) - static_cast<std::ptrdiff_t>(word.text.size());
+            // The word before, kept as typed, looked at again.
+            if (options.nextWord && !done.empty() && done.back().after == done.back().typed) {
+                auto& previous = done.back();
+                if (const auto meant = engine->Recheck(previous.after, text.substr(0, previous.begin), after)) {
+                    text.replace(previous.begin, previous.after.size(), *meant);
+                    const auto grown = static_cast<std::ptrdiff_t>(meant->size()) -
+                                       static_cast<std::ptrdiff_t>(previous.after.size());
+                    shift += grown;
+                    word.begin = static_cast<std::size_t>(static_cast<std::ptrdiff_t>(word.begin) + grown);
+                    previous.after = *meant;
+                }
+            }
+            done.push_back({word.begin, word.text, after, std::move(choices)});
+        }
+        for (std::size_t w = 0; w < done.size(); ++w) {
+            out << id << '\t' << w << '\t' << Narrow(done[w].typed) << '\t' << Narrow(done[w].after) << '\t';
+            for (std::size_t c = 0; c < done[w].choices.size(); ++c) {
+                if (c) out << '\x1f';
+                out << Narrow(done[w].choices[c]);
+            }
+            out << '\n';
         }
         ++sentences;
     }
@@ -422,9 +447,16 @@ int RunEnglishStudy(const EnglishStudyOptions& options) {
             std::cout << Narrow(word.text) << " -> " << Narrow(AfterSpace(state, word.text, candidates)) << " |";
             for (std::size_t i = 0; i < candidates.size() && i < 4; ++i) {
                 const auto& c = candidates[i];
-                std::cout << "  [" << Narrow(c.text) << " label=" << static_cast<int>(c.label)
+                std::cout << "  [" << Narrow(c.text) << " score=" << c.score << " label=" << static_cast<int>(c.label)
                           << " orig=" << c.isOriginal << " policy=0x" << std::hex << c.policyFlags
                           << " source=0x" << c.sourceFlags << std::dec << "]";
+            }
+            std::cout << "\n";
+            // With the next word known too.
+            const auto withNext = engine->Convert(RequestFor(sentence, word, word.text, Mode::WaitForNext)).candidates;
+            std::cout << "    next:";
+            for (std::size_t i = 0; i < withNext.size() && i < 4; ++i) {
+                std::cout << "  [" << Narrow(withNext[i].text) << " score=" << withNext[i].score << "]";
             }
             std::cout << "\n";
         }

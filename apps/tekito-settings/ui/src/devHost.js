@@ -46,6 +46,7 @@ function initialState() {
       japaneseEnglishSpacing: false,
       nextWordPrediction: true,
       doubledWordCheck: true,
+      recheckPreviousWord: true,
       doubleSpacePeriod: false,
       smartPunctuation: false,
       japaneseSpaceWidth: 0,

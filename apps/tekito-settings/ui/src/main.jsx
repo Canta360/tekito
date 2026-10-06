@@ -43,6 +43,7 @@ const initialSettings = {
   periodOnEnter: false,
   nextWordPrediction: true,
   doubledWordCheck: true,
+  recheckPreviousWord: true,
   doubleSpacePeriod: false,
   smartPunctuation: false,
   japaneseSpaceWidth: 0,
@@ -545,7 +546,7 @@ function CandidatesPage({ advanced, settings, setSetting }) {
 }
 
 // English options shown with the Advanced switch, after the period on Enter.
-const writingOptions = ["nextWordPrediction", "doubledWordCheck", "doubleSpacePeriod", "smartPunctuation"];
+const writingOptions = ["nextWordPrediction", "doubledWordCheck", "recheckPreviousWord", "doubleSpacePeriod", "smartPunctuation"];
 
 // English: what Auto does as you type.
 function EnglishPage({ advanced, settings, setSetting }) {

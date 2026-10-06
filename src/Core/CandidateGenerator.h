@@ -48,6 +48,11 @@ public:
         std::wstring_view followingContext = {},
         const ConversionOptions& options = {}) const;
 
+    // IConversionEngine::Recheck: `word` is a real word, but one a slip away
+    // goes with the words before and after it far better.
+    [[nodiscard]] std::optional<std::wstring> Recheck(std::wstring_view word, std::wstring_view context,
+                                                      std::wstring_view followingContext) const;
+
 private:
     // `flags` for `candidate`, except that a correction the user undid for
     // this input is only offered from then on.

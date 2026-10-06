@@ -398,6 +398,78 @@ std::uint32_t CandidateGenerator::Offered(std::wstring_view lowerRaw, std::wstri
     return (flags & ~kAutomatic) | CandidatePolicySuggestOnly;
 }
 
+std::optional<std::wstring> CandidateGenerator::Recheck(std::wstring_view word, std::wstring_view context,
+                                                       std::wstring_view followingContext) const {
+    // The meant word must fit both sides this much better (the phrase
+    // pack's scores: ten times log10 of how often), be this common and this
+    // much commoner than the word typed; and the word typed must hardly go
+    // with either side (seen together fewer than ten times).
+    constexpr double kBetterBy = 25.0;
+    constexpr double kCommonWord = 3.0;
+    constexpr double kCommonerBy = 1.0;
+    constexpr double kTypedFitsAt = 10.0;
+    // Written with capitals inside (API, iOS): as meant.
+    if (word.size() < 2 || std::any_of(word.begin() + 1, word.end(), [](wchar_t c) { return std::iswupper(c) != 0; })) {
+        return std::nullopt;
+    }
+    const auto lower = Lower(word);
+    if (!std::all_of(lower.begin(), lower.end(), [](wchar_t c) { return c >= L'a' && c <= L'z'; })) {
+        return std::nullopt;
+    }
+    const auto previousWords = ContextWords(context);
+    const auto followingWords = ContextWords(followingContext);
+    if (previousWords.empty() || followingWords.empty()) return std::nullopt;
+    // How well a word goes with the word before and the one after; both
+    // must know it.
+    const auto fit = [&](const std::wstring& candidate) -> std::optional<double> {
+        const double before = phraseProvider_.Score(candidate, previousWords.back());
+        const double after = phraseProvider_.Score(followingWords.front(), candidate);
+        if (before <= 0.0 || after <= 0.0) return std::nullopt;
+        return before + after;
+    };
+    if (phraseProvider_.Score(lower, previousWords.back()) >= kTypedFitsAt ||
+        phraseProvider_.Score(followingWords.front(), lower) >= kTypedFitsAt) {
+        return std::nullopt;
+    }
+    const double typed = fit(lower).value_or(0.0);
+    const double typedFrequency = frequencyProvider_.Score(lower);
+    // The words one slip away: a neighboring key, a key left out, one
+    // typed twice or extra, two swapped; in a word longer than a few
+    // letters not in the last letter, where another letter is another form
+    // of the word (update, updated, debut; but ca: car).
+    constexpr std::size_t kShortWord = 3;
+    const std::size_t last = lower.size() <= kShortWord ? lower.size() : lower.size() - 1;
+    std::vector<std::wstring> near;
+    for (std::size_t i = 0; i < lower.size(); ++i) {
+        for (wchar_t c = L'a'; c <= L'z' && i < last; ++c) {
+            if (AreQwertyNeighbors(lower[i], c)) near.push_back(lower.substr(0, i) + c + lower.substr(i + 1));
+        }
+        if (lower.size() > 2 && i < last) near.push_back(lower.substr(0, i) + lower.substr(i + 1));
+        if (i + 1 < lower.size() && lower[i] != lower[i + 1]) {
+            auto swapped = lower;
+            std::swap(swapped[i], swapped[i + 1]);
+            near.push_back(std::move(swapped));
+        }
+    }
+    for (std::size_t i = 0; i <= last; ++i) {
+        for (wchar_t c = L'a'; c <= L'z'; ++c) near.push_back(lower.substr(0, i) + c + lower.substr(i));
+    }
+    std::optional<std::wstring> best;
+    double bestFit = typed + kBetterBy;
+    for (const auto& candidate : near) {
+        const double frequency = frequencyProvider_.Score(candidate);
+        if (candidate == lower || frequency < kCommonWord || frequency < typedFrequency + kCommonerBy) continue;
+        const auto score = fit(candidate);
+        if (score && *score > bestFit) {
+            bestFit = *score;
+            best = candidate;
+        }
+    }
+    if (!best) return std::nullopt;
+    if (std::iswupper(word.front())) best->front() = static_cast<wchar_t>(std::towupper(best->front()));
+    return best;
+}
+
 std::vector<Candidate> CandidateGenerator::Generate(std::wstring_view rawText,
                                                     std::wstring_view context,
                                                     std::wstring_view followingContext,

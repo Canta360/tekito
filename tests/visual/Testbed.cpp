@@ -69,6 +69,8 @@ struct EnglishTyping {
     tekito::InputStateMachine state;
     // The word as typed.
     std::wstring rawText;
+    // The word Space last left as typed (TextService::keptWord_).
+    std::wstring keptWord;
     // The composition as shown after the committed text.
     std::wstring composition;
     bool composing{false};
@@ -804,6 +806,9 @@ bool HandleEnglishKey(Testbed& bed, const KeyInput& input) {
     }
 
     case Type::Space: {
+        const bool firstSpace = state.State() == tekito::CompositionState::Composing;
+        const auto keptBefore = firstSpace ? std::exchange(en.keptWord, std::wstring{}) : std::wstring{};
+        const auto rawBefore = en.rawText;
         const auto action = state.OnSpace();
         if (action.kind == ActionKind::CommitAndStartNext) {
             ReplaceComposition(bed, action.text);
@@ -815,6 +820,19 @@ bool HandleEnglishKey(Testbed& bed, const KeyInput& input) {
         if (action.kind != ActionKind::ReplaceComposition) return false;
         ReplaceComposition(bed, action.text);
         en.listShown = action.showCandidates;
+        // The word before looked at again, as TextService::RecheckPreviousWord.
+        if (firstSpace) {
+            std::wstring left = action.text;
+            while (!left.empty() && left.back() == L' ') left.pop_back();
+            if (left == rawBefore) en.keptWord = rawBefore;
+            const std::wstring ending = keptBefore + L" ";
+            if (bed.settings.recheckPreviousWord && !keptBefore.empty() && en.engine && bed.text.ends_with(ending)) {
+                const auto preceding = bed.text.substr(0, bed.text.size() - ending.size());
+                if (const auto meant = en.engine->Recheck(keptBefore, preceding, left)) {
+                    bed.text = preceding + *meant + L" ";
+                }
+            }
+        }
         return true;
     }
 

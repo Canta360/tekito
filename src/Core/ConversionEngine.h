@@ -4,6 +4,7 @@
 #include "Core/SpecialConversions.h"
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -66,6 +67,14 @@ class IConversionEngine {
 public:
     virtual ~IConversionEngine() = default;
     [[nodiscard]] virtual ConversionResult Convert(const ConversionRequest& request) const = 0;
+    // A word already typed, looked at again once the word after it is
+    // known: the word one slip away it was meant as, when the words around
+    // it say so (have to urn the: run). Nothing when it fits.
+    [[nodiscard]] virtual std::optional<std::wstring> Recheck(std::wstring_view /*word*/,
+                                                              std::wstring_view /*precedingText*/,
+                                                              std::wstring_view /*followingText*/) const {
+        return std::nullopt;
+    }
     // Re-reads the UserDictionary the engine was created with, after it was
     // changed in place. Far cheaper than building a new engine, which
     // reloads every Data Pack.

@@ -20,6 +20,7 @@
 #include <filesystem>
 #include <iterator>
 #include <new>
+#include <utility>
 #include <oleauto.h>
 #include <vector>
 
@@ -1677,6 +1678,10 @@ HRESULT TextService::HandleKeyInEditSessionCore(ITfContext* context, TfEditCooki
 
     case KeyInput::Type::Space: {
         const auto rawBefore = rawText_;
+        // The word before this one, when Space left it as typed; only on
+        // this word's first Space.
+        const bool firstSpace = state_.State() == CompositionState::Composing;
+        const auto keptBefore = firstSpace ? std::exchange(keptWord_, std::wstring{}) : std::wstring{};
         const auto selectedBefore = state_.SelectedIndex();
         const auto candidateBefore = selectedBefore < state_.Candidates().size()
                                          ? state_.Candidates()[selectedBefore].text
@@ -1714,6 +1719,14 @@ HRESULT TextService::HandleKeyInEditSessionCore(ITfContext* context, TfEditCooki
                 ShowCandidates(context, editCookie);
             } else {
                 candidateWindow_.Hide();
+            }
+            if (firstSpace) {
+                std::wstring left = action.text;
+                while (!left.empty() && left.back() == L' ') left.pop_back();
+                if (left == rawBefore) keptWord_ = rawBefore;
+                if (userSettings_.recheckPreviousWord && !keptBefore.empty()) {
+                    RecheckPreviousWord(context, editCookie, keptBefore, left);
+                }
             }
         }
         return hr;
@@ -2202,6 +2215,30 @@ std::wstring TextService::CommitContext(ITfContext* context, TfEditCookie editCo
     std::wstring following;
     ReadCompositionContext(composition_, editCookie, preceding, following);
     return preceding;
+}
+
+void TextService::RecheckPreviousWord(ITfContext* context, TfEditCookie editCookie, const std::wstring& word,
+                                      const std::wstring& following) {
+    if (!candidateEngine_ || !composition_) return;
+    // The text before the composition ends with the word and its space.
+    const std::wstring before = CommitContext(context, editCookie);
+    const std::wstring ending = word + L" ";
+    if (!before.ends_with(ending)) return;
+    const std::wstring preceding = before.substr(0, before.size() - ending.size());
+    const auto meant = candidateEngine_->Recheck(word, preceding, following);
+    if (!meant) return;
+    ComPtr<ITfRange> range;
+    ComPtr<ITfRange> previous;
+    if (FAILED(composition_->GetRange(range.Put())) || FAILED(range->Clone(previous.Put()))) return;
+    LONG moved = 0;
+    const LONG length = static_cast<LONG>(ending.size());
+    if (FAILED(previous->Collapse(editCookie, TF_ANCHOR_START)) ||
+        FAILED(previous->ShiftStart(editCookie, -length, &moved, nullptr)) || moved != -length ||
+        ReadRangeText(previous.Get(), editCookie) != ending) {
+        return;
+    }
+    const std::wstring text = *meant + L" ";
+    (void)previous->SetText(editCookie, 0, text.c_str(), static_cast<LONG>(text.size()));
 }
 
 void TextService::TakeBackSpaceBefore(ITfContext* context, TfEditCookie editCookie) {

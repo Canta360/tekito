@@ -38,6 +38,9 @@ struct EnglishStudyOptions {
     // compare with the same sentences typed right (eval/typo-study.py).
     std::filesystem::path typed;
     std::filesystem::path writeWords;
+    // With --typed: each word's Space looks at the word before it again
+    // (IConversionEngine::Recheck), as the text service may.
+    bool nextWord{false};
 };
 
 int RunEnglishStudy(const EnglishStudyOptions& options);

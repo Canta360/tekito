@@ -873,6 +873,8 @@ private:
         json += settings_.nextWordPrediction ? L"true" : L"false";
         json += L",\"doubledWordCheck\":";
         json += settings_.doubledWordCheck ? L"true" : L"false";
+        json += L",\"recheckPreviousWord\":";
+        json += settings_.recheckPreviousWord ? L"true" : L"false";
         json += L",\"doubleSpacePeriod\":";
         json += settings_.doubleSpacePeriod ? L"true" : L"false";
         json += L",\"smartPunctuation\":";
@@ -1038,6 +1040,7 @@ private:
             else if (key == L"periodOnEnter") settings_.periodOnEnter = value;
             else if (key == L"nextWordPrediction") settings_.nextWordPrediction = value;
             else if (key == L"doubledWordCheck") settings_.doubledWordCheck = value;
+            else if (key == L"recheckPreviousWord") settings_.recheckPreviousWord = value;
             else if (key == L"doubleSpacePeriod") settings_.doubleSpacePeriod = value;
             else if (key == L"smartPunctuation") settings_.smartPunctuation = value;
             else if (key == L"meaningsEnabled") settings_.meaningsEnabled = value;

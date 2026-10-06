@@ -198,6 +198,8 @@ int main(int argc, char** argv) {
             study.typed = argv[++index];
         } else if (arg == "--write-words" && index + 1 < argc) {
             study.writeWords = argv[++index];
+        } else if (arg == "--next-word") {
+            study.nextWord = true;
         } else if (arg == "--show-examples" && index + 1 < argc) {
             study.showExamples = static_cast<std::size_t>(std::stoul(argv[++index]));
         } else {

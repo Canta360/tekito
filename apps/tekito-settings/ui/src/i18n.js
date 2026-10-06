@@ -139,6 +139,7 @@ const en = {
   writing: {
     nextWordPrediction: { title: "Next words", description: "Suggest words that often come next." },
     doubledWordCheck: { title: "Repeated words", description: "Remove a word typed twice, like “the the”." },
+    recheckPreviousWord: { title: "Fix the word before", description: "Fix a typo that made another word once the next word shows it, like “have to urn”." },
     doubleSpacePeriod: { title: "Period with two spaces", description: "Press Space twice to end a sentence. Tab still shows the choices." },
     smartPunctuation: { title: "Curly quotes and dashes", description: "Type “ ” ’ and — for \" ' and --." },
   },
@@ -442,6 +443,7 @@ const ja = {
   writing: {
     nextWordPrediction: { title: "次に来る単語", description: "次に続きそうな単語を候補に出します。" },
     doubledWordCheck: { title: "単語の重複", description: "「the the」のように2回続けて打った単語を1つにします。" },
+    recheckPreviousWord: { title: "前の単語の見直し", description: "次の単語を打ったとき、別の単語になった打ち間違いを直します（have to urn → run）。" },
     doubleSpacePeriod: { title: "スペース2回でピリオド", description: "Space を2回押すと文末にピリオドを付けます。候補は Tab で出せます。" },
     smartPunctuation: { title: "飾りの引用符とダッシュ", description: "\" ' -- を “ ” ’ — にします。" },
   },

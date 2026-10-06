@@ -178,6 +178,12 @@ ConversionResult CandidateEngine::Convert(const ConversionRequest& request) cons
     return {std::move(candidates)};
 }
 
+std::optional<std::wstring> CandidateEngine::Recheck(std::wstring_view word, std::wstring_view precedingText,
+                                                     std::wstring_view followingText) const {
+    if (!generator_) return std::nullopt;
+    return generator_->Recheck(word, precedingText, followingText);
+}
+
 void CandidateEngine::AddDates(std::wstring_view rawText, std::vector<Candidate>& candidates) {
     std::wstring word(rawText);
     for (auto& c : word) c = static_cast<wchar_t>(std::towlower(c));
