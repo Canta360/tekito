@@ -655,6 +655,7 @@ function JapanesePage({ advanced, settings, setSetting }) {
           <Key label={j.keys.predictions} keys={["Tab", "↓"]} />
           <Key label={j.keys.kana} keys={["F6", "F7", "F8"]} />
           <Key label={j.keys.letters} keys={["F9", "F10"]} />
+          <Key label={j.keys.ctrlForms} keys={["Ctrl", "U I O P T"]} />
           <Key label={j.keys.english} keys={["Shift", "A-Z"]} />
           <Key label={j.keys.back} keys={["Esc"]} />
           <Key label={j.keys.undo} keys={["Ctrl", "Backspace"]} />
