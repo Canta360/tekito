@@ -288,6 +288,7 @@ bool SqliteUserDictionaryRepository::LoadSettings(UserSettings& settings) const 
             loaded.lastJapaneseProfileMode =
                 value == static_cast<int>(InputMode::Direct)    ? InputMode::Direct
                 : value == static_cast<int>(InputMode::Convert) ? InputMode::Convert
+                : value == static_cast<int>(InputMode::Mixed)   ? InputMode::Mixed
                                                                 : InputMode::Japanese;
         } else if (std::strcmp(key, "japanese_profile_english_mode") == 0) {
             loaded.japaneseProfileEnglishMode = value == static_cast<int>(InputMode::Direct)
@@ -309,6 +310,8 @@ bool SqliteUserDictionaryRepository::LoadSettings(UserSettings& settings) const 
             loaded.japaneseLiveConversion = value != 0;
         } else if (std::strcmp(key, "japanese_ignore_caps_lock") == 0) {
             loaded.japaneseIgnoreCapsLock = value != 0;
+        } else if (std::strcmp(key, "mixed_typing_enabled") == 0) {
+            loaded.mixedTypingEnabled = value != 0;
         }
     }
     success = success && stepResult == SQLITE_DONE;
@@ -402,6 +405,7 @@ bool SqliteUserDictionaryRepository::SaveSettings(const UserSettings& settings) 
     saveValue("japanese_prediction_enabled", settings.japanesePredictionEnabled ? 1 : 0);
     saveValue("japanese_live_conversion", settings.japaneseLiveConversion ? 1 : 0);
     saveValue("japanese_ignore_caps_lock", settings.japaneseIgnoreCapsLock ? 1 : 0);
+    saveValue("mixed_typing_enabled", settings.mixedTypingEnabled ? 1 : 0);
     if (statement) sqlite3_finalize(statement);
     statement = nullptr;
 

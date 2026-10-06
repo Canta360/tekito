@@ -5,12 +5,13 @@
 // the real candidate window, the installed Data Packs and your settings, user
 // words and learning, which it reads but never writes back.
 //
-//   tekito_testbed.exe [--defaults] [--english] [--smart-punctuation]
+//   tekito_testbed.exe [--defaults] [--english] [--mixed] [--smart-punctuation]
 //                      [--double-space-period] [--period-on-enter]
 //                      [--no-next-words] [--no-doubled-words]
 //
 // --defaults types with the default settings and no user words or learning.
-// --english starts in English (Auto) instead of Japanese. The other options
+// --english starts in English (Auto) instead of Japanese, --mixed in Mix
+// (Japanese and English typed in chunks; F2 turns it on or off). The other options
 // turn an English setting on or off for this window only, over your settings.
 // TEKITO_DATA_PACK_DIR picks other Data Packs (the repository's data folder,
 // say); otherwise the installed ones are used. Ctrl+L clears the page; F11
@@ -193,7 +194,9 @@ void EnsureFonts(Testbed& bed) {
 int Scale(const Testbed& bed, int value) { return MulDiv(value, static_cast<int>(bed.fontDpi), 96); }
 
 std::wstring StatusLine(const Testbed& bed) {
-    std::wstring line = bed.english ? L"TEKITO Testbed  |  English  |  " : L"TEKITO Testbed  |  Japanese  |  ";
+    std::wstring line = bed.english                   ? L"TEKITO Testbed  |  English  |  "
+                        : bed.composer.MixedTyping() ? L"TEKITO Testbed  |  Mix  |  "
+                                                     : L"TEKITO Testbed  |  Japanese  |  ";
     line += bed.userData ? L"your settings, words and learning (read only)" : L"default settings";
     if (bed.english) {
         const auto& settings = bed.settings;
@@ -213,6 +216,7 @@ std::wstring StatusLine(const Testbed& bed) {
         for (const auto part : missing) line += L" " + std::wstring(part);
     }
     line += bed.composer.LiveConversion() ? L"  |  live conversion on (F12)" : L"  |  live conversion off (F12)";
+    line += bed.composer.MixedTyping() ? L"  |  Japanese (F2)" : L"  |  Mix (F2)";
     line += L"  |  English (F11)  |  Ctrl+L clears";
     return line;
 }
@@ -960,6 +964,11 @@ bool OnKey(Testbed& bed, WPARAM key) {
         Refresh(bed);
         return true;
     }
+    if (key == VK_F2 && !bed.composer.IsComposing()) {
+        ja::AttachMixedTyping(bed.composer, !bed.composer.MixedTyping());
+        Refresh(bed);
+        return true;
+    }
     const auto command = ja::TranslateKey(bed.composer, tekito::tsf::JapaneseKeyPressFor(key, bed.settings.japaneseIgnoreCapsLock),
                                           tekito::userdata::JapaneseKeyOptions(bed.settings));
     bool used = true;
@@ -1024,6 +1033,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR commandLine, int show) 
     SetUpComposer(*bed);
     SetUpEnglish(*bed);
     if (options.find(L"--english") != std::wstring_view::npos) bed->english = EnsureEngine(*bed);
+    if (options.find(L"--mixed") != std::wstring_view::npos) ja::AttachMixedTyping(bed->composer, true);
 
     WNDCLASSEXW windowClass{sizeof(windowClass)};
     windowClass.hInstance = instance;

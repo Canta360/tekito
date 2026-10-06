@@ -15,6 +15,7 @@ constexpr UINT kMenuAuto = 1;
 constexpr UINT kMenuDirect = 2;
 constexpr UINT kMenuSettings = 3;
 constexpr UINT kMenuJapanese = 4;
+constexpr UINT kMenuMixed = 5;
 
 // Whether the taskbar, where the mode icon shows, is dark (Settings >
 // Personalization > Colors > "Choose your default Windows mode").
@@ -31,14 +32,15 @@ bool TaskbarIsDark() {
 
 ModeLangBarItem::ModeLangBarItem(HINSTANCE instance, ModeGetter getMode, ModeSetter setMode,
                                  ModeGetter toggledMode, Query japaneseProfile,
-                                 SettingsLauncher launchSettings, Query japaneseUi)
+                                 SettingsLauncher launchSettings, Query japaneseUi, Query mixedAvailable)
     : instance_(instance),
       getMode_(std::move(getMode)),
       setMode_(std::move(setMode)),
       toggledMode_(std::move(toggledMode)),
       japaneseProfile_(std::move(japaneseProfile)),
       launchSettings_(std::move(launchSettings)),
-      japaneseUi_(std::move(japaneseUi)) {}
+      japaneseUi_(std::move(japaneseUi)),
+      mixedAvailable_(std::move(mixedAvailable)) {}
 
 const wchar_t* ModeLangBarItem::Text(const wchar_t* english, const wchar_t* japanese) const {
     return japaneseUi_ && japaneseUi_() ? japanese : english;
@@ -97,6 +99,7 @@ HRESULT ModeLangBarItem::GetTooltipString(BSTR* tooltip) {
     if (!tooltip) return E_INVALIDARG;
     const auto mode = Mode();
     *tooltip = SysAllocString(mode == InputMode::Japanese ? Text(L"TEKITO Japanese", L"TEKITO 日本語")
+                              : mode == InputMode::Mixed ? Text(L"TEKITO Mix", L"TEKITO まぜ打ち")
                               : mode == InputMode::Direct
                                   ? Text(L"TEKITO Direct mode", L"TEKITO Direct モード")
                                   : Text(L"TEKITO Auto mode", L"TEKITO Auto モード"));
@@ -126,6 +129,7 @@ void ModeLangBarItem::ShowContextMenu(POINT point) {
     AppendMenuW(menu, flags(InputMode::Direct), kMenuDirect, L"Direct");
     if (JapaneseProfile()) {
         AppendMenuW(menu, flags(InputMode::Japanese), kMenuJapanese, Text(L"Japanese", L"日本語"));
+        if (MixedAvailable()) AppendMenuW(menu, flags(InputMode::Mixed), kMenuMixed, Text(L"Mix", L"まぜ打ち"));
     }
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(menu, MF_STRING, kMenuSettings, Text(L"Settings...", L"設定..."));
@@ -155,6 +159,10 @@ HRESULT ModeLangBarItem::InitMenu(ITfMenu* menu) {
     if (JapaneseProfile()) {
         hr = addItem(kMenuJapanese, checked(InputMode::Japanese), Text(L"Japanese", L"日本語"));
         if (FAILED(hr)) return hr;
+        if (MixedAvailable()) {
+            hr = addItem(kMenuMixed, checked(InputMode::Mixed), Text(L"Mix", L"まぜ打ち"));
+            if (FAILED(hr)) return hr;
+        }
     }
     hr = addItem(0, TF_LBMENUF_SEPARATOR, nullptr);
     if (FAILED(hr)) return hr;
@@ -173,6 +181,8 @@ HRESULT ModeLangBarItem::OnMenuSelect(UINT id) {
         setMode_(InputMode::Direct);
     } else if (id == kMenuJapanese && JapaneseProfile()) {
         setMode_(InputMode::Japanese);
+    } else if (id == kMenuMixed && MixedAvailable()) {
+        setMode_(InputMode::Mixed);
     } else {
         return S_OK;
     }
@@ -185,7 +195,7 @@ HRESULT ModeLangBarItem::GetIcon(HICON* icon) {
     const auto mode = Mode();
     // Auto's icon reads on either taskbar; the others have a dark version.
     darkTaskbar_ = TaskbarIsDark();
-    const int resourceId = mode == InputMode::Japanese ? (darkTaskbar_ ? IDI_JAPANESE_DARK : IDI_JAPANESE)
+    const int resourceId = TypesJapanese(mode) ? (darkTaskbar_ ? IDI_JAPANESE_DARK : IDI_JAPANESE)
                            : mode == InputMode::Direct ? (darkTaskbar_ ? IDI_DIRECT_DARK : IDI_DIRECT)
                                                        : IDI_AUTO;
     const int size = GetSystemMetrics(SM_CXSMICON);
@@ -200,6 +210,7 @@ HRESULT ModeLangBarItem::GetText(BSTR* text) {
     Trace(L"ModeLangBarItem GetText");
     const auto mode = Mode();
     *text = SysAllocString(mode == InputMode::Japanese ? L"あ"
+                           : mode == InputMode::Mixed  ? L"Aあ"
                            : mode == InputMode::Direct ? L"D"
                                                        : L"A");
     return *text ? S_OK : E_OUTOFMEMORY;

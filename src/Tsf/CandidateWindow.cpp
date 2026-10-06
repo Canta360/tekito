@@ -2291,7 +2291,7 @@ void CandidateWindow::ShowModeBadge(const RECT& caretRect, InputMode mode) {
     frame.caret = caretRect;
     frame.generation = ++generation_;
     frame.style = style_;
-    frame.badge = mode == InputMode::Japanese ? kBadgeJapanese
+    frame.badge = TypesJapanese(mode) ? kBadgeJapanese
                   : mode == InputMode::Direct ? kBadgeDirect
                                               : kBadgeAuto;
     {

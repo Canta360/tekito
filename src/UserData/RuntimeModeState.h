@@ -25,7 +25,7 @@ public:
     [[nodiscard]] bool IsAvailable() const noexcept;
     // The en-US profile: Convert or Direct.
     [[nodiscard]] InputMode Mode() const noexcept;
-    // The ja-JP profile: Japanese, Convert or Direct.
+    // The ja-JP profile: Japanese, Mixed, Convert or Direct.
     [[nodiscard]] InputMode JapaneseMode() const noexcept;
     [[nodiscard]] std::uint32_t ModeGeneration() const noexcept;
     [[nodiscard]] std::uint32_t SettingsGeneration() const noexcept;

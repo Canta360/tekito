@@ -4,6 +4,7 @@
 #include "Core/Japanese/KanaText.h"
 #include "Core/TypoModel.h"
 #include "Core/Japanese/KeyConverter.h"
+#include "Core/Japanese/ChunkJudge.h"
 #include "Core/Japanese/Loanwords.h"
 #include "Core/Japanese/PostalCodes.h"
 #include "Core/Japanese/RomajiTable.h"
@@ -71,7 +72,11 @@ constexpr std::size_t kLoanwordScan = 5;
 // Content words of the text committed lately kept for the language model.
 constexpr std::size_t kContextWords = 8;
 constexpr std::size_t kShortestLoanword = 2;
-constexpr std::size_t kLoanwords = 2;
+constexpr std::size_t kLoanwords = 3;
+// A reading the dictionary did not know is looked up from this many kana,
+// with at most this many after the word (a particle).
+constexpr std::size_t kShortestUnknownLoanword = 3;
+constexpr std::size_t kLoanwordParticle = 2;
 
 bool IsAlphanumeric(KanaForm form) {
     return form == KanaForm::FullWidthAlphanumeric || form == KanaForm::HalfWidthAlphanumeric;
@@ -627,6 +632,15 @@ void JapaneseComposer::BuildPhrases(bool convert) {
     focus_ = 0;
     listOpen_ = false;
     if (reading.empty()) return;
+    // Mixed typing: the chunk may be English.
+    std::optional<ChunkJudge::Judgement> chunk;
+    if (convert && chunkJudge_ && !HasAscii()) {
+        chunk = chunkJudge_->Judge(Keys(false), englishRun_);
+        if (chunk->english) {
+            phrases_.push_back({0, reading.size(), EnglishCandidates(chunk->written, reading)});
+            return;
+        }
+    }
     if (convert) {
         if (auto sum = SumCandidates(reading); !sum.empty()) {
             phrases_.push_back({0, reading.size(), std::move(sum)});
@@ -654,6 +668,55 @@ void JapaneseComposer::BuildPhrases(bool convert) {
                             convert ? KanaCandidates(reading) : std::vector<PhraseCandidate>{}});
         if (convert) AddSpecial(reading, phrases_.back().candidates);
     }
+    // Japanese, but it reads as English too: the English for the whole
+    // chunk is the next choice.
+    if (chunk && chunk->either && !phrases_.front().candidates.empty()) {
+        auto& candidates = phrases_.front().candidates;
+        PhraseCandidate english{chunk->written, candidates.front().cost, PhraseCandidate::Kind::English, false};
+        english.reading = conversionReading_;
+        candidates.insert(candidates.begin() + 1, std::move(english));
+    }
+}
+
+std::vector<PhraseCandidate> JapaneseComposer::EnglishCandidates(const std::wstring& written,
+                                                                 const std::wstring& reading) const {
+    std::vector<PhraseCandidate> candidates;
+    const auto add = [&](std::wstring text, PhraseCandidate::Kind kind) {
+        if (text.empty()) return;
+        const bool seen = std::any_of(candidates.begin(), candidates.end(),
+                                      [&](const PhraseCandidate& c) { return c.text == text; });
+        if (!seen) candidates.push_back({std::move(text), 0, kind, false});
+    };
+    add(written, PhraseCandidate::Kind::English);
+    add(Keys(false), PhraseCandidate::Kind::English);
+    // How it is written in katakana (ギットハブ), then as Japanese.
+    if (loanwords_) {
+        for (const auto& spelling : loanwords_->ForEnglish(Keys(false), 2)) {
+            add(spelling.katakana, PhraseCandidate::Kind::Katakana);
+        }
+    }
+    if (converter_ && LeftoverLetters(reading) == 0) {
+        std::wstring japanese;
+        for (const auto& phrase : ConvertReading(reading, 0, context_, contextWords_)) {
+            if (phrase.candidates.empty()) {
+                japanese.clear();
+                break;
+            }
+            japanese += phrase.candidates.front().text;
+        }
+        add(std::move(japanese), PhraseCandidate::Kind::Dictionary);
+        for (auto& kana : KanaCandidates(reading)) add(std::move(kana.text), kana.kind);
+    }
+    return candidates;
+}
+
+bool JapaneseComposer::ChoseEnglish() const noexcept {
+    if (!IsConverted() || preview_) return false;
+    if (const auto* whole = WholeChoice()) return whole->kind == PhraseCandidate::Kind::English;
+    return std::all_of(phrases_.begin(), phrases_.end(), [](const PhraseState& phrase) {
+        return !phrase.form && phrase.selected < phrase.candidates.size() &&
+               phrase.candidates[phrase.selected].kind == PhraseCandidate::Kind::English;
+    });
 }
 
 void JapaneseComposer::AddPhrases(std::vector<Phrase> phrases, const std::wstring& reading) {
@@ -662,7 +725,7 @@ void JapaneseComposer::AddPhrases(std::vector<Phrase> phrases, const std::wstrin
         const auto phraseReading = std::wstring_view(reading).substr(phrase.begin, phrase.length);
         if (std::none_of(phraseReading.begin(), phraseReading.end(), IsDigit)) PutDigitsAfterWords(phrase.candidates);
         if (learning_) learning_->Reorder(LearningReading(reading, phrase.begin, phrase.length), phrase.candidates);
-        AddLoanwords(phrase.candidates);
+        AddLoanwords(phrase.candidates, phraseReading);
         AddSpecial(std::wstring_view(reading).substr(phrase.begin, phrase.length), phrase.candidates);
         phrases_.push_back({phrase.begin, phrase.length, std::move(phrase.candidates)});
     }
@@ -681,8 +744,28 @@ std::vector<RomajiToken> JapaneseComposer::ParseRomaji(const RomajiTable& table,
     return tokens;
 }
 
-void JapaneseComposer::AddLoanwords(std::vector<PhraseCandidate>& candidates) const {
+void JapaneseComposer::AddLoanwords(std::vector<PhraseCandidate>& candidates, std::wstring_view reading) const {
     if (!loanwords_) return;
+    // The dictionary did not know the word: the first candidate is the
+    // kana as typed ("ぐうぐるで", "ツイッタあ"). The reading, or all of it
+    // but a short particle, may be a katakana word.
+    if (!candidates.empty() && reading.size() >= kShortestUnknownLoanword &&
+        ToHiragana(candidates.front().text) == ToHiragana(reading)) {
+        for (std::size_t length = reading.size();
+             length >= kShortestUnknownLoanword && reading.size() - length <= kLoanwordParticle; --length) {
+            const auto words = loanwords_->Words(reading.substr(0, length), kLoanwords);
+            if (words.empty()) continue;
+            const std::wstring rest(reading.substr(length));
+            std::vector<PhraseCandidate> found;
+            for (const auto& word : words) {
+                PhraseCandidate english{word + rest, candidates.front().cost, PhraseCandidate::Kind::English, false};
+                const auto same = [&](const PhraseCandidate& c) { return c.text == english.text; };
+                if (std::none_of(candidates.begin(), candidates.end(), same)) found.push_back(std::move(english));
+            }
+            candidates.insert(candidates.begin() + 1, found.begin(), found.end());
+            return;
+        }
+    }
     const auto isKatakana = [](wchar_t c) { return (c >= L'\x30A1' && c <= L'\x30F6') || c == L'\x30FC'; };
     for (std::size_t i = 0; i < std::min(candidates.size(), kLoanwordScan); ++i) {
         const auto& candidate = candidates[i];
@@ -1275,6 +1358,31 @@ std::wstring JapaneseComposer::Commit() {
     FlushAll();
     // Live: the keys that were pending are converted too.
     if (live_ && preview_) UpdateLive();
+    // Mixed typing: Enter before Space takes the chunk as Space would.
+    if (chunkJudge_ && IsComposing() && !IsConverted() && !HasAscii() && !chosenPrediction_) {
+        const auto chunk = chunkJudge_->Judge(Keys(false), englishRun_);
+        if (chunk.english) BuildPhrases(true);
+    }
+    if (chunkJudge_) {
+        const bool english = ChoseEnglish();
+        const bool spaced = english && englishRun_ > 0;
+        englishRun_ = english ? englishRun_ + 1 : 0;
+        if (english) {
+            auto text = Preedit();
+            if (learning_ && IsConverted()) {
+                const auto& phrase = phrases_[focus_];
+                if (phrase.selected < phrase.candidates.size()) {
+                    learning_->RecordChoice(conversionReading_, phrase.candidates[phrase.selected].text,
+                                            phrase.candidates.front().text);
+                }
+            }
+            if (spaced) text.insert(0, 1, L' ');
+            context_ = englishContext_;
+            Clear();
+            lastCommit_.reset();
+            return text;
+        }
+    }
     CommitRecord record{{}, units_, phrases_, conversionReading_, readingKeys_, context_, contextWords_, focus_,
                         preview_, asciiMode_, capitals_, settledPhrases_, settledLength_};
     const auto keep = [&](const std::wstring& text) {

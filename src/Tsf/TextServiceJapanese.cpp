@@ -70,23 +70,33 @@ InputMode TextService::SharedMode() const noexcept {
     if (!runtimeMode_) return mode_;
     if (!japaneseProfile_) return runtimeMode_->Mode();
     const auto mode = runtimeMode_->JapaneseMode();
-    return mode == InputMode::Japanese && !JapaneseModeAvailable() ? InputMode::Convert : mode;
+    if (TypesJapanese(mode) && !JapaneseModeAvailable()) return InputMode::Convert;
+    return mode == InputMode::Mixed && !MixedModeAvailable() ? InputMode::Japanese : mode;
 }
 
 InputMode TextService::ToggledMode() const noexcept {
     if (!JapaneseModeAvailable()) {
         return mode_ == InputMode::Convert ? InputMode::Direct : InputMode::Convert;
     }
+    // With mixed typing on, Mixed comes right after Japanese.
+    const auto afterJapanese = [&](InputMode english) {
+        return MixedModeAvailable() ? InputMode::Mixed : english;
+    };
     switch (userSettings_.japaneseSwitchOrder) {
     case 2:
         // Japanese, Auto, Direct, and round again.
-        return mode_ == InputMode::Japanese ? InputMode::Convert
+        return mode_ == InputMode::Japanese ? afterJapanese(InputMode::Convert)
+               : mode_ == InputMode::Mixed   ? InputMode::Convert
                : mode_ == InputMode::Convert ? InputMode::Direct
                                              : InputMode::Japanese;
     case 1:
-        return mode_ == InputMode::Japanese ? InputMode::Direct : InputMode::Japanese;
+        return mode_ == InputMode::Japanese ? afterJapanese(InputMode::Direct)
+               : mode_ == InputMode::Mixed  ? InputMode::Direct
+                                            : InputMode::Japanese;
     default:
-        return mode_ == InputMode::Japanese ? InputMode::Convert : InputMode::Japanese;
+        return mode_ == InputMode::Japanese ? afterJapanese(InputMode::Convert)
+               : mode_ == InputMode::Mixed  ? InputMode::Convert
+                                            : InputMode::Japanese;
     }
 }
 
@@ -152,7 +162,7 @@ void TextService::SyncModeCompartments() {
                      clientId_, mode_ == InputMode::Direct ? 0 : 1);
     if (japaneseProfile_ && mode_ != InputMode::Direct) {
         LONG conversion = TF_CONVERSIONMODE_ALPHANUMERIC;
-        if (mode_ == InputMode::Japanese) {
+        if (TypesJapanese(mode_)) {
             conversion = TF_CONVERSIONMODE_NATIVE | TF_CONVERSIONMODE_FULLSHAPE | TF_CONVERSIONMODE_ROMAN;
             if (japanese_.InputForm() == japanese::KanaForm::Katakana) {
                 conversion |= TF_CONVERSIONMODE_KATAKANA;
@@ -204,7 +214,7 @@ HRESULT TextService::OnChange(REFGUID compartment) {
             return S_OK;
         }
         if ((conversion & TF_CONVERSIONMODE_NATIVE) != 0) {
-            target = InputMode::Japanese;
+            target = TypesJapanese(mode_) ? mode_ : InputMode::Japanese;
             japanese_.SetInputForm((conversion & TF_CONVERSIONMODE_KATAKANA) != 0
                                        ? japanese::KanaForm::Katakana
                                        : japanese::KanaForm::Hiragana);
@@ -244,25 +254,25 @@ bool TextService::TranslateModeKey(WPARAM wParam, ModeKey& key) const {
     switch (wParam) {
     case VK_CONVERT:
         // In a composition Henkan converts; in Japanese it has nothing to do.
-        if (japanese_.IsComposing() || mode_ == InputMode::Japanese) return false;
+        if (japanese_.IsComposing() || TypesJapanese(mode_)) return false;
         key.mode = InputMode::Japanese;
         return true;
     case VK_NONCONVERT:
         if (japanese_.IsComposing()) return false;
         // To English; pressed again in English, between Auto and Direct.
-        key.mode = mode_ == InputMode::Japanese ? english
+        key.mode = TypesJapanese(mode_) ? english
                    : mode_ == InputMode::Convert ? InputMode::Direct
                                                  : InputMode::Convert;
         return true;
     case kVkHiragana:
     case kVkKatakana:
-        key.mode = InputMode::Japanese;
+        key.mode = TypesJapanese(mode_) ? mode_ : InputMode::Japanese;
         key.setsInputForm = true;
         key.inputForm = wParam == kVkKatakana || KeyDown(VK_SHIFT) ? japanese::KanaForm::Katakana
                                                                    : japanese::KanaForm::Hiragana;
         return true;
     case kVkImeOn:
-        key.mode = InputMode::Japanese;
+        key.mode = TypesJapanese(mode_) ? mode_ : InputMode::Japanese;
         return true;
     case kVkImeOff:
         key.mode = english;
@@ -341,7 +351,7 @@ bool TextService::TranslateEnglishSegmentKey(WPARAM wParam, KeyInput& input) {
 
 void TextService::EndEnglishSegment() {
     englishSegment_ = false;
-    if (mode_ == InputMode::Japanese) state_.SetInputMode(InputMode::Direct);
+    if (TypesJapanese(mode_)) state_.SetInputMode(InputMode::Direct);
 }
 
 HRESULT TextService::HandleEnglishSegmentEnd(ITfContext* context, TfEditCookie editCookie,

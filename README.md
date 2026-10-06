@@ -151,8 +151,9 @@ for the phrase in focus.
 - **Meanings beside the list.** Candidates with a meaning carry a small book
   sign, and the highlighted one's meaning appears beside the list, so you
   can tell 初め from 始め. Slang such as エモい and 推し活 has one too.
-- **Katakana with its English.** Loanwords offer the English word too
-  (ミーティング → meeting).
+- **Katakana with its English.** Loanwords and names offer the English word
+  too (ミーティング → meeting, グーグル → Google), from JMdict and Japanese
+  Wikipedia.
 - **It learns your way of writing.** The conversion you pick for a reading
   comes first the next time.
 - **Your own words.** Add a reading and how you write it in Settings, and
@@ -178,6 +179,17 @@ for the phrase in focus.
 Microsoft IME, Google Japanese Input and ATOK are trademarks of their
 owners; they are named here only to say which files TEKITO reads. TEKITO
 is not affiliated with them.
+
+### Mix mode
+
+Turn on Mix mode in Settings > Japanese, and it joins the modes after
+Japanese. There you type Japanese and English without switching, a Space
+after each part: `kyouha github ni push suru` becomes 今日はGitHubにpushする.
+Each part is taken as Japanese or English on its own: keys that are no romaji
+(github, push) and well-known names (API) stay English, written the way they
+are (GitHub); Japanese is converted as usual. A part that reads both ways,
+like “take”, follows the sentence: Japanese in Japanese, English after
+English. Space again gives the other one.
 
 ## Settings
 

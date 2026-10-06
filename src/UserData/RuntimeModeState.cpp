@@ -23,6 +23,7 @@ struct SharedRuntimeState {
 InputMode JapaneseModeFrom(LONG value) noexcept {
     return value == static_cast<LONG>(InputMode::Direct)    ? InputMode::Direct
            : value == static_cast<LONG>(InputMode::Convert) ? InputMode::Convert
+           : value == static_cast<LONG>(InputMode::Mixed)   ? InputMode::Mixed
                                                             : InputMode::Japanese;
 }
 

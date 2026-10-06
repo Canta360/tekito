@@ -24,17 +24,21 @@
 // text is among the first phrase-by-phrase choices, and conversion time.
 
 #include "Core/ExternalRankingProviders.h"
+#include "Core/Japanese/ChunkJudge.h"
 #include "Core/Japanese/JapaneseComposer.h"
 #include "Core/Japanese/JapaneseConverter.h"
 #include "Core/Japanese/JapaneseDictionary.h"
+#include "Core/Japanese/JapaneseUserDictionary.h"
 #include "Core/Japanese/KeyConverter.h"
 #include "Core/Japanese/LanguageModel.h"
+#include "Core/Japanese/Loanwords.h"
 #include "Core/Japanese/RomajiTable.h"
 #include "JapaneseEvalCommon.h"
 #include "JapaneseTypingStudy.h"
 
 #include <algorithm>
 #include <chrono>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
@@ -98,7 +102,8 @@ struct Totals {
 int RunKeys(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary, const JapaneseConverter& converter,
             const std::filesystem::path& corpus, const std::filesystem::path& romaji,
             tekito::japanese::KeyConverter::Costs costs, std::size_t showMisses,
-            const std::filesystem::path& dumpPhrases, bool byPhrase, bool useContext) {
+            const std::filesystem::path& dumpPhrases, bool byPhrase, bool useContext,
+            const tekito::japanese::Loanwords* loanwords) {
     const auto table = tekito::japanese::RomajiTable::Load(romaji);
     if (!table) {
         std::cerr << "could not open the romaji table\n";
@@ -108,6 +113,7 @@ int RunKeys(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary
     tekito::japanese::JapaneseComposer composer(table.get());
     composer.SetConverter(&converter);
     composer.SetKeyConverter(&keyConverter);
+    if (loanwords) composer.SetLoanwords(loanwords);
 
     struct KeyTotals {
         std::size_t rows{0}, exact{0}, inList{0}, errors{0}, characters{0};
@@ -200,6 +206,22 @@ int RunKeys(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary
             ++shown;
             std::cout << "miss " << row.source << ":" << row.id << "  " << Narrow(output) << "  (want "
                       << Narrow(row.expected.front()) << (inList ? ", in the list" : "") << ")\n";
+            if (std::getenv("TEKITO_EVAL_LISTS")) {
+                // Each phrase's first choices, to see why the meant text was not among them.
+                const std::size_t count = composer.Segments().size();
+                for (std::size_t f = 0; f < count; ++f) {
+                    composer.MoveFocus(-static_cast<int>(count));
+                    composer.MoveFocus(static_cast<int>(f));
+                    composer.NextCandidate();
+                    composer.PreviousCandidate();
+                    std::cout << "    phrase " << f << ":";
+                    const auto* candidates = composer.FocusedCandidates();
+                    for (std::size_t j = 0; candidates && j < std::min<std::size_t>(9, candidates->size()); ++j) {
+                        std::cout << " " << Narrow((*candidates)[j].text);
+                    }
+                    std::cout << "\n";
+                }
+            }
         }
     }
     std::cout << std::fixed << std::setprecision(1);
@@ -218,22 +240,21 @@ int RunKeys(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary
 }
 
 
-// --chunks: Japanese and English typed in chunks, a Space after each (the
-// mixed typing mode). Each chunk is judged English or Japanese, Japanese is
-// converted and committed, English kept; English after English gets a
-// space. A chunk ending in "*" in the corpus is English (the answer).
+// --chunks: Japanese and English typed in chunks, a Space after each, with
+// the composer in mixed typing (ChunkJudge): each chunk is converted with
+// Space and committed by the next. A chunk ending in "*" in the corpus is
+// English (the answer, not typed).
 struct ChunkOptions {
     std::filesystem::path englishScores;
-    // An English word at least this common (log10 score) is English when
-    // its romaji reads as Japanese only at this cost per kana or more.
-    double englishScore{4.0};
-    double japaneseCost{2300.0};
+    std::filesystem::path pack;
+    tekito::japanese::ChunkJudge::Thresholds thresholds;
     std::size_t showChunks{0};
 };
 
 int RunChunks(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary, const JapaneseConverter& converter,
               const std::filesystem::path& corpus, const std::filesystem::path& romaji,
-              tekito::japanese::KeyConverter::Costs costs, std::size_t showMisses, const ChunkOptions& options) {
+              tekito::japanese::KeyConverter::Costs costs, std::size_t showMisses, const ChunkOptions& options,
+              const tekito::japanese::Loanwords* names) {
     const auto table = tekito::japanese::RomajiTable::Load(romaji);
     if (!table) {
         std::cerr << "could not open the romaji table\n";
@@ -248,6 +269,11 @@ int RunChunks(const ConnectionMatrix& matrix, const JapaneseDictionary& dictiona
     tekito::japanese::JapaneseComposer composer(table.get());
     composer.SetConverter(&converter);
     composer.SetKeyConverter(&keyConverter);
+    if (names) composer.SetLoanwords(names);
+    const tekito::japanese::ChunkJudge judge(*table, converter, &keyConverter, english, names, options.thresholds);
+    const auto parts = tekito::japanese::UserPartsOfSpeech::Load(options.pack / "pos.tsv");
+    const auto noun = parts.For(tekito::japanese::UserWordKind::ProperNoun);
+    composer.SetMixedTyping(&judge, noun ? noun->right : 0);
 
     struct ChunkTotals {
         std::size_t rows{0}, exact{0}, errors{0}, characters{0};
@@ -257,57 +283,27 @@ int RunChunks(const ConnectionMatrix& matrix, const JapaneseDictionary& dictiona
     std::size_t shownMisses = 0, shownChunks = 0;
     for (const auto& row : LoadCorpus(corpus)) {
         std::wstring output;
-        bool lastEnglish = false;
+        std::size_t englishBefore = 0;
         composer.ForgetContext();
         std::vector<std::pair<bool, bool>> judged;  // English meant, English said
         std::wistringstream words(row.reading);
         for (std::wstring chunk; words >> chunk;) {
             const bool meant = chunk.back() == L'*';
             if (meant) chunk.pop_back();
-            // How the chunk reads as romaji.
-            std::wstring kana;
-            bool readable = true;
-            for (const auto& token : tekito::japanese::JapaneseComposer::ParseRomaji(*table, chunk)) {
-                readable = readable && !token.leftover;
-                kana += token.kana;
-            }
-            // Letters romaji uses only for small kana and ヴ (la, xtu, vi):
-            // English when the chunk is an English word.
-            bool rareLetters = false;
-            for (std::size_t i = 0; i < chunk.size(); ++i) {
-                const wchar_t c = chunk[i];
-                rareLetters = rareLetters || c == L'l' || c == L'q' || c == L'x' || c == L'v' ||
-                              (c == L'c' && (i + 1 == chunk.size() || chunk[i + 1] != L'h'));
-            }
-            const double score = english.Score(chunk);
-            const auto best = readable ? converter.Best(kana) : std::nullopt;
-            const double perKana = best && !kana.empty() ? static_cast<double>(best->cost) / kana.size() : 1e9;
-            // Two letters or fewer are particles (to, de, na), not English.
-            constexpr double kKnownWord = 2.5;
-            // Keys that make no kana: an English word, or Japanese with a slip
-            // when undoing it reads as Japanese; otherwise a name (chatgpt).
-            constexpr double kListedWord = 0.9;
-            const bool slip = !readable && score < kListedWord && keyConverter.Convert(chunk).has_value();
-            const bool said = (!readable && !slip) || (chunk.size() > 2 && rareLetters && score >= kKnownWord) ||
-                              (chunk.size() > 2 && score >= options.englishScore && perKana >= options.japaneseCost);
+            const auto judgement = judge.Judge(chunk, englishBefore);
+            const bool said = judgement.english;
+            englishBefore = said ? englishBefore + 1 : 0;
             judged.push_back({meant, said});
             if (shownChunks < options.showChunks) {
                 ++shownChunks;
                 std::cout << "chunk " << Narrow(chunk) << (meant ? " E" : " J") << " said=" << (said ? "E" : "J")
-                          << " readable=" << readable << " english=" << score << " ja_per_kana=" << perKana
-                          << " kana=" << Narrow(kana) << (meant != said ? "  WRONG" : "") << "\n";
+                          << " written=" << Narrow(judgement.written) << (judgement.either ? " either" : "")
+                          << " in_japanese=" << (names && names->InJapaneseText(chunk) ? *names->InJapaneseText(chunk) : -9.0)
+                          << (meant != said ? "  WRONG" : "") << "\n";
             }
-            if (said) {
-                if (lastEnglish) output += L' ';
-                output += chunk;
-                lastEnglish = true;
-                continue;
-            }
-            composer.Clear();
             for (const wchar_t key : chunk) composer.Insert(key);
             composer.Convert();
             output += composer.Commit();
-            lastEnglish = false;
         }
         const auto [distance, length] = ja_eval::Closest(output, row.expected);
         for (ChunkTotals* t : {&totals[row.source], &totals["all"]}) {
@@ -356,6 +352,9 @@ int main(int argc, char** argv) {
     TypingStudyOptions study;
     ChunkOptions chunks;
     std::filesystem::path chunkCorpus;
+    // English for katakana candidates: the japanese-loanwords and
+    // japanese-english packs.
+    std::filesystem::path loanwordPack, japaneseEnglishPack;
     tekito::japanese::KeyConverter::Costs costs;
     for (int i = 1; i < argc; ++i) {
         const std::string_view arg = argv[i];
@@ -377,9 +376,12 @@ int main(int argc, char** argv) {
         else if (arg == "--join" && i + 1 < argc) study.join = std::stoul(argv[++i]);
         else if (arg == "--sample" && i + 1 < argc) study.sample = std::stoul(argv[++i]);
         else if (arg == "--chunks" && i + 1 < argc) chunkCorpus = argv[++i];
+        else if (arg == "--loanwords" && i + 1 < argc) loanwordPack = argv[++i];
+        else if (arg == "--japanese-english" && i + 1 < argc) japaneseEnglishPack = argv[++i];
         else if (arg == "--english-scores" && i + 1 < argc) chunks.englishScores = argv[++i];
-        else if (arg == "--english-score" && i + 1 < argc) chunks.englishScore = std::stod(argv[++i]);
-        else if (arg == "--japanese-cost" && i + 1 < argc) chunks.japaneseCost = std::stod(argv[++i]);
+        else if (arg == "--english-score" && i + 1 < argc) chunks.thresholds.commonWord = std::stod(argv[++i]);
+        else if (arg == "--japanese-cost" && i + 1 < argc) chunks.thresholds.costPerKana = std::stoll(argv[++i]);
+        else if (arg == "--known-name" && i + 1 < argc) chunks.thresholds.knownName = std::stod(argv[++i]);
         else if (arg == "--show-chunks" && i + 1 < argc) chunks.showChunks = std::stoul(argv[++i]);
     }
     tekito::japanese::LanguageModel model;
@@ -400,7 +402,12 @@ int main(int argc, char** argv) {
         }
         JapaneseConverter converter(dictionary, matrix);
         if (model.IsOpen()) converter.SetLanguageModel(&model, weights);
-        return RunChunks(matrix, dictionary, converter, chunkCorpus, romaji, costs, showMisses, chunks);
+        chunks.pack = pack;
+        tekito::japanese::Loanwords names;
+        if (!loanwordPack.empty()) (void)names.Open(loanwordPack);
+        if (!japaneseEnglishPack.empty()) (void)names.OpenEnglish(japaneseEnglishPack);
+        return RunChunks(matrix, dictionary, converter, chunkCorpus, romaji, costs, showMisses, chunks,
+                         names.IsOpen() ? &names : nullptr);
     }
     if (!pack.empty() && !keysCorpus.empty()) {
 #if defined(_WIN32)
@@ -419,8 +426,11 @@ int main(int argc, char** argv) {
             study.showExamples = showMisses;
             return RunTypingStudy(dictionary, converter, keysCorpus, romaji, study);
         }
+        tekito::japanese::Loanwords loanwords;
+        if (!loanwordPack.empty()) (void)loanwords.Open(loanwordPack);
+        if (!japaneseEnglishPack.empty()) (void)loanwords.OpenEnglish(japaneseEnglishPack);
         return RunKeys(matrix, dictionary, converter, keysCorpus, romaji, costs, showMisses, dumpPhrases, byPhrase,
-                       useContext);
+                       useContext, loanwords.IsOpen() ? &loanwords : nullptr);
     }
     if (pack.empty() || corpus.empty()) {
         std::cerr << "usage: tekito_ja_eval --pack <dir> --corpus <japanese_eval.tsv> [--show-misses N]\n";

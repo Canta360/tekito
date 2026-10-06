@@ -42,6 +42,7 @@ function initialState() {
       toggleKey: 1,
       keyboardType: 0,
       periodOnEnter: false,
+      mixedTypingEnabled: false,
       nextWordPrediction: true,
       doubledWordCheck: true,
       doubleSpacePeriod: false,

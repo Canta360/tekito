@@ -32,11 +32,12 @@ const en = {
   settingNotSaved: "The setting could not be saved.",
   modeNotSaved: "The input mode could not be saved.",
 
-  modeNames: { japanese: "Japanese", auto: "Auto", direct: "Direct" },
+  modeNames: { japanese: "Japanese", mixed: "Mix", auto: "Auto", direct: "Direct" },
   // Japanese keyboard keys, as English text names them.
   keyNames: { hankaku: "Hankaku/Zenkaku", henkan: "Henkan", muhenkan: "Muhenkan", hiragana: "Hiragana" },
   modes: {
     japanese: "Turns romaji into kana and kanji.",
+    mixed: "Japanese and English without switching, a Space after each part.",
     auto: "Corrects spelling and suggests words as you type.",
     direct: "Types exactly the keys you press.",
   },
@@ -175,6 +176,10 @@ const en = {
     digits: { title: "Digits", description: "The width of the numbers you type." },
     symbols: { title: "Letters and symbols", description: "The width of letters and symbols like ! and ( )." },
     capsLock: { title: "Ignore Caps Lock", description: "Type kana even when Caps Lock is on." },
+    mixed: {
+      title: "Mix mode",
+      description: "Type Japanese and English without switching: a Space after each part.",
+    },
     live: { title: "Live conversion" },
     prediction: { title: "Predict words", description: "Suggest words as you type. Pick one with Tab." },
     keys: {
@@ -329,10 +334,11 @@ const ja = {
   settingNotSaved: "設定を保存できませんでした。",
   modeNotSaved: "入力モードを保存できませんでした。",
 
-  modeNames: { japanese: "日本語", auto: "Auto", direct: "Direct" },
+  modeNames: { japanese: "日本語", mixed: "まぜ打ち", auto: "Auto", direct: "Direct" },
   keyNames: { hankaku: "半角/全角", henkan: "変換", muhenkan: "無変換", hiragana: "ひらがな" },
   modes: {
     japanese: "ローマ字をかなと漢字にします。",
+    mixed: "日本語と英語を切り替えずに、Space で区切りながら打てます。",
     auto: "打ちながらスペルを直し、単語を提案します。",
     direct: "押したキーがそのまま入ります。",
   },
@@ -471,6 +477,10 @@ const ja = {
     digits: { title: "数字", description: "打った数字の幅です。" },
     symbols: { title: "英字と記号", description: "英字と、！や（）などの記号の幅です。" },
     capsLock: { title: "Caps Lock を無視する", description: "Caps Lock がオンでも、かなで打てます。" },
+    mixed: {
+      title: "まぜ打ちモード",
+      description: "日本語と英語を切り替えずに、Space で区切りながら打てます。",
+    },
     live: { title: "ライブ変換" },
     prediction: { title: "予測候補", description: "打っている途中で、続きの言葉を出します。Tab で選べます。" },
     keys: {

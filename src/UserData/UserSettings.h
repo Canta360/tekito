@@ -55,7 +55,7 @@ struct UserSettings {
     // 106/109 keys), 2 = US (101/102 keys). Decides the switch keys and the
     // layout the English profile uses. See KeyboardLayout.h.
     int keyboardType{0};
-    // The ja-JP profile's mode (Japanese, Convert or Direct), and which of
+    // The ja-JP profile's mode (Japanese, Mixed, Convert or Direct), and which of
     // Convert and Direct its switch key goes to from Japanese.
     InputMode lastJapaneseProfileMode{InputMode::Japanese};
     InputMode japaneseProfileEnglishMode{InputMode::Convert};
@@ -87,6 +87,10 @@ struct UserSettings {
     // Japanese shown converted while typing; Space then picks other
     // candidates for the last phrase.
     bool japaneseLiveConversion{false};
+    // The mixed typing mode (InputMode::Mixed): Japanese and English typed
+    // in chunks, a Space after each, with no switching between them. On, it
+    // comes right after Japanese when the switch key goes round.
+    bool mixedTypingEnabled{false};
     // Letters typed in Japanese as if Caps Lock were off.
     bool japaneseIgnoreCapsLock{true};
     // Special conversions, in English and Japanese (the special-conversions

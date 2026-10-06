@@ -52,6 +52,7 @@ const initialSettings = {
   advancedSettings: false,
   japanesePredictionEnabled: true,
   japaneseLiveConversion: false,
+  mixedTypingEnabled: false,
   japaneseIgnoreCapsLock: true,
   dateConversion: true,
   numberConversion: true,
@@ -86,6 +87,8 @@ const candidateStyles = [{ value: 0, id: "glass" }, { value: 1, id: "simple" }];
 // dark background.
 const modeTiles = {
   japanese: { image: "./assets/japanese.ico", imageDark: "./assets/japanese-dark.ico" },
+  // Japanese's icon until Mix has its own.
+  mixed: { image: "./assets/japanese.ico", imageDark: "./assets/japanese-dark.ico" },
   auto: { image: "./assets/auto.ico" },
   direct: { image: "./assets/direct.ico", imageDark: "./assets/direct-dark.ico" },
 };
@@ -136,7 +139,7 @@ function App() {
   const applyState = useCallback((state) => {
     if (!state) return;
     setSettings((value) => ({ ...value, ...(state.settings || {}) }));
-    setMode(["japanese", "direct"].includes(state.mode) ? state.mode : "auto");
+    setMode(["japanese", "mixed", "direct"].includes(state.mode) ? state.mode : "auto");
     setRuntime((value) => ({ ...value, ...(state.runtime || {}) }));
     setLearning((value) => ({ ...value, ...(state.learning || {}) }));
     setDictionary(state.dictionary || []);
@@ -372,11 +375,12 @@ function GeneralPage({ advanced, mode, japanese, japaneseInstalled, settings, ch
   const t = useText();
   // UserSettings::uiLanguage.
   const languages = [[0, t.language.system], [1, "English"], [2, "日本語"]];
-  // Japanese is a mode only when it is installed.
-  const modes = japanese ? ["auto", "direct", "japanese"] : ["auto", "direct"];
+  // Japanese is a mode only when it is installed; Mix, when it is on too.
+  const mixed = japanese && settings.mixedTypingEnabled;
+  const modes = japanese ? ["auto", "direct", "japanese"].concat(mixed ? ["mixed"] : []) : ["auto", "direct"];
   return (
     <>
-      <div className={`tile-grid mode-grid ${japanese ? "three" : ""}`}>
+      <div className={`tile-grid mode-grid ${modes.length === 3 ? "three" : ""}`}>
         {modes.map((id) => (
           <Tile key={id} on={mode === id} image={modeTiles[id].image} imageDark={modeTiles[id].imageDark}
             title={t.modeNames[id]} description={t.modes[id]} status={mode === id ? t.inUse : undefined}
@@ -417,10 +421,12 @@ function SwitchingPage({ advanced, japanese, japaneseKeyboard, settings, setSett
   const keyboards = [[0, t.keyboard.detect], [1, t.keyboard.japanese], [2, t.keyboard.us]];
   const toggleKeys = [1, 2, 3].map((value) => [value, <Keycaps keys={switchKeyCaps(value, japaneseKeyboard, t)} />])
     .concat([[0, t.switchKey.none]]);
+  // With Mix on, it comes right after Japanese.
+  const after = settings.mixedTypingEnabled ? ["japanese", "mixed"] : ["japanese"];
   const orders = [
-    [0, <ModeOrder ids={["japanese", "auto"]} />],
-    [1, <ModeOrder ids={["japanese", "direct"]} />],
-    [2, <ModeOrder ids={["japanese", "auto", "direct"]} round />],
+    [0, <ModeOrder ids={[...after, "auto"]} round={after.length > 1} />],
+    [1, <ModeOrder ids={[...after, "direct"]} round={after.length > 1} />],
+    [2, <ModeOrder ids={[...after, "auto", "direct"]} round />],
   ];
   const switchKey = switchKeyCaps(settings.toggleKey, japaneseKeyboard, t);
   return (
@@ -598,6 +604,9 @@ function JapanesePage({ advanced, settings, setSetting }) {
   return (
     <>
       <Glass className="card">
+        <Row title={j.mixed.title} description={j.mixed.description}>
+          <Toggle label={j.mixed.title} checked={settings.mixedTypingEnabled} onChange={(value) => setSetting("mixedTypingEnabled", value)} />
+        </Row>
         <Row title={j.live.title}>
           <Toggle label={j.live.title} checked={settings.japaneseLiveConversion} onChange={(value) => setSetting("japaneseLiveConversion", value)} />
         </Row>

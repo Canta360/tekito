@@ -14,6 +14,7 @@
 
 namespace tekito::japanese {
 
+class ChunkJudge;
 class JapaneseLearningStore;
 class KeyConverter;
 class JapaneseUserDictionary;
@@ -74,6 +75,17 @@ public:
     // English words for katakana candidates (ミーティング -> meeting), offered
     // right after them; nullptr offers none.
     void SetLoanwords(const Loanwords* loanwords) noexcept { loanwords_ = loanwords; }
+    // Mixed typing: Space (and Enter) takes what was typed as one chunk of
+    // English or Japanese (ChunkJudge). English stays English, written as
+    // it is (GitHub), with a space before it after English, and the other
+    // language comes next in the list. Japanese after English reads on from
+    // `englishContext`, the part of speech of a noun. nullptr: off.
+    void SetMixedTyping(const ChunkJudge* judge, std::uint16_t englishContext = 0) noexcept {
+        chunkJudge_ = judge;
+        englishContext_ = englishContext;
+        englishRun_ = 0;
+    }
+    [[nodiscard]] bool MixedTyping() const noexcept { return chunkJudge_ != nullptr; }
     // The user's words, for conversion and predictions; null for none.
     void SetUserDictionary(const JapaneseUserDictionary* user) noexcept { userDictionary_ = user; }
     // Dates for "きょう", numbers in kanji, symbols by reading and sums for
@@ -155,6 +167,7 @@ public:
     void ForgetContext() noexcept {
         context_ = 0;
         contextWords_.clear();
+        englishRun_ = 0;
     }
     [[nodiscard]] std::uint16_t Context() const noexcept { return context_; }
     // Space and Henkan: converts, then steps through the candidates.
@@ -269,11 +282,20 @@ private:
                                         int letterCase) const;
     // Phrases from the converter, or one phrase for the whole text.
     void BuildPhrases(bool convert);
+    // Mixed typing: the candidates for a chunk judged English, `written`
+    // first, then the keys as typed, katakana and the Japanese.
+    [[nodiscard]] std::vector<PhraseCandidate> EnglishCandidates(const std::wstring& written,
+                                                                 const std::wstring& reading) const;
+    // Mixed typing: whether what is chosen is English (to space it and
+    // read on from it).
+    [[nodiscard]] bool ChoseEnglish() const noexcept;
     [[nodiscard]] std::vector<PhraseCandidate> KanaCandidates(std::wstring_view reading) const;
     void AddPhrases(std::vector<Phrase> phrases, const std::wstring& reading);
     void UpdatePredictions();
     // The English word after the first candidate that starts in katakana.
-    void AddLoanwords(std::vector<PhraseCandidate>& candidates) const;
+    // `reading`: the phrase's kana, looked up too when the dictionary did
+    // not know the word (ぐうぐるで: Googleで).
+    void AddLoanwords(std::vector<PhraseCandidate>& candidates, std::wstring_view reading) const;
     // Dates, number forms and symbols for a phrase read as `reading`.
     void AddSpecial(std::wstring_view reading, std::vector<PhraseCandidate>& candidates) const;
     // The sum for arithmetic ending in "=" ("1+2=" -> 3, 1+2=3), or nothing.
@@ -334,6 +356,10 @@ private:
     const JapaneseConverter* converter_{nullptr};
     const KeyConverter* keyConverter_{nullptr};
     const Loanwords* loanwords_{nullptr};
+    const ChunkJudge* chunkJudge_{nullptr};
+    std::uint16_t englishContext_{0};
+    // Mixed typing: English chunks committed in a row, just before.
+    std::size_t englishRun_{0};
     const JapaneseUserDictionary* userDictionary_{nullptr};
     const SpecialConversions* special_{nullptr};
     const PostalCodes* postalCodes_{nullptr};

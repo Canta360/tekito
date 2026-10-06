@@ -78,6 +78,7 @@ constexpr DataPackInfo kJapaneseDataPacks[] = {
     {L"japanese-romaji", L"Romaji Table"},
     {L"japanese-lm", L"Japanese Word Pairs"},
     {L"japanese-loanwords", L"Loanwords"},
+    {L"japanese-english", L"Katakana and English"},
     {L"japanese-wiktionary", L"Japanese Meanings (Wiktionary)"},
     {L"japanese-wordnet", L"Japanese Meanings (WordNet)"},
 };
@@ -744,6 +745,9 @@ private:
         if (!runtime_) return L"auto";
         if (japaneseAvailable_) {
             const auto mode = runtime_->JapaneseMode();
+            if (mode == tekito::InputMode::Mixed && settings_.japaneseEnabled) {
+                return settings_.mixedTypingEnabled ? L"mixed" : L"japanese";
+            }
             return mode == tekito::InputMode::Japanese ? (settings_.japaneseEnabled ? L"japanese" : L"auto")
                    : mode == tekito::InputMode::Direct ? L"direct"
                                                        : L"auto";
@@ -881,6 +885,8 @@ private:
         json += settings_.advancedSettings ? L"true" : L"false";
         json += L",\"japanesePredictionEnabled\":";
         json += settings_.japanesePredictionEnabled ? L"true" : L"false";
+        json += L",\"mixedTypingEnabled\":";
+        json += settings_.mixedTypingEnabled ? L"true" : L"false";
         json += L",\"japaneseLiveConversion\":";
         json += settings_.japaneseLiveConversion ? L"true" : L"false";
         json += L",\"japaneseIgnoreCapsLock\":";
@@ -1056,6 +1062,7 @@ private:
             }
             else if (key == L"japanesePredictionEnabled") settings_.japanesePredictionEnabled = value;
             else if (key == L"japaneseLiveConversion") settings_.japaneseLiveConversion = value;
+            else if (key == L"mixedTypingEnabled") settings_.mixedTypingEnabled = value;
             else if (key == L"japaneseIgnoreCapsLock") settings_.japaneseIgnoreCapsLock = value;
             else if (key == L"uiLanguage") settings_.uiLanguage = std::clamp(integerValue, 0, 2);
             else if (key == L"toggleKey") {
@@ -1087,6 +1094,12 @@ private:
                                                                            : settings_.japaneseProfileEnglishMode,
                                                  ignored);
                 }
+                // Mix turned off while in it: back to Japanese.
+                if (key == L"mixedTypingEnabled" && !settings_.mixedTypingEnabled && runtime_ &&
+                    runtime_->JapaneseMode() == tekito::InputMode::Mixed) {
+                    std::wstring ignored;
+                    (void)SetCurrentJapaneseMode(tekito::InputMode::Japanese, ignored);
+                }
                 Reply(requestId, true);
             }
         } else if (type == L"mode.set") {
@@ -1094,12 +1107,14 @@ private:
             const auto value = message.String(L"value");
             const auto mode = value == L"direct"     ? tekito::InputMode::Direct
                               : value == L"japanese" ? tekito::InputMode::Japanese
+                              : value == L"mixed"    ? tekito::InputMode::Mixed
                                                      : tekito::InputMode::Convert;
             (void)DataPacksJson();
-            const bool saved = mode == tekito::InputMode::Japanese && !settings_.japaneseEnabled ? false
+            const bool saved = tekito::TypesJapanese(mode) && !settings_.japaneseEnabled ? false
+                               : mode == tekito::InputMode::Mixed && !settings_.mixedTypingEnabled ? false
                                : japaneseAvailable_ ? SetCurrentJapaneseMode(mode, error)
-                               : mode == tekito::InputMode::Japanese ? false
-                                                                     : SetCurrentMode(mode, error);
+                               : tekito::TypesJapanese(mode) ? false
+                                                             : SetCurrentMode(mode, error);
             Reply(requestId, saved, error);
         } else if (type == L"excludedApps.add") {
             std::wstring error;
@@ -1505,7 +1520,7 @@ private:
         const auto previousMode = runtime_ ? runtime_->JapaneseMode() : settings_.lastJapaneseProfileMode;
         if (runtime_) runtime_->SetJapaneseMode(mode);
         settings_.lastJapaneseProfileMode = mode;
-        if (mode != tekito::InputMode::Japanese) settings_.japaneseProfileEnglishMode = mode;
+        if (!tekito::TypesJapanese(mode)) settings_.japaneseProfileEnglishMode = mode;
         if (!repository_ || !repository_->SaveSettings(settings_)) {
             settings_ = previousSettings;
             if (runtime_) runtime_->SetJapaneseMode(previousMode);

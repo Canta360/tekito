@@ -10,7 +10,8 @@
 namespace tekito::tsf {
 
 // The mode button in the taskbar: Auto and Direct, and in the Japanese
-// profile also Japanese. A click goes where the switch key goes.
+// profile also Japanese (and Mix, when it is on). A click goes where the
+// switch key goes.
 class ModeLangBarItem final : public ITfLangBarItemButton,
                               public ITfSource {
 public:
@@ -21,7 +22,7 @@ public:
 
     ModeLangBarItem(HINSTANCE instance, ModeGetter getMode, ModeSetter setMode,
                     ModeGetter toggledMode, Query japaneseProfile, SettingsLauncher launchSettings,
-                    Query japaneseUi);
+                    Query japaneseUi, Query mixedAvailable);
 
     HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void** object) override;
     ULONG STDMETHODCALLTYPE AddRef() override;
@@ -48,6 +49,7 @@ private:
 
     [[nodiscard]] InputMode Mode() const;
     [[nodiscard]] bool JapaneseProfile() const;
+    [[nodiscard]] bool MixedAvailable() const { return mixedAvailable_ && mixedAvailable_(); }
     [[nodiscard]] const wchar_t* Text(const wchar_t* english, const wchar_t* japanese) const;
     void ShowContextMenu(POINT point);
 
@@ -60,6 +62,7 @@ private:
     Query japaneseProfile_;
     SettingsLauncher launchSettings_;
     Query japaneseUi_;
+    Query mixedAvailable_;
     ITfLangBarItemSink* sink_{nullptr};
 };
 

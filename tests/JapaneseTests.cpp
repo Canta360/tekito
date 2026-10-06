@@ -9,6 +9,8 @@
 #include "Core/Japanese/KeyConverter.h"
 #include "Core/Japanese/LanguageModel.h"
 #include "Core/Japanese/Loanwords.h"
+#include "Core/Japanese/ChunkJudge.h"
+#include "Core/RankingData.h"
 #include "Core/Japanese/KanaText.h"
 #include "Core/Japanese/Meanings.h"
 #include "Core/Japanese/PostalCodes.h"
@@ -767,6 +769,52 @@ void TestLoanwords(const RomajiTable& table, const MiniPack& pack) {
     }
 }
 
+// Mixed typing: each chunk before Space is English or Japanese.
+void TestMixedTyping(const RomajiTable& table, const MiniPack& pack) {
+    struct WordScores final : tekito::IFrequencyProvider {
+        double Score(std::wstring_view word) const noexcept override {
+            for (const auto& [listed, score] : {std::pair<std::wstring_view, double>{L"github", 2.7},
+                                                {L"push", 4.2}, {L"to", 6.7}, {L"take", 5.1}}) {
+                if (word == listed) return score;
+            }
+            return 0.0;
+        }
+    } scores;
+    const tekito::japanese::JapaneseConverter converter(pack.dictionary, pack.matrix);
+    const tekito::japanese::ChunkJudge judge(table, converter, nullptr, scores, nullptr);
+    Require(judge.Judge(L"github", 0).english, "keys that make no kana and are a word are English");
+    Require(judge.Judge(L"push", 0).english, "push is English");
+    Require(judge.Judge(L"chatgpt", 0).english, "keys that make no kana and no Japanese are English");
+    Require(!judge.Judge(L"to", 0).english, "two letters are a particle");
+    Require(!judge.Judge(L"kikai", 0).english, "romaji that is no English word is Japanese");
+
+    JapaneseComposer composer(&table);
+    composer.SetConverter(&converter);
+    composer.SetMixedTyping(&judge);
+    Type(composer, L"github");
+    composer.Convert();
+    const auto* candidates = composer.FocusedCandidates();
+    Require(candidates && candidates->front().text == L"github" &&
+                candidates->front().kind == tekito::japanese::PhraseCandidate::Kind::English,
+            "an English chunk converts to itself");
+    RequireText(composer.Commit(), L"github", "and is committed so");
+    Type(composer, L"push");
+    composer.Convert();
+    RequireText(composer.Commit(), L" push", "English after English gets a space");
+    Type(composer, L"kikai");
+    composer.Convert();
+    const auto japanese = composer.Commit();
+    Require(!japanese.empty() && japanese.front() >= 0x3000, "Japanese after English has no space");
+    Type(composer, L"push");
+    RequireText(composer.Commit(), L"push", "Enter takes an English chunk as Space would");
+
+    composer.SetMixedTyping(nullptr);
+    Type(composer, L"push");
+    composer.Convert();
+    Require(composer.Preedit() != L"push", "without mixed typing the keys are romaji");
+    composer.Clear();
+}
+
 void TestRomajiCorrection(const RomajiTable& table, const MiniPack& pack) {
     const tekito::japanese::JapaneseConverter converter(pack.dictionary, pack.matrix);
     // Slips are corrected in the key lattice, English words or not.
@@ -1386,6 +1434,7 @@ int main(int argc, char** argv) {
     TestContext(*table, *pack);
     TestLanguageModel(*pack);
     TestLoanwords(*table, *pack);
+    TestMixedTyping(*table, *pack);
     TestRomajiCorrection(*table, *pack);
     TestPrediction(*table, *pack);
     TestUserWords(*table, *pack);

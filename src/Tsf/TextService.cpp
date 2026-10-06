@@ -1,5 +1,7 @@
 #include "Tsf/TextService.h"
 
+#include "Core/Japanese/JapaneseData.h"
+
 #include "Tsf/ComPtr.h"
 #include "Tsf/Compartments.h"
 #include "Tsf/DisplayAttributes.h"
@@ -652,8 +654,12 @@ void TextService::SyncRuntimeState() {
         if (settingsRepository_->LoadSettings(loadedSettings)) {
             userSettings_ = std::move(loadedSettings);
             ApplySettings();
-            // Japanese was turned off in Settings.
-            if (mode_ == InputMode::Japanese && !JapaneseModeAvailable()) ChangeInputMode(InputMode::Convert);
+            // Japanese, or mixed typing, was turned off in Settings.
+            if (TypesJapanese(mode_) && !JapaneseModeAvailable()) {
+                ChangeInputMode(InputMode::Convert);
+            } else if (mode_ == InputMode::Mixed && !MixedModeAvailable()) {
+                ChangeInputMode(InputMode::Japanese);
+            }
         }
         runtimeSettingsGeneration_ = settingsGeneration;
     }
@@ -738,7 +744,7 @@ void TextService::ApplySettings() {
 // not part of a word, and Enter unless it picks a candidate from the list.
 bool TextService::LetsKeyThrough(const KeyInput& input) const noexcept {
     // In Japanese, Enter only commits the text, as in Microsoft IME.
-    if (mode_ == InputMode::Japanese) return input.type == KeyInput::Type::EndComposition;
+    if (TypesJapanese(mode_)) return input.type == KeyInput::Type::EndComposition;
     return input.type == KeyInput::Type::EndComposition ||
            (input.type == KeyInput::Type::Enter && !state_.IsCandidateNavigationActive());
 }
@@ -749,15 +755,17 @@ bool TextService::ProcessPassesThrough() const noexcept {
 
 void TextService::SetInputMode(InputMode mode) {
     // Only the Japanese profile has a Japanese mode, and only with Japanese on.
-    if (!JapaneseModeAvailable() && mode == InputMode::Japanese) mode = InputMode::Convert;
+    if (!JapaneseModeAvailable() && TypesJapanese(mode)) mode = InputMode::Convert;
+    if (!MixedModeAvailable() && mode == InputMode::Mixed) mode = InputMode::Japanese;
     englishSegment_ = false;
     const bool finishWord = (mode != InputMode::Convert && state_.IsActive()) ||
-                            (mode != InputMode::Japanese && japanese_.IsComposing());
+                            (mode != mode_ && japanese_.IsComposing());
     mode_ = mode;
+    japanese::AttachMixedTyping(japanese_, mode == InputMode::Mixed);
     state_.SetInputMode(mode == InputMode::Convert ? InputMode::Convert : InputMode::Direct);
     if (japaneseProfile_) {
         userSettings_.lastJapaneseProfileMode = mode;
-        if (mode != InputMode::Japanese) userSettings_.japaneseProfileEnglishMode = mode;
+        if (!TypesJapanese(mode)) userSettings_.japaneseProfileEnglishMode = mode;
     } else {
         userSettings_.lastInputMode = mode;
     }
@@ -926,7 +934,8 @@ void TextService::RegisterLangBarItem() {
         [this]() { return ToggledMode(); },
         [this]() { return JapaneseModeAvailable(); },
         [this]() { OpenSettings(); },
-        [this]() { return userdata::UseJapaneseUi(userSettings_.uiLanguage); });
+        [this]() { return userdata::UseJapaneseUi(userSettings_.uiLanguage); },
+        [this]() { return MixedModeAvailable(); });
     if (!item) return;
 
     ComPtr<ModeLangBarItem> ownedItem(item);
@@ -1203,7 +1212,7 @@ HRESULT TextService::Reset() {
 
 bool TextService::TranslateKey(WPARAM wParam, LPARAM, KeyInput& input) {
     if (ProcessPassesThrough() || FocusIsClassicPasswordEdit()) return false;
-    if (mode_ == InputMode::Japanese) {
+    if (TypesJapanese(mode_)) {
         if (TranslateEnglishSegmentKey(wParam, input)) return true;
         return TranslateJapaneseKey(wParam, input);
     }
@@ -1274,7 +1283,7 @@ bool TextService::TranslateEnglishKey(WPARAM wParam, KeyInput& input) {
             return true;
         }
         // Not in an English word typed inside Japanese, which ends on its own keys.
-        if (mode_ != InputMode::Japanese && SpecialConversions::Installed().MayEndEnglish(buffer[0], SpecialOptions())) {
+        if (!TypesJapanese(mode_) && SpecialConversions::Installed().MayEndEnglish(buffer[0], SpecialOptions())) {
             input.type = KeyInput::Type::SpecialEnd;
             input.character = buffer[0];
             return true;
@@ -1517,12 +1526,12 @@ HRESULT TextService::HandleKeyInEditSessionCore(ITfContext* context, TfEditCooki
         input.type == KeyInput::Type::EnglishSegmentCommit) {
         return HandleEnglishSegmentEnd(context, editCookie, input);
     }
-    if (input.englishSegment && !englishSegment_ && mode_ == InputMode::Japanese) {
+    if (input.englishSegment && !englishSegment_ && TypesJapanese(mode_)) {
         englishSegment_ = true;
         state_.SetInputMode(InputMode::Convert);
     }
     // Japanese typing, and committing it after the mode or focus changed.
-    if ((mode_ == InputMode::Japanese && !englishSegment_) ||
+    if ((TypesJapanese(mode_) && !englishSegment_) ||
         input.type == KeyInput::Type::JapaneseCommit || japanese_.IsComposing()) {
         if (input.type != KeyInput::Type::JapaneseCommit &&
             (ContextHasPassThroughInputScope(context, editCookie) || FocusIsClassicPasswordEdit() ||
@@ -1908,7 +1917,7 @@ HRESULT TextService::ReplaceComposition(ITfContext* context, TfEditCookie editCo
                                         const std::wstring& written) {
     if (!composition_) return E_UNEXPECTED;
     std::wstring text = written;
-    if (userSettings_.smartPunctuation && (mode_ != InputMode::Japanese || englishSegment_)) {
+    if (userSettings_.smartPunctuation && (!TypesJapanese(mode_) || englishSegment_)) {
         std::replace(text.begin(), text.end(), L'\'', L'\u2019');
     }
     ComPtr<ITfRange> range;

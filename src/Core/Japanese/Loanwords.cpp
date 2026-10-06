@@ -2,6 +2,8 @@
 
 #include "Core/Japanese/KanaText.h"
 
+#include <cwctype>
+
 namespace tekito::japanese {
 namespace {
 
@@ -61,19 +63,92 @@ bool Loanwords::Open(const std::filesystem::path& packDirectory) noexcept {
     return words_.Open(packDirectory / L"words.tsv");
 }
 
+bool Loanwords::OpenEnglish(const std::filesystem::path& packDirectory) noexcept {
+    const bool names = names_.Open(packDirectory / L"words.tsv");
+    // Counts came later: a pack without them still opens.
+    (void)latin_.Open(packDirectory / L"latin.tsv");
+    return english_.Open(packDirectory / L"english.tsv") && names;
+}
+
 std::vector<std::wstring> Loanwords::Words(std::wstring_view katakana, std::size_t limit) const {
     std::vector<std::wstring> words;
     if (!IsOpen() || katakana.empty() || limit == 0) return words;
+    const auto add = [&](std::wstring word) {
+        // One spelling per word: Zoom and zoom are the same choice.
+        const auto lower = [](std::wstring text) {
+            for (auto& c : text) c = static_cast<wchar_t>(std::towlower(c));
+            return text;
+        };
+        for (const auto& seen : words) {
+            if (lower(seen) == lower(word)) return;
+        }
+        if (words.size() < limit) words.push_back(std::move(word));
+    };
     try {
-        // Rows: key, word, how common it is; a key's rows most common first.
-        words_.ForEachRow(ToUtf8(LoanwordKey(katakana)), [&](const std::vector<std::string_view>& fields) {
-            if (fields.size() >= 2 && !fields[1].empty()) words.push_back(FromUtf8(fields[1]));
+        const auto key = ToUtf8(LoanwordKey(katakana));
+        // japanese-english rows: key, English, katakana, score, best first.
+        // Those written with this very katakana come first.
+        std::vector<std::wstring> others;
+        const std::wstring written(katakana);
+        names_.ForEachRow(key, [&](const std::vector<std::string_view>& fields) {
+            if (fields.size() < 3 || fields[1].empty()) return true;
+            if (FromUtf8(fields[2]) == written) {
+                add(FromUtf8(fields[1]));
+            } else {
+                others.push_back(FromUtf8(fields[1]));
+            }
+            return true;
+        });
+        // Spellings that only sound alike (Google Play for グーグル) only
+        // when this katakana has none of its own.
+        if (words.empty()) {
+            for (auto& word : others) add(std::move(word));
+        }
+        // japanese-loanwords rows: key, word, how common it is.
+        words_.ForEachRow(key, [&](const std::vector<std::string_view>& fields) {
+            if (fields.size() >= 2 && !fields[1].empty()) add(FromUtf8(fields[1]));
             return words.size() < limit;
         });
     } catch (...) {
         words.clear();
     }
     return words;
+}
+
+std::optional<double> Loanwords::InJapaneseText(std::wstring_view word) const {
+    if (!latin_.IsOpen() || word.empty()) return std::nullopt;
+    std::optional<double> found;
+    try {
+        // Rows: word in lower case, log10 per million sentences.
+        latin_.ForEachRow(ToUtf8(word), [&](const std::vector<std::string_view>& fields) {
+            if (fields.size() >= 2) found = std::stod(std::string(fields[1]));
+            return false;
+        });
+    } catch (...) {
+        found.reset();
+    }
+    return found;
+}
+
+std::vector<Loanwords::Spelling> Loanwords::ForEnglish(std::wstring_view english, std::size_t limit) const {
+    std::vector<Spelling> spellings;
+    if (!english_.IsOpen() || english.empty() || limit == 0) return spellings;
+    std::wstring key;
+    for (const wchar_t c : english) {
+        if (c != L' ') key += static_cast<wchar_t>(std::towlower(c));
+    }
+    try {
+        // Rows: English in lower case without spaces, English, katakana, score.
+        english_.ForEachRow(ToUtf8(key), [&](const std::vector<std::string_view>& fields) {
+            if (fields.size() >= 4 && !fields[1].empty()) {
+                spellings.push_back({FromUtf8(fields[1]), FromUtf8(fields[2]), std::stod(std::string(fields[3]))});
+            }
+            return spellings.size() < limit;
+        });
+    } catch (...) {
+        spellings.clear();
+    }
+    return spellings;
 }
 
 }  // namespace tekito::japanese

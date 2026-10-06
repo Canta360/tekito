@@ -33,6 +33,10 @@ class UserPartsOfSpeech;
 // The meaning packs, mapped on first use; lookups read them in place.
 [[nodiscard]] const MeaningDictionary& ProcessMeanings();
 
+// Mixed typing (JapaneseComposer::SetMixedTyping) on or off for `composer`;
+// stays off when the English word scores are missing.
+void AttachMixedTyping(JapaneseComposer& composer, bool on);
+
 // Gives `composer` the converter, slip correction and the loanwords, as far
 // as they are installed (set its table first: SetTable clears it).
 void AttachJapaneseData(JapaneseComposer& composer);

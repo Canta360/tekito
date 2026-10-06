@@ -30,6 +30,7 @@ LANGUAGE = {
     "wikipedia-common-misspellings": "en",
     "wiktionary-slang": "en",
     "japanese-core": "ja",
+    "japanese-english": "ja",
     "japanese-lm": "ja",
     "japanese-loanwords": "ja",
     "japanese-romaji": "ja",
