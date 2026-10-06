@@ -1192,6 +1192,9 @@ void TestEnglishWritingRules() {
             "march is a word too: kept, with March offered");
     Require(spaceGives(L"THe") == L"The", "a second capital by mistake is taken back");
     Require(spaceGives(L"NASA") == L"NASA", "an acronym stays as typed");
+    Require(spaceGives(L"backend") == L"backend", "a word news writes, that the lexicon lacks, stays");
+    Require(spaceGives(L"onboarding") == L"onboarding", "onboarding is not boarding");
+    Require(spaceGives(L"teh") == L"the", "a slip news also has is still corrected");
     Require(spaceGives(L"hi'", L"Say '") == L"hi'", "a quoted word keeps its closing quote");
     Require(spaceGives(L"'hi'", L"Say ") == L"'hi'", "a word typed with both quotes stays");
     Require(spaceGives(L"hi'") == L"hi'","a closing quote is not turned into a letter (hi' is not his)");

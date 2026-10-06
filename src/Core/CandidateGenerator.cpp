@@ -558,6 +558,19 @@ std::vector<Candidate> CandidateGenerator::Generate(std::wstring_view rawText,
         AddOriginal(output, seen, rawText);
     }
 
+    // A word the lexicon lacks but news text writes (backend, onboarding,
+    // OAuth) stays as typed when the closest word is not far more common:
+    // a slip (teh, occured, thier) is rare next to the word it misses.
+    constexpr double kSeenInText = 1.5;
+    constexpr double kSlipGap = 1.5;
+    if (!exact && !ranked.empty()) {
+        const double typedScore = frequencyProvider_.Score(lower);
+        if (typedScore >= kSeenInText && ranked.front().signals.frequency - typedScore < kSlipGap) {
+            keptAsTyped = true;
+            AddOriginal(output, seen, rawText);
+        }
+    }
+
     bool addedFirstCorrection = false;
     std::size_t addedCorrectionCount = 0;
     for (const auto& correction : ranked) {
