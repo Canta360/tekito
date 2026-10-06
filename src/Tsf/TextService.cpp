@@ -2168,6 +2168,8 @@ RECT TextService::GetCandidateAnchor(ITfContext* context, TfEditCookie editCooki
 }
 
 void TextService::CheckJapaneseContext(ITfContext* context, TfEditCookie editCookie) {
+    // Mix: English there starts with a capital when a sentence starts.
+    japanese_.SetSentenceStart(japanese::JapaneseComposer::EndsSentence(ReadSelectionContext(context, editCookie)));
     if (lastJapaneseCommit_.empty() || !ReadSelectionContext(context, editCookie).ends_with(lastJapaneseCommit_)) {
         japanese_.ForgetContext();
     }

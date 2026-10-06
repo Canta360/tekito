@@ -86,6 +86,13 @@ public:
         englishRun_ = 0;
     }
     [[nodiscard]] bool MixedTyping() const noexcept { return chunkJudge_ != nullptr; }
+    // Mixed typing: whether what is typed next starts a sentence, so English
+    // there starts with a capital. The text service says so from the text
+    // before the caret; committing keeps it up to date.
+    void SetSentenceStart(bool start) noexcept { sentenceStart_ = start; }
+    // Whether text ending in `before` has ended its sentence (nothing, a
+    // line break, 。 . ! ? and their full-width forms).
+    [[nodiscard]] static bool EndsSentence(std::wstring_view before) noexcept;
     // The user's words, for conversion and predictions; null for none.
     void SetUserDictionary(const JapaneseUserDictionary* user) noexcept { userDictionary_ = user; }
     // Dates for "きょう", numbers in kanji, symbols by reading and sums for
@@ -290,6 +297,9 @@ private:
     // first, then the keys as typed, katakana and the Japanese.
     [[nodiscard]] std::vector<PhraseCandidate> EnglishCandidates(const std::wstring& written,
                                                                  const std::wstring& reading) const;
+    // `written`, with a capital when it starts a sentence (hello: Hello;
+    // GitHub stays).
+    [[nodiscard]] std::wstring EnglishAsWritten(std::wstring written) const;
     // Mixed typing: whether what is chosen is English (to space it and
     // read on from it).
     [[nodiscard]] bool ChoseEnglish() const noexcept;
@@ -369,6 +379,7 @@ private:
     std::uint16_t englishContext_{0};
     // Mixed typing: English chunks committed in a row, just before.
     std::size_t englishRun_{0};
+    bool sentenceStart_{true};
     const JapaneseUserDictionary* userDictionary_{nullptr};
     const SpecialConversions* special_{nullptr};
     const PostalCodes* postalCodes_{nullptr};

@@ -671,7 +671,7 @@ void JapaneseComposer::BuildPhrases(bool convert) {
     if (convert && chunkJudge_ && !HasAscii()) {
         chunk = chunkJudge_->Judge(Keys(false), englishRun_);
         if (chunk->english) {
-            phrases_.push_back({0, reading.size(), EnglishCandidates(chunk->written, reading)});
+            phrases_.push_back({0, reading.size(), EnglishCandidates(EnglishAsWritten(chunk->written), reading)});
             return;
         }
     }
@@ -709,7 +709,8 @@ void JapaneseComposer::BuildPhrases(bool convert) {
     // chunk is the next choice.
     if (chunk && chunk->either && !phrases_.front().candidates.empty()) {
         auto& candidates = phrases_.front().candidates;
-        PhraseCandidate english{chunk->written, candidates.front().cost, PhraseCandidate::Kind::English, false};
+        PhraseCandidate english{EnglishAsWritten(chunk->written), candidates.front().cost,
+                                PhraseCandidate::Kind::English, false};
         english.reading = conversionReading_;
         candidates.insert(candidates.begin() + 1, std::move(english));
     }
@@ -745,6 +746,14 @@ std::vector<PhraseCandidate> JapaneseComposer::EnglishCandidates(const std::wstr
         for (auto& kana : KanaCandidates(reading)) add(std::move(kana.text), kana.kind);
     }
     return candidates;
+}
+
+std::wstring JapaneseComposer::EnglishAsWritten(std::wstring written) const {
+    const bool lower = std::all_of(written.begin(), written.end(), [](wchar_t c) { return !(c >= L'A' && c <= L'Z'); });
+    if (sentenceStart_ && lower && !written.empty() && written.front() >= L'a' && written.front() <= L'z') {
+        written.front() = static_cast<wchar_t>(written.front() - L'a' + L'A');
+    }
+    return written;
 }
 
 bool JapaneseComposer::ChoseEnglish() const noexcept {
@@ -1418,6 +1427,7 @@ std::wstring JapaneseComposer::Commit() {
             }
             if (spaced) text.insert(0, 1, L' ');
             context_ = englishContext_;
+            sentenceStart_ = false;
             Clear();
             lastCommit_.reset();
             return text;
@@ -1445,6 +1455,7 @@ std::wstring JapaneseComposer::Commit() {
         if (learning_) learning_->RecordChoice(whole->reading, whole->text, whole->text);
         auto text = whole->text;
         context_ = ContextAfter(text, whole->rightId);
+        sentenceStart_ = EndsSentence(text);
         RememberWords(text);
         Clear();
         keep(text);
@@ -1470,6 +1481,7 @@ std::wstring JapaneseComposer::Commit() {
     }
     auto text = IsConverted() ? Preedit() : RenderTyping(false);
     context_ = ContextAfter(text, last);
+    if (!text.empty()) sentenceStart_ = EndsSentence(text);
     RememberWords(text);
     Clear();
     keep(text);
@@ -1590,6 +1602,12 @@ void JapaneseComposer::RememberWords(std::wstring_view text) {
         contextWords_.erase(contextWords_.begin(),
                             contextWords_.end() - static_cast<std::ptrdiff_t>(kContextWords));
     }
+}
+
+bool JapaneseComposer::EndsSentence(std::wstring_view before) noexcept {
+    std::size_t end = before.size();
+    while (end > 0 && (before[end - 1] == L' ' || before[end - 1] == L'\x3000' || before[end - 1] == L'\t')) --end;
+    return end == 0 || std::wstring_view(L"。．.！!？?\r\n").find(before[end - 1]) != std::wstring_view::npos;
 }
 
 std::uint16_t JapaneseComposer::ContextAfter(std::wstring_view text, std::uint16_t rightId) noexcept {

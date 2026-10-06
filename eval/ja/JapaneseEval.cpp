@@ -285,6 +285,7 @@ int RunChunks(const ConnectionMatrix& matrix, const JapaneseDictionary& dictiona
         std::wstring output;
         std::size_t englishBefore = 0;
         composer.ForgetContext();
+        composer.SetSentenceStart(true);
         std::vector<std::pair<bool, bool>> judged;  // English meant, English said
         std::wistringstream words(row.reading);
         for (std::wstring chunk; words >> chunk;) {

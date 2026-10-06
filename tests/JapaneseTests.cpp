@@ -786,11 +786,18 @@ void TestMixedTyping(const RomajiTable& table, const MiniPack& pack) {
     Require(judge.Judge(L"push", 0).english, "push is English");
     Require(judge.Judge(L"chatgpt", 0).english, "keys that make no kana and no Japanese are English");
     Require(!judge.Judge(L"to", 0).english, "two letters are a particle");
+    Require(!judge.Judge(L"to", 1).english, "after one English part too (github ni)");
+    Require(judge.Judge(L"to", 2).english, "in an English sentence, to is English");
     Require(!judge.Judge(L"kikai", 0).english, "romaji that is no English word is Japanese");
 
     JapaneseComposer composer(&table);
     composer.SetConverter(&converter);
     composer.SetMixedTyping(&judge);
+    Type(composer, L"push");
+    composer.Convert();
+    RequireText(composer.Commit(), L"Push", "English that starts a sentence gets a capital");
+    composer.ForgetContext();
+    composer.SetSentenceStart(false);
     Type(composer, L"github");
     composer.Convert();
     const auto* candidates = composer.FocusedCandidates();

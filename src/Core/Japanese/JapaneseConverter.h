@@ -89,6 +89,9 @@ public:
     // Only the likeliest text for the whole reading and its cost, much
     // quicker than Convert (and without the language model); nothing when
     // a character is in no word.
+    // Whether `reading` is a word of the dictionary as a whole (たけ: 竹;
+    // not いっすえ, which only makes 逸 and 陶).
+    [[nodiscard]] bool IsWord(std::wstring_view reading) const;
     [[nodiscard]] std::optional<PhraseCandidate> Best(std::wstring_view reading, std::uint16_t context = 0,
                                                       const JapaneseUserDictionary* user = nullptr) const;
 

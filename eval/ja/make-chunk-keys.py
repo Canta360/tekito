@@ -9,6 +9,7 @@ Sources:
   chunk-english  English that cannot be read as romaji (github, push)
   chunk-both     English that reads as romaji too (api, data, game)
   chunk-ja       Japanese that looks like English (made, sake, take)
+  chunk-sentence whole English sentences typed in Mix mode
 """
 
 import importlib.util
@@ -65,6 +66,9 @@ ENGLISH = [
     ("screenshot* wo tottekudasai", "{screenshot|スクリーンショット}を撮ってください"),
     ("discord* ni sankasita", "{Discord|discord}に参加した"),
     ("spotify* de kiiteru", "{Spotify|spotify}で聞いてる"),
+    ("github* no issue* wo mite", "{GitHub|github}の{issue|イシュー}を見て"),
+    ("meeting* no agenda* wo okuru", "{meeting|ミーティング}の{agenda|アジェンダ}を送る"),
+    ("kono feature* ha benri", "この{feature|フィーチャー}は便利"),
 ]
 
 BOTH = [
@@ -80,6 +84,17 @@ BOTH = [
     ("ruby* no baajon", "{Ruby|ruby}のバージョン"),
     ("home* wo hiraku", "{home|ホーム}を開く"),
     ("menu* de erabu", "{menu|メニュー}で選ぶ"),
+]
+
+SENTENCES = [
+    ("hello* nice* to* meet* you*", "Hello nice to meet you"),
+    ("thank* you* so* much*", "Thank you so much"),
+    ("i* will* send* it* to* you* tomorrow*", "I will send it to you tomorrow"),
+    ("see* you* on* monday*", "See you on Monday"),
+    ("please* check* the* github* page*", "Please check the GitHub page"),
+    ("good* morning* everyone*", "Good morning everyone"),
+    ("how* are* you*", "How are you"),
+    ("let* me* know* if* you* have* any* questions*", "Let me know if you have any questions"),
 ]
 
 JAPANESE = [
@@ -108,13 +123,16 @@ JAPANESE = [
 
 def main() -> None:
     lines = []
-    for source, rows in (("chunk-english", ENGLISH), ("chunk-both", BOTH), ("chunk-ja", JAPANESE)):
+    for source, rows in (("chunk-english", ENGLISH), ("chunk-both", BOTH), ("chunk-ja", JAPANESE),
+                         ("chunk-sentence", SENTENCES)):
         for number, (keys, *templates) in enumerate(rows, 1):
             expected = []
             for template in templates:
                 for text in mixed.expand(template):
-                    if text not in expected:
-                        expected.append(text)
+                    # English that starts the line may take a capital.
+                    for form in (text, text[:1].upper() + text[1:]):
+                        if form not in expected:
+                            expected.append(form)
             lines.append("\t".join([source, str(number), keys, *expected]))
     out = here / "chunk_keys.tsv"
     out.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")

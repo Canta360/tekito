@@ -287,6 +287,32 @@ def count_latin_words(least: int = 3) -> tuple[dict[str, int], int]:
     return {word: count for word, count in counts.items() if count >= least}, sentences
 
 
+# How English writes a word: the form English news uses for it this share
+# of the time, when that is not all lower case (google: Google; nice stays
+# nice, though Nice is a city).
+CASE_SHARE = 0.8
+
+
+def english_cases(least: int = 5) -> dict[str, str]:
+    path = CACHE / "leipzig" / "eng_news_2025_1M" / "eng_news_2025_1M-words.txt"
+    if not path.exists():
+        return {}
+    forms: dict[str, dict[str, int]] = defaultdict(dict)
+    with path.open(encoding="utf-8", errors="replace") as source:
+        for line in source:
+            fields = line.rstrip("\n").split("\t")
+            if len(fields) < 3 or not re.fullmatch(r"[A-Za-z][A-Za-z0-9]*", fields[1]):
+                continue
+            forms[fields[1].lower()][fields[1]] = int(fields[2])
+    cases = {}
+    for lower, counts in forms.items():
+        total = sum(counts.values())
+        form, count = max(counts.items(), key=lambda item: item[1])
+        if total >= least and form != lower and count >= CASE_SHARE * total:
+            cases[lower] = form
+    return cases
+
+
 def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest().upper()
 
@@ -350,6 +376,12 @@ def main() -> int:
             per_million = latin[word] * 1e6 / max(sentences, 1)
             output.write(f"{word}\t{math.log10(per_million):.2f}\n".encode("utf-8"))
     print(f"latin: {len(latin):,} words from {sentences:,} Japanese sentences")
+    # case.tsv: word in lower case, how English writes it.
+    cases = english_cases()
+    with (pack / "case.tsv").open("wb") as output:
+        for lower in sorted(cases, key=lambda w: w.encode("utf-8")):
+            output.write(f"{lower}\t{cases[lower]}\n".encode("utf-8"))
+    print(f"case: {len(cases):,} words written with capitals")
     (pack / "NOTICE").write_text("""Katakana words and the English they are written as, built by
 scripts/ja/build-japanese-english-pack.py from:
 
@@ -365,6 +397,9 @@ scripts/ja/build-japanese-english-pack.py from:
   crawl 2019 and Wikipedia 2021 corpora, licensed CC BY 4.0: D. Goldhahn,
   T. Eckart and U. Quasthoff, "Building Large Monolingual Dictionaries at
   the Leipzig Corpora Collection", LREC 2012.
+- How English writes each word (case.tsv: Google, GitHub), from the Leipzig
+  Corpora Collection's English news 2025 corpus, licensed CC BY 4.0 (same
+  attribution).
 
 This pack is distributed under CC BY-SA 4.0
 (https://creativecommons.org/licenses/by-sa/4.0/).
@@ -378,10 +413,10 @@ This pack is distributed under CC BY-SA 4.0
         "type": "japanese-english",
         "format": "sorted-tsv-v1",
         "file": "words.tsv",
-        "files": ["words.tsv", "english.tsv", "latin.tsv"],
+        "files": ["words.tsv", "english.tsv", "latin.tsv", "case.tsv"],
         "entry_count": words,
         "sha256": {"file": sha256(pack / "words.tsv"), "english": sha256(pack / "english.tsv"),
-                   "latin": sha256(pack / "latin.tsv")},
+                   "latin": sha256(pack / "latin.tsv"), "case": sha256(pack / "case.tsv")},
         "license": "CC-BY-SA-4.0",
         "source": "JMdict (EDRDG); Japanese Wikipedia titles, redirects, language links and opening sentences; Leipzig Corpora Collection (Japanese news 2019, Wikipedia 2021)",
         "notice_file": "NOTICE",

@@ -67,6 +67,7 @@ bool Loanwords::OpenEnglish(const std::filesystem::path& packDirectory) noexcept
     const bool names = names_.Open(packDirectory / L"words.tsv");
     // Counts came later: a pack without them still opens.
     (void)latin_.Open(packDirectory / L"latin.tsv");
+    (void)case_.Open(packDirectory / L"case.tsv");
     return english_.Open(packDirectory / L"english.tsv") && names;
 }
 
@@ -128,6 +129,21 @@ std::optional<double> Loanwords::InJapaneseText(std::wstring_view word) const {
         found.reset();
     }
     return found;
+}
+
+std::optional<std::wstring> Loanwords::WrittenAs(std::wstring_view word) const {
+    if (!case_.IsOpen() || word.empty()) return std::nullopt;
+    std::optional<std::wstring> written;
+    try {
+        // Rows: word in lower case, how it is written.
+        case_.ForEachRow(ToUtf8(word), [&](const std::vector<std::string_view>& fields) {
+            if (fields.size() >= 2 && !fields[1].empty()) written = FromUtf8(fields[1]);
+            return false;
+        });
+    } catch (...) {
+        written.reset();
+    }
+    return written;
 }
 
 std::vector<Loanwords::Spelling> Loanwords::ForEnglish(std::wstring_view english, std::size_t limit) const {

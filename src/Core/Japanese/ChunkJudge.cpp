@@ -39,17 +39,38 @@ ChunkJudge::Judgement ChunkJudge::Judge(std::wstring_view keys, std::size_t engl
     if (names_) {
         for (const auto& spelling : names_->ForEnglish(keys, 1)) {
             // Written with capitals inside (GitHub, API, iPhone), or very
-            // well known (Google). Wikipedia capitalizes every title, so
-            // Mail stays mail.
+            // well known (Google).
             const bool capitals = std::any_of(spelling.english.begin() + 1, spelling.english.end(),
                                               [](wchar_t c) { return std::iswupper(c) != 0; });
             name = capitals || spelling.score >= thresholds_.knownName;
-            if (name) judgement.written = spelling.english;
+            // A name English news does not write (Qiita) as the pack does.
+            if (capitals && score <= 0.0) judgement.written = spelling.english;
         }
+        // As English writes it: Google, but nice (Nice is a city too) and
+        // it (not IT).
+        if (const auto written = names_->WrittenAs(keys)) judgement.written = *written;
     }
 
-    // Two letters or fewer are particles (to, de, na), not English.
-    if (keys.size() <= 2) return judgement;
+    // "i" alone is I: い alone is hardly ever meant.
+    if (keys == L"i") {
+        judgement.english = true;
+        judgement.written = L"I";
+        return judgement;
+    }
+    // Two letters or fewer that read as kana: Japanese, but English after
+    // English (let me, see you on), except the particles that follow an
+    // English noun (Stack Overflowで, GitHubに); to (と) only in an English
+    // sentence (nice to meet you).
+    constexpr std::size_t kEnglishSentence = 2;
+    if (keys.size() <= 2 && readable) {
+        constexpr std::wstring_view kParticles[] = {L"de", L"ga", L"ni", L"wo", L"ha", L"wa", L"no", L"mo", L"ka",
+                                                    L"ya", L"ne", L"yo", L"na", L"da", L"e", L"he", L"te"};
+        const bool particle = std::find(std::begin(kParticles), std::end(kParticles), keys) != std::end(kParticles);
+        const std::size_t needed = keys == L"to" ? kEnglishSentence : 1;
+        judgement.english = !particle && englishBefore >= needed && score >= thresholds_.knownWord;
+        if (!judgement.english) judgement.written = std::wstring(keys);
+        return judgement;
+    }
     if (!readable) {
         // Japanese with a slip in it, unless it is an English word.
         const bool slip = score < thresholds_.listedWord && slips_ && slips_->Convert(keys).has_value();
@@ -68,12 +89,16 @@ ChunkJudge::Judgement ChunkJudge::Judge(std::wstring_view keys, std::size_t engl
     const auto inJapanese = names_ ? names_->InJapaneseText(keys) : std::nullopt;
     const bool writtenInJapanese = !names_ || !names_->HasJapaneseTextCounts() ||
                                    (inJapanese && *inJapanese >= thresholds_.inJapaneseText);
-    if (japaneseOdd && (name || (score >= thresholds_.commonWord && writtenInJapanese))) {
+    // A common English word is English when its romaji is no Japanese
+    // word (issue: いっすえ), or when Japanese text writes it in Latin
+    // letters; take stays 竹.
+    const bool japaneseWord = converter_.IsWord(kana);
+    if ((japaneseOdd && name) ||
+        (score >= thresholds_.commonWord && (!japaneseWord || (japaneseOdd && writtenInJapanese)))) {
         judgement.english = true;
         return judgement;
     }
     // Reads both ways (kara, take, amazon): as the sentence goes.
-    constexpr std::size_t kEnglishSentence = 2;
     if (name || score >= thresholds_.knownWord) {
         judgement.either = true;
         judgement.english = englishBefore >= kEnglishSentence ||

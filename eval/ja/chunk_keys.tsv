@@ -5,56 +5,59 @@ chunk-english	4	zoom* no kaigini irimasu	Zoomの会議に入ります	zoomの会
 chunk-english	5	excel* no fairuwo okurimasu	Excelのファイルを送ります	excelのファイルを送ります
 chunk-english	6	python* de script* wo kaita	Pythonでscriptを書いた	Pythonでスクリプトを書いた	pythonでscriptを書いた	pythonでスクリプトを書いた
 chunk-english	7	docker* wo tukatteimasu	Dockerを使っています	dockerを使っています
-chunk-english	8	mail* wo kakunowo wasureta	mailを書くのを忘れた	メールを書くのを忘れた
-chunk-english	9	commit* sitekara push* site	commitしてからpushして	commitしてからプッシュして	コミットしてからpushして	コミットしてからプッシュして
-chunk-english	10	branch* wo kiru hituyougaaru	branchを切る必要がある	ブランチを切る必要がある
-chunk-english	11	review* wo onegaisimasu	reviewをお願いします	レビューをお願いします
-chunk-english	12	bug* wo naosita	bugを直した	バグを直した
-chunk-english	13	test* ga toorimasita	testが通りました	テストが通りました
-chunk-english	14	deploy* ha asitano yoteidesu	deployは明日の予定です	デプロイは明日の予定です
-chunk-english	15	chatgpt* ni kiitemita	ChatGPTに聞いてみた	chatgptに聞いてみた
-chunk-english	16	iphone* wo kaikaeta	iPhoneを買い替えた	iphoneを買い替えた
+chunk-english	8	mail* wo kakunowo wasureta	mailを書くのを忘れた	Mailを書くのを忘れた	メールを書くのを忘れた
+chunk-english	9	commit* sitekara push* site	commitしてからpushして	Commitしてからpushして	commitしてからプッシュして	Commitしてからプッシュして	コミットしてからpushして	コミットしてからプッシュして
+chunk-english	10	branch* wo kiru hituyougaaru	branchを切る必要がある	Branchを切る必要がある	ブランチを切る必要がある
+chunk-english	11	review* wo onegaisimasu	reviewをお願いします	Reviewをお願いします	レビューをお願いします
+chunk-english	12	bug* wo naosita	bugを直した	Bugを直した	バグを直した
+chunk-english	13	test* ga toorimasita	testが通りました	Testが通りました	テストが通りました
+chunk-english	14	deploy* ha asitano yoteidesu	deployは明日の予定です	Deployは明日の予定です	デプロイは明日の予定です
+chunk-english	15	chatgpt* ni kiitemita	ChatGPTに聞いてみた	chatgptに聞いてみた	Chatgptに聞いてみた
+chunk-english	16	iphone* wo kaikaeta	iPhoneを買い替えた	IPhoneを買い替えた	iphoneを買い替えた	Iphoneを買い替えた
 chunk-english	17	windows* no update* ga owaranai	Windowsのupdateが終わらない	Windowsのアップデートが終わらない	windowsのupdateが終わらない	windowsのアップデートが終わらない
 chunk-english	18	chrome* ga omoi	Chromeが重い	chromeが重い
 chunk-english	19	twitter* de mita nyuusu	Twitterで見たニュース	twitterで見たニュース
-chunk-english	20	json* wo parse* suru	JSONをparseする	JSONをパースする	jsonをparseする	jsonをパースする
-chunk-english	21	server* wo saikidousita	serverを再起動した	サーバーを再起動した
-chunk-english	22	password* wo wasureta	passwordを忘れた	パスワードを忘れた
-chunk-english	23	link* wo okurune	linkを送るね	リンクを送るね
-chunk-english	24	download* sitekudasai	downloadしてください	ダウンロードしてください
-chunk-english	25	schedule* wo chouseisimasu	scheduleを調整します	スケジュールを調整します
-chunk-english	26	meeting* no maeni siryouwo yomu	meetingの前に資料を読む	ミーティングの前に資料を読む
+chunk-english	20	json* wo parse* suru	JSONをparseする	JSONをパースする	jsonをparseする	Jsonをparseする	jsonをパースする	Jsonをパースする
+chunk-english	21	server* wo saikidousita	serverを再起動した	Serverを再起動した	サーバーを再起動した
+chunk-english	22	password* wo wasureta	passwordを忘れた	Passwordを忘れた	パスワードを忘れた
+chunk-english	23	link* wo okurune	linkを送るね	Linkを送るね	リンクを送るね
+chunk-english	24	download* sitekudasai	downloadしてください	Downloadしてください	ダウンロードしてください
+chunk-english	25	schedule* wo chouseisimasu	scheduleを調整します	Scheduleを調整します	スケジュールを調整します
+chunk-english	26	meeting* no maeni siryouwo yomu	meetingの前に資料を読む	Meetingの前に資料を読む	ミーティングの前に資料を読む
 chunk-english	27	figma* de dezainnsita	Figmaでデザインした	figmaでデザインした
 chunk-english	28	friday* ni kaigiga aru	Fridayに会議がある	fridayに会議がある
-chunk-english	29	sorry* osokunatta	sorry遅くなった	ソーリー遅くなった
-chunk-english	30	check* siteoite	checkしておいて	チェックしておいて
-chunk-english	31	spreadsheet* ni kakikonde	spreadsheetに書き込んで	スプレッドシートに書き込んで
-chunk-english	32	backup* wo toru	backupを取る	バックアップを取る
+chunk-english	29	sorry* osokunatta	sorry遅くなった	Sorry遅くなった	ソーリー遅くなった
+chunk-english	30	check* siteoite	checkしておいて	Checkしておいて	チェックしておいて
+chunk-english	31	spreadsheet* ni kakikonde	spreadsheetに書き込んで	Spreadsheetに書き込んで	スプレッドシートに書き込んで
+chunk-english	32	backup* wo toru	backupを取る	Backupを取る	バックアップを取る
 chunk-english	33	qiita* ni kijiwo kaita	Qiitaに記事を書いた	qiitaに記事を書いた
-chunk-english	34	stack* overflow* de sirabeta	Stack Overflowで調べた	stack overflowで調べた
-chunk-english	35	vscode* wo kidousuru	VS Codeを起動する	vscodeを起動する
-chunk-english	36	github* actions* ga ugokanai	GitHub Actionsが動かない	github actionsが動かない	GitHub actionsが動かない
-chunk-english	37	pull* request* wo dasita	pull requestを出した	プルリクエストを出した
-chunk-english	38	merge* sitemo iidesuka	mergeしてもいいですか	マージしてもいいですか
-chunk-english	39	thanks* matanee	thanksまたねー	サンクスまたねー	thanksまたねえ	サンクスまたねえ
+chunk-english	34	stack* overflow* de sirabeta	Stack Overflowで調べた	stack overflowで調べた	Stack overflowで調べた
+chunk-english	35	vscode* wo kidousuru	VS Codeを起動する	vscodeを起動する	Vscodeを起動する
+chunk-english	36	github* actions* ga ugokanai	GitHub Actionsが動かない	github actionsが動かない	Github actionsが動かない	GitHub actionsが動かない
+chunk-english	37	pull* request* wo dasita	pull requestを出した	Pull requestを出した	プルリクエストを出した
+chunk-english	38	merge* sitemo iidesuka	mergeしてもいいですか	Mergeしてもいいですか	マージしてもいいですか
+chunk-english	39	thanks* matanee	thanksまたねー	Thanksまたねー	サンクスまたねー	thanksまたねえ	Thanksまたねえ	サンクスまたねえ
 chunk-english	40	happy* birthday* omedetou	happy birthdayおめでとう	Happy birthdayおめでとう
-chunk-english	41	weekend* ha nanisuru	weekendは何する	ウィークエンドは何する
-chunk-english	42	file* wo share* simasu	fileをshareします	fileをシェアします	ファイルをshareします	ファイルをシェアします
-chunk-english	43	screenshot* wo tottekudasai	screenshotを撮ってください	スクリーンショットを撮ってください
+chunk-english	41	weekend* ha nanisuru	weekendは何する	Weekendは何する	ウィークエンドは何する
+chunk-english	42	file* wo share* simasu	fileをshareします	Fileをshareします	fileをシェアします	Fileをシェアします	ファイルをshareします	ファイルをシェアします
+chunk-english	43	screenshot* wo tottekudasai	screenshotを撮ってください	Screenshotを撮ってください	スクリーンショットを撮ってください
 chunk-english	44	discord* ni sankasita	Discordに参加した	discordに参加した
 chunk-english	45	spotify* de kiiteru	Spotifyで聞いてる	spotifyで聞いてる
-chunk-both	1	api* wo tatakuto	APIを叩くと	apiを叩くと
+chunk-english	46	github* no issue* wo mite	GitHubのissueを見て	GitHubのイシューを見て	githubのissueを見て	Githubのissueを見て	githubのイシューを見て	Githubのイシューを見て
+chunk-english	47	meeting* no agenda* wo okuru	meetingのagendaを送る	Meetingのagendaを送る	meetingのアジェンダを送る	Meetingのアジェンダを送る	ミーティングのagendaを送る	ミーティングのアジェンダを送る
+chunk-english	48	kono feature* ha benri	このfeatureは便利	このフィーチャーは便利
+chunk-both	1	api* wo tatakuto	APIを叩くと	apiを叩くと	Apiを叩くと
 chunk-both	2	notion* ni memosita	Notionにメモした	notionにメモした
-chunk-both	3	youtube* de mita	YouTubeで見た	youtubeで見た
-chunk-both	4	data* wo kousinsuru	dataを更新する	データを更新する
-chunk-both	5	game* wo suru	gameをする	ゲームをする
-chunk-both	6	online* de sankasuru	onlineで参加する	オンラインで参加する
-chunk-both	7	line* deno tyakusin	LINEでの着信	lineでの着信
-chunk-both	8	token* wo hakkousuru	tokenを発行する	トークンを発行する
+chunk-both	3	youtube* de mita	YouTubeで見た	youtubeで見た	Youtubeで見た
+chunk-both	4	data* wo kousinsuru	dataを更新する	Dataを更新する	データを更新する
+chunk-both	5	game* wo suru	gameをする	Gameをする	ゲームをする
+chunk-both	6	online* de sankasuru	onlineで参加する	Onlineで参加する	オンラインで参加する
+chunk-both	7	line* deno tyakusin	LINEでの着信	lineでの着信	Lineでの着信
+chunk-both	8	token* wo hakkousuru	tokenを発行する	Tokenを発行する	トークンを発行する
 chunk-both	9	amazon* de katta	Amazonで買った	amazonで買った
 chunk-both	10	ruby* no baajon	Rubyのバージョン	rubyのバージョン
-chunk-both	11	home* wo hiraku	homeを開く	ホームを開く
-chunk-both	12	menu* de erabu	menuで選ぶ	メニューで選ぶ
+chunk-both	11	home* wo hiraku	homeを開く	Homeを開く	ホームを開く
+chunk-both	12	menu* de erabu	menuで選ぶ	Menuで選ぶ	メニューで選ぶ
 chunk-ja	1	kokomade kita	ここまで来た
 chunk-ja	2	sakewo nomu	酒を飲む
 chunk-ja	3	takenokowo tabeta	筍を食べた	たけのこを食べた	タケノコを食べた
@@ -75,3 +78,11 @@ chunk-ja	17	hide	秀	ひで
 chunk-ja	18	kite	来て	着て
 chunk-ja	19	ane	姉
 chunk-ja	20	hate	果て
+chunk-sentence	1	hello* nice* to* meet* you*	Hello nice to meet you
+chunk-sentence	2	thank* you* so* much*	Thank you so much
+chunk-sentence	3	i* will* send* it* to* you* tomorrow*	I will send it to you tomorrow
+chunk-sentence	4	see* you* on* monday*	See you on Monday
+chunk-sentence	5	please* check* the* github* page*	Please check the GitHub page
+chunk-sentence	6	good* morning* everyone*	Good morning everyone
+chunk-sentence	7	how* are* you*	How are you
+chunk-sentence	8	let* me* know* if* you* have* any* questions*	Let me know if you have any questions

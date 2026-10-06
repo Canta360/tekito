@@ -47,12 +47,17 @@ public:
     // seen there (take) or the pack has no counts.
     [[nodiscard]] std::optional<double> InJapaneseText(std::wstring_view word) const;
     [[nodiscard]] bool HasJapaneseTextCounts() const noexcept { return latin_.IsOpen(); }
+    // How English writes `word` (lower case) when it is with capitals
+    // (google: Google, github: GitHub); nothing for a word written in lower
+    // case (nice), or without the table.
+    [[nodiscard]] std::optional<std::wstring> WrittenAs(std::wstring_view word) const;
 
 private:
     SortedTsv words_;
     SortedTsv names_;
     SortedTsv english_;
     SortedTsv latin_;
+    SortedTsv case_;
 };
 
 }  // namespace tekito::japanese

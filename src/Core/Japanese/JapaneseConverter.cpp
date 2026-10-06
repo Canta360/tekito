@@ -497,6 +497,15 @@ std::vector<Phrase> JapaneseConverter::Convert(std::wstring_view reading,
     return phrases;
 }
 
+bool JapaneseConverter::IsWord(std::wstring_view reading) const {
+    if (reading.empty()) return false;
+    bool found = false;
+    dictionary_.CommonPrefixSearch(dictionary_.Encode(reading), [&](std::size_t length, std::uint32_t) {
+        found = found || length == reading.size();
+    });
+    return found;
+}
+
 std::optional<PhraseCandidate> JapaneseConverter::Best(std::wstring_view reading, std::uint16_t context,
                                                       const JapaneseUserDictionary* user) const {
     const std::size_t n = reading.size();
