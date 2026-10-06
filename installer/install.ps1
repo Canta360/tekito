@@ -27,6 +27,9 @@ param(
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
+# Windows PowerShell 5.1 leaves $PSScriptRoot empty in a parameter's
+# default when the script is run with -File.
+if (-not $SourceRoot) { $SourceRoot = $PSScriptRoot }
 
 $tip = "0409:{6F67E5C8-A873-4B69-8EC3-26DF00F642F1}{8D99240A-5C9C-4ED8-8DE4-85F21DF23763}"
 $japaneseTip = "0411:{6F67E5C8-A873-4B69-8EC3-26DF00F642F1}{2876747C-FA52-4CCC-B308-F406190F8CDE}"

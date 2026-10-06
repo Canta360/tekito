@@ -10,6 +10,9 @@ param(
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
+# Windows PowerShell 5.1 leaves $PSScriptRoot empty in a parameter's
+# default when the script is run with -File.
+if (-not $PackageRoot) { $PackageRoot = $PSScriptRoot }
 
 $PackageRoot = (Resolve-Path $PackageRoot).Path
 $manifestPath = Join-Path $PackageRoot "package-manifest.json"
