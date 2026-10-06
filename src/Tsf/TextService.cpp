@@ -86,7 +86,10 @@ std::wstring ReadRangeText(ITfRange* range, TfEditCookie editCookie) {
     wchar_t buffer[256]{};
     ULONG length = 0;
     if (FAILED(range->GetText(editCookie, 0, buffer, 256, &length))) return {};
-    return std::wstring(buffer, std::min<ULONG>(length, 255));
+    std::wstring text(buffer, std::min<ULONG>(length, 255));
+    // Browsers keep a space typed last as a no-break space; it is a space here.
+    std::replace(text.begin(), text.end(), L'\x00A0', L' ');
+    return text;
 }
 
 void ReadCompositionContext(ITfComposition* composition, TfEditCookie editCookie,
