@@ -745,11 +745,14 @@ void JapaneseComposer::BuildPhrases(bool convert) {
             return;
         }
     }
+    // A slip in the keys was undone: English typed into it comes second.
+    bool slipUndone = false;
     if (convert && converter_) {
         // A slip in the keys: converted from the keys as meant. Esc still
         // goes back to what was typed.
         if (auto conversion = keyConverter_ && !HasAscii() ? keyConverter_->Convert(Keys(false), context_, contextWords_, userDictionary_)
                                             : std::nullopt) {
+            slipUndone = true;
             conversionReading_ = ApplyTypingStyle(std::move(conversion->reading));
             readingKeys_ = std::move(conversion->keyAt);
             AddPhrases(std::move(conversion->phrases), conversionReading_);
@@ -766,11 +769,26 @@ void JapaneseComposer::BuildPhrases(bool convert) {
         }
     }
     if (convert && !chunkJudge_) AddTypedEnglish();
+    // Japanese mode: English typed into it without spaces, first when the
+    // keys make no kana.
+    if (convert && !chunkJudge_ && splitter_ && !HasAscii() && !phrases_.empty()) {
+        if (auto split = RunTogetherEnglish()) {
+            const bool leftover = std::any_of(units_.begin(), units_.end(), [](const Unit& unit) {
+                return !unit.ascii && LeftoverLetters(ToFullWidthAscii(unit.kana)) > 0;
+            });
+            PhraseCandidate whole{std::move(*split), 0, PhraseCandidate::Kind::Dictionary, false};
+            whole.reading = Reading();
+            auto& candidates = phrases_.front().candidates;
+            candidates.insert(candidates.begin() + ((leftover && !slipUndone) || candidates.empty() ? 0 : 1),
+                              std::move(whole));
+        }
+    }
     if (chunk && !chunk->english && !phrases_.empty()) {
         if (auto split = RunTogetherEnglish()) {
             PhraseCandidate whole{std::move(*split), 0, PhraseCandidate::Kind::Dictionary, false};
             whole.reading = Reading();
-            phrases_.front().candidates.insert(phrases_.front().candidates.begin(), std::move(whole));
+            auto& candidates = phrases_.front().candidates;
+            candidates.insert(candidates.begin() + (slipUndone && !candidates.empty() ? 1 : 0), std::move(whole));
         }
     }
     // Japanese, but it reads as English too: the English for the whole
@@ -814,31 +832,24 @@ void JapaneseComposer::AddTypedEnglish() {
 }
 
 std::optional<std::wstring> JapaneseComposer::RunTogetherEnglish() const {
-    // As typed: a slip correction may take the leftover letters away.
-    const bool leftover = std::any_of(units_.begin(), units_.end(), [](const Unit& unit) {
-        return !unit.ascii && LeftoverLetters(ToFullWidthAscii(unit.kana)) > 0;
-    });
-    if (!chunkJudge_ || !converter_ || !table_ || !leftover) return std::nullopt;
-    const std::wstring keys = Keys(false);
-    constexpr std::size_t kShortestWord = 3;
-    for (std::size_t at = 1; at + kShortestWord <= keys.size(); ++at) {
-        std::wstring kana;
-        bool readable = true;
-        for (const auto& token : ParseRomaji(*table_, std::wstring_view(keys).substr(0, at))) {
-            readable = readable && !token.leftover;
-            kana += token.kana;
+    const ChunkJudge* splitter = chunkJudge_ ? chunkJudge_ : splitter_;
+    if (!splitter || !converter_ || !table_) return std::nullopt;
+    const auto pieces = splitter->Split(Keys(false));
+    if (!pieces) return std::nullopt;
+    std::wstring text;
+    for (std::size_t i = 0; i < pieces->size(); ++i) {
+        const auto& piece = (*pieces)[i];
+        if (piece.english) {
+            text += i == 0 ? EnglishAsWritten(piece.text) : piece.text;
+            continue;
         }
-        if (!readable || kana.empty()) continue;
-        const auto english = chunkJudge_->Judge(std::wstring_view(keys).substr(at), englishRun_, japaneseInSentence_);
-        if (!english.english || !english.word) continue;
-        std::wstring japanese;
-        for (const auto& phrase : ConvertReading(ApplyTypingStyle(kana), 0, context_, contextWords_)) {
+        for (const auto& phrase : ConvertReading(ApplyTypingStyle(piece.text), 0, i == 0 ? context_ : 0,
+                                                 contextWords_)) {
             if (phrase.candidates.empty()) return std::nullopt;
-            japanese += phrase.candidates.front().text;
+            text += phrase.candidates.front().text;
         }
-        return japanese + english.written;
     }
-    return std::nullopt;
+    return text;
 }
 
 std::vector<PhraseCandidate> JapaneseComposer::EnglishCandidates(const std::wstring& written,

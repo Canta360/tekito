@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <cwctype>
+#include <map>
 
 namespace tekito::japanese {
 
@@ -207,6 +208,115 @@ ChunkJudge::Judgement ChunkJudge::Judge(std::wstring_view keys, std::size_t engl
     }
     if (!judgement.english) judgement.written = std::wstring(keys);
     return judgement;
+}
+
+std::optional<std::vector<ChunkJudge::Piece>> ChunkJudge::Split(std::wstring_view keys) const {
+    // An English word costs this many kana of ordinary Japanese; shorter
+    // than this many letters only names written with capitals (API).
+    constexpr std::int64_t kEnglishKana = 2;
+    constexpr std::size_t kShortestWord = 4;
+    constexpr std::size_t kMostWords = 24;
+    constexpr std::size_t kLongestKeys = 40;
+    if (keys.size() < kShortestWord + 2 || keys.size() > kLongestKeys ||
+        !std::all_of(keys.begin(), keys.end(), [](wchar_t c) { return c >= L'a' && c <= L'z'; })) {
+        return std::nullopt;
+    }
+    const auto kanaOf = [&](std::wstring_view part) -> std::optional<std::wstring> {
+        std::wstring kana;
+        for (const auto& token : JapaneseComposer::ParseRomaji(table_, part)) {
+            if (token.leftover) return std::nullopt;
+            kana += token.kana;
+        }
+        return kana;
+    };
+    // What a run of keys costs as Japanese, nothing when it is not natural.
+    std::map<std::pair<std::size_t, std::size_t>, std::optional<std::int64_t>> costs;
+    // Two keys or fewer are a particle (githubni) or nothing (plugin: not
+    // plug + in).
+    constexpr std::size_t kShortPiece = 2;
+    const auto japaneseCost = [&](std::size_t begin, std::size_t end) -> std::optional<std::int64_t> {
+        if (begin == end) return 0;
+        if (end - begin <= kShortPiece &&
+            std::find(std::begin(kParticles), std::end(kParticles), keys.substr(begin, end - begin)) == std::end(kParticles)) {
+            return std::nullopt;
+        }
+        const auto key = std::make_pair(begin, end);
+        if (const auto found = costs.find(key); found != costs.end()) return found->second;
+        std::optional<std::int64_t> cost;
+        if (const auto kana = kanaOf(keys.substr(begin, end - begin)); kana && !kana->empty()) {
+            const auto found = converter_.Cost(*kana);
+            if (found && *found < thresholds_.costPerKana * static_cast<std::int64_t>(kana->size())) cost = found;
+        }
+        costs.emplace(key, cost);
+        return cost;
+    };
+    // The keys as Japanese, when they read as kana.
+    std::optional<std::int64_t> whole;
+    if (const auto kana = kanaOf(keys); kana && !kana->empty()) whole = converter_.Cost(*kana);
+    // The English words in the keys, longest first.
+    struct Word {
+        std::size_t begin, end;
+    };
+    std::vector<Word> words;
+    for (std::size_t length = keys.size() - 1; length >= 3; --length) {
+        for (std::size_t begin = 0; begin + length <= keys.size() && words.size() < kMostWords; ++begin) {
+            const auto word = keys.substr(begin, length);
+            bool known = length >= kShortestWord && english_.Score(word) >= thresholds_.knownWord;
+            if (!known && names_) {
+                for (const auto& spelling : names_->ForEnglish(word, 1)) {
+                    const bool capitals = std::any_of(spelling.english.begin() + 1, spelling.english.end(),
+                                                      [](wchar_t c) { return std::iswupper(c) != 0; });
+                    known = capitals || (length >= kShortestWord && spelling.score >= thresholds_.knownName);
+                }
+            }
+            if (known) words.push_back({begin, begin + length});
+        }
+    }
+    const std::int64_t wordCost = thresholds_.costPerKana * kEnglishKana;
+    std::optional<std::int64_t> best;
+    std::vector<Word> chosen;
+    // One word, or two apart, with natural Japanese around them.
+    const auto tryWords = [&](const std::vector<Word>& pick) {
+        std::int64_t cost = wordCost * static_cast<std::int64_t>(pick.size());
+        std::size_t at = 0;
+        bool japanese = false;
+        for (const auto& word : pick) {
+            const auto gap = japaneseCost(at, word.begin);
+            if (!gap) return;
+            cost += *gap;
+            japanese = japanese || word.begin > at;
+            at = word.end;
+        }
+        const auto tail = japaneseCost(at, keys.size());
+        if (!tail) return;
+        cost += *tail;
+        japanese = japanese || at < keys.size();
+        if (!japanese || (best && *best <= cost)) return;
+        best = cost;
+        chosen = pick;
+    };
+    for (std::size_t a = 0; a < words.size(); ++a) {
+        tryWords({words[a]});
+        for (std::size_t b = 0; b < words.size(); ++b) {
+            if (words[b].begin >= words[a].end) tryWords({words[a], words[b]});
+        }
+    }
+    // Better than the keys as Japanese by this many kana of it.
+    constexpr std::int64_t kBetterByKana = 2;
+    if (!best || (whole && *best + thresholds_.costPerKana * kBetterByKana >= *whole)) return std::nullopt;
+    std::vector<Piece> pieces;
+    std::size_t at = 0;
+    const auto japanese = [&](std::size_t begin, std::size_t end) {
+        if (begin < end) pieces.push_back({false, std::wstring(keys.substr(begin, end - begin)), *kanaOf(keys.substr(begin, end - begin))});
+    };
+    for (const auto& word : chosen) {
+        japanese(at, word.begin);
+        const auto typed = keys.substr(word.begin, word.end - word.begin);
+        pieces.push_back({true, std::wstring(typed), WrittenAs(typed)});
+        at = word.end;
+    }
+    japanese(at, keys.size());
+    return pieces;
 }
 
 bool ChunkJudge::EnglishThenJapanese(std::wstring_view keys) const {

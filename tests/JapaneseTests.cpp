@@ -795,6 +795,10 @@ void TestMixedTyping(const RomajiTable& table, const MiniPack& pack) {
     const auto particle = judge.Judge(L"dr", 1);
     Require(!particle.english && particle.meant == L"de", "two keys after English one slip from a particle are it");
     Require(judge.Judge(L"ggithub", 0).english, "a first letter typed twice is a slip of the English word");
+    const auto pieces = judge.Split(L"pushsimasita");
+    Require(pieces && pieces->size() == 2 && (*pieces)[0].english && (*pieces)[0].text == L"push" && !(*pieces)[1].english,
+            "English run into Japanese without a space is split off");
+    Require(!judge.Split(L"pushin"), "two keys after it that are no particle are not Japanese");
 
     JapaneseComposer composer(&table);
     composer.SetConverter(&converter);

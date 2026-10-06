@@ -116,6 +116,7 @@ void AttachJapaneseData(JapaneseComposer& composer) {
     composer.SetConverter(data ? data->converter.get() : nullptr);
     composer.SetKeyConverter(data ? data->keys.get() : nullptr);
     composer.SetLoanwords(data && data->loanwords.IsOpen() ? &data->loanwords : nullptr);
+    composer.SetRunTogether(data ? data->chunks.get() : nullptr);
 }
 
 void AttachMixedTyping(JapaneseComposer& composer, bool on) {

@@ -94,6 +94,10 @@ public:
     // Mixed typing: English Auto's spelling, so English with a slip in it
     // is put right as in English (rveiew: review). nullptr: as typed.
     void SetEnglishSpelling(const EnglishSpelling* spelling) noexcept { englishSpelling_ = spelling; }
+    // English words typed into Japanese without spaces (reflectsareta:
+    // reflectされた), found with `splitter` in Japanese mode too: first when
+    // the keys make no kana, otherwise the next choice. nullptr: off.
+    void SetRunTogether(const ChunkJudge* splitter) noexcept { splitter_ = splitter; }
     // Mixed typing: whether what is typed next starts a sentence, so English
     // there starts with a capital. The text service says so from the text
     // before the caret; committing keeps it up to date.
@@ -421,6 +425,7 @@ private:
     const Loanwords* loanwords_{nullptr};
     const ChunkJudge* chunkJudge_{nullptr};
     const EnglishSpelling* englishSpelling_{nullptr};
+    const ChunkJudge* splitter_{nullptr};
     std::uint16_t englishContext_{0};
     // Mixed typing: English chunks committed in a row, just before, and
     // their text (context for English Auto's spelling).

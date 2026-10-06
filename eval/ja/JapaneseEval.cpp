@@ -262,6 +262,8 @@ struct ChunkOptions {
     bool japaneseMode{false};
     bool slips{true};
     bool englishEngine{false};
+    // English typed into Japanese without spaces is looked for (--no-run-together: not).
+    bool runTogether{true};
     std::filesystem::path writeChunks;
 };
 
@@ -315,6 +317,7 @@ int RunChunks(const ConnectionMatrix& matrix, const JapaneseDictionary& dictiona
     const auto parts = tekito::japanese::UserPartsOfSpeech::Load(options.pack / "pos.tsv");
     const auto noun = parts.For(tekito::japanese::UserWordKind::ProperNoun);
     if (!options.japaneseMode) composer.SetMixedTyping(&judge, noun ? noun->right : 0);
+    if (options.runTogether) composer.SetRunTogether(&judge);
     std::unique_ptr<tekito::IConversionEngine> englishEngine;
     std::unique_ptr<tekito::EnglishSpelling> spelling;
     if (options.englishEngine) {
@@ -485,6 +488,7 @@ int main(int argc, char** argv) {
         else if (arg == "--japanese-mode") chunks.japaneseMode = true;
         else if (arg == "--no-slips") chunks.slips = false;
         else if (arg == "--english-engine") chunks.englishEngine = true;
+        else if (arg == "--no-run-together") chunks.runTogether = false;
         else if (arg == "--write-chunks" && i + 1 < argc) chunks.writeChunks = argv[++i];
     }
     tekito::japanese::LanguageModel model;

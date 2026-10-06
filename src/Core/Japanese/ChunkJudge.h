@@ -2,8 +2,10 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace tekito {
 class EnglishSpelling;
@@ -73,6 +75,19 @@ public:
     [[nodiscard]] Judgement Judge(std::wstring_view keys, std::size_t englishBefore,
                                   bool japaneseInSentence = true, const EnglishSpelling* spelling = nullptr,
                                   std::wstring_view before = {}) const;
+
+    // Japanese with English words typed into it without spaces
+    // (reflectsareta: reflect + sareta, kyouhameetinggaarimasu: kyouha +
+    // meeting + gaarimasu): the pieces, when the keys do not read as
+    // natural Japanese and the pieces do. Only English spelled right (a
+    // known word or name) is taken; one or two of them.
+    struct Piece {
+        bool english{false};
+        std::wstring keys;
+        // English: as written (GitHub); Japanese: the kana.
+        std::wstring text;
+    };
+    [[nodiscard]] std::optional<std::vector<Piece>> Split(std::wstring_view keys) const;
 
 private:
     // How English writes `word` (GitHub, Google, nice).
