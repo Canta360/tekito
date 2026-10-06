@@ -147,7 +147,9 @@ void JapaneseComposer::Insert(wchar_t key) {
     // Mixed typing: a capital is a letter of the chunk like any other; the
     // chunk keeps it for when it is English.
     if (chunkJudge_) {
-        if (!IsComposing()) {
+        // A converted chunk joins the sentence, and a new one starts.
+        if (IsConverted() && !Live()) SettleChunk();
+        if (!Typing()) {
             typedCase_.clear();
             typedCaseKept_ = true;
         }
@@ -180,7 +182,7 @@ bool JapaneseComposer::FeedAscii(wchar_t key) {
     // half-width, until the text is committed. Digits and symbols stay as
     // typed too; a small letter after two or more capitals (NHKno) goes
     // back to kana.
-    if (!IsComposing()) {
+    if (!Typing()) {
         asciiMode_ = false;
         capitals_ = 0;
     }
@@ -532,7 +534,7 @@ std::size_t JapaneseComposer::SplitAt(std::size_t offset) {
 }
 
 void JapaneseComposer::MoveCaret(int delta) {
-    if (IsConverted() || !IsComposing()) return;
+    if (IsConverted() || !Typing()) return;
     FlushAll();
     predictions_.clear();
     chosenPrediction_.reset();
@@ -542,12 +544,16 @@ void JapaneseComposer::MoveCaret(int delta) {
 }
 
 std::size_t JapaneseComposer::CaretOffset() const {
-    if (IsConverted()) return Preedit().size();
-    return ReadingOffset(caret_) + pending_.size();
+    // After the settled chunks of the sentence (Mix).
+    std::size_t settled = 0;
+    const auto segments = Segments();
+    if (!segments.empty() && segments.front().settled) settled = segments.front().text.size();
+    if (IsConverted()) return settled + Preedit().size();
+    return settled + ReadingOffset(caret_) + pending_.size();
 }
 
 void JapaneseComposer::Delete() {
-    if (IsConverted() || !IsComposing()) return;
+    if (IsConverted() || !Typing()) return;
     FlushAll();
     if (caret_ >= units_.size()) return;
     auto& next = units_[caret_];
@@ -574,6 +580,13 @@ std::optional<std::wstring> JapaneseComposer::TypedWithCapitals(std::wstring_vie
 }
 
 void JapaneseComposer::Backspace() {
+    if (chunkJudge_ && !Typing() && !settled_.empty()) {
+        const auto chunk = settled_.back();
+        settled_.pop_back();
+        RecountSentence();
+        for (const wchar_t key : chunk.typed) Insert(key);
+        return;
+    }
     // Mixed typing: what was typed after the caret is kept no longer.
     if (chunkJudge_ && caret_ != units_.size()) typedCaseKept_ = false;
     if (Live() && IsConverted()) {
@@ -730,6 +743,7 @@ void JapaneseComposer::BuildPhrases(bool convert) {
         if (word > 0) {
             chunk = chunkJudge_->Judge(std::wstring_view(keys).substr(0, word), englishRun_, japaneseInSentence_,
                                        englishSpelling_, englishText_);
+            JudgeWholeSentence(chunk, std::wstring_view(keys).substr(0, word));
             // A capital typed in it: English, as typed (I, Have), or as the
             // name is written when only its first letter was (Github: GitHub).
             if (const auto typed = TypedWithCapitals(std::wstring_view(keys).substr(0, word))) {
@@ -1137,7 +1151,7 @@ std::vector<PhraseCandidate> JapaneseComposer::PostalCandidates(std::wstring_vie
 }
 
 void JapaneseComposer::Convert() {
-    if (!IsComposing()) return;
+    if (!Typing()) return;
     if (Live() && preview_) {
         // Live: the last phrase's next candidate; the next Space opens the list.
         StartPicking();
@@ -1432,7 +1446,7 @@ void JapaneseComposer::ResizeFocus(int delta) {
 }
 
 void JapaneseComposer::CycleKana() {
-    if (!IsComposing()) return;
+    if (!Typing()) return;
     // From the live conversion: the whole text, as before conversion.
     if (preview_) {
         phrases_.clear();
@@ -1454,7 +1468,7 @@ void JapaneseComposer::CycleKana() {
 }
 
 void JapaneseComposer::Transliterate(KanaForm form) {
-    if (!IsComposing()) return;
+    if (!Typing()) return;
     // From the live conversion: the whole text, as before conversion.
     if (preview_) {
         phrases_.clear();
@@ -1567,12 +1581,27 @@ std::wstring JapaneseComposer::Preedit() const {
 }
 
 std::vector<PreeditSegment> JapaneseComposer::Segments() const {
-    if (!IsConverted()) {
-        if (!IsComposing()) return {};
-        return {{RenderTyping(true), false, false}};
-    }
-    if (const auto* whole = WholeChoice()) return {{whole->text, true, true}};
     std::vector<PreeditSegment> segments;
+    if (!settled_.empty()) {
+        // English settled last keeps its space before what is typed next,
+        // unless that is Japanese.
+        std::wstring text = SettledText();
+        bool englishLast = false;
+        for (const auto& chunk : settled_) {
+            if (!chunk.marksOnly) englishLast = chunk.isEnglish;
+        }
+        const bool japaneseNext = IsConverted() && !ChoseEnglish();
+        if (englishLast && Typing() && !japaneseNext && !text.empty() && text.back() < 0x3000) text.push_back(L' ');
+        segments.push_back({std::move(text), true, false, true});
+    }
+    if (!IsConverted()) {
+        if (Typing()) segments.push_back({RenderTyping(true), false, false});
+        return segments;
+    }
+    if (const auto* whole = WholeChoice()) {
+        segments.push_back({whole->text, true, true});
+        return segments;
+    }
     for (std::size_t i = 0; i < phrases_.size(); ++i) {
         segments.push_back({PhraseText(phrases_[i]), true, !preview_ && i == focus_});
     }
@@ -1613,15 +1642,128 @@ std::vector<std::wstring> JapaneseComposer::PhraseKeys() const {
 }
 
 std::wstring JapaneseComposer::Commit() {
+    if (!chunkJudge_ || settled_.empty()) return CommitChunk();
+    // Enter takes the chunk being typed as Space would, then the sentence.
+    if (Typing()) SettleChunk();
+    return CommitSentence();
+}
+
+void JapaneseComposer::SettleChunk() {
+    if (!Typing()) return;
+    SettledChunk chunk;
+    chunk.typed = typedCaseKept_ && !typedCase_.empty() ? typedCase_ : Keys(false);
+    const std::wstring keys = Keys(false);
+    std::size_t word = keys.size();
+    while (word > 0 && std::wstring_view(L".,!?").find(keys[word - 1]) != std::wstring_view::npos) --word;
+    chunk.keys = keys.substr(0, word);
+    chunk.marksOnly = word == 0;
+    chunk.locked = TypedWithCapitals(chunk.keys).has_value() ||
+                   std::any_of(phrases_.begin(), phrases_.end(), [](const PhraseState& p) { return p.selected != 0; });
+    // Both ways, for when the sentence judges the chunk again.
+    const std::wstring marks = MarksAfterEnglish(std::wstring_view(keys).substr(word));
+    if (word > 0) {
+        const auto judged = chunkJudge_->Judge(chunk.keys, englishRun_, japaneseInSentence_, englishSpelling_, englishText_);
+        chunk.english = EnglishAsWritten(TypedWithCapitals(chunk.keys).value_or(judged.written)) + marks;
+    } else {
+        chunk.english = marks;
+    }
+    if (converter_ && word > 0) {
+        for (const auto& phrase : ConvertReading(ApplyTypingStyle(Reading()), 0, context_, contextWords_)) {
+            if (!phrase.candidates.empty()) chunk.japanese += phrase.candidates.front().text;
+        }
+    }
+    if (chunk.japanese.empty()) chunk.japanese = ApplyTypingStyle(Reading());
+    if (settled_.empty()) spaceBeforeSentence_ = spaceAfterEnglish_;
+    auto text = CommitChunk();
+    while (!text.empty() && text.back() == L' ') text.pop_back();
+    chunk.isEnglish = lastChunkEnglish_;
+    lastChunkEnglish_ = false;
+    // As it was taken (a candidate picked stays).
+    (chunk.isEnglish ? chunk.english : chunk.japanese) = text;
+    lastCommit_.reset();
+    settled_.push_back(std::move(chunk));
+}
+
+std::wstring JapaneseComposer::SettledText() const {
+    std::wstring text;
+    bool englishBefore = false;
+    for (const auto& chunk : settled_) {
+        const bool english = chunk.marksOnly ? englishBefore : chunk.isEnglish;
+        // English words apart; punctuation and Japanese against what is before.
+        if (!text.empty() && englishBefore && english && !chunk.marksOnly) text.push_back(L' ');
+        text += english ? chunk.english : chunk.japanese;
+        englishBefore = english;
+    }
+    return text;
+}
+
+std::wstring JapaneseComposer::CommitSentence() {
+    std::wstring text = SettledText();
+    const bool firstJapanese = !settled_.front().marksOnly && !settled_.front().isEnglish;
+    bool lastEnglish = false;
+    for (const auto& chunk : settled_) {
+        if (!chunk.marksOnly) lastEnglish = chunk.isEnglish;
+    }
+    const bool japaneseMark = !text.empty() && text.back() >= 0x3000;
+    // As a chunk of its own would be: a space after English, taken back
+    // when Japanese follows; the space before the sentence taken back when
+    // it starts with Japanese.
+    if (lastEnglish && !japaneseMark) text.push_back(L' ');
+    dropSpaceBefore_ = spaceBeforeSentence_ && firstJapanese;
+    spaceAfterEnglish_ = lastEnglish && !japaneseMark;
+    settled_.clear();
+    spaceBeforeSentence_ = false;
+    SetSentenceStart(EndsSentence(text));
+    lastCommit_.reset();
+    return text;
+}
+
+void JapaneseComposer::RecountSentence() {
+    englishRun_ = 0;
+    englishText_.clear();
+    japaneseInSentence_ = false;
+    for (const auto& chunk : settled_) {
+        if (chunk.marksOnly) continue;
+        if (chunk.isEnglish) {
+            ++englishRun_;
+            englishText_ += chunk.english + L" ";
+        } else {
+            englishRun_ = 0;
+            englishText_.clear();
+            japaneseInSentence_ = true;
+        }
+    }
+}
+
+void JapaneseComposer::JudgeWholeSentence(std::optional<ChunkJudge::Judgement>& current, std::wstring_view currentKeys) {
+    if (!chunkJudge_ || settled_.empty()) return;
+    std::vector<std::wstring> keys;
+    std::vector<std::size_t> at;  // the settled chunk each key is from
+    for (std::size_t i = 0; i < settled_.size(); ++i) {
+        if (settled_[i].marksOnly) continue;
+        keys.push_back(settled_[i].keys);
+        at.push_back(i);
+    }
+    keys.emplace_back(currentKeys);
+    const auto whole = chunkJudge_->JudgeSentence(keys, englishSpelling_);
+    for (std::size_t k = 0; k < at.size(); ++k) {
+        auto& chunk = settled_[at[k]];
+        if (!chunk.locked) chunk.isEnglish = whole[k].english;
+    }
+    if (current && !TypedWithCapitals(currentKeys) && whole.back().english != current->english) current = whole.back();
+    RecountSentence();
+}
+
+std::wstring JapaneseComposer::CommitChunk() {
     FlushAll();
     // Live: the keys that were pending are converted too.
     if (Live() && preview_) UpdateLive();
     // A URL, address, path or mention is committed as typed on Enter too.
-    if (IsComposing() && !IsConverted() && !HasAscii() && !chosenPrediction_ && IsProtectedSpan(Keys(false))) {
+    if (Typing() && !IsConverted() && !HasAscii() && !chosenPrediction_ && IsProtectedSpan(Keys(false))) {
         BuildPhrases(true);
     }
     // Mixed typing: Enter before Space takes the chunk as Space would.
-    if (chunkJudge_ && IsComposing() && !IsConverted() && !HasAscii() && !chosenPrediction_) {
+    if (chunkJudge_ && Typing() && !IsConverted() && !HasAscii() && !chosenPrediction_) {
         const std::wstring keys = Keys(false);
         std::size_t word = keys.size();
         while (word > 0 && std::wstring_view(L".,!?").find(keys[word - 1]) != std::wstring_view::npos) --word;
@@ -1632,6 +1774,7 @@ std::wstring JapaneseComposer::Commit() {
     }
     if (chunkJudge_) {
         const bool english = ChoseEnglish();
+        lastChunkEnglish_ = english;
         englishRun_ = english ? englishRun_ + 1 : 0;
         if (!english) englishText_.clear();
         if (english) {

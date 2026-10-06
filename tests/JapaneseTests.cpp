@@ -827,6 +827,18 @@ void TestMixedTyping(const RomajiTable& table, const MiniPack& pack) {
     Type(composer, L"push.");
     RequireText(composer.Commit(), L"Push. ", "and so on Enter (a new sentence)");
     composer.ForgetContext();
+    composer.SetSentenceStart(true);
+    Type(composer, L"push");
+    composer.Convert();
+    Type(composer, L"kikai");
+    const auto held = composer.Segments();
+    Require(held.size() == 2 && held.front().settled && held.front().text == L"Push ",
+            "Mix holds the chunks before the one typed until Enter");
+    composer.Convert();
+    const auto sentence = composer.Commit();
+    Require(sentence.starts_with(L"Push") && sentence.size() > 4 && sentence[4] >= 0x3000,
+            "Enter commits the whole sentence, Japanese right after English");
+    composer.ForgetContext();
     composer.SetSentenceStart(false);
     Type(composer, L"github");
     composer.Convert();

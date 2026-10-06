@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Core/Japanese/ChunkJudge.h"
 #include "Core/Japanese/JapaneseConverter.h"
 #include "Core/SpecialConversions.h"
 
@@ -56,6 +57,9 @@ struct PreeditSegment {
     std::wstring text;
     bool converted{false};
     bool focused{false};
+    // Mixed typing: chunks before the one being typed, held with it until
+    // Enter so the sentence is judged as a whole.
+    bool settled{false};
 };
 
 // The text being typed in Japanese mode, before it is committed.
@@ -178,7 +182,9 @@ public:
     [[nodiscard]] bool Live() const noexcept { return live_ && !chunkJudge_; }
     static constexpr std::size_t kOpenPhrases = 4;
 
-    [[nodiscard]] bool IsComposing() const noexcept { return !units_.empty() || !pending_.empty(); }
+    // Text is held: the chunk being typed, or (Mix) the sentence's chunks
+    // before it.
+    [[nodiscard]] bool IsComposing() const noexcept { return Typing() || !settled_.empty(); }
     // True once converted (Space, Muhenkan, F6-F10), and while live
     // conversion shows the text converted.
     [[nodiscard]] bool IsConverted() const noexcept { return !phrases_.empty(); }
@@ -187,10 +193,10 @@ public:
     [[nodiscard]] bool IsLivePreview() const noexcept { return preview_ && !phrases_.empty(); }
     // Typing, rather than picking candidates: before conversion, or while
     // the live conversion is shown.
-    [[nodiscard]] bool IsTyping() const noexcept { return IsComposing() && (!IsConverted() || preview_); }
+    [[nodiscard]] bool IsTyping() const noexcept { return Typing() && (!IsConverted() || preview_); }
     // Whether typing a key commits the conversion first (Microsoft IME);
-    // live conversion types on instead.
-    [[nodiscard]] bool CommitsBeforeTyping() const noexcept { return IsConverted() && !Live(); }
+    // live conversion types on instead, and Mix holds the chunk until Enter.
+    [[nodiscard]] bool CommitsBeforeTyping() const noexcept { return IsConverted() && !Live() && !chunkJudge_; }
 
     // Types a key at the caret.
     void Insert(wchar_t key);
@@ -437,6 +443,39 @@ private:
     const ChunkJudge* chunkJudge_{nullptr};
     const EnglishSpelling* englishSpelling_{nullptr};
     const ChunkJudge* splitter_{nullptr};
+    // Mixed typing: the sentence's chunks before the one being typed, each
+    // as English and as Japanese, shown as the whole sentence judges it.
+    struct SettledChunk {
+        std::wstring typed;     // the keys as typed (capitals, punctuation)
+        std::wstring keys;      // lower case, without the punctuation after
+        std::wstring english;   // as English
+        std::wstring japanese;  // as Japanese
+        bool isEnglish{false};
+        bool marksOnly{false};  // punctuation of its own (a "." after English)
+        bool locked{false};     // picked from the list or typed with capitals
+    };
+    std::vector<SettledChunk> settled_;
+    // English was committed just before the sentence, with its space after.
+    bool spaceBeforeSentence_{false};
+    // The chunk CommitChunk took last was English.
+    bool lastChunkEnglish_{false};
+    // The chunk being typed (not the settled ones).
+    [[nodiscard]] bool Typing() const noexcept { return !units_.empty() || !pending_.empty(); }
+    // Mixed typing: the chunk being typed joins the settled ones.
+    void SettleChunk();
+    // Mixed typing: the settled chunks as one text, and the whole sentence
+    // committed.
+    [[nodiscard]] std::wstring SettledText() const;
+    [[nodiscard]] std::wstring CommitSentence();
+    // The chunk being typed, committed (what Commit was before Mix held
+    // sentences).
+    [[nodiscard]] std::wstring CommitChunk();
+    // Mixed typing: the sentence's English and Japanese so far, from the
+    // settled chunks.
+    void RecountSentence();
+    // Mixed typing: the settled chunks and `current` (the chunk being
+    // typed, judged) judged again as a whole sentence.
+    void JudgeWholeSentence(std::optional<ChunkJudge::Judgement>& current, std::wstring_view currentKeys);
     // Mixed typing: the chunk's keys as typed, capitals kept (they go into
     // the composer in lower case); empty once the caret moved inside it.
     std::wstring typedCase_;
