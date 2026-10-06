@@ -125,7 +125,6 @@ def main() -> int:
     parser.add_argument("--no-english-engine", action="store_true", help="Mix as before English Auto spelled it")
     args = parser.parse_args()
     args.work.mkdir(parents=True, exist_ok=True)
-    rng = random.Random(args.seed)
 
     def run_ja(keys: Path, out: Path, mode: str, slips: bool) -> None:
         d = args.ja_data
@@ -152,6 +151,8 @@ def main() -> int:
 
     results = []
     for name, mode, keys in args.chunks:
+        # Each set its own slips, the same whichever other sets run.
+        rng = random.Random(f"{args.seed}-{name}")
         clean, typo, notes = [], [], {}
         for row in read_rows(Path(keys)):
             if len(clean) == args.limit:
@@ -181,6 +182,7 @@ def main() -> int:
         write_examples(args.work / f"{name}_misses.txt", notes, typo_path, *(read_chunks(outs[k]) for k in ("clean", "typo")))
 
     for name, sentences in args.english:
+        rng = random.Random(f"{args.seed}-{name}")
         clean, typo, notes = [], [], {}
         for row in read_rows(Path(sentences)):
             if len(clean) == args.limit:
