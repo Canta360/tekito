@@ -109,6 +109,13 @@ std::optional<KeyConversion> KeyConverter::Convert(std::wstring_view keys, std::
                                                    const JapaneseUserDictionary* user) const {
     const std::size_t n = keys.size();
     if (n < kShortestKeys || costs_.typo <= 0) return std::nullopt;
+    // A slip in a word starting at key `at`: dearer early, cheaper late.
+    const auto SlipCost = [&](std::size_t at) {
+        const std::int64_t percent =
+            costs_.earlyPercent +
+            (costs_.latePercent - costs_.earlyPercent) * static_cast<std::int64_t>(at) / static_cast<std::int64_t>(n);
+        return costs_.typo * percent / 100;
+    };
     const std::uint16_t unknown = dictionary_.UnknownId();
 
     std::vector<Node> nodes;
@@ -136,7 +143,7 @@ std::optional<KeyConversion> KeyConverter::Convert(std::wstring_view keys, std::
             dictionary_.ForEachWord(record, [&](const DictionaryWord& word) {
                 add({static_cast<std::uint32_t>(i), static_cast<std::uint32_t>(end), word.left, word.right,
                      word.cost + (word.spellingCorrection ? kSpellingCorrectionPenalty : 0) +
-                         (corrected ? costs_.typo : 0),
+                         (corrected ? SlipCost(i) : 0),
                      NodeKind::Japanese, kana.substr(0, length), corrected});
                 return !corrected || ++forms < kCorrectedForms;
             });

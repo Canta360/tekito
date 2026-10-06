@@ -37,6 +37,12 @@ public:
     // correction off.
     struct Costs {
         std::int64_t typo{6000};
+        // The slip's cost at the first key and at the last, in percent of
+        // `typo`, in between in proportion: a slip late in what is typed is
+        // likelier, after more keys went by (tekito_ja_eval: 70% at the end
+        // corrects more slips and no sentence typed right).
+        std::int64_t earlyPercent{100};
+        std::int64_t latePercent{70};
     };
 
     KeyConverter(const JapaneseDictionary& dictionary, const ConnectionMatrix& matrix,
