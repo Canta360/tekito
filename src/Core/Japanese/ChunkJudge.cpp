@@ -94,15 +94,15 @@ ChunkJudge::Judgement ChunkJudge::Judge(std::wstring_view keys, std::size_t engl
     // A well-known name, and how it is written (github: GitHub).
     bool name = false;
     if (names_) {
-        for (const auto& spelling : names_->ForEnglish(keys, 1)) {
+        for (const auto& named : names_->ForEnglish(keys, 1)) {
             // Written with capitals inside (GitHub, API, iPhone), or very
             // well known (Google).
-            const bool capitals = std::any_of(spelling.english.begin() + 1, spelling.english.end(),
+            const bool capitals = std::any_of(named.english.begin() + 1, named.english.end(),
                                               [](wchar_t c) { return std::iswupper(c) != 0; });
-            name = capitals || spelling.score >= thresholds_.knownName;
+            name = capitals || named.score >= thresholds_.knownName;
             judgement.word = judgement.word || name;
             // A name English news does not write (Qiita) as the pack does.
-            if (capitals && score <= 0.0) judgement.written = spelling.english;
+            if (capitals && score <= 0.0) judgement.written = named.english;
         }
         // As English writes it: Google, but nice (Nice is a city too) and
         // it (not IT).
@@ -322,10 +322,10 @@ std::optional<std::vector<ChunkJudge::Piece>> ChunkJudge::Split(std::wstring_vie
 bool ChunkJudge::EnglishThenJapanese(std::wstring_view keys) const {
     if (english_.Score(keys) >= thresholds_.knownWord) return false;
     if (names_ && !names_->ForEnglish(keys, 1).empty()) return false;
-    constexpr std::wstring_view kParticles[] = {L"wo", L"ga", L"ni", L"de", L"ha", L"wa", L"mo", L"no", L"to"};
+    constexpr std::wstring_view kStarts[] = {L"wo", L"ga", L"ni", L"de", L"ha", L"wa", L"mo", L"no", L"to"};
     for (std::size_t at = 1; at + 2 <= keys.size(); ++at) {
         const auto rest = keys.substr(at);
-        if (std::none_of(std::begin(kParticles), std::end(kParticles),
+        if (std::none_of(std::begin(kStarts), std::end(kStarts),
                          [&](std::wstring_view particle) { return rest.starts_with(particle); })) {
             continue;
         }
