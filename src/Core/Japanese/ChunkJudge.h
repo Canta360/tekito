@@ -67,6 +67,10 @@ public:
                                   bool japaneseInSentence = true) const;
 
 private:
+    // An English word run into Japanese after it, starting with a particle
+    // (pcwotukau: pcを使う); not when the keys are an English word.
+    [[nodiscard]] bool EnglishThenJapanese(std::wstring_view keys) const;
+
     const RomajiTable& table_;
     const JapaneseConverter& converter_;
     const KeyConverter* slips_;

@@ -7,7 +7,7 @@
 //
 //   tekito_testbed.exe [--defaults] [--english] [--mixed] [--smart-punctuation]
 //                      [--double-space-period] [--period-on-enter]
-//                      [--no-next-words] [--no-doubled-words] [--english-spacing]
+//                      [--no-next-words] [--no-doubled-words] [--spacing]
 //
 // --defaults types with the default settings and no user words or learning.
 // --english starts in English (Auto) instead of Japanese, --mixed in Mix
@@ -144,7 +144,7 @@ void ApplyOverrides(Testbed& bed, std::wstring_view commandLine) {
     if (has(L"--period-on-enter")) settings.periodOnEnter = true;
     if (has(L"--no-next-words")) settings.nextWordPrediction = false;
     if (has(L"--no-doubled-words")) settings.doubledWordCheck = false;
-    if (has(L"--english-spacing")) settings.japaneseEnglishSpacing = true;
+    if (has(L"--spacing")) settings.japaneseEnglishSpacing = true;
 }
 
 // The English half, as the text service sets it up (ApplySettings).

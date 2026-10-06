@@ -15,6 +15,15 @@ ChunkJudge::Judgement ChunkJudge::Judge(std::wstring_view keys, std::size_t engl
                                         bool japaneseInSentence) const {
     Judgement judgement;
     judgement.written = std::wstring(keys);
+    // A word with a number after it (iphone15, gpt4): as the word is, with
+    // the number kept.
+    std::size_t digits = keys.size();
+    while (digits > 0 && keys[digits - 1] >= L'0' && keys[digits - 1] <= L'9') --digits;
+    if (digits > 0 && digits < keys.size()) {
+        auto word = Judge(keys.substr(0, digits), englishBefore, japaneseInSentence);
+        word.written += keys.substr(digits);
+        return word;
+    }
     const bool letters = !keys.empty() && std::all_of(keys.begin(), keys.end(), [](wchar_t c) {
         return c >= L'a' && c <= L'z';
     });
@@ -80,8 +89,8 @@ ChunkJudge::Judgement ChunkJudge::Judge(std::wstring_view keys, std::size_t engl
     }
     if (!readable) {
         // Japanese with a slip in it, unless it is an English word.
-        const bool slip = score < thresholds_.listedWord && slips_ && slips_->Convert(keys).has_value();
-        judgement.english = !slip;
+        const bool slip = score < thresholds_.listedWord && !name && slips_ && slips_->Convert(keys).has_value();
+        judgement.english = !slip && !EnglishThenJapanese(keys);
         return judgement;
     }
     if (rareLetters && score >= thresholds_.knownWord) {
@@ -121,6 +130,27 @@ ChunkJudge::Judgement ChunkJudge::Judge(std::wstring_view keys, std::size_t engl
     }
     if (!judgement.english) judgement.written = std::wstring(keys);
     return judgement;
+}
+
+bool ChunkJudge::EnglishThenJapanese(std::wstring_view keys) const {
+    if (english_.Score(keys) >= thresholds_.knownWord) return false;
+    if (names_ && !names_->ForEnglish(keys, 1).empty()) return false;
+    constexpr std::wstring_view kParticles[] = {L"wo", L"ga", L"ni", L"de", L"ha", L"wa", L"mo", L"no", L"to"};
+    for (std::size_t at = 1; at + 2 <= keys.size(); ++at) {
+        const auto rest = keys.substr(at);
+        if (std::none_of(std::begin(kParticles), std::end(kParticles),
+                         [&](std::wstring_view particle) { return rest.starts_with(particle); })) {
+            continue;
+        }
+        bool readable = true;
+        for (const auto& token : JapaneseComposer::ParseRomaji(table_, rest)) readable = readable && !token.leftover;
+        bool englishReadable = true;
+        for (const auto& token : JapaneseComposer::ParseRomaji(table_, keys.substr(0, at))) {
+            englishReadable = englishReadable && !token.leftover;
+        }
+        if (readable && !englishReadable) return true;
+    }
+    return false;
 }
 
 }  // namespace tekito::japanese
