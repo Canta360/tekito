@@ -570,6 +570,31 @@ std::vector<Candidate> CandidateGenerator::Generate(std::wstring_view rawText,
             AddOriginal(output, seen, rawText);
         }
     }
+    // A word's possessive (pitcher's) and British spellings of a word
+    // (organise, caramelising, familiarisation) are words too.
+    if ((!exact || exactHasWeakFrequency) && !keptAsTyped && !ranked.empty() && lower.size() > 4) {
+        bool word = false;
+        if (lower.ends_with(L"'s") || lower.ends_with(L"’s")) {
+            word = IsWord(lower.substr(0, lower.size() - 2));
+        }
+        constexpr std::pair<std::wstring_view, std::wstring_view> kBritish[] = {
+            {L"isation", L"ization"}, {L"ising", L"izing"}, {L"ised", L"ized"}, {L"iser", L"izer"},
+            {L"ises", L"izes"},       {L"ise", L"ize"},     {L"yse", L"yze"},   {L"ysing", L"yzing"},
+            {L"ysed", L"yzed"}};
+        for (const auto& [british, american] : kBritish) {
+            if (word) break;
+            // In the word or before its possessive or plural ending.
+            const auto at = lower.rfind(british);
+            if (at == std::wstring::npos || at == 0) continue;
+            std::wstring variant = lower;
+            variant.replace(at, british.size(), american);
+            word = IsWord(variant);
+        }
+        if (word) {
+            keptAsTyped = true;
+            AddOriginal(output, seen, rawText);
+        }
+    }
 
     bool addedFirstCorrection = false;
     std::size_t addedCorrectionCount = 0;
