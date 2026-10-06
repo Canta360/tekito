@@ -192,6 +192,8 @@ private:
     // Mix: removes the space right before the composition (or the caret),
     // the one English was committed with, when it is there.
     void TakeBackSpaceBefore(ITfContext* context, TfEditCookie editCookie);
+    // Mix: the period on Enter after an English sentence.
+    HRESULT PutEnglishPeriod(ITfContext* context, TfEditCookie editCookie);
     // Ctrl+Backspace right after a Japanese commit: the text back in the composition.
     HRESULT UndoJapaneseCommit(ITfContext* context, TfEditCookie editCookie);
     // Henkan with nothing typed: the selection (or the text just committed) converted again.

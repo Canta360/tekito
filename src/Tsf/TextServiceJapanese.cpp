@@ -374,6 +374,13 @@ HRESULT TextService::HandleEnglishSegmentEnd(ITfContext* context, TfEditCookie e
 }
 
 bool TextService::TranslateJapaneseKey(WPARAM wParam, KeyInput& input) {
+    // Mix: Enter after an English sentence ends it with a period, as English
+    // Auto does, when Settings has the period on Enter.
+    if (mode_ == InputMode::Mixed && wParam == VK_RETURN && userSettings_.periodOnEnter &&
+        japanese_.EnglishSentenceOpen() && !HasCommandModifier()) {
+        input.type = KeyInput::Type::MixedEnterPeriod;
+        return true;
+    }
     japanese::KeyOptions options = userdata::JapaneseKeyOptions(userSettings_);
     options.pageSize = japanesePage_;
     const auto command = japanese::TranslateKey(japanese_, JapaneseKeyPressFor(wParam, userSettings_.japaneseIgnoreCapsLock), options);
@@ -393,6 +400,8 @@ HRESULT TextService::HandleJapaneseKey(ITfContext* context, TfEditCookie editCoo
     using Action = japanese::KeyCommand::Action;
     japanese::KeyCommand command;
     switch (input.type) {
+    case KeyInput::Type::MixedEnterPeriod:
+        return PutEnglishPeriod(context, editCookie);
     case KeyInput::Type::JapaneseKey:
         command = input.japaneseKey;
         break;

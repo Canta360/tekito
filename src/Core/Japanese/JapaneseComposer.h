@@ -90,10 +90,18 @@ public:
     // Mixed typing: whether what is typed next starts a sentence, so English
     // there starts with a capital. The text service says so from the text
     // before the caret; committing keeps it up to date.
-    void SetSentenceStart(bool start) noexcept { sentenceStart_ = start; }
+    void SetSentenceStart(bool start) noexcept {
+        sentenceStart_ = start;
+        if (start) japaneseInSentence_ = false;
+    }
     // Whether text ending in `before` has ended its sentence (nothing, a
     // line break, 。 . ! ? and their full-width forms).
     [[nodiscard]] static bool EndsSentence(std::wstring_view before) noexcept;
+    // Mixed typing: an English sentence is open, its last word committed
+    // with its space (for the period on Enter, as in English Auto).
+    [[nodiscard]] bool EnglishSentenceOpen() const noexcept {
+        return chunkJudge_ && !IsComposing() && spaceAfterEnglish_ && !japaneseInSentence_;
+    }
     // The user's words, for conversion and predictions; null for none.
     void SetUserDictionary(const JapaneseUserDictionary* user) noexcept { userDictionary_ = user; }
     // Dates for "きょう", numbers in kanji, symbols by reading and sums for
@@ -311,6 +319,9 @@ private:
     // `written`, with a capital when it starts a sentence (hello: Hello;
     // GitHub stays).
     [[nodiscard]] std::wstring EnglishAsWritten(std::wstring written) const;
+    // Punctuation keys typed after an English word (you.), as English
+    // writes them in an English sentence and as Japanese does otherwise.
+    [[nodiscard]] std::wstring MarksAfterEnglish(std::wstring_view keys) const;
     // Mixed typing: whether what is chosen is English (to space it and
     // read on from it).
     [[nodiscard]] bool ChoseEnglish() const noexcept;
@@ -393,6 +404,9 @@ private:
     bool sentenceStart_{true};
     // English was committed last, with its space after it.
     bool spaceAfterEnglish_{false};
+    // Japanese was committed in this sentence: punctuation after English
+    // is Japanese (、。) then, English (, .) in an English sentence.
+    bool japaneseInSentence_{false};
     bool dropSpaceBefore_{false};
     const JapaneseUserDictionary* userDictionary_{nullptr};
     const SpecialConversions* special_{nullptr};

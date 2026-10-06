@@ -46,6 +46,8 @@ chunk-english	45	spotify* de kiiteru	Spotifyで聞いてる	spotifyで聞いて�
 chunk-english	46	github* no issue* wo mite	GitHubのissueを見て	GitHubのイシューを見て	githubのissueを見て	Githubのissueを見て	githubのイシューを見て	Githubのイシューを見て
 chunk-english	47	meeting* no agenda* wo okuru	meetingのagendaを送る	Meetingのagendaを送る	meetingのアジェンダを送る	Meetingのアジェンダを送る	ミーティングのagendaを送る	ミーティングのアジェンダを送る
 chunk-english	48	kono feature* ha benri	このfeatureは便利	このフィーチャーは便利
+chunk-english	49	kyouha github* wo tukatta.	今日はGitHubを使った。	今日はgithubを使った。
+chunk-english	50	sorega bug.*	それがbug。	それがバグ。
 chunk-both	1	api* wo tatakuto	APIを叩くと	apiを叩くと	Apiを叩くと
 chunk-both	2	notion* ni memosita	Notionにメモした	notionにメモした
 chunk-both	3	youtube* de mita	YouTubeで見た	youtubeで見た	Youtubeで見た
@@ -85,4 +87,6 @@ chunk-sentence	4	see* you* on* monday*	See you on Monday
 chunk-sentence	5	please* check* the* github* page*	Please check the GitHub page
 chunk-sentence	6	good* morning* everyone*	Good morning everyone
 chunk-sentence	7	how* are* you*	How are you
-chunk-sentence	8	let* me* know* if* you* have* any* questions*	Let me know if you have any questions
+chunk-sentence	8	hello* nice* to* meet* you.* see* you* soon.*	Hello nice to meet you. See you soon.
+chunk-sentence	9	thanks,* i* got* it.*	Thanks, I got it.
+chunk-sentence	10	let* me* know* if* you* have* any* questions*	Let me know if you have any questions

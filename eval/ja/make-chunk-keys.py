@@ -69,6 +69,8 @@ ENGLISH = [
     ("github* no issue* wo mite", "{GitHub|github}の{issue|イシュー}を見て"),
     ("meeting* no agenda* wo okuru", "{meeting|ミーティング}の{agenda|アジェンダ}を送る"),
     ("kono feature* ha benri", "この{feature|フィーチャー}は便利"),
+    ("kyouha github* wo tukatta.", "今日は{GitHub|github}を使った。"),
+    ("sorega bug.*", "それが{bug|バグ}。"),
 ]
 
 BOTH = [
@@ -94,6 +96,8 @@ SENTENCES = [
     ("please* check* the* github* page*", "Please check the GitHub page"),
     ("good* morning* everyone*", "Good morning everyone"),
     ("how* are* you*", "How are you"),
+    ("hello* nice* to* meet* you.* see* you* soon.*", "Hello nice to meet you. See you soon."),
+    ("thanks,* i* got* it.*", "Thanks, I got it."),
     ("let* me* know* if* you* have* any* questions*", "Let me know if you have any questions"),
 ]
 

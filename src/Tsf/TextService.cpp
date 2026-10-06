@@ -744,7 +744,9 @@ void TextService::ApplySettings() {
 // not part of a word, and Enter unless it picks a candidate from the list.
 bool TextService::LetsKeyThrough(const KeyInput& input) const noexcept {
     // In Japanese, Enter only commits the text, as in Microsoft IME.
-    if (TypesJapanese(mode_)) return input.type == KeyInput::Type::EndComposition;
+    if (TypesJapanese(mode_)) {
+        return input.type == KeyInput::Type::EndComposition || input.type == KeyInput::Type::MixedEnterPeriod;
+    }
     return input.type == KeyInput::Type::EndComposition ||
            (input.type == KeyInput::Type::Enter && !state_.IsCandidateNavigationActive());
 }
@@ -2173,6 +2175,14 @@ void TextService::CheckJapaneseContext(ITfContext* context, TfEditCookie editCoo
     if (lastJapaneseCommit_.empty() || !ReadSelectionContext(context, editCookie).ends_with(lastJapaneseCommit_)) {
         japanese_.ForgetContext();
     }
+}
+
+HRESULT TextService::PutEnglishPeriod(ITfContext* context, TfEditCookie editCookie) {
+    const auto preceding = ReadSelectionContext(context, editCookie);
+    japanese_.ForgetContext();
+    japanese_.SetSentenceStart(true);
+    if (!preceding.ends_with(L' ') || !NeedsTerminalPeriod(preceding)) return S_OK;
+    return ReplaceTrailingWhitespaceAtSelection(context, editCookie, 1, L".");
 }
 
 void TextService::TakeBackSpaceBefore(ITfContext* context, TfEditCookie editCookie) {

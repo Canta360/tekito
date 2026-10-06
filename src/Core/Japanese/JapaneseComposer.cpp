@@ -666,13 +666,25 @@ void JapaneseComposer::BuildPhrases(bool convert) {
     focus_ = 0;
     listOpen_ = false;
     if (reading.empty()) return;
-    // Mixed typing: the chunk may be English.
+    // Mixed typing: the chunk may be English, with punctuation typed after
+    // it (you., hello,), or be only punctuation after English.
     std::optional<ChunkJudge::Judgement> chunk;
     if (convert && chunkJudge_ && !HasAscii()) {
-        chunk = chunkJudge_->Judge(Keys(false), englishRun_);
-        if (chunk->english) {
-            phrases_.push_back({0, reading.size(), EnglishCandidates(EnglishAsWritten(chunk->written), reading)});
+        std::wstring keys = Keys(false);
+        std::size_t word = keys.size();
+        while (word > 0 && std::wstring_view(L".,!?").find(keys[word - 1]) != std::wstring_view::npos) --word;
+        const auto marks = MarksAfterEnglish(std::wstring_view(keys).substr(word));
+        if (word == 0 && spaceAfterEnglish_) {
+            phrases_.push_back({0, reading.size(), {{marks, 0, PhraseCandidate::Kind::English, false}}});
             return;
+        }
+        if (word > 0) {
+            chunk = chunkJudge_->Judge(std::wstring_view(keys).substr(0, word), englishRun_);
+            if (chunk->english) {
+                phrases_.push_back({0, reading.size(),
+                                    EnglishCandidates(EnglishAsWritten(chunk->written) + marks, reading)});
+                return;
+            }
         }
     }
     if (convert) {
@@ -754,6 +766,15 @@ std::wstring JapaneseComposer::EnglishAsWritten(std::wstring written) const {
         written.front() = static_cast<wchar_t>(written.front() - L'a' + L'A');
     }
     return written;
+}
+
+std::wstring JapaneseComposer::MarksAfterEnglish(std::wstring_view keys) const {
+    std::wstring marks(keys);
+    if (!japaneseInSentence_) return marks;
+    for (auto& c : marks) {
+        c = c == L'.' ? L'。' : c == L',' ? L'、' : c == L'!' ? L'！' : L'？';
+    }
+    return ApplyTypingStyle(std::move(marks));
 }
 
 bool JapaneseComposer::ChoseEnglish() const noexcept {
@@ -1424,11 +1445,14 @@ std::wstring JapaneseComposer::Commit() {
                                             phrase.candidates.front().text);
                 }
             }
-            text.push_back(L' ');
+            // A Japanese mark after English (you。) takes no space; English
+            // punctuation (you.) is spaced like a word.
+            const bool japaneseMark = !text.empty() && text.back() >= 0x3000;
+            if (!japaneseMark) text.push_back(L' ');
             context_ = englishContext_;
-            sentenceStart_ = false;
-            spaceAfterEnglish_ = true;
-            dropSpaceBefore_ = false;
+            dropSpaceBefore_ = spaceAfterEnglish_ && !text.empty() && std::wstring_view(L".,!?。、．，！？").find(text.front()) != std::wstring_view::npos;
+            spaceAfterEnglish_ = !japaneseMark;
+            SetSentenceStart(EndsSentence(text));
             Clear();
             lastCommit_.reset();
             return text;
@@ -1436,6 +1460,7 @@ std::wstring JapaneseComposer::Commit() {
         // Japanese after English takes its space back.
         dropSpaceBefore_ = spaceAfterEnglish_;
         spaceAfterEnglish_ = false;
+        japaneseInSentence_ = true;
     }
     CommitRecord record{{}, units_, phrases_, conversionReading_, readingKeys_, context_, contextWords_, focus_,
                         preview_, asciiMode_, capitals_, settledPhrases_, settledLength_};
@@ -1459,7 +1484,7 @@ std::wstring JapaneseComposer::Commit() {
         if (learning_) learning_->RecordChoice(whole->reading, whole->text, whole->text);
         auto text = whole->text;
         context_ = ContextAfter(text, whole->rightId);
-        sentenceStart_ = EndsSentence(text);
+        SetSentenceStart(EndsSentence(text));
         RememberWords(text);
         Clear();
         keep(text);
@@ -1485,7 +1510,7 @@ std::wstring JapaneseComposer::Commit() {
     }
     auto text = IsConverted() ? Preedit() : RenderTyping(false);
     context_ = ContextAfter(text, last);
-    if (!text.empty()) sentenceStart_ = EndsSentence(text);
+    if (!text.empty()) SetSentenceStart(EndsSentence(text));
     RememberWords(text);
     Clear();
     keep(text);
