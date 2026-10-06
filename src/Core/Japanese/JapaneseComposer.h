@@ -110,10 +110,14 @@ public:
     // (１２３). A period or comma between digits is a decimal point or a
     // thousands comma of the same width (3.14), not 。 or 、.
     void SetHalfWidthDigits(bool half) noexcept { halfWidthDigits_ = half; }
-    // Letters and symbols typed in Japanese that stay as they are (! ? ( ) q):
-    // half-width, or by default full-width. The Japanese marks (、。「」・ー)
-    // are not among them.
+    // Symbols typed in Japanese that stay as they are (! ? ( )): half-width,
+    // or by default full-width. The Japanese marks (、。「」・ー) are not
+    // among them.
     void SetHalfWidthSymbols(bool half) noexcept { halfWidthSymbols_ = half; }
+    // Letters typed in Japanese that stay letters (k, q): half-width, or by
+    // default full-width (Settings makes them half-width). Converting offers
+    // the other width next.
+    void SetHalfWidthLetters(bool half) noexcept { halfWidthLetters_ = half; }
     // Hiragana or Katakana: how new text is shown while typing.
     void SetInputForm(KanaForm form) noexcept;
     [[nodiscard]] KanaForm InputForm() const noexcept { return inputForm_; }
@@ -290,6 +294,11 @@ private:
     // read on from it).
     [[nodiscard]] bool ChoseEnglish() const noexcept;
     [[nodiscard]] std::vector<PhraseCandidate> KanaCandidates(std::wstring_view reading) const;
+    // Letters in the first candidate in the other width, right after it
+    // (k: ｋ, ｋ: k).
+    void AddOtherWidth(std::vector<PhraseCandidate>& candidates) const;
+    // Pending keys as shown: letters and symbols in their widths.
+    [[nodiscard]] std::wstring PendingText() const;
     void AddPhrases(std::vector<Phrase> phrases, const std::wstring& reading);
     void UpdatePredictions();
     // The English word after the first candidate that starts in katakana.
@@ -375,6 +384,7 @@ private:
     PunctuationStyle punctuation_{PunctuationStyle::ToutenKuten};
     bool halfWidthDigits_{false};
     bool halfWidthSymbols_{false};
+    bool halfWidthLetters_{false};
     // A capital started letters as typed (Google Japanese Input's "Shift
     // for alphanumeric"); the capitals typed in a row.
     bool asciiMode_{false};

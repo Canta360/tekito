@@ -1305,7 +1305,24 @@ void TestSpecialConversions(const RomajiTable& table, const MiniPack& pack) {
         symbols.SetHalfWidthSymbols(true);
         symbols.SetPunctuationStyle(PunctuationStyle::CommaPeriod);
         Type(symbols, L"(q)!,");
-        RequireText(symbols.Commit(), L"(q)!\xFF0C", "half-width symbols and letters; the comma key keeps its style");
+        RequireText(symbols.Commit(), L"(\xFF51)!\xFF0C", "half-width symbols; the comma key keeps its style");
+        symbols.SetHalfWidthLetters(true);
+        Type(symbols, L"(q)!,");
+        RequireText(symbols.Commit(), L"(q)!\xFF0C", "half-width letters are a setting of their own");
+        symbols.SetHalfWidthSymbols(false);
+        Type(symbols, L"q");
+        symbols.Convert();
+        const auto* widths = symbols.FocusedCandidates();
+        Require(widths && widths->size() > 1 && widths->front().text == L"q" && (*widths)[1].text == L"\xFF51",
+                "a letter converts to itself, then to the other width");
+        symbols.Clear();
+        symbols.SetHalfWidthLetters(false);
+        Type(symbols, L"q");
+        symbols.Convert();
+        widths = symbols.FocusedCandidates();
+        Require(widths && widths->size() > 1 && widths->front().text == L"\xFF51" && (*widths)[1].text == L"q",
+                "full-width first when letters are full-width");
+        symbols.Clear();
         RequireText(Committed(table, L"!?"), L"\xFF01\xFF1F", "full-width symbols by default");
     }
     {

@@ -45,6 +45,7 @@ inline void ApplyJapaneseSettings(japanese::JapaneseComposer& composer, const Us
         static_cast<japanese::PunctuationStyle>(std::clamp(settings.japanesePunctuation, 0, 3)));
     composer.SetHalfWidthDigits(settings.japaneseDigitWidth == 0);
     composer.SetHalfWidthSymbols(settings.japaneseSymbolWidth == 1);
+    composer.SetHalfWidthLetters(settings.japaneseLetterWidth == 1);
     composer.SetLearning(settings.learningEnabled ? learning : nullptr);
     composer.SetPredictionEnabled(settings.japanesePredictionEnabled);
     composer.SetLiveConversion(settings.japaneseLiveConversion);

@@ -174,7 +174,8 @@ const en = {
     },
     punctuation: { title: "Punctuation", description: "The comma and period marks." },
     digits: { title: "Digits", description: "The width of the numbers you type." },
-    symbols: { title: "Letters and symbols", description: "The width of letters and symbols like ! and ( )." },
+    letters: { title: "Letters", description: "The width of letters typed in Japanese. Converting offers the other." },
+    symbols: { title: "Symbols", description: "The width of symbols like ! and ( )." },
     capsLock: { title: "Ignore Caps Lock", description: "Type kana even when Caps Lock is on." },
     mixed: {
       title: "Mix mode",
@@ -475,7 +476,8 @@ const ja = {
     },
     punctuation: { title: "句読点", description: "句読点の形です。" },
     digits: { title: "数字", description: "打った数字の幅です。" },
-    symbols: { title: "英字と記号", description: "英字と、！や（）などの記号の幅です。" },
+    letters: { title: "英字", description: "日本語の中で打った英字の幅です。変換するともう一方も選べます。" },
+    symbols: { title: "記号", description: "！や（）などの記号の幅です。" },
     capsLock: { title: "Caps Lock を無視する", description: "Caps Lock がオンでも、かなで打てます。" },
     mixed: {
       title: "まぜ打ちモード",

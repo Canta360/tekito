@@ -51,6 +51,7 @@ function initialState() {
       japanesePunctuation: 0,
       japaneseDigitWidth: 0,
       japaneseSymbolWidth: 0,
+      japaneseLetterWidth: 1,
       advancedSettings: false,
       japanesePredictionEnabled: true,
       japaneseLiveConversion: false,

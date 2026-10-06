@@ -605,6 +605,40 @@ std::wstring JapaneseComposer::Reading() const {
     return ApplyTypingStyle(std::move(kana));
 }
 
+std::wstring JapaneseComposer::PendingText() const {
+    std::wstring text = ToFullWidthAscii(pending_);
+    for (auto& ch : text) {
+        const bool letter = (ch >= L'\xFF21' && ch <= L'\xFF3A') || (ch >= L'\xFF41' && ch <= L'\xFF5A');
+        if (ch >= L'\xFF01' && ch <= L'\xFF5E' && (letter ? halfWidthLetters_ : halfWidthSymbols_)) {
+            ch = static_cast<wchar_t>(ch - 0xFEE0);
+        }
+    }
+    return text;
+}
+
+void JapaneseComposer::AddOtherWidth(std::vector<PhraseCandidate>& candidates) const {
+    if (candidates.empty()) return;
+    const auto& first = candidates.front();
+    std::wstring other = first.text;
+    bool changed = false;
+    for (auto& ch : other) {
+        if ((ch >= L'\xFF21' && ch <= L'\xFF3A') || (ch >= L'\xFF41' && ch <= L'\xFF5A')) {
+            ch = static_cast<wchar_t>(ch - 0xFEE0);
+            changed = true;
+        } else if ((ch >= L'A' && ch <= L'Z') || (ch >= L'a' && ch <= L'z')) {
+            ch = static_cast<wchar_t>(ch + 0xFEE0);
+            changed = true;
+        }
+    }
+    if (!changed) return;
+    const bool seen = std::any_of(candidates.begin(), candidates.end(),
+                                  [&](const PhraseCandidate& c) { return c.text == other; });
+    if (seen) return;
+    PhraseCandidate candidate{std::move(other), first.cost, first.kind, false};
+    candidate.reading = first.reading;
+    candidates.insert(candidates.begin() + 1, std::move(candidate));
+}
+
 std::vector<PhraseCandidate> JapaneseComposer::KanaCandidates(std::wstring_view reading) const {
     PhraseCandidate hiragana{std::wstring(reading), 0, PhraseCandidate::Kind::Hiragana, false};
     PhraseCandidate katakana{ToKatakana(reading), 0, PhraseCandidate::Kind::Katakana, false};
@@ -666,7 +700,10 @@ void JapaneseComposer::BuildPhrases(bool convert) {
     if (phrases_.empty()) {
         phrases_.push_back({0, reading.size(),
                             convert ? KanaCandidates(reading) : std::vector<PhraseCandidate>{}});
-        if (convert) AddSpecial(reading, phrases_.back().candidates);
+        if (convert) {
+            AddOtherWidth(phrases_.back().candidates);
+            AddSpecial(reading, phrases_.back().candidates);
+        }
     }
     // Japanese, but it reads as English too: the English for the whole
     // chunk is the next choice.
@@ -726,6 +763,7 @@ void JapaneseComposer::AddPhrases(std::vector<Phrase> phrases, const std::wstrin
         if (std::none_of(phraseReading.begin(), phraseReading.end(), IsDigit)) PutDigitsAfterWords(phrase.candidates);
         if (learning_) learning_->Reorder(LearningReading(reading, phrase.begin, phrase.length), phrase.candidates);
         AddLoanwords(phrase.candidates, phraseReading);
+        AddOtherWidth(phrase.candidates);
         AddSpecial(std::wstring_view(reading).substr(phrase.begin, phrase.length), phrase.candidates);
         phrases_.push_back({phrase.begin, phrase.length, std::move(phrase.candidates)});
     }
@@ -1238,7 +1276,9 @@ std::wstring JapaneseComposer::ApplyTypingStyle(std::wstring text) const {
         auto& ch = text[i];
         const bool wide = ch >= L'\xFF01' && ch <= L'\xFF5E';
         const bool digit = ch >= L'\xFF10' && ch <= L'\xFF19';
-        if (wide && (digit ? halfWidthDigits_ : halfWidthSymbols_)) ch = static_cast<wchar_t>(ch - 0xFEE0);
+        const bool letter = (ch >= L'\xFF21' && ch <= L'\xFF3A') || (ch >= L'\xFF41' && ch <= L'\xFF5A');
+        const bool half = digit ? halfWidthDigits_ : letter ? halfWidthLetters_ : halfWidthSymbols_;
+        if (wide && half) ch = static_cast<wchar_t>(ch - 0xFEE0);
         // Between digits: a decimal point or a thousands comma.
         const bool betweenDigits = i > 0 && i + 1 < text.size() && IsDigit(text[i - 1]) && IsDigit(text[i + 1]);
         if (betweenDigits && (ch == L'。' || ch == L'．')) {
@@ -1257,7 +1297,7 @@ std::wstring JapaneseComposer::ApplyTypingStyle(std::wstring text) const {
 std::wstring JapaneseComposer::RenderTyping(bool includePending) const {
     std::wstring kana = Reading();
     // Pending keys show at the caret, where the kana they make will go.
-    if (includePending) kana.insert(ReadingOffset(caret_), halfWidthSymbols_ ? pending_ : ToFullWidthAscii(pending_));
+    if (includePending) kana.insert(ReadingOffset(caret_), PendingText());
     return TypingForm() == KanaForm::Katakana ? ToKatakana(kana) : kana;
 }
 
@@ -1304,7 +1344,7 @@ std::wstring JapaneseComposer::Preedit() const {
     if (const auto* whole = WholeChoice()) return whole->text;
     std::wstring text;
     for (const auto& phrase : phrases_) text += PhraseText(phrase);
-    if (preview_) text += halfWidthSymbols_ ? pending_ : ToFullWidthAscii(pending_);
+    if (preview_) text += PendingText();
     return text;
 }
 
@@ -1319,7 +1359,7 @@ std::vector<PreeditSegment> JapaneseComposer::Segments() const {
         segments.push_back({PhraseText(phrases_[i]), true, !preview_ && i == focus_});
     }
     // Live: the keys still pending follow, as typed.
-    if (preview_ && !pending_.empty()) segments.push_back({halfWidthSymbols_ ? pending_ : ToFullWidthAscii(pending_), false, false});
+    if (preview_ && !pending_.empty()) segments.push_back({PendingText(), false, false});
     return segments;
 }
 
