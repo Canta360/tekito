@@ -248,7 +248,9 @@ InputAction InputStateMachine::OnCancel() {
         return {ActionKind::RestoreOriginal, rawText_, true};
     }
 
-    std::wstring text = rawText_;
+    // After the Space that ended the word, the word goes back as typed and
+    // keeps its space.
+    std::wstring text = boundarySpaceActive_ ? Spaced(rawText_) : rawText_;
     Reset();
     return {ActionKind::ReplaceComposition, std::move(text), false};
 }

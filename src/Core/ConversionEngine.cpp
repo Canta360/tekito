@@ -12,7 +12,7 @@ bool IsSentenceStart(std::wstring_view precedingText) noexcept {
     while (end > 0) {
         const auto ch = precedingText[end - 1];
         if (ch == L' ' || ch == L'\t' || ch == L'\"' || ch == L'\'' || ch == L'\u201D' || ch == L'\u2019' ||
-            ch == L')' || ch == L']' || ch == L'}') {
+            ch == L'\u201C' || ch == L'\u2018' || ch == L')' || ch == L']' || ch == L'}') {
             --end;
             continue;
         }

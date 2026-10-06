@@ -742,6 +742,21 @@ std::vector<Candidate> CandidateGenerator::Generate(std::wstring_view rawText,
     if (!HasOriginal(output)) AddOriginal(output, seen, rawText);
     ApplyWritingRules(output, seen, rawText, lower, exact && !exactHasWeakFrequency, options);
     ApplyDoubledWord(output, rawText, lower, context, options);
+    // A word in quotes ('hi', 'hi') or a plural's apostrophe (students'):
+    // not a slip, so nothing replaces it on its own.
+    const auto isQuote = [](wchar_t ch) { return ch == L'\'' || ch == L'\u2019' || ch == L'\u2018'; };
+    std::wstring_view inside(lower);
+    while (!inside.empty() && isQuote(inside.front())) inside.remove_prefix(1);
+    while (!inside.empty() && isQuote(inside.back())) inside.remove_suffix(1);
+    if (!inside.empty() && inside.size() != lower.size() && IsWord(inside)) {
+        for (auto& candidate : output) {
+            if (!candidate.isOriginal &&
+                (candidate.policyFlags & (CandidatePolicyCorrect | CandidatePolicyNormalize)) != 0) {
+                candidate.policyFlags = (candidate.policyFlags & ~(CandidatePolicyCorrect | CandidatePolicyNormalize)) |
+                                        CandidatePolicySuggestOnly;
+            }
+        }
+    }
     AddPredictions(output, seen, rawText, lower, context, options);
     FinalizeCandidates(output, rawText);
     return output;

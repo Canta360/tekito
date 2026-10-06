@@ -192,6 +192,8 @@ void TestSentenceBoundaryAndCapitalizationProvenance() {
             "terminal punctuation before quote starts a sentence");
     Require(tekito::IsSentenceStart(L"Hello\r\n  "), "line start is a sentence start");
     Require(!tekito::IsSentenceStart(L"Hello, "), "clause separator is not a sentence start");
+    Require(tekito::IsSentenceStart(L"Hello. \u201C"), "a curly opening quote after a period starts a sentence");
+    Require(tekito::IsSentenceStart(L"\u2018"), "a curly opening quote at the start starts a sentence");
     Require(tekito::NeedsTerminalPeriod(L"Hello world "),
             "unterminated line needs a period");
     Require(!tekito::NeedsTerminalPeriod(L"Hello world!  "),
@@ -575,6 +577,14 @@ void TestCancelRestoresRawInput() {
     const auto secondCancel = state.OnCancel();
     Require(secondCancel.kind == tekito::ActionKind::ReplaceComposition && !state.IsActive(),
             "Esc outside candidate navigation closes the composition");
+
+    // "teh " corrected on Space, then Esc: "teh " as typed, space and all.
+    state.BeginOrUpdate(L"raw", MakeCandidates(3));
+    [[maybe_unused]] const auto spaced = state.OnSpace();
+    const auto afterSpace = state.OnCancel();
+    Require(afterSpace.kind == tekito::ActionKind::ReplaceComposition && !state.IsActive(),
+            "Esc after Space closes the composition");
+    Require(afterSpace.text == L"raw ", "Esc after Space keeps the space that was typed");
 }
 
 void TestConversionEngineBoundary() {
@@ -1182,6 +1192,10 @@ void TestEnglishWritingRules() {
             "march is a word too: kept, with March offered");
     Require(spaceGives(L"THe") == L"The", "a second capital by mistake is taken back");
     Require(spaceGives(L"NASA") == L"NASA", "an acronym stays as typed");
+    Require(spaceGives(L"hi'", L"Say '") == L"hi'", "a quoted word keeps its closing quote");
+    Require(spaceGives(L"'hi'", L"Say ") == L"'hi'", "a word typed with both quotes stays");
+    Require(spaceGives(L"hi'") == L"hi'","a closing quote is not turned into a letter (hi' is not his)");
+    Require(spaceGives(L"students'") == L"students'", "a plural's apostrophe stays");
 }
 
 // A word typed twice, the next words, and Space twice for a period.

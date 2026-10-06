@@ -4,6 +4,7 @@
 #include "Tsf/Compartments.h"
 #include "Tsf/DisplayAttributes.h"
 #include "Tsf/Diagnostics.h"
+#include "Tsf/EnglishText.h"
 #include "Tsf/Globals.h"
 #include "Tsf/TekitoGuids.h"
 #include "UserData/KeyboardLayout.h"
@@ -33,23 +34,6 @@ bool HasBlockedModifier() {
            (GetKeyState(VK_MENU) & 0x8000) != 0 ||
            (GetKeyState(VK_LWIN) & 0x8000) != 0 ||
            (GetKeyState(VK_RWIN) & 0x8000) != 0;
-}
-
-bool TryClassifyPunctuation(wchar_t ch, PunctuationRole& role) {
-    switch (ch) {
-    case L'.':
-    case L'!':
-    case L'?':
-        role = PunctuationRole::SentenceTerminal;
-        return true;
-    case L',':
-    case L':':
-    case L';':
-        role = PunctuationRole::ClauseSeparator;
-        return true;
-    default:
-        return false;
-    }
 }
 
 // Fields where correcting words would be wrong or unsafe: secrets, and
@@ -88,34 +72,6 @@ bool IsPassThroughInputScope(InputScope scope) {
     case IS_SRGS:
     case IS_XML:
     case IS_ALPHANUMERIC_HALFWIDTH:
-        return true;
-    default:
-        return false;
-    }
-}
-
-// Letters and the apostrophe inside contractions ("don't", "it’s").
-bool IsWordCharacter(wchar_t ch) {
-    return std::iswalpha(ch) != 0 || ch == L'\'' || ch == L'\u2019';
-}
-
-// A word may begin after whitespace, an opening bracket or quote, a dash, or
-// Japanese text.
-// Right after anything else -- a letter or digit we did not compose, or the
-// '/', '.', '@', ':', '_' of a URL, address, path or identifier -- the typing
-// is part of a token that must be left exactly as typed.
-bool CanStartWordAfter(std::wstring_view preceding) {
-    if (preceding.empty()) return true;
-    const wchar_t ch = preceding.back();
-    if (std::iswspace(ch)) return true;
-    // Japanese text puts English words right after kana, kanji or
-    // full-width marks, with no space ("Macを使う", "これはMac").
-    if (ch >= L'　') return true;
-    switch (ch) {
-    case L'(': case L'[': case L'{': case L'<':
-    case L'"': case L'\'': case L'\u201C': case L'\u2018': case L'\u00AB':
-    case L'-': case L'\u2013': case L'\u2014':
-    case L'*':
         return true;
     default:
         return false;
@@ -1450,22 +1406,12 @@ HRESULT TextService::HandleSmartPunctuation(ITfContext* context, TfEditCookie ed
     rawText_.clear();
 
     const auto preceding = ReadSelectionContext(context, editCookie);
-    const wchar_t before = preceding.empty() ? L'\n' : preceding.back();
     if (character == L'-') {
-        // "word--" and "word --": the second hyphen makes an em dash.
-        if (before == L'-' && preceding.size() >= 2 &&
-            (std::iswalnum(preceding[preceding.size() - 2]) || preceding[preceding.size() - 2] == L' ')) {
-            return ReplaceTrailingWhitespaceAtSelection(context, editCookie, 1, L"\u2014");
-        }
+        if (MakesEmDash(preceding)) return ReplaceTrailingWhitespaceAtSelection(context, editCookie, 1, L"\u2014");
         if (SpecialEnding(preceding, character)) return HandleSpecialEnd(context, editCookie, character);
         return InsertAtSelection(context, editCookie, L"-");
     }
-    // Opening after a space, a bracket, another opening quote or a dash;
-    // closing (and the apostrophe) after anything else.
-    const bool opening = std::iswspace(before) || std::wcschr(L"([{<\u201C\u2018\u2014\u2013-", before) != nullptr ||
-                         (before >= L'\u3000' && before != L'\u2019' && before != L'\u201D');
-    const wchar_t quote = character == L'"' ? (opening ? L'\u201C' : L'\u201D') : (opening ? L'\u2018' : L'\u2019');
-    return InsertAtSelection(context, editCookie, std::wstring(1, quote));
+    return InsertAtSelection(context, editCookie, std::wstring(1, SmartQuote(character, preceding)));
 }
 
 HRESULT TextService::StartCompositionBefore(ITfContext* context, TfEditCookie editCookie, std::size_t count) {
