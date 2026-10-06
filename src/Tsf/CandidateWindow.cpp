@@ -969,11 +969,13 @@ void DrawIndicator(ID2D1RenderTarget* target, const Layout& layout, const Frame&
 constexpr int kBadgeAuto = 1;
 constexpr int kBadgeDirect = 2;
 constexpr int kBadgeJapanese = 3;
+constexpr int kBadgeMixed = 4;
 
 // The badge's mode icon (the taskbar's, dark versions on dark), centered.
 void DrawBadge(ID2D1RenderTarget* target, const Layout& layout, int badge, HINSTANCE instance) {
     const bool dark = IsDarkThemeActive() && !IsHighContrast();
-    const int resource = badge == kBadgeJapanese ? (dark ? IDI_JAPANESE_DARK : IDI_JAPANESE)
+    const int resource = badge == kBadgeMixed      ? IDI_MIXED
+                         : badge == kBadgeJapanese ? (dark ? IDI_JAPANESE_DARK : IDI_JAPANESE)
                          : badge == kBadgeDirect ? (dark ? IDI_DIRECT_DARK : IDI_DIRECT)
                                                  : IDI_AUTO;
     const int side = static_cast<int>(std::lround(kBadgeIcon * layout.scale));
@@ -2291,7 +2293,8 @@ void CandidateWindow::ShowModeBadge(const RECT& caretRect, InputMode mode) {
     frame.caret = caretRect;
     frame.generation = ++generation_;
     frame.style = style_;
-    frame.badge = TypesJapanese(mode) ? kBadgeJapanese
+    frame.badge = mode == InputMode::Mixed ? kBadgeMixed
+                  : TypesJapanese(mode)    ? kBadgeJapanese
                   : mode == InputMode::Direct ? kBadgeDirect
                                               : kBadgeAuto;
     {

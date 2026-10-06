@@ -164,7 +164,7 @@ $settingsSource = Join-Path $releaseRoot "settings-ui"
 $settingsIndex = Get-Content -LiteralPath (Join-Path $settingsSource "index.html") -Raw
 $settingsFiles = @("index.html") + @([regex]::Matches($settingsIndex, "assets/[^`"']+") | ForEach-Object { $_.Value }) +
     @("assets/auto.ico", "assets/direct.ico", "assets/direct-dark.ico", "assets/japanese.ico",
-      "assets/japanese-dark.ico", "assets/tekito.ico", "assets/tekito-wordmark-dark.svg",
+      "assets/japanese-dark.ico", "assets/mixed.ico", "assets/tekito.ico", "assets/tekito-wordmark-dark.svg",
       "assets/tekito-wordmark-light.svg",
       "assets/fonts/MPLUS1-wght.ttf")
 foreach ($file in $settingsFiles | Select-Object -Unique) {

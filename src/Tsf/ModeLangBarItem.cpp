@@ -193,9 +193,11 @@ HRESULT ModeLangBarItem::OnMenuSelect(UINT id) {
 HRESULT ModeLangBarItem::GetIcon(HICON* icon) {
     if (!icon) return E_INVALIDARG;
     const auto mode = Mode();
-    // Auto's icon reads on either taskbar; the others have a dark version.
+    // Auto's and Mix's icons read on either taskbar; the others have a dark
+    // version.
     darkTaskbar_ = TaskbarIsDark();
-    const int resourceId = TypesJapanese(mode) ? (darkTaskbar_ ? IDI_JAPANESE_DARK : IDI_JAPANESE)
+    const int resourceId = mode == InputMode::Mixed ? IDI_MIXED
+                           : TypesJapanese(mode)    ? (darkTaskbar_ ? IDI_JAPANESE_DARK : IDI_JAPANESE)
                            : mode == InputMode::Direct ? (darkTaskbar_ ? IDI_DIRECT_DARK : IDI_DIRECT)
                                                        : IDI_AUTO;
     const int size = GetSystemMetrics(SM_CXSMICON);

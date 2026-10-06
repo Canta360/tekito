@@ -8,6 +8,7 @@
 #define IDI_DIRECT_DARK 104
 #define IDI_JAPANESE 105
 #define IDI_JAPANESE_DARK 106
+#define IDI_MIXED 107
 // M PLUS 1 (SIL OFL 1.1, see assets/fonts/OFL.txt), the TEKITO UI typeface.
 #define IDR_FONT_MPLUS1 601
 // installer/TEKITO_LICENSE.md, shown by Settings > About > License.

@@ -91,8 +91,7 @@ const candidateStyles = [{ value: 0, id: "glass" }, { value: 1, id: "simple" }];
 // dark background.
 const modeTiles = {
   japanese: { image: "./assets/japanese.ico", imageDark: "./assets/japanese-dark.ico" },
-  // Japanese's icon until Mix has its own.
-  mixed: { image: "./assets/japanese.ico", imageDark: "./assets/japanese-dark.ico" },
+  mixed: { image: "./assets/mixed.ico" },
   auto: { image: "./assets/auto.ico" },
   direct: { image: "./assets/direct.ico", imageDark: "./assets/direct-dark.ico" },
 };

@@ -488,7 +488,7 @@ private:
             return false;
         }
         for (const auto* icon : {L"auto.ico", L"direct.ico", L"direct-dark.ico", L"japanese.ico",
-                                 L"japanese-dark.ico", L"tekito.ico"}) {
+                                 L"japanese-dark.ico", L"mixed.ico", L"tekito.ico"}) {
             const auto path = root / L"assets" / icon;
             std::ifstream file(path, std::ios::binary);
             unsigned char header[4]{};

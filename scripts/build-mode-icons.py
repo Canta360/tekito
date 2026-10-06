@@ -2,14 +2,14 @@
 """Packs the input mode icons (assets/icons/*.ico) from PNGs of their SVG
 sources.
 
-Each SVG in assets/icons (direct-dark, japanese, japanese-dark) is exported
+Each SVG in assets/icons (direct-dark, japanese, japanese-dark, mixed) is exported
 at every icon size in SIZES as <name>-<size>.png, square with transparent
 margins and its proportions kept (from the design tool, or by drawing the
 SVG on a canvas in a browser). This packs each name's PNGs into
 assets/icons/<name>.ico, so Windows picks the size it needs and the mode
 indicator stays sharp at any scaling.
 
-  python scripts/build-mode-icons.py --pngs <folder of PNGs>
+  python scripts/build-mode-icons.py --pngs <folder of PNGs> [--only mixed]
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 ICONS = ROOT / "assets" / "icons"
-SOURCES = ["direct-dark", "japanese", "japanese-dark"]
+SOURCES = ["direct-dark", "japanese", "japanese-dark", "mixed"]
 SIZES = [16, 20, 24, 32, 40, 48, 64, 256]
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 
@@ -46,8 +46,9 @@ def write_ico(path: Path, images: list[tuple[int, bytes]]) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--pngs", type=Path, required=True, help="folder of <name>-<size>.png")
+    parser.add_argument("--only", nargs="+", choices=SOURCES, help="pack these icons only")
     args = parser.parse_args()
-    for name in SOURCES:
+    for name in args.only or SOURCES:
         images = []
         for size in SIZES:
             png = (args.pngs / f"{name}-{size}.png").read_bytes()
