@@ -55,9 +55,18 @@ public:
         // right and change no text typed right; a neighboring key cheaper
         // converts text typed right worse).
         std::int64_t replacedPercent{100};
-        std::int64_t droppedPercent{60};
+        std::int64_t droppedPercent{80};
         std::int64_t addedPercent{100};
         std::int64_t swappedPercent{60};
+        // The keys as typed and the likeliest reading with a slip undone
+        // are both converted with the language model and the text before
+        // them, and the slip is undone when that costs, with the slips,
+        // `keepTypedBy` less than the keys as typed (誰おん: 誰の).
+        // Off: the key lattice alone decides.
+        bool contextDecides{true};
+        std::int64_t keepTypedBy{0};
+        // A consonant left out (nomiai: nomitai), as well as a vowel or n.
+        bool consonantsDropped{true};
     };
 
     KeyConverter(const JapaneseDictionary& dictionary, const ConnectionMatrix& matrix,

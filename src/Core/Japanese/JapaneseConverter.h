@@ -94,6 +94,11 @@ public:
     [[nodiscard]] bool IsWord(std::wstring_view reading) const;
     [[nodiscard]] std::optional<PhraseCandidate> Best(std::wstring_view reading, std::uint16_t context = 0,
                                                       const JapaneseUserDictionary* user = nullptr) const;
+    // What the likeliest words for the whole reading cost, as Convert finds
+    // them (with the language model), after `context`; nothing when there
+    // are none.
+    [[nodiscard]] std::optional<std::int64_t> Cost(std::wstring_view reading, std::uint16_t context = 0,
+                                                   const JapaneseUserDictionary* user = nullptr) const;
 
     // The likeliest reading of written `text` (kanji and kana), from the
     // words it is made of; nothing when a kanji is in no word. Looks

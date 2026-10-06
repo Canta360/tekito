@@ -888,18 +888,16 @@ void TestRomajiCorrection(const RomajiTable& table, const MiniPack& pack) {
     RequireText(composer.Preedit().substr(0, 1), L"っ", "kka stays っか");
     composer.Clear();
 
-    // A slip the first choice keeps (a dropped consonant reads as other
-    // kana) is one pick away once the list opens, marked as a slip.
+    // A dropped consonant (ikaiga: kikaiga) is undone when the words read
+    // better so; the other spelling is one pick away.
     Type(composer, L"ikaigatomaru");
     composer.Convert();
     const std::wstring first = composer.Preedit();
     composer.NextCandidate();
     const auto* listed = composer.FocusedCandidates();
-    Require(first.find(L"機械") == std::wstring::npos, "the first choice is what was typed");
+    Require(first.starts_with(L"\u6A5F"), "ikaiga converts as きかいが");
     Require(std::any_of(listed->begin(), listed->end(),
-                        [](const tekito::japanese::PhraseCandidate& c) {
-                            return c.slip && c.text.starts_with(L"機械が");
-                        }),
+                        [](const tekito::japanese::PhraseCandidate& c) { return c.text.starts_with(L"機械が"); }),
             "the list offers 機械が for ikaiga");
     composer.Clear();
 

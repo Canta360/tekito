@@ -24,6 +24,8 @@ constexpr std::size_t kShortestKeys = 3;
 constexpr std::size_t kTypoWindow = 12;
 // Keys a slip may have left out: a vowel, the n of ん.
 constexpr std::wstring_view kDroppedKeys = L"aiueon";
+// With Costs::consonantsDropped, the consonants too.
+constexpr std::wstring_view kDroppedConsonants = L"kgsztdhbpmyrwjfc";
 // Of the words a corrected reading can be, the cheapest this many.
 constexpr std::size_t kCorrectedForms = 2;
 // Corrected words allowed per this many keys (at least one): more slips than
@@ -44,8 +46,10 @@ struct Node {
     NodeKind kind{NodeKind::Japanese};
     // Kana, or the key as typed for an unknown key.
     std::wstring text;
-    // A Japanese word read through a slip in the keys.
+    // A Japanese word read through a slip in the keys, and what the slip
+    // costs.
     bool corrected{false};
+    std::int64_t slip{0};
 };
 
 // One slip in a run of keys, undone: `keys` is the run as meant, and a
@@ -71,7 +75,7 @@ struct Slip {
 
 // The runs one slip away from `typed`, with the slip at `at` (at the end:
 // a key left out last).
-void SlipsAt(std::wstring_view typed, std::size_t at, std::vector<Slip>& slips) {
+void SlipsAt(std::wstring_view typed, std::size_t at, bool consonants, std::vector<Slip>& slips) {
     const wchar_t key = at < typed.size() ? typed[at] : L'\0';
     const bool letter = key >= L'a' && key <= L'z';
     if (letter) {
@@ -89,7 +93,8 @@ void SlipsAt(std::wstring_view typed, std::size_t at, std::vector<Slip>& slips) 
     // A key left out before this one: a vowel, n, or the doubled consonant
     // of small tsu.
     std::wstring dropped(kDroppedKeys);
-    if (letter && kDroppedKeys.find(key) == std::wstring_view::npos) dropped += key;
+    if (consonants) dropped += kDroppedConsonants;
+    if (letter && dropped.find(key) == std::wstring::npos) dropped += key;
     for (const wchar_t missing : dropped) {
         std::wstring keys(typed);
         keys.insert(at, 1, missing);
@@ -155,7 +160,7 @@ std::optional<KeyConversion> KeyConverter::Convert(std::wstring_view keys, std::
             dictionary_.ForEachWord(record, [&](const DictionaryWord& word) {
                 add({static_cast<std::uint32_t>(i), static_cast<std::uint32_t>(end), word.left, word.right,
                      word.cost + (word.spellingCorrection ? kSpellingCorrectionPenalty : 0) + slipCost,
-                     NodeKind::Japanese, kana.substr(0, length), corrected});
+                     NodeKind::Japanese, kana.substr(0, length), corrected, slipCost});
                 return !corrected || ++forms < kCorrectedForms;
             });
         });
@@ -188,42 +193,59 @@ std::optional<KeyConversion> KeyConverter::Convert(std::wstring_view keys, std::
              NodeKind::UnknownKey, std::wstring(1, keys[i])});
     }
 
-    std::vector<std::int64_t> best;
-    std::vector<int> previous;
+    // The likeliest path, and the likeliest with no slip and with one or
+    // more: each node's best cost on paths that have (1) or have not (0)
+    // undone a slip up to it.
+    std::vector<std::int64_t> best[2];
+    std::vector<int> previous[2];
+    std::vector<int> paths[2];
     const auto bestPath = [&]() {
-        best.assign(nodes.size(), kInfinity);
-        previous.assign(nodes.size(), -1);
+        for (int s = 0; s < 2; ++s) {
+            best[s].assign(nodes.size(), kInfinity);
+            previous[s].assign(nodes.size(), -1);
+        }
         for (std::size_t i = 0; i < n; ++i) {
             for (const int k : beginningAt[i]) {
                 const Node& node = nodes[k];
+                const int s = node.corrected ? 1 : 0;
                 if (i == 0) {
-                    best[k] = node.cost + matrix_.Cost(context, node.left);
+                    best[s][k] = node.cost + matrix_.Cost(context, node.left);
                     continue;
                 }
                 for (const int p : endingAt[i]) {
-                    if (best[p] >= kInfinity) continue;
-                    const std::int64_t cost = best[p] + matrix_.Cost(nodes[p].right, node.left) + node.cost;
-                    if (cost < best[k]) {
-                        best[k] = cost;
-                        previous[k] = p;
+                    for (int from = 0; from < 2; ++from) {
+                        if (best[from][p] >= kInfinity) continue;
+                        const int to = from | s;
+                        const std::int64_t cost = best[from][p] + matrix_.Cost(nodes[p].right, node.left) + node.cost;
+                        if (cost < best[to][k]) {
+                            best[to][k] = cost;
+                            previous[to][k] = p * 2 + from;
+                        }
                     }
                 }
             }
         }
-        int last = -1;
-        std::int64_t lastCost = kInfinity;
-        for (const int p : endingAt[n]) {
-            if (best[p] >= kInfinity) continue;
-            const std::int64_t cost = best[p] + matrix_.Cost(nodes[p].right, 0);
-            if (cost < lastCost) {
-                lastCost = cost;
-                last = p;
+        std::int64_t pathCost[2] = {kInfinity, kInfinity};
+        for (int s = 0; s < 2; ++s) {
+            int last = -1;
+            for (const int p : endingAt[n]) {
+                if (best[s][p] >= kInfinity) continue;
+                const std::int64_t cost = best[s][p] + matrix_.Cost(nodes[p].right, 0);
+                if (cost < pathCost[s]) {
+                    pathCost[s] = cost;
+                    last = p;
+                }
             }
+            paths[s].clear();
+            for (int k = last, layer = s; k >= 0;) {
+                paths[s].push_back(k);
+                const int back = previous[layer][k];
+                k = back < 0 ? -1 : back / 2;
+                layer = back < 0 ? 0 : back % 2;
+            }
+            std::reverse(paths[s].begin(), paths[s].end());
         }
-        std::vector<int> path;
-        for (int k = last; k >= 0; k = previous[k]) path.push_back(k);
-        std::reverse(path.begin(), path.end());
-        return path;
+        return pathCost[1] < pathCost[0] ? paths[1] : paths[0];
     };
     std::vector<int> path = bestPath();
 
@@ -247,7 +269,7 @@ std::optional<KeyConversion> KeyConverter::Convert(std::wstring_view keys, std::
             const std::size_t fromKey = bounds[from];
             const std::size_t toKey = std::min(n, g + kTypoWindow);
             slips.clear();
-            SlipsAt(keys.substr(fromKey, toKey - fromKey), g - fromKey, slips);
+            SlipsAt(keys.substr(fromKey, toKey - fromKey), g - fromKey, costs_.consonantsDropped, slips);
             for (const auto& slip : slips) {
                 // The keys as meant from `fromKey` (and from the slip's own
                 // unit, when that starts a word), then earlier units in front.
@@ -292,6 +314,28 @@ std::optional<KeyConversion> KeyConverter::Convert(std::wstring_view keys, std::
             }
         }
         if (nodes.size() > before) path = bestPath();
+    }
+
+    // The keys as typed against the likeliest slip undone, converted with
+    // the language model after the text before them.
+    if (costs_.contextDecides && !paths[1].empty()) {
+        const auto readingOf = [&](const std::vector<int>& p) {
+            std::wstring reading;
+            for (const int k : p) reading += nodes[k].text;
+            return reading;
+        };
+        const auto readable = [&](const std::vector<int>& p) {
+            return !p.empty() && std::none_of(p.begin(), p.end(), [&](int k) { return nodes[k].kind == NodeKind::UnknownKey; });
+        };
+        std::int64_t slipCosts = 0;
+        for (const int k : paths[1]) slipCosts += nodes[k].slip;
+        const auto typed = readable(paths[0]) ? converter_.Cost(readingOf(paths[0]), context, user) : std::nullopt;
+        const auto meant = readable(paths[1]) ? converter_.Cost(readingOf(paths[1]), context, user) : std::nullopt;
+        if (meant && (!typed || *meant + slipCosts + costs_.keepTypedBy < *typed)) {
+            path = paths[1];
+        } else if (typed) {
+            return std::nullopt;
+        }
     }
 
     const auto slips = static_cast<std::size_t>(

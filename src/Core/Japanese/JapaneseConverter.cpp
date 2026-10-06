@@ -192,6 +192,50 @@ std::int64_t PairBonus(const LanguageModel* model, const JapaneseConverter::Mode
     return std::llround(pmi * static_cast<double>(pmi >= 0 ? weights.costPerNat : weights.penaltyPerNat));
 }
 
+// The likeliest path through `lattice` for a reading of `n` characters
+// after `context`, and its cost.
+struct Searched {
+    std::vector<int> path;
+    std::int64_t cost{kInfinity};
+};
+Searched SearchPath(const Lattice& lattice, std::size_t n, std::uint16_t context, const ConnectionMatrix& matrix,
+                    const LanguageModel* model, const JapaneseConverter::ModelWeights& weights) {
+    const auto& nodes = lattice.nodes;
+    std::vector<std::int64_t> best(nodes.size(), kInfinity);
+    std::vector<int> previous(nodes.size(), -1);
+    for (std::size_t i = 0; i < n; ++i) {
+        for (const int k : lattice.beginningAt[i]) {
+            const Node& node = nodes[k];
+            if (i == 0) {
+                best[k] = node.cost + matrix.Cost(context, node.left);
+                continue;
+            }
+            for (const int p : lattice.endingAt[i]) {
+                if (best[p] >= kInfinity) continue;
+                const std::int64_t cost = best[p] + matrix.Cost(nodes[p].right, node.left) + node.cost -
+                                          PairBonus(model, weights, nodes[p], node);
+                if (cost < best[k]) {
+                    best[k] = cost;
+                    previous[k] = p;
+                }
+            }
+        }
+    }
+    Searched searched;
+    int last = -1;
+    for (const int p : lattice.endingAt[n]) {
+        if (best[p] >= kInfinity) continue;
+        const std::int64_t cost = best[p] + matrix.Cost(nodes[p].right, 0);
+        if (cost < searched.cost) {
+            searched.cost = cost;
+            last = p;
+        }
+    }
+    for (int k = last; k >= 0; k = previous[k]) searched.path.push_back(k);
+    std::reverse(searched.path.begin(), searched.path.end());
+    return searched;
+}
+
 struct PathEntry {
     std::int64_t cost{kInfinity};
     int previous{-1};
@@ -226,39 +270,7 @@ std::vector<Phrase> JapaneseConverter::Convert(std::wstring_view reading,
     const auto& nodes = lattice.nodes;
 
     // The most likely words for the whole reading.
-    std::vector<std::int64_t> best(nodes.size(), kInfinity);
-    std::vector<int> previous(nodes.size(), -1);
-    for (std::size_t i = 0; i < n; ++i) {
-        for (const int k : lattice.beginningAt[i]) {
-            const Node& node = nodes[k];
-            if (i == 0) {
-                best[k] = node.cost + matrix_.Cost(context, node.left);
-                continue;
-            }
-            for (const int p : lattice.endingAt[i]) {
-                if (best[p] >= kInfinity) continue;
-                const std::int64_t cost = best[p] + matrix_.Cost(nodes[p].right, node.left) + node.cost -
-                                          PairBonus(model_, weights_, nodes[p], node);
-                if (cost < best[k]) {
-                    best[k] = cost;
-                    previous[k] = p;
-                }
-            }
-        }
-    }
-    int last = -1;
-    std::int64_t lastCost = kInfinity;
-    for (const int p : lattice.endingAt[n]) {
-        if (best[p] >= kInfinity) continue;
-        const std::int64_t cost = best[p] + matrix_.Cost(nodes[p].right, 0);
-        if (cost < lastCost) {
-            lastCost = cost;
-            last = p;
-        }
-    }
-    std::vector<int> path;
-    for (int k = last; k >= 0; k = previous[k]) path.push_back(k);
-    std::reverse(path.begin(), path.end());
+    const std::vector<int> path = SearchPath(lattice, n, context, matrix_, model_, weights_).path;
     if (path.empty()) return {};
 
     // Phrases: fixed ones as given, then wherever the rules put a boundary.
@@ -504,6 +516,20 @@ bool JapaneseConverter::IsWord(std::wstring_view reading) const {
         found = found || length == reading.size();
     });
     return found;
+}
+
+std::optional<std::int64_t> JapaneseConverter::Cost(std::wstring_view reading, std::uint16_t context,
+                                                   const JapaneseUserDictionary* user) const {
+    const std::size_t n = reading.size();
+    if (n == 0) return std::nullopt;
+    const ReadingCodes codes = dictionary_.Encode(reading);
+    const std::vector<bool> noBoundary(n + 1, false);
+    const bool pairs = model_ && (weights_.costPerNat > 0 || weights_.penaltyPerNat > 0);
+    const Lattice lattice = BuildLattice(dictionary_, codes, noBoundary, reading, pairs ? model_ : nullptr, user,
+                                         number_ ? &*number_ : nullptr);
+    const auto searched = SearchPath(lattice, n, context, matrix_, model_, weights_);
+    if (searched.path.empty()) return std::nullopt;
+    return searched.cost;
 }
 
 std::optional<PhraseCandidate> JapaneseConverter::Best(std::wstring_view reading, std::uint16_t context,
