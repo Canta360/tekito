@@ -700,7 +700,24 @@ void JapaneseComposer::BuildPhrases(bool convert) {
             return;
         }
         if (word > 0) {
-            chunk = chunkJudge_->Judge(std::wstring_view(keys).substr(0, word), englishRun_, japaneseInSentence_);
+            chunk = chunkJudge_->Judge(std::wstring_view(keys).substr(0, word), englishRun_, japaneseInSentence_,
+                                       englishSpelling_, englishText_);
+            // A slip of a particle (dr): the particle, then the keys as typed.
+            if (!chunk->english && !chunk->meant.empty() && table_ && converter_) {
+                std::wstring kana;
+                for (const auto& token : ParseRomaji(*table_, chunk->meant)) kana += token.kana;
+                std::vector<PhraseCandidate> candidates;
+                for (const auto& phrase : ConvertReading(ApplyTypingStyle(kana) + marks, 0, context_, contextWords_)) {
+                    if (!phrase.candidates.empty()) {
+                        candidates.push_back({phrase.candidates.front().text, 0, PhraseCandidate::Kind::Dictionary, false});
+                    }
+                }
+                if (candidates.size() == 1) {
+                    candidates.push_back({keys, 0, PhraseCandidate::Kind::English, false});
+                    phrases_.push_back({0, reading.size(), std::move(candidates)});
+                    return;
+                }
+            }
             // Keys that are no word may be Japanese run into one (korehagithub).
             if (chunk->english && !chunk->word && word == keys.size()) {
                 if (const auto split = RunTogetherEnglish()) {
@@ -836,9 +853,14 @@ std::vector<PhraseCandidate> JapaneseComposer::EnglishCandidates(const std::wstr
     add(written, PhraseCandidate::Kind::English);
     add(Keys(false), PhraseCandidate::Kind::English);
     // How it is written in katakana (ギットハブ), then as Japanese.
+    // As written when a slip was put right (review: レビュー).
     if (loanwords_) {
-        for (const auto& spelling : loanwords_->ForEnglish(Keys(false), 2)) {
-            add(spelling.katakana, PhraseCandidate::Kind::Katakana);
+        std::wstring lower = written;
+        for (auto& c : lower) c = static_cast<wchar_t>(std::towlower(c));
+        for (const auto& word : {lower, Keys(false)}) {
+            for (const auto& spelling : loanwords_->ForEnglish(word, 2)) {
+                add(spelling.katakana, PhraseCandidate::Kind::Katakana);
+            }
         }
     }
     if (converter_ && LeftoverLetters(reading) == 0) {
@@ -1530,14 +1552,18 @@ std::wstring JapaneseComposer::Commit() {
     }
     // Mixed typing: Enter before Space takes the chunk as Space would.
     if (chunkJudge_ && IsComposing() && !IsConverted() && !HasAscii() && !chosenPrediction_) {
-        const auto chunk = chunkJudge_->Judge(Keys(false), englishRun_, japaneseInSentence_);
+        const auto chunk = chunkJudge_->Judge(Keys(false), englishRun_, japaneseInSentence_, englishSpelling_,
+                                              englishText_);
         if (chunk.english) BuildPhrases(true);
     }
     if (chunkJudge_) {
         const bool english = ChoseEnglish();
         englishRun_ = english ? englishRun_ + 1 : 0;
+        if (!english) englishText_.clear();
         if (english) {
             auto text = Preedit();
+            englishText_ += text;
+            englishText_.push_back(L' ');
             if (learning_ && IsConverted()) {
                 const auto& phrase = phrases_[focus_];
                 if (phrase.selected < phrase.candidates.size()) {

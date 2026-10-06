@@ -398,6 +398,8 @@ bool TextService::TranslateJapaneseKey(WPARAM wParam, KeyInput& input) {
 HRESULT TextService::HandleJapaneseKey(ITfContext* context, TfEditCookie editCookie,
                                        const KeyInput& input) {
     using Action = japanese::KeyCommand::Action;
+    // Mix spells English as English Auto does, once its data is loaded.
+    if (mode_ == InputMode::Mixed) (void)EnsureEngine();
     japanese::KeyCommand command;
     switch (input.type) {
     case KeyInput::Type::MixedEnterPeriod:

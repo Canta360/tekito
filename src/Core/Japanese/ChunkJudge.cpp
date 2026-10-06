@@ -1,18 +1,57 @@
 #include "Core/Japanese/ChunkJudge.h"
 
+#include "Core/EnglishSpelling.h"
 #include "Core/Japanese/JapaneseComposer.h"
 #include "Core/Japanese/JapaneseConverter.h"
 #include "Core/Japanese/KeyConverter.h"
 #include "Core/Japanese/Loanwords.h"
 #include "Core/RankingData.h"
+#include "Core/TypoModel.h"
 
 #include <algorithm>
 #include <cwctype>
 
 namespace tekito::japanese {
 
+namespace {
+
+// The particles that follow an English noun (Stack Overflowで, GitHubに).
+constexpr std::wstring_view kParticles[] = {L"de", L"ga", L"ni", L"wo", L"ha", L"wa", L"no", L"mo", L"ka",
+                                            L"ya", L"ne", L"yo", L"na", L"da", L"e", L"he", L"te"};
+
+// The particle two keys are one slip from: a neighboring key, or the two
+// swapped (dr: de, ow: wo).
+std::wstring_view SlipOfParticle(std::wstring_view keys) {
+    if (keys.size() != 2) return {};
+    for (const auto particle : kParticles) {
+        if (particle.size() != 2) continue;
+        const bool swapped = keys[0] == particle[1] && keys[1] == particle[0];
+        const bool first = keys[0] == particle[0] && AreQwertyNeighbors(keys[1], particle[1]);
+        const bool second = keys[1] == particle[1] && AreQwertyNeighbors(keys[0], particle[0]);
+        if (swapped || first || second) return particle;
+    }
+    return {};
+}
+
+}  // namespace
+
+std::wstring ChunkJudge::WrittenAs(std::wstring_view word) const {
+    std::wstring lower(word);
+    for (auto& c : lower) c = static_cast<wchar_t>(std::towlower(c));
+    if (names_) {
+        if (const auto written = names_->WrittenAs(lower)) return *written;
+        for (const auto& spelling : names_->ForEnglish(lower, 1)) {
+            const bool capitals = std::any_of(spelling.english.begin() + 1, spelling.english.end(),
+                                              [](wchar_t c) { return std::iswupper(c) != 0; });
+            if (capitals) return spelling.english;
+        }
+    }
+    return std::wstring(word);
+}
+
 ChunkJudge::Judgement ChunkJudge::Judge(std::wstring_view keys, std::size_t englishBefore,
-                                        bool japaneseInSentence) const {
+                                        bool japaneseInSentence, const EnglishSpelling* spelling,
+                                        std::wstring_view before) const {
     Judgement judgement;
     judgement.written = std::wstring(keys);
     // A word with a number after it (iphone15, gpt4): as the word is, with
@@ -20,7 +59,7 @@ ChunkJudge::Judgement ChunkJudge::Judge(std::wstring_view keys, std::size_t engl
     std::size_t digits = keys.size();
     while (digits > 0 && keys[digits - 1] >= L'0' && keys[digits - 1] <= L'9') --digits;
     if (digits > 0 && digits < keys.size()) {
-        auto word = Judge(keys.substr(0, digits), englishBefore, japaneseInSentence);
+        auto word = Judge(keys.substr(0, digits), englishBefore, japaneseInSentence, spelling, before);
         word.written += keys.substr(digits);
         return word;
     }
@@ -28,6 +67,12 @@ ChunkJudge::Judgement ChunkJudge::Judge(std::wstring_view keys, std::size_t engl
         return c >= L'a' && c <= L'z';
     });
     if (!letters) return judgement;
+    // A first letter typed twice (bbug): no Japanese starts with っ, so the
+    // English word, when the rest is one.
+    if (keys.size() >= 4 && keys[0] == keys[1] && std::wstring_view(L"aiueon").find(keys[0]) == std::wstring_view::npos) {
+        auto rest = Judge(keys.substr(1), englishBefore, japaneseInSentence, spelling, before);
+        if (rest.english && rest.word) return rest;
+    }
 
     // How the keys read as romaji.
     std::wstring kana;
@@ -77,8 +122,6 @@ ChunkJudge::Judgement ChunkJudge::Judge(std::wstring_view keys, std::size_t engl
     // English so far with no Japanese: an English sentence.
     const bool englishSentence = englishBefore >= kEnglishSentence || (englishBefore > 0 && !japaneseInSentence);
     if (keys.size() <= 2 && readable) {
-        constexpr std::wstring_view kParticles[] = {L"de", L"ga", L"ni", L"wo", L"ha", L"wa", L"no", L"mo", L"ka",
-                                                    L"ya", L"ne", L"yo", L"na", L"da", L"e", L"he", L"te"};
         const bool particle = std::find(std::begin(kParticles), std::end(kParticles), keys) != std::end(kParticles);
         // English before, or the start of a sentence (do you, so far).
         const bool sentenceStart = englishBefore == 0 && !japaneseInSentence;
@@ -87,10 +130,44 @@ ChunkJudge::Judgement ChunkJudge::Judge(std::wstring_view keys, std::size_t engl
         if (!judgement.english) judgement.written = std::wstring(keys);
         return judgement;
     }
+    // Keys that are no word: English with a slip in it when English Auto
+    // puts it right to a word Japanese text writes in Latin letters at all
+    // (rveiew: review; not delinai: Celina), or in an English sentence.
+    const auto spelled = [&]() -> bool {
+        if (!spelling) return false;
+        const auto result = spelling->Spell(keys, before);
+        if (!result.corrected) return false;
+        std::wstring lower = result.word;
+        for (auto& c : lower) c = static_cast<wchar_t>(std::towlower(c));
+        const auto seen = names_ ? names_->InJapaneseText(lower) : std::nullopt;
+        const bool used = !names_ || !names_->HasJapaneseTextCounts() || englishBefore >= kEnglishSentence ||
+                          seen.has_value();
+        if (!used) return false;
+        judgement.english = true;
+        judgement.word = true;
+        judgement.written = WrittenAs(result.word);
+        return true;
+    };
     if (!readable) {
         // Japanese with a slip in it, unless it is an English word.
-        const bool slip = score < thresholds_.listedWord && !name && slips_ && slips_->Convert(keys).has_value();
-        judgement.english = !slip && !EnglishThenJapanese(keys);
+        const bool known = score >= thresholds_.listedWord || name;
+        // Two letters after English one slip from a particle (dr: で) are
+        // the particle, unless written in capitals (PC, OK).
+        const bool capitals = std::all_of(judgement.written.begin(), judgement.written.end(),
+                                          [](wchar_t c) { return std::iswupper(c) != 0; });
+        const bool slip = slips_ && slips_->Convert(keys).has_value();
+        if (const auto particle = SlipOfParticle(keys); englishBefore > 0 && !capitals && !particle.empty()) {
+            judgement.meant = std::wstring(particle);
+            return judgement;
+        }
+        if (known) {
+            judgement.english = true;
+            return judgement;
+        }
+        // A slip correction makes Japanese of it: when in doubt, Japanese.
+        if (EnglishThenJapanese(keys) || slip) return judgement;
+        if (spelled()) return judgement;
+        judgement.english = true;
         return judgement;
     }
     if (rareLetters && score >= thresholds_.knownWord) {

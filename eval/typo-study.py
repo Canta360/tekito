@@ -122,6 +122,7 @@ def main() -> int:
     parser.add_argument("--slips", type=int, default=2)
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--limit", type=int, default=100)
+    parser.add_argument("--no-english-engine", action="store_true", help="Mix as before English Auto spelled it")
     args = parser.parse_args()
     args.work.mkdir(parents=True, exist_ok=True)
     rng = random.Random(args.seed)
@@ -137,7 +138,12 @@ def main() -> int:
             command.append("--japanese-mode")
         if not slips:
             command.append("--no-slips")
-        subprocess.run(command, check=True, stdout=subprocess.DEVNULL)
+        env = dict(os.environ)
+        if mode == "mix" and args.en_data and not args.no_english_engine:
+            # English chunks spelled as English Auto spells them.
+            command.append("--english-engine")
+            env["TEKITO_DATA_PACK_DIR"] = str(args.en_data)
+        subprocess.run(command, check=True, stdout=subprocess.DEVNULL, env=env)
 
     def run_en(sentences: Path, out: Path) -> None:
         env = dict(os.environ, TEKITO_DATA_PACK_DIR=str(args.en_data))

@@ -23,6 +23,8 @@
 // error rate against the closest acceptable text, how often an acceptable
 // text is among the first phrase-by-phrase choices, and conversion time.
 
+#include "Core/ConversionEngine.h"
+#include "Core/EnglishSpelling.h"
 #include "Core/ExternalRankingProviders.h"
 #include "Core/Japanese/ChunkJudge.h"
 #include "Core/Japanese/JapaneseComposer.h"
@@ -246,7 +248,8 @@ int RunKeys(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary
 // English (the answer, not typed).
 //
 // --japanese-mode types the chunks in Japanese mode instead (no judging);
-// --no-slips leaves slips in the keys as typed; --write-chunks <path>
+// --no-slips leaves slips in the keys as typed; --english-engine spells
+// English chunks as English Auto does (TEKITO_DATA_PACK_DIR: its packs); --write-chunks <path>
 // writes each chunk's committed text and what one pick from its list gives
 // (source, id, chunk, committed, choices split by U+001F), to compare text
 // typed with slips against the same text typed right
@@ -258,6 +261,7 @@ struct ChunkOptions {
     std::size_t showChunks{0};
     bool japaneseMode{false};
     bool slips{true};
+    bool englishEngine{false};
     std::filesystem::path writeChunks;
 };
 
@@ -311,6 +315,18 @@ int RunChunks(const ConnectionMatrix& matrix, const JapaneseDictionary& dictiona
     const auto parts = tekito::japanese::UserPartsOfSpeech::Load(options.pack / "pos.tsv");
     const auto noun = parts.For(tekito::japanese::UserWordKind::ProperNoun);
     if (!options.japaneseMode) composer.SetMixedTyping(&judge, noun ? noun->right : 0);
+    std::unique_ptr<tekito::IConversionEngine> englishEngine;
+    std::unique_ptr<tekito::EnglishSpelling> spelling;
+    if (options.englishEngine) {
+        tekito::PreloadDefaultEngineData();
+        englishEngine = tekito::CreateDefaultConversionEngine();
+        if (!englishEngine) {
+            std::cerr << "could not load English Auto (TEKITO_DATA_PACK_DIR)\n";
+            return 1;
+        }
+        spelling = std::make_unique<tekito::EnglishSpelling>(*englishEngine);
+        composer.SetEnglishSpelling(spelling.get());
+    }
     std::ofstream written;
     if (!options.writeChunks.empty()) written.open(options.writeChunks, std::ios::binary);
 
@@ -325,6 +341,7 @@ int RunChunks(const ConnectionMatrix& matrix, const JapaneseDictionary& dictiona
     for (const auto& row : LoadCorpus(corpus)) {
         std::wstring output;
         std::size_t englishBefore = 0;
+        std::wstring englishText;
         bool japaneseInSentence = false;
         composer.ForgetContext();
         composer.SetSentenceStart(true);
@@ -338,7 +355,8 @@ int RunChunks(const ConnectionMatrix& matrix, const JapaneseDictionary& dictiona
             std::wstring word = chunk;
             while (!word.empty() && std::wstring_view(L".,!?").find(word.back()) != std::wstring_view::npos) word.pop_back();
             const auto judgement = word.empty() ? tekito::japanese::ChunkJudge::Judgement{englishBefore > 0, chunk, false}
-                                                : judge.Judge(word, englishBefore, japaneseInSentence);
+                                                : judge.Judge(word, englishBefore, japaneseInSentence,
+                                                              spelling.get(), englishText);
             const bool said = judgement.english;
             englishBefore = said ? englishBefore + 1 : 0;
             if (!said) japaneseInSentence = true;
@@ -365,6 +383,11 @@ int RunChunks(const ConnectionMatrix& matrix, const JapaneseDictionary& dictiona
             }
             if (composer.TakeSpaceBefore() && !committed.empty() && output.ends_with(L' ')) output.pop_back();
             output += committed;
+            if (said) {
+                englishText += committed;
+            } else {
+                englishText.clear();
+            }
         }
         // English last leaves its space after it.
         while (!output.empty() && output.back() == L' ') output.pop_back();
@@ -454,6 +477,7 @@ int main(int argc, char** argv) {
         else if (arg == "--show-chunks" && i + 1 < argc) chunks.showChunks = std::stoul(argv[++i]);
         else if (arg == "--japanese-mode") chunks.japaneseMode = true;
         else if (arg == "--no-slips") chunks.slips = false;
+        else if (arg == "--english-engine") chunks.englishEngine = true;
         else if (arg == "--write-chunks" && i + 1 < argc) chunks.writeChunks = argv[++i];
     }
     tekito::japanese::LanguageModel model;

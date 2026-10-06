@@ -12,6 +12,10 @@
 #include <utility>
 #include <vector>
 
+namespace tekito {
+class EnglishSpelling;
+}
+
 namespace tekito::japanese {
 
 class ChunkJudge;
@@ -87,6 +91,9 @@ public:
         englishRun_ = 0;
     }
     [[nodiscard]] bool MixedTyping() const noexcept { return chunkJudge_ != nullptr; }
+    // Mixed typing: English Auto's spelling, so English with a slip in it
+    // is put right as in English (rveiew: review). nullptr: as typed.
+    void SetEnglishSpelling(const EnglishSpelling* spelling) noexcept { englishSpelling_ = spelling; }
     // Mixed typing: whether what is typed next starts a sentence, so English
     // there starts with a capital. The text service says so from the text
     // before the caret; committing keeps it up to date.
@@ -194,6 +201,7 @@ public:
         context_ = 0;
         contextWords_.clear();
         englishRun_ = 0;
+        englishText_.clear();
         spaceAfterEnglish_ = false;
         dropSpaceBefore_ = false;
     }
@@ -412,9 +420,12 @@ private:
     const KeyConverter* keyConverter_{nullptr};
     const Loanwords* loanwords_{nullptr};
     const ChunkJudge* chunkJudge_{nullptr};
+    const EnglishSpelling* englishSpelling_{nullptr};
     std::uint16_t englishContext_{0};
-    // Mixed typing: English chunks committed in a row, just before.
+    // Mixed typing: English chunks committed in a row, just before, and
+    // their text (context for English Auto's spelling).
     std::size_t englishRun_{0};
+    std::wstring englishText_;
     bool sentenceStart_{true};
     // English was committed last, with its space after it.
     bool spaceAfterEnglish_{false};

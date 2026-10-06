@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Core/ConversionEngine.h"
+#include "Core/EnglishSpelling.h"
 #include "Core/InputStateMachine.h"
 #include "Core/UserLearning.h"
 #include "Tsf/CandidateWindow.h"
@@ -240,6 +241,10 @@ private:
     SocialLearningStore socialLearning_;
     SocialLearningProvider socialLearningProvider_;
     std::unique_ptr<IConversionEngine> candidateEngine_;
+    // Mix: English Auto's spelling for English typed among Japanese.
+    std::unique_ptr<EnglishSpelling> englishSpelling_;
+    // Drops the English engine, and what Mix borrows of it.
+    void ResetEngine();
     std::unique_ptr<userdata::IUserDataRepository> settingsRepository_;
     std::unique_ptr<userdata::RuntimeModeState> runtimeMode_;
     userdata::UserSettings userSettings_{};

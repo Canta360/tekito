@@ -792,6 +792,9 @@ void TestMixedTyping(const RomajiTable& table, const MiniPack& pack) {
     Require(!judge.Judge(L"pcwotukau", 0).english, "English run into Japanese after a particle is Japanese");
     const auto numbered = judge.Judge(L"github15", 0);
     Require(numbered.english && numbered.written == L"github15", "a number after a word keeps the word English");
+    const auto particle = judge.Judge(L"dr", 1);
+    Require(!particle.english && particle.meant == L"de", "two keys after English one slip from a particle are it");
+    Require(judge.Judge(L"ggithub", 0).english, "a first letter typed twice is a slip of the English word");
 
     JapaneseComposer composer(&table);
     composer.SetConverter(&converter);

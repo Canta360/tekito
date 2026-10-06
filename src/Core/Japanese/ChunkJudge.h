@@ -6,6 +6,7 @@
 #include <string_view>
 
 namespace tekito {
+class EnglishSpelling;
 class IFrequencyProvider;
 }
 
@@ -58,15 +59,24 @@ public:
         bool either{false};
         // A known English word or name (not just keys that make no kana).
         bool word{false};
+        // Japanese: the keys as meant, when they are a slip of a particle
+        // (dr: de), too short for slip correction.
+        std::wstring meant;
     };
     // `keys`: lower-case letters. `englishBefore`: English chunks right
     // before this one. `japaneseInSentence`: the sentence so far has
     // Japanese in it; without, English chunks before make it an English
-    // sentence (do you, nice to).
+    // sentence (do you, nice to). `spelling`: English Auto's spelling, to
+    // take keys that are no word as the English word with a slip in it
+    // (rveiew: review), with `before` the English typed before them;
+    // keys a slip correction makes Japanese of stay Japanese.
     [[nodiscard]] Judgement Judge(std::wstring_view keys, std::size_t englishBefore,
-                                  bool japaneseInSentence = true) const;
+                                  bool japaneseInSentence = true, const EnglishSpelling* spelling = nullptr,
+                                  std::wstring_view before = {}) const;
 
 private:
+    // How English writes `word` (GitHub, Google, nice).
+    [[nodiscard]] std::wstring WrittenAs(std::wstring_view word) const;
     // An English word run into Japanese after it, starting with a particle
     // (pcwotukau: pcを使う); not when the keys are an English word.
     [[nodiscard]] bool EnglishThenJapanese(std::wstring_view keys) const;

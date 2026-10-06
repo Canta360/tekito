@@ -492,7 +492,7 @@ HRESULT TextService::ActivateEx(ITfThreadMgr* threadManager, TfClientId clientId
     clientId_ = clientId;
     activateFlags_ = flags;
 
-    candidateEngine_.reset();
+    ResetEngine();
     runtimeMode_.reset();
     userDictionary_ = {};
     userLearning_ = {};
@@ -550,7 +550,7 @@ HRESULT TextService::ActivateEx(ITfThreadMgr* threadManager, TfClientId clientId
 
     // Loading the language data takes seconds; never do it on the host
     // application's thread. Until it is ready, keys pass through untouched.
-    candidateEngine_.reset();
+    ResetEngine();
     if (IsDefaultEngineDataLoaded()) {
         EnsureEngine();
     } else {
@@ -715,8 +715,19 @@ bool TextService::EnsureEngine() {
     if (!IsDefaultEngineDataLoaded()) return false;
     candidateEngine_ = CreateDefaultConversionEngine(userDictionary_, userLearningProvider_,
                                                      socialLearningProvider_);
-    if (!candidateEngine_) Trace(L"Engine creation failed");
-    return candidateEngine_ != nullptr;
+    if (!candidateEngine_) {
+        Trace(L"Engine creation failed");
+        return false;
+    }
+    englishSpelling_ = std::make_unique<EnglishSpelling>(*candidateEngine_);
+    japanese_.SetEnglishSpelling(englishSpelling_.get());
+    return true;
+}
+
+void TextService::ResetEngine() {
+    japanese_.SetEnglishSpelling(nullptr);
+    englishSpelling_.reset();
+    candidateEngine_.reset();
 }
 
 void TextService::ApplySettings() {

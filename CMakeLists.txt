@@ -27,6 +27,7 @@ add_library(tekito_core STATIC
     src/Core/AutoApplyPolicy.cpp
     src/Core/BuiltinLexicon.cpp
     src/Core/CandidateEngine.cpp
+    src/Core/EnglishSpelling.cpp
     src/Core/CandidateGenerator.cpp
     src/Core/CandidateRanker.cpp
     src/Core/ConversionEngine.cpp

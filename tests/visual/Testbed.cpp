@@ -20,6 +20,7 @@
 // What it cannot show is how applications treat a composition: caret
 // placement, Word or a browser. Check those with the input method registered.
 #include "Core/ConversionEngine.h"
+#include "Core/EnglishSpelling.h"
 #include "Core/ExternalLexiconProvider.h"
 #include "Core/InputStateMachine.h"
 #include "Core/Japanese/JapaneseComposer.h"
@@ -63,6 +64,8 @@ constexpr int kMargin = 24;
 // English typing: what the text service keeps for it (TextService.h).
 struct EnglishTyping {
     std::unique_ptr<tekito::IConversionEngine> engine;
+    // Mix spells English with it as the text service does.
+    std::unique_ptr<tekito::EnglishSpelling> spelling;
     tekito::InputStateMachine state;
     // The word as typed.
     std::wstring rawText;
@@ -165,7 +168,10 @@ bool EnsureEngine(Testbed& bed) {
     bed.en.engine =
         tekito::CreateDefaultConversionEngine(bed.englishWords, bed.englishLearningProvider, bed.socialLearningProvider);
     SetCursor(old);
-    return bed.en.engine != nullptr;
+    if (!bed.en.engine) return false;
+    bed.en.spelling = std::make_unique<tekito::EnglishSpelling>(*bed.en.engine);
+    bed.composer.SetEnglishSpelling(bed.en.spelling.get());
+    return true;
 }
 
 void SetUpComposer(Testbed& bed) {
@@ -978,6 +984,7 @@ bool OnKey(Testbed& bed, WPARAM key) {
         return true;
     }
     if (key == VK_F2 && !bed.composer.IsComposing()) {
+        if (!bed.composer.MixedTyping()) (void)EnsureEngine(bed);
         ja::AttachMixedTyping(bed.composer, !bed.composer.MixedTyping());
         Refresh(bed);
         return true;
@@ -1046,7 +1053,10 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR commandLine, int show) 
     SetUpComposer(*bed);
     SetUpEnglish(*bed);
     if (options.find(L"--english") != std::wstring_view::npos) bed->english = EnsureEngine(*bed);
-    if (options.find(L"--mixed") != std::wstring_view::npos) ja::AttachMixedTyping(bed->composer, true);
+    if (options.find(L"--mixed") != std::wstring_view::npos) {
+        (void)EnsureEngine(*bed);
+        ja::AttachMixedTyping(bed->composer, true);
+    }
 
     WNDCLASSEXW windowClass{sizeof(windowClass)};
     windowClass.hInstance = instance;
