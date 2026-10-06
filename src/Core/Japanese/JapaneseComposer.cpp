@@ -748,6 +748,7 @@ void JapaneseComposer::BuildPhrases(bool convert) {
             AddSpecial(reading, phrases_.back().candidates);
         }
     }
+    if (convert && !chunkJudge_) AddTypedEnglish();
     if (chunk && !chunk->english && !phrases_.empty()) {
         if (auto split = RunTogetherEnglish()) {
             PhraseCandidate whole{std::move(*split), 0, PhraseCandidate::Kind::Dictionary, false};
@@ -763,6 +764,35 @@ void JapaneseComposer::BuildPhrases(bool convert) {
                                 PhraseCandidate::Kind::English, false};
         english.reading = conversionReading_;
         candidates.insert(candidates.begin() + 1, std::move(english));
+    }
+}
+
+void JapaneseComposer::AddTypedEnglish() {
+    if (!loanwords_ || phrases_.empty() || HasAscii()) return;
+    const bool leftover = std::any_of(units_.begin(), units_.end(), [](const Unit& unit) {
+        return LeftoverLetters(ToFullWidthAscii(unit.kana)) > 0;
+    });
+    const std::wstring keys = Keys(false);
+    if (!leftover || keys.size() < 3 ||
+        !std::all_of(keys.begin(), keys.end(), [](wchar_t c) { return c >= L'a' && c <= L'z'; })) {
+        return;
+    }
+    const auto spellings = loanwords_->ForEnglish(keys, 1);
+    if (spellings.empty()) return;
+    std::wstring written = loanwords_->WrittenAs(keys).value_or(keys);
+    std::vector<PhraseCandidate> words;
+    PhraseCandidate english{std::move(written), 0, PhraseCandidate::Kind::English, false};
+    english.reading = Reading();
+    words.push_back(std::move(english));
+    PhraseCandidate katakana{spellings.front().katakana, 0, PhraseCandidate::Kind::Katakana, false};
+    katakana.reading = Reading();
+    words.push_back(std::move(katakana));
+    auto& candidates = phrases_.front().candidates;
+    std::size_t at = std::min<std::size_t>(1, candidates.size());
+    for (auto& word : words) {
+        const bool seen = std::any_of(candidates.begin(), candidates.end(),
+                                      [&](const PhraseCandidate& c) { return c.text == word.text; });
+        if (!seen) candidates.insert(candidates.begin() + static_cast<std::ptrdiff_t>(at++), std::move(word));
     }
 }
 
