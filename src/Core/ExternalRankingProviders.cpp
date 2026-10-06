@@ -246,22 +246,59 @@ bool ExternalPhraseContextProvider::BuildIndex(const std::filesystem::path& data
 
 double ExternalPhraseContextProvider::Score(std::wstring_view word,
                                              std::wstring_view context) const noexcept {
-    constexpr std::size_t kContextCacheBudgetBytes = 32u * 1024u * 1024u;
     const auto asciiContext = ToAscii(context);
     const auto asciiWord = ToAscii(word);
     if (asciiContext.empty() || asciiWord.empty()) return 0.0;
     std::lock_guard lock(dataFileMutex_);
     if (!loaded_) return 0.0;
+    try {
+        return ScoreFromContextBucket(Bucket(asciiContext), asciiWord);
+    } catch (...) {
+        return 0.0;
+    }
+}
 
+std::vector<std::wstring> ExternalPhraseContextProvider::Following(std::wstring_view context,
+                                                                   std::wstring_view prefix,
+                                                                   std::size_t limit) const {
+    const auto asciiContext = ToAscii(context);
+    const auto asciiPrefix = ToAscii(prefix);
+    if (asciiContext.empty() || asciiPrefix.empty() || limit == 0) return {};
+    std::vector<const ScoreEntry*> found;
+    std::lock_guard lock(dataFileMutex_);
+    if (!loaded_) return {};
+    const auto& entries = Bucket(asciiContext);
+    auto it = std::lower_bound(entries.begin(), entries.end(), asciiPrefix,
+                               [](const ScoreEntry& entry, std::string_view value) { return entry.word < value; });
+    for (; it != entries.end() && it->word.starts_with(asciiPrefix); ++it) {
+        if (it->word.size() > asciiPrefix.size()) found.push_back(&*it);
+    }
+    const auto count = std::min(limit, found.size());
+    std::partial_sort(found.begin(), found.begin() + static_cast<std::ptrdiff_t>(count), found.end(),
+                      [](const ScoreEntry* left, const ScoreEntry* right) { return left->score > right->score; });
+    std::vector<std::wstring> words;
+    words.reserve(count);
+    for (std::size_t index = 0; index < count; ++index) {
+        words.emplace_back(found[index]->word.begin(), found[index]->word.end());
+    }
+    return words;
+}
+
+const std::vector<ExternalPhraseContextProvider::ScoreEntry>& ExternalPhraseContextProvider::Bucket(
+    const std::string& asciiContext) const {
+    constexpr std::size_t kContextCacheBudgetBytes = 32u * 1024u * 1024u;
     if (const auto cached = contextCache_.find(asciiContext); cached != contextCache_.end()) {
         contextLru_.splice(contextLru_.begin(), contextLru_, cached->second.lruPosition);
-        return ScoreFromContextBucket(cached->second.entries, asciiWord);
+        return cached->second.entries;
     }
 
     auto loaded = ReadContextBucket(dataFile_, index_, asciiContext);
-    const auto score = ScoreFromContextBucket(loaded, asciiWord);
     const auto bytes = ContextBucketBytes(asciiContext, loaded);
-    if (bytes > kContextCacheBudgetBytes) return score;
+    if (bytes > kContextCacheBudgetBytes) {
+        uncachedBucket_.clear();
+        for (auto& entry : loaded) uncachedBucket_.push_back({std::move(entry.word), entry.score});
+        return uncachedBucket_;
+    }
 
     while (contextCacheBytes_ + bytes > kContextCacheBudgetBytes && !contextLru_.empty()) {
         const auto& oldestKey = contextLru_.back();
@@ -279,8 +316,7 @@ double ExternalPhraseContextProvider::Score(std::wstring_view word,
     bucket.bytes = bytes;
     bucket.lruPosition = contextLru_.begin();
     contextCacheBytes_ += bytes;
-    contextCache_.emplace(asciiContext, std::move(bucket));
-    return score;
+    return contextCache_.emplace(asciiContext, std::move(bucket)).first->second.entries;
 }
 
 }  // namespace tekito

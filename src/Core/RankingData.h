@@ -1,6 +1,9 @@
 #pragma once
 
+#include <cstddef>
+#include <string>
 #include <string_view>
+#include <vector>
 
 namespace tekito {
 
@@ -22,6 +25,13 @@ public:
     virtual ~IPhraseContextProvider() = default;
     [[nodiscard]] virtual double Score(std::wstring_view word,
                                        std::wstring_view context) const noexcept = 0;
+    // The words seen right after `context` that start with `prefix`, the
+    // most common first.
+    [[nodiscard]] virtual std::vector<std::wstring> Following(std::wstring_view /*context*/,
+                                                              std::wstring_view /*prefix*/,
+                                                              std::size_t /*limit*/) const {
+        return {};
+    }
 };
 
 class IUserLearningProvider {

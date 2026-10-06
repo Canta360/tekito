@@ -48,6 +48,9 @@ public:
     // Rows the list shows at first, and once the user pages through it
     // (UserSettings::candidateRows).
     void SetPageSizes(std::size_t first, std::size_t paged) noexcept;
+    // Space right after the Space that ended a word puts a period there
+    // instead of going to the next candidate (Tab still does).
+    void SetDoubleSpacePeriod(bool enabled) noexcept { doubleSpacePeriod_ = enabled; }
 
     [[nodiscard]] InputAction OnNextCandidate();
     [[nodiscard]] InputAction OnPreviousCandidate();
@@ -93,6 +96,9 @@ private:
     std::size_t page_{10};
     bool candidateNavigationActive_{false};
     bool boundarySpaceActive_{false};
+    bool doubleSpacePeriod_{false};
+    // The last key was the Space that ended the word.
+    bool afterFirstSpace_{false};
 };
 
 }  // namespace tekito

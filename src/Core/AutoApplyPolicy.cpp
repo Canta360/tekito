@@ -34,7 +34,9 @@ std::optional<std::size_t> AutoApplyPolicy::SelectForBoundary(
 
 bool AutoApplyPolicy::IsSafeAutomaticCandidate(std::wstring_view rawText,
                                                const Candidate& candidate) const noexcept {
-    if (candidate.isOriginal || candidate.isProtected || candidate.text == rawText) {
+    // Taking out a doubled word is for Space only: before punctuation it
+    // would leave the space behind.
+    if (candidate.isOriginal || candidate.isProtected || candidate.text == rawText || candidate.text.empty()) {
         return false;
     }
     if ((candidate.policyFlags & (CandidatePolicyProtect | CandidatePolicySuggestOnly)) != 0) {

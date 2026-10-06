@@ -505,6 +505,8 @@ std::wstring LabelText(const Candidate& candidate, bool japanese) {
     // *why* the engine generated the candidate, not whether the user should
     // want it, so it stays unlabeled to keep the row scannable.
     if (candidate.isOriginal) return japanese ? L"そのまま" : L"ORIGINAL";
+    // The empty row that takes out a word typed twice.
+    if ((candidate.sourceFlags & CandidateSourceDoubledWord) != 0) return japanese ? L"重複を削除" : L"REMOVE REPEAT";
     if (candidate.label == SemanticLabel::Slang) return japanese ? L"スラング" : L"SLANG";
     if (candidate.label == SemanticLabel::Emoji) return japanese ? L"絵文字" : L"EMOJI";
     // Not what was typed: the user should know before picking it.

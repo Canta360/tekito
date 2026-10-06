@@ -272,6 +272,14 @@ bool SqliteUserDictionaryRepository::LoadSettings(UserSettings& settings) const 
             loaded.toggleKey = std::clamp(value, 0, 3);
         } else if (std::strcmp(key, "period_on_enter") == 0) {
             loaded.periodOnEnter = value != 0;
+        } else if (std::strcmp(key, "next_word_prediction") == 0) {
+            loaded.nextWordPrediction = value != 0;
+        } else if (std::strcmp(key, "doubled_word_check") == 0) {
+            loaded.doubledWordCheck = value != 0;
+        } else if (std::strcmp(key, "double_space_period") == 0) {
+            loaded.doubleSpacePeriod = value != 0;
+        } else if (std::strcmp(key, "smart_punctuation") == 0) {
+            loaded.smartPunctuation = value != 0;
         } else if (std::strcmp(key, "ui_language") == 0) {
             loaded.uiLanguage = std::clamp(value, 0, 2);
         } else if (std::strcmp(key, "keyboard_type") == 0) {
@@ -375,6 +383,10 @@ bool SqliteUserDictionaryRepository::SaveSettings(const UserSettings& settings) 
     saveValue("meanings_enabled", settings.meaningsEnabled ? 1 : 0);
     saveValue("toggle_key", std::clamp(settings.toggleKey, 0, 3));
     saveValue("period_on_enter", settings.periodOnEnter ? 1 : 0);
+    saveValue("next_word_prediction", settings.nextWordPrediction ? 1 : 0);
+    saveValue("doubled_word_check", settings.doubledWordCheck ? 1 : 0);
+    saveValue("double_space_period", settings.doubleSpacePeriod ? 1 : 0);
+    saveValue("smart_punctuation", settings.smartPunctuation ? 1 : 0);
     saveValue("ui_language", std::clamp(settings.uiLanguage, 0, 2));
     saveValue("keyboard_type", std::clamp(settings.keyboardType, 0, 2));
     saveValue("last_japanese_profile_mode", static_cast<int>(settings.lastJapaneseProfileMode));

@@ -52,6 +52,10 @@ enum CandidateSourceFlags : std::uint32_t {
     CandidateSourceSocialExpression = 1u << 17,
     CandidateSourceJapanesePhonetic = 1u << 18,
     CandidateSourceQwertyTypoCatalog = 1u << 19,
+    // A word that often follows the words before it (next-word prediction).
+    CandidateSourcePrediction = 1u << 20,
+    // A word typed twice in a row: the candidate is empty, taking it out.
+    CandidateSourceDoubledWord = 1u << 21,
 };
 
 enum SocialRangeTier : std::uint8_t {

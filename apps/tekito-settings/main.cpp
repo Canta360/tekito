@@ -865,6 +865,14 @@ private:
         json += L",\"keyboardType\":" + std::to_wstring(settings_.keyboardType);
         json += L",\"periodOnEnter\":";
         json += settings_.periodOnEnter ? L"true" : L"false";
+        json += L",\"nextWordPrediction\":";
+        json += settings_.nextWordPrediction ? L"true" : L"false";
+        json += L",\"doubledWordCheck\":";
+        json += settings_.doubledWordCheck ? L"true" : L"false";
+        json += L",\"doubleSpacePeriod\":";
+        json += settings_.doubleSpacePeriod ? L"true" : L"false";
+        json += L",\"smartPunctuation\":";
+        json += settings_.smartPunctuation ? L"true" : L"false";
         json += L",\"japaneseSpaceWidth\":" + std::to_wstring(settings_.japaneseSpaceWidth);
         json += L",\"japanesePunctuation\":" + std::to_wstring(settings_.japanesePunctuation);
         json += L",\"japaneseDigitWidth\":" + std::to_wstring(settings_.japaneseDigitWidth);
@@ -1019,6 +1027,10 @@ private:
                 settings_.candidateRows = integerValue == 5 || integerValue == 7 || integerValue == 9 ? integerValue : 0;
             }
             else if (key == L"periodOnEnter") settings_.periodOnEnter = value;
+            else if (key == L"nextWordPrediction") settings_.nextWordPrediction = value;
+            else if (key == L"doubledWordCheck") settings_.doubledWordCheck = value;
+            else if (key == L"doubleSpacePeriod") settings_.doubleSpacePeriod = value;
+            else if (key == L"smartPunctuation") settings_.smartPunctuation = value;
             else if (key == L"meaningsEnabled") settings_.meaningsEnabled = value;
             else if (key == L"japaneseEnabled") settings_.japaneseEnabled = value;
             else if (key == L"modeIndicatorEnabled") settings_.modeIndicatorEnabled = value;

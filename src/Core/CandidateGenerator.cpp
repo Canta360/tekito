@@ -24,8 +24,8 @@ std::vector<std::wstring> ContextWords(std::wstring_view value) {
     std::vector<std::wstring> words;
     std::wstring current;
     for (const wchar_t ch : value) {
-        if (std::iswalpha(ch) || ch == L'\'') {
-            current.push_back(static_cast<wchar_t>(std::towlower(ch)));
+        if (std::iswalpha(ch) || ch == L'\'' || ch == L'\u2019') {
+            current.push_back(ch == L'\u2019' ? L'\'' : static_cast<wchar_t>(std::towlower(ch)));
         } else if (!current.empty()) {
             words.push_back(std::move(current));
             current.clear();
@@ -741,6 +741,8 @@ std::vector<Candidate> CandidateGenerator::Generate(std::wstring_view rawText,
 
     if (!HasOriginal(output)) AddOriginal(output, seen, rawText);
     ApplyWritingRules(output, seen, rawText, lower, exact && !exactHasWeakFrequency, options);
+    ApplyDoubledWord(output, rawText, lower, context, options);
+    AddPredictions(output, seen, rawText, lower, context, options);
     FinalizeCandidates(output, rawText);
     return output;
 }
@@ -911,6 +913,93 @@ void CandidateGenerator::ApplyWritingRules(std::vector<Candidate>& output, std::
         if (candidate.label == SemanticLabel::ProperNoun) candidate.label = SemanticLabel::None;
         output.insert(output.begin(), std::move(candidate));
     }
+}
+
+void CandidateGenerator::ApplyDoubledWord(std::vector<Candidate>& output, std::wstring_view rawText,
+                                          std::wstring_view lower, std::wstring_view context,
+                                          const ConversionOptions& options) const {
+    if (!options.doubledWords || lower.empty() ||
+        !std::all_of(lower.begin(), lower.end(), [](wchar_t ch) { return std::iswalpha(ch) != 0; })) {
+        return;
+    }
+    const auto original = std::find_if(output.begin(), output.end(),
+                                       [](const Candidate& candidate) { return candidate.isOriginal; });
+    if (original != output.end() && original->isProtected) return;
+    // The word before, with only spaces between.
+    auto end = context.size();
+    while (end > 0 && (context[end - 1] == L' ' || context[end - 1] == L'\t')) --end;
+    if (end == context.size()) return;
+    auto start = end;
+    while (start > 0 && (std::iswalpha(context[start - 1]) || context[start - 1] == L'\'')) --start;
+    if (start == end || Lower(context.substr(start, end - start)) != lower) return;
+
+    // Never meant twice; others sometimes are ("that that", "had had").
+    constexpr std::wstring_view kNeverTwice[] = {L"the", L"a",    L"an",  L"of",    L"and", L"for",
+                                                 L"with", L"from", L"by", L"my",    L"your", L"our",
+                                                 L"their", L"its", L"to"};
+    const bool automatic = options.correctionEnabled &&
+                           std::find(std::begin(kNeverTwice), std::end(kNeverTwice), lower) != std::end(kNeverTwice);
+    Candidate removal;
+    removal.score = 100.0;
+    removal.sourceFlags = CandidateSourceDoubledWord;
+    removal.policyFlags = automatic ? Offered(lower, L"", CandidatePolicyNormalize) : CandidatePolicySuggestOnly;
+    if ((removal.policyFlags & CandidatePolicyNormalize) == 0) {
+        const auto at = std::find_if(output.begin(), output.end(),
+                                     [](const Candidate& candidate) { return candidate.isOriginal; });
+        output.insert(at == output.end() ? output.end() : at + 1, std::move(removal));
+        return;
+    }
+    for (auto& other : output) {
+        if (!other.isOriginal && (other.policyFlags & (CandidatePolicyCorrect | CandidatePolicyNormalize)) != 0) {
+            other.policyFlags = (other.policyFlags & ~(CandidatePolicyCorrect | CandidatePolicyNormalize)) |
+                                CandidatePolicySuggestOnly;
+        }
+    }
+    output.insert(output.begin(), std::move(removal));
+    (void)rawText;
+}
+
+void CandidateGenerator::AddPredictions(std::vector<Candidate>& output, std::unordered_set<std::wstring>& seen,
+                                        std::wstring_view rawText, std::wstring_view lower,
+                                        std::wstring_view context, const ConversionOptions& options) const {
+    if (!options.nextWordPrediction || lower.empty() ||
+        !std::all_of(lower.begin(), lower.end(), [](wchar_t ch) { return std::iswalpha(ch) != 0; })) {
+        return;
+    }
+    // Only the words of this sentence say what comes next.
+    const auto sentenceEnd = context.find_last_of(L".!?\r\n");
+    const auto words = ContextWords(sentenceEnd == std::wstring_view::npos ? context : context.substr(sentenceEnd + 1));
+    if (words.empty()) return;
+
+    constexpr std::size_t kPredictions = 3;
+    std::vector<std::wstring> predicted;
+    const auto collect = [&](const std::wstring& key) {
+        for (auto& word : phraseProvider_.Following(key, lower, 8)) {
+            if (predicted.size() >= kPredictions) return;
+            if (std::find(predicted.begin(), predicted.end(), word) != predicted.end() || !IsWord(word)) continue;
+            predicted.push_back(std::move(word));
+        }
+    };
+    if (words.size() >= 2) collect(JoinWords(words, words.size() - 2, 2));
+    collect(words.back());
+    if (predicted.empty()) return;
+
+    std::vector<Candidate> taken;
+    for (const auto& word : predicted) {
+        const auto text = MatchCase(rawText, word);
+        // Already first (a correction, or the word itself): stays there.
+        if (!output.empty() && output.front().text == text) continue;
+        auto candidate = TakeOut(output, text);
+        seen.insert(text);
+        candidate.policyFlags = CandidatePolicySuggestOnly;
+        candidate.sourceFlags |= CandidateSourcePrediction;
+        taken.push_back(std::move(candidate));
+    }
+    // After the first candidate and the word as typed.
+    std::size_t at = std::min<std::size_t>(1, output.size());
+    if (at < output.size() && output[at].isOriginal) ++at;
+    output.insert(output.begin() + static_cast<std::ptrdiff_t>(at), std::make_move_iterator(taken.begin()),
+                  std::make_move_iterator(taken.end()));
 }
 
 }  // namespace tekito

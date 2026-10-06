@@ -1184,6 +1184,88 @@ void TestEnglishWritingRules() {
     Require(spaceGives(L"NASA") == L"NASA", "an acronym stays as typed");
 }
 
+// A word typed twice, the next words, and Space twice for a period.
+void TestEnglishWritingOptions() {
+    const auto engine = tekito::CreateDefaultConversionEngine();
+    const tekito::SpaceBoundaryPolicy space;
+    const auto convert = [&](std::wstring_view raw, std::wstring_view context, bool options = true) {
+        tekito::ConversionRequest request;
+        request.rawText = std::wstring(raw);
+        request.context.precedingText = std::wstring(context);
+        request.options.doubledWords = options;
+        request.options.nextWordPrediction = options;
+        return engine->Convert(request).candidates;
+    };
+    const auto spaceGives = [&](std::wstring_view raw, std::wstring_view context, bool options = true) {
+        const auto candidates = convert(raw, context, options);
+        const auto selected = space.SelectCorrection(raw, candidates);
+        return selected ? candidates[*selected].text : std::wstring(raw);
+    };
+    Require(spaceGives(L"the", L"I saw the ").empty(), "the the: the second one is taken out");
+    Require(spaceGives(L"the", L"I saw the ", false) == L"the", "doubled words can be left alone");
+    Require(spaceGives(L"that", L"I said that ") == L"that", "that that may be meant: kept");
+    const auto thatThat = convert(L"that", L"I said that ");
+    Require(std::any_of(thatThat.begin(), thatThat.end(), [](const tekito::Candidate& candidate) {
+                return candidate.text.empty() && (candidate.sourceFlags & tekito::CandidateSourceDoubledWord) != 0;
+            }),
+            "that that: taking one out is offered");
+    Require(spaceGives(L"the", L"the end. Then the ") .empty(), "doubled across a sentence too");
+    Require(spaceGives(L"the", L"the. ") == L"the", "not doubled across punctuation");
+
+    const auto next = convert(L"t", L"I want ");
+    const auto to = std::find_if(next.begin(), next.end(), [](const tekito::Candidate& candidate) {
+        return candidate.text == L"to" && (candidate.sourceFlags & tekito::CandidateSourcePrediction) != 0;
+    });
+    Require(to != next.end() && to - next.begin() <= 3, "I want t: to is predicted on the first page");
+    Require(!next.empty() && (next.front().sourceFlags & tekito::CandidateSourcePrediction) == 0,
+            "a prediction is never put first");
+    const auto off = convert(L"t", L"I want ", false);
+    Require(std::none_of(off.begin(), off.end(), [](const tekito::Candidate& candidate) {
+                return (candidate.sourceFlags & tekito::CandidateSourcePrediction) != 0;
+            }),
+            "predictions can be turned off");
+
+    // The empty candidate leaves the space already typed.
+    std::vector<tekito::Candidate> removal{
+        {L"", tekito::SemanticLabel::None, false, 100.0, false, tekito::CandidatePolicyNormalize,
+         tekito::CandidateSourceDoubledWord},
+        {L"the", tekito::SemanticLabel::Original, true},
+    };
+    tekito::InputStateMachine state;
+    state.BeginOrUpdate(L"the", removal);
+    auto action = state.OnSpace();
+    Require(action.kind == tekito::ActionKind::ReplaceComposition && action.text.empty(),
+            "Space takes the doubled word out, adding no space");
+    action = state.OnBackspace();
+    Require(action.kind == tekito::ActionKind::RestoreOriginal && action.text == L"the",
+            "Backspace brings the doubled word back");
+    const tekito::AutoApplyPolicy autoApply;
+    Require(!autoApply.SelectForBoundary(L"the", removal, std::nullopt),
+            "punctuation does not take a doubled word out");
+
+    std::vector<tekito::Candidate> kept{
+        {L"hello", tekito::SemanticLabel::Original, true},
+        {L"hallo", tekito::SemanticLabel::None, false, 90.0, false, tekito::CandidatePolicySuggestOnly},
+    };
+    state.SetDoubleSpacePeriod(true);
+    state.BeginOrUpdate(L"hello", kept);
+    action = state.OnSpace();
+    Require(action.text == L"hello ", "first Space ends the word");
+    action = state.OnSpace();
+    Require(action.kind == tekito::ActionKind::CommitAndStartNext && action.text == L"hello. ",
+            "second Space puts a period");
+    state.BeginOrUpdate(L"hello", kept);
+    (void)state.OnSpace();
+    (void)state.OnTab();
+    action = state.OnSpace();
+    Require(action.text != L"hello. ", "Space after Tab does not put a period");
+    state.SetDoubleSpacePeriod(false);
+    state.BeginOrUpdate(L"hello", kept);
+    (void)state.OnSpace();
+    action = state.OnSpace();
+    Require(action.kind == tekito::ActionKind::ReplaceComposition, "with it off, Space twice goes to the next choice");
+}
+
 class TestDictionaryProvider final : public tekito::dictionary::IDictionaryProvider {
 public:
     [[nodiscard]] std::optional<tekito::dictionary::DictionaryEntry> Find(
@@ -2287,6 +2369,7 @@ int main() {
     TestPostalCodeImport();
     TestImeDictionaryImport();
     TestEnglishWritingRules();
+    TestEnglishWritingOptions();
     TestRankingDataBoundaries();
     TestCompositeLexiconProvider();
     TestPolicyEngineBoundary();

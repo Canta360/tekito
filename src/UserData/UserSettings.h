@@ -43,6 +43,14 @@ struct UserSettings {
     int toggleKey{1};
     // Enter adds a period to a line that ends without punctuation.
     bool periodOnEnter{false};
+    // English: words that often come next, offered while typing one.
+    bool nextWordPrediction{true};
+    // English: a word typed twice in a row ("the the") is taken out on Space.
+    bool doubledWordCheck{true};
+    // English: Space twice after a word ends the sentence with a period.
+    bool doubleSpacePeriod{false};
+    // English: curly quotes and apostrophes, and "--" as an em dash.
+    bool smartPunctuation{false};
     // The physical keyboard: 0 = as Windows reports it, 1 = Japanese (JIS,
     // 106/109 keys), 2 = US (101/102 keys). Decides the switch keys and the
     // layout the English profile uses. See KeyboardLayout.h.

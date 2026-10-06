@@ -2,9 +2,20 @@
 #include "Core/ConversionEngine.h"
 
 #include <algorithm>
+#include <cwctype>
 #include <utility>
 
 namespace tekito {
+namespace {
+
+// A candidate and the space after it; a word taken out ("the the") leaves
+// the space already there.
+std::wstring Spaced(std::wstring text) {
+    if (!text.empty()) text.push_back(L' ');
+    return text;
+}
+
+}  // namespace
 
 void InputStateMachine::BeginOrUpdate(std::wstring rawText, std::vector<Candidate> candidates) {
     if (inputMode_ == InputMode::Direct) {
@@ -26,6 +37,7 @@ void InputStateMachine::BeginOrUpdate(std::wstring rawText, std::vector<Candidat
     visibleCount_ = std::min<std::size_t>(firstPage_, candidates_.size());
     candidateNavigationActive_ = false;
     boundarySpaceActive_ = false;
+    afterFirstSpace_ = false;
 }
 
 void InputStateMachine::SetInputMode(InputMode mode) noexcept {
@@ -35,6 +47,7 @@ void InputStateMachine::SetInputMode(InputMode mode) noexcept {
 }
 
 InputAction InputStateMachine::OnNextCandidate() {
+    afterFirstSpace_ = false;
     if (!IsActive()) {
         return {};
     }
@@ -55,13 +68,24 @@ InputAction InputStateMachine::OnNextCandidate() {
 }
 
 InputAction InputStateMachine::OnSpace() {
+    const bool afterFirstSpace = afterFirstSpace_;
+    afterFirstSpace_ = false;
     if (!IsActive()) return {};
 
     if (candidateNavigationActive_) {
-        std::wstring text = candidates_[selectedIndex_].text;
-        text.push_back(L' ');
+        std::wstring text = Spaced(candidates_[selectedIndex_].text);
         Reset();
         return {ActionKind::CommitAndStartNext, std::move(text), false};
+    }
+
+    if (doubleSpacePeriod_ && afterFirstSpace &&
+        (state_ == CompositionState::Boundary || state_ == CompositionState::Cycling)) {
+        std::wstring text = state_ == CompositionState::Boundary ? rawText_ : candidates_[selectedIndex_].text;
+        if (!text.empty() && std::iswalnum(text.back())) {
+            text += L". ";
+            Reset();
+            return {ActionKind::CommitAndStartNext, std::move(text), false};
+        }
     }
 
     if (state_ == CompositionState::Boundary) {
@@ -83,14 +107,14 @@ InputAction InputStateMachine::OnSpace() {
         candidateNavigationActive_ = false;
         boundarySpaceActive_ = true;
         UpdatePageForSelection();
-        return {ActionKind::ReplaceComposition, candidates_[selectedIndex_].text + L" ", true};
+        return {ActionKind::ReplaceComposition, Spaced(candidates_[selectedIndex_].text), true};
     }
 
     if (state_ == CompositionState::Cycling) {
         selectedIndex_ = (selectedIndex_ + 1) % candidates_.size();
         boundarySpaceActive_ = true;
         UpdatePageForSelection(selectedIndex_ == 0);
-        return {ActionKind::ReplaceComposition, candidates_[selectedIndex_].text + L" ", true};
+        return {ActionKind::ReplaceComposition, Spaced(candidates_[selectedIndex_].text), true};
     }
 
     const auto selected = spaceBoundaryPolicy_.SelectCorrection(rawText_, candidates_);
@@ -108,6 +132,7 @@ InputAction InputStateMachine::OnSpace() {
                              ? 0
                              : static_cast<std::size_t>(std::distance(candidates_.begin(), raw));
         UpdatePageForSelection();
+        afterFirstSpace_ = true;
         return {ActionKind::ReplaceComposition, std::move(text), false};
     }
 
@@ -116,7 +141,8 @@ InputAction InputStateMachine::OnSpace() {
     candidateNavigationActive_ = false;
     boundarySpaceActive_ = true;
     UpdatePageForSelection();
-    return {ActionKind::ReplaceComposition, candidates_[selectedIndex_].text + L" ", true};
+    afterFirstSpace_ = true;
+    return {ActionKind::ReplaceComposition, Spaced(candidates_[selectedIndex_].text), true};
 }
 
 InputAction InputStateMachine::OnTab() {
@@ -124,6 +150,7 @@ InputAction InputStateMachine::OnTab() {
 }
 
 InputAction InputStateMachine::OnPreviousCandidate() {
+    afterFirstSpace_ = false;
     if (!IsActive()) {
         return {};
     }
@@ -140,6 +167,7 @@ InputAction InputStateMachine::OnPreviousCandidate() {
 }
 
 InputAction InputStateMachine::OnCandidateSelected(std::size_t index) {
+    afterFirstSpace_ = false;
     if (!IsActive() || index >= candidates_.size()) return {};
 
     state_ = CompositionState::Cycling;
@@ -159,6 +187,7 @@ InputAction InputStateMachine::OnShiftTab() {
 }
 
 InputAction InputStateMachine::OnBackspace() {
+    afterFirstSpace_ = false;
     if (!IsActive()) {
         return {};
     }
@@ -256,6 +285,7 @@ void InputStateMachine::Reset() noexcept {
     visibleCount_ = 0;
     candidateNavigationActive_ = false;
     boundarySpaceActive_ = false;
+    afterFirstSpace_ = false;
 }
 
 bool InputStateMachine::IsActive() const noexcept {
@@ -302,7 +332,7 @@ InputAction InputStateMachine::ReplaceSelected() const {
 
     return {
         ActionKind::ReplaceComposition,
-        boundarySpaceActive_ ? candidates_[selectedIndex_].text + L" "
+        boundarySpaceActive_ ? Spaced(candidates_[selectedIndex_].text)
                              : candidates_[selectedIndex_].text,
         true,
     };

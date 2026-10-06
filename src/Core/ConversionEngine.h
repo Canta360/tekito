@@ -39,6 +39,11 @@ struct ConversionOptions {
     bool completionEnabled{true};
     bool japanesePhoneticSuggestionsEnabled{true};
     int socialExpressionRange{1};
+    // Words that often follow the words before it, offered while typing one.
+    bool nextWordPrediction{true};
+    // A word typed twice in a row ("the the") is taken out; one that may be
+    // meant twice ("that that") only offers it.
+    bool doubledWords{true};
     // English uses the dates ("today"); the rest is typed outside words.
     SpecialConversionOptions special;
 };

@@ -100,6 +100,12 @@ languages and names like “iPhone” get their capitals. Where the word you
 typed is a word too, like “cant” or “march”, it stays, and the other way of
 writing it comes right after it in the list.
 
+The list also offers words that often come next (“to” for “I want t”), and
+Space takes out a word typed twice, like “the the”; Backspace brings it back.
+With Settings’ Advanced switch you can turn these off, or turn on a period
+for Space pressed twice and curly quotes and dashes (“ ” ’ and — for " ' and
+--).
+
 A few things come up as choices too: “today” and “now” offer the date and
 time, “(c)” and “->” offer © and →, and “1+2=” offers 3. What you typed
 stays first, so nothing changes unless you pick one.

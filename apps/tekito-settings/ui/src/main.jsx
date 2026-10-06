@@ -41,6 +41,10 @@ const initialSettings = {
   toggleKey: 1,
   keyboardType: 0,
   periodOnEnter: false,
+  nextWordPrediction: true,
+  doubledWordCheck: true,
+  doubleSpacePeriod: false,
+  smartPunctuation: false,
   japaneseSpaceWidth: 0,
   japanesePunctuation: 0,
   japaneseDigitWidth: 0,
@@ -532,6 +536,9 @@ function CandidatesPage({ advanced, settings, setSetting }) {
   );
 }
 
+// English options shown with the Advanced switch, after the period on Enter.
+const writingOptions = ["nextWordPrediction", "doubledWordCheck", "doubleSpacePeriod", "smartPunctuation"];
+
 // English: what Auto does as you type.
 function EnglishPage({ advanced, settings, setSetting }) {
   const t = useText();
@@ -551,9 +558,16 @@ function EnglishPage({ advanced, settings, setSetting }) {
           <Segmented label={t.casual.title} value={settings.socialExpressionRange} options={expressionRanges} onChange={(value) => setSetting("socialExpressionRange", value)} />
         </Row>
         {advanced && (
-          <Row title={t.period.title} description={t.period.description}>
-            <Toggle label={t.period.title} checked={settings.periodOnEnter} onChange={(value) => setSetting("periodOnEnter", value)} />
-          </Row>
+          <>
+            <Row title={t.period.title} description={t.period.description}>
+              <Toggle label={t.period.title} checked={settings.periodOnEnter} onChange={(value) => setSetting("periodOnEnter", value)} />
+            </Row>
+            {writingOptions.map((key) => (
+              <Row key={key} title={t.writing[key].title} description={t.writing[key].description}>
+                <Toggle label={t.writing[key].title} checked={Boolean(settings[key])} onChange={(value) => setSetting(key, value)} />
+              </Row>
+            ))}
+          </>
         )}
       </Glass>
       <Glass className="card">

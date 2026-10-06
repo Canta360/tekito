@@ -50,10 +50,15 @@ public:
     [[nodiscard]] bool IsLoaded() const noexcept { return loaded_; }
     [[nodiscard]] double Score(std::wstring_view word,
                                std::wstring_view context) const noexcept override;
+    [[nodiscard]] std::vector<std::wstring> Following(std::wstring_view context, std::wstring_view prefix,
+                                                      std::size_t limit) const override;
 
 private:
     struct IndexRow { std::string key; std::uint64_t offset{0}; };
     struct ScoreEntry { std::string word; double score{0.0}; };
+    // The words after `context`, sorted by word; read once and kept while
+    // the cache has room. Called with dataFileMutex_ held.
+    [[nodiscard]] const std::vector<ScoreEntry>& Bucket(const std::string& context) const;
     struct CachedContextBucket {
         std::vector<ScoreEntry> entries;
         std::size_t bytes{0};
@@ -70,6 +75,8 @@ private:
     mutable std::list<std::string> contextLru_;
     mutable std::unordered_map<std::string, CachedContextBucket> contextCache_;
     mutable std::size_t contextCacheBytes_{0};
+    // A bucket too large to cache, for the call that read it.
+    mutable std::vector<ScoreEntry> uncachedBucket_;
     bool loaded_{false};
 };
 

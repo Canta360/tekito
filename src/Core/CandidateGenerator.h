@@ -60,6 +60,13 @@ private:
     void ApplyWritingRules(std::vector<Candidate>& output, std::unordered_set<std::wstring>& seen,
                            std::wstring_view rawText, std::wstring_view lower, bool exact,
                            const ConversionOptions& options) const;
+    // "the the": the second one taken out, or offered to be.
+    void ApplyDoubledWord(std::vector<Candidate>& output, std::wstring_view rawText, std::wstring_view lower,
+                          std::wstring_view context, const ConversionOptions& options) const;
+    // Words that often follow the words before, starting with what is typed.
+    void AddPredictions(std::vector<Candidate>& output, std::unordered_set<std::wstring>& seen,
+                        std::wstring_view rawText, std::wstring_view lower, std::wstring_view context,
+                        const ConversionOptions& options) const;
     [[nodiscard]] bool IsWord(std::wstring_view lower) const;
 
     const ILexiconProvider& lexiconProvider_;

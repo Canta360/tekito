@@ -135,6 +135,12 @@ const en = {
     ranges: ["Off", "Common", "Familiar", "Broad", "Full"],
   },
   period: { title: "Period at the end of a line", description: "Add a period when you press Enter." },
+  writing: {
+    nextWordPrediction: { title: "Next words", description: "Suggest words that often come next." },
+    doubledWordCheck: { title: "Repeated words", description: "Remove a word typed twice, like “the the”." },
+    doubleSpacePeriod: { title: "Period with two spaces", description: "Press Space twice to end a sentence. Tab still shows the choices." },
+    smartPunctuation: { title: "Curly quotes and dashes", description: "Type “ ” ’ and — for \" ' and --." },
+  },
   keys: {
     title: "Keys",
     next: "Correct, then next choice",
@@ -425,6 +431,12 @@ const ja = {
     ranges: ["オフ", "定番", "親しい", "広め", "すべて"],
   },
   period: { title: "行末のピリオド", description: "Enter を押したとき、文末にピリオドを付けます。" },
+  writing: {
+    nextWordPrediction: { title: "次に来る単語", description: "次に続きそうな単語を候補に出します。" },
+    doubledWordCheck: { title: "単語の重複", description: "「the the」のように2回続けて打った単語を1つにします。" },
+    doubleSpacePeriod: { title: "スペース2回でピリオド", description: "Space を2回押すと文末にピリオドを付けます。候補は Tab で出せます。" },
+    smartPunctuation: { title: "飾りの引用符とダッシュ", description: "\" ' -- を “ ” ’ — にします。" },
+  },
   keys: {
     title: "キー操作",
     next: "補正して次の候補へ",

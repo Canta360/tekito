@@ -11,7 +11,7 @@ bool IsSentenceStart(std::wstring_view precedingText) noexcept {
     auto end = precedingText.size();
     while (end > 0) {
         const auto ch = precedingText[end - 1];
-        if (ch == L' ' || ch == L'\t' || ch == L'\"' || ch == L'\'' ||
+        if (ch == L' ' || ch == L'\t' || ch == L'\"' || ch == L'\'' || ch == L'\u201D' || ch == L'\u2019' ||
             ch == L')' || ch == L']' || ch == L'}') {
             --end;
             continue;
@@ -30,7 +30,8 @@ bool NeedsTerminalPeriod(std::wstring_view lineText) noexcept {
     if (start == end) return false;
     const auto last = lineText[end - 1];
     return last != L'.' && last != L'!' && last != L'?' && last != L',' &&
-           last != L':' && last != L';' && last != L'\"' && last != L'\'' &&
+           last != L':' && last != L';' && last != L'\"' && last != L'\'' && last != L'\u201D' &&
+           last != L'\u2019' &&
            last != L')' && last != L']' && last != L'}';
 }
 

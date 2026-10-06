@@ -112,6 +112,7 @@ private:
     [[nodiscard]] std::optional<SpecialConversions::Ending> SpecialEnding(std::wstring_view preceding,
                                                                          wchar_t character) const;
     HRESULT HandleSpecialEnd(ITfContext* context, TfEditCookie editCookie, wchar_t character);
+    HRESULT HandleSmartPunctuation(ITfContext* context, TfEditCookie editCookie, wchar_t character);
     // Starts the composition over the `count` characters before the caret.
     HRESULT StartCompositionBefore(ITfContext* context, TfEditCookie editCookie, std::size_t count);
     // Japanese mode: Shift+letter with nothing typed starts an English word

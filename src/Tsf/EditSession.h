@@ -46,6 +46,9 @@ struct KeyInput {
         // English: `character` finishes a symbol's spelling or a sum before
         // the caret ("->", "(c)", "1+2="), which becomes the composition.
         SpecialEnd,
+        // English with curly quotes on: `character` (" ' or -) typed with no
+        // word being typed, written as a curly quote or a dash.
+        SmartPunctuation,
     } type;
     wchar_t character{0};
     japanese::KeyCommand japaneseKey;

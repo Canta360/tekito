@@ -774,6 +774,7 @@ void TextService::ApplySettings() {
     userdata::ApplyJapaneseSettings(japanese_, userSettings_, &japaneseLearning_);
     const auto rows = static_cast<std::size_t>(userSettings_.candidateRows);
     state_.SetPageSizes(rows ? rows : 5, rows ? rows : 10);
+    state_.SetDoubleSpacePeriod(userSettings_.doubleSpacePeriod);
     japanesePage_ = userdata::JapanesePageSize(userSettings_);
 }
 
@@ -1309,6 +1310,13 @@ bool TextService::TranslateEnglishKey(WPARAM wParam, KeyInput& input) {
                                   buffer, static_cast<int>(std::size(buffer)), 0,
                                   GetKeyboardLayout(0));
     if (count == 1 && buffer[0] >= 0x20 && buffer[0] != 0x7f) {
+        // "--" becomes a dash; a hyphen inside a word still ends it as typed.
+        if (userSettings_.smartPunctuation && buffer[0] == L'-' &&
+            !(state_.IsActive() && state_.State() == CompositionState::Composing)) {
+            input.type = KeyInput::Type::SmartPunctuation;
+            input.character = buffer[0];
+            return true;
+        }
         // Not in an English word typed inside Japanese, which ends on its own keys.
         if (mode_ != InputMode::Japanese && SpecialConversions::Installed().MayEndEnglish(buffer[0], SpecialOptions())) {
             input.type = KeyInput::Type::SpecialEnd;
@@ -1322,6 +1330,20 @@ bool TextService::TranslateEnglishKey(WPARAM wParam, KeyInput& input) {
 }
 
 bool TextService::TranslateEnglishCharacter(wchar_t character, KeyInput& input) const {
+    if (userSettings_.smartPunctuation && (character == L'"' || character == L'\'')) {
+        const bool inWord = state_.IsActive() && state_.State() == CompositionState::Composing;
+        if (inWord && character == L'"') {
+            input.type = KeyInput::Type::Punctuation;
+            input.character = L'\u201D';
+            input.punctuationRole = PunctuationRole::ClauseSeparator;
+            return true;
+        }
+        if (!inWord) {
+            input.type = KeyInput::Type::SmartPunctuation;
+            input.character = character;
+            return true;
+        }
+    }
     PunctuationRole punctuationRole{};
     if (TryClassifyPunctuation(character, punctuationRole)) {
         if (!state_.IsActive()) return false;
@@ -1415,6 +1437,35 @@ HRESULT TextService::HandleSpecialEnd(ITfContext* context, TfEditCookie editCook
     state_.BeginOrUpdate(rawText_, std::move(candidates));
     ShowCandidates(context, editCookie);
     return S_OK;
+}
+
+HRESULT TextService::HandleSmartPunctuation(ITfContext* context, TfEditCookie editCookie, wchar_t character) {
+    // A word ended by Space stays as it is shown.
+    if (composition_) {
+        HRESULT hr = EndComposition(editCookie);
+        if (FAILED(hr)) return hr;
+    }
+    candidateWindow_.Hide();
+    state_.Reset();
+    rawText_.clear();
+
+    const auto preceding = ReadSelectionContext(context, editCookie);
+    const wchar_t before = preceding.empty() ? L'\n' : preceding.back();
+    if (character == L'-') {
+        // "word--" and "word --": the second hyphen makes an em dash.
+        if (before == L'-' && preceding.size() >= 2 &&
+            (std::iswalnum(preceding[preceding.size() - 2]) || preceding[preceding.size() - 2] == L' ')) {
+            return ReplaceTrailingWhitespaceAtSelection(context, editCookie, 1, L"\u2014");
+        }
+        if (SpecialEnding(preceding, character)) return HandleSpecialEnd(context, editCookie, character);
+        return InsertAtSelection(context, editCookie, L"-");
+    }
+    // Opening after a space, a bracket, another opening quote or a dash;
+    // closing (and the apostrophe) after anything else.
+    const bool opening = std::iswspace(before) || std::wcschr(L"([{<\u201C\u2018\u2014\u2013-", before) != nullptr ||
+                         (before >= L'\u3000' && before != L'\u2019' && before != L'\u201D');
+    const wchar_t quote = character == L'"' ? (opening ? L'\u201C' : L'\u201D') : (opening ? L'\u2018' : L'\u2019');
+    return InsertAtSelection(context, editCookie, std::wstring(1, quote));
 }
 
 HRESULT TextService::StartCompositionBefore(ITfContext* context, TfEditCookie editCookie, std::size_t count) {
@@ -1553,6 +1604,9 @@ HRESULT TextService::HandleKeyInEditSessionCore(ITfContext* context, TfEditCooki
     }
 
     if (input.type == KeyInput::Type::SpecialEnd) return HandleSpecialEnd(context, editCookie, input.character);
+    if (input.type == KeyInput::Type::SmartPunctuation) {
+        return HandleSmartPunctuation(context, editCookie, input.character);
+    }
     // A spelling or sum: typing on keeps it as typed; Backspace takes its
     // last character and keeps the rest.
     if (symbolComposition_ && state_.State() == CompositionState::Composing) {
@@ -1905,8 +1959,12 @@ HRESULT TextService::EnsureComposition(ITfContext* context, TfEditCookie editCoo
 }
 
 HRESULT TextService::ReplaceComposition(ITfContext* context, TfEditCookie editCookie,
-                                        const std::wstring& text) {
+                                        const std::wstring& written) {
     if (!composition_) return E_UNEXPECTED;
+    std::wstring text = written;
+    if (userSettings_.smartPunctuation && (mode_ != InputMode::Japanese || englishSegment_)) {
+        std::replace(text.begin(), text.end(), L'\'', L'\u2019');
+    }
     ComPtr<ITfRange> range;
     HRESULT hr = composition_->GetRange(range.Put());
     if (FAILED(hr)) {
@@ -2036,6 +2094,8 @@ void TextService::RefreshCandidates(ITfContext* context, TfEditCookie editCookie
     request.options.japanesePhoneticSuggestionsEnabled =
         userSettings_.japanesePhoneticSuggestionsEnabled;
     request.options.socialExpressionRange = userSettings_.socialExpressionRange;
+    request.options.nextWordPrediction = userSettings_.nextWordPrediction;
+    request.options.doubledWords = userSettings_.doubledWordCheck;
     request.options.special = SpecialOptions();
     {
         ScopedTraceDuration duration(L"Perf CandidateEngine");
