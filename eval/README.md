@@ -170,3 +170,24 @@ breaks a typist would mark taken from the acceptable text:
   inputs.
 - `register`: how often no candidate fits a phrase, whether shorter phrases
   make it, and what registering those words does to other sentences.
+
+## Slips in whole sentences
+
+`eval/typo-study.py` types sentences twice, right and with slips put into
+their keys (two per sentence by default), in Japanese, Mix and English Auto,
+and compares what comes out with what the same sentence typed right gives,
+so a word converted differently from an answer key does not count against
+slips. It reports sentences put right by Space alone, by one pick per
+chunk, without slip correction, the share recovered, how often text typed
+right was changed, and by where the slip is in its chunk.
+
+Japanese and Mix sentences come as kana chunks (`@word` for English), typed
+as romaji by `eval/ja/kana-to-keys.py`; English sentences as id, tab,
+sentence:
+
+```powershell
+python eval\ja\kana-to-keys.py ja.jsonl ja_keys.tsv ja
+python eval\typo-study.py --work out\typo --bin out\build\full\Release `
+    --ja-data $env:LOCALAPPDATA\TEKITO\data --en-data data `
+    --chunks ja japanese ja_keys.tsv --chunks mix mix mix_keys.tsv --english en en.txt
+```

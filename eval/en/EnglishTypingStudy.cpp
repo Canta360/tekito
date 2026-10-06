@@ -366,11 +366,50 @@ void PrintTop(const std::map<std::pair<std::wstring, std::wstring>, std::size_t>
 
 }  // namespace
 
+int RunTyped(const EnglishStudyOptions& options) {
+    tekito::UserDictionary dictionary;
+    auto engine = tekito::CreateDefaultConversionEngine(dictionary);
+    tekito::InputStateMachine state;
+    state.SetInputMode(tekito::InputMode::Convert);
+    std::ifstream stream(options.typed, std::ios::binary);
+    std::ofstream out(options.writeWords, std::ios::binary);
+    std::size_t sentences = 0;
+    for (std::string line; std::getline(stream, line);) {
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+        const auto tab = line.find('\t');
+        if (tab == std::string::npos) continue;
+        const std::string id = line.substr(0, tab);
+        std::wstring text = AsTyped(Widen(line.substr(tab + 1)));
+        // The words as typed; each is replaced by what Space left for it,
+        // so the next word sees the text as it now is.
+        const auto words = Words(text);
+        std::ptrdiff_t shift = 0;
+        for (std::size_t w = 0; w < words.size(); ++w) {
+            Word word = words[w];
+            word.begin = static_cast<std::size_t>(static_cast<std::ptrdiff_t>(word.begin) + shift);
+            const auto candidates = engine->Convert(RequestFor(text, word, word.text)).candidates;
+            const auto after = AfterSpace(state, word.text, candidates);
+            out << id << '\t' << w << '\t' << Narrow(word.text) << '\t' << Narrow(after) << '\t';
+            for (std::size_t c = 0; c < candidates.size() && c < 9; ++c) {
+                if (c) out << '\x1f';
+                out << Narrow(candidates[c].text);
+            }
+            out << '\n';
+            text.replace(word.begin, word.text.size(), after);
+            shift += static_cast<std::ptrdiff_t>(after.size()) - static_cast<std::ptrdiff_t>(word.text.size());
+        }
+        ++sentences;
+    }
+    std::cout << "typed sentences=" << sentences << "\n";
+    return 0;
+}
+
 int RunEnglishStudy(const EnglishStudyOptions& options) {
 #if defined(_WIN32)
     SetConsoleOutputCP(CP_UTF8);
 #endif
     tekito::PreloadDefaultEngineData();
+    if (!options.typed.empty()) return RunTyped(options);
     if (!options.probe.empty()) {
         // Each word of one sentence: what Space does and the first candidates.
         tekito::UserDictionary dictionary;

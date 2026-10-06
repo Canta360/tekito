@@ -31,6 +31,13 @@ struct EnglishStudyOptions {
     std::string probe;
     // Only the time per key, with each part of the engine turned off in turn.
     bool latency{false};
+    // Sentences as typed, maybe with slips: id, tab, sentence. Each word is
+    // typed and ended with Space, after what Space left for the words
+    // before it; written to `writeWords` as id, word number, typed word,
+    // what Space left and the first nine candidates (split by U+001F), to
+    // compare with the same sentences typed right (eval/typo-study.py).
+    std::filesystem::path typed;
+    std::filesystem::path writeWords;
 };
 
 int RunEnglishStudy(const EnglishStudyOptions& options);

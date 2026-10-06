@@ -194,6 +194,10 @@ int main(int argc, char** argv) {
             study.latency = true;
         } else if (arg == "--probe" && index + 1 < argc) {
             study.probe = argv[++index];
+        } else if (arg == "--typed" && index + 1 < argc) {
+            study.typed = argv[++index];
+        } else if (arg == "--write-words" && index + 1 < argc) {
+            study.writeWords = argv[++index];
         } else if (arg == "--show-examples" && index + 1 < argc) {
             study.showExamples = static_cast<std::size_t>(std::stoul(argv[++index]));
         } else {
@@ -202,7 +206,7 @@ int main(int argc, char** argv) {
         }
     }
 
-    if (corpusPath.empty() && study.sentences.empty() && study.probe.empty()) {
+    if (corpusPath.empty() && study.sentences.empty() && study.probe.empty() && study.typed.empty()) {
         usage();
         return 2;
     }
@@ -214,7 +218,7 @@ int main(int argc, char** argv) {
                   << dataPackRoot << "). Set it to the repository's data/ directory.\n";
         return 2;
     }
-    if (!study.sentences.empty() || !study.probe.empty()) {
+    if (!study.sentences.empty() || !study.probe.empty() || !study.typed.empty()) {
         study.corpus = corpusPath;
         return RunEnglishStudy(study);
     }

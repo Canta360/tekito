@@ -244,12 +244,48 @@ int RunKeys(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary
 // the composer in mixed typing (ChunkJudge): each chunk is converted with
 // Space and committed by the next. A chunk ending in "*" in the corpus is
 // English (the answer, not typed).
+//
+// --japanese-mode types the chunks in Japanese mode instead (no judging);
+// --no-slips leaves slips in the keys as typed; --write-chunks <path>
+// writes each chunk's committed text and what one pick from its list gives
+// (source, id, chunk, committed, choices split by U+001F), to compare text
+// typed with slips against the same text typed right
+// (eval/typo-study.py).
 struct ChunkOptions {
     std::filesystem::path englishScores;
     std::filesystem::path pack;
     tekito::japanese::ChunkJudge::Thresholds thresholds;
     std::size_t showChunks{0};
+    bool japaneseMode{false};
+    bool slips{true};
+    std::filesystem::path writeChunks;
 };
+
+// The text of the composition with one phrase's choice replaced, for each
+// of the first nine choices of each phrase (the list the second Space opens).
+std::vector<std::wstring> OnePickAway(tekito::japanese::JapaneseComposer& composer) {
+    std::vector<std::wstring> texts;
+    const std::size_t count = composer.Segments().size();
+    for (std::size_t f = 0; f < count; ++f) {
+        composer.MoveFocus(-static_cast<int>(count));
+        composer.MoveFocus(static_cast<int>(f));
+        composer.NextCandidate();
+        composer.PreviousCandidate();
+        const auto segments = composer.Segments();
+        const auto* candidates = composer.FocusedCandidates();
+        for (std::size_t j = 0; candidates && j < std::min<std::size_t>(9, candidates->size()); ++j) {
+            std::wstring text;
+            if (!(*candidates)[j].reading.empty()) {
+                text = (*candidates)[j].text;
+            } else {
+                for (std::size_t s = 0; s < segments.size(); ++s) text += s == f ? (*candidates)[j].text : segments[s].text;
+            }
+            texts.push_back(std::move(text));
+        }
+    }
+    composer.MoveFocus(-static_cast<int>(count));
+    return texts;
+}
 
 int RunChunks(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary, const JapaneseConverter& converter,
               const std::filesystem::path& corpus, const std::filesystem::path& romaji,
@@ -268,12 +304,15 @@ int RunChunks(const ConnectionMatrix& matrix, const JapaneseDictionary& dictiona
     const tekito::japanese::KeyConverter keyConverter(dictionary, matrix, converter, *table, costs);
     tekito::japanese::JapaneseComposer composer(table.get());
     composer.SetConverter(&converter);
-    composer.SetKeyConverter(&keyConverter);
+    if (options.slips) composer.SetKeyConverter(&keyConverter);
     if (names) composer.SetLoanwords(names);
-    const tekito::japanese::ChunkJudge judge(*table, converter, &keyConverter, english, names, options.thresholds);
+    const tekito::japanese::ChunkJudge judge(*table, converter, options.slips ? &keyConverter : nullptr, english, names,
+                                             options.thresholds);
     const auto parts = tekito::japanese::UserPartsOfSpeech::Load(options.pack / "pos.tsv");
     const auto noun = parts.For(tekito::japanese::UserWordKind::ProperNoun);
-    composer.SetMixedTyping(&judge, noun ? noun->right : 0);
+    if (!options.japaneseMode) composer.SetMixedTyping(&judge, noun ? noun->right : 0);
+    std::ofstream written;
+    if (!options.writeChunks.empty()) written.open(options.writeChunks, std::ios::binary);
 
     struct ChunkTotals {
         std::size_t rows{0}, exact{0}, errors{0}, characters{0};
@@ -291,7 +330,8 @@ int RunChunks(const ConnectionMatrix& matrix, const JapaneseDictionary& dictiona
         composer.SetSentenceStart(true);
         std::vector<std::pair<bool, bool>> judged;  // English meant, English said
         std::wistringstream words(row.reading);
-        for (std::wstring chunk; words >> chunk;) {
+        std::size_t chunkIndex = 0;
+        for (std::wstring chunk; words >> chunk; ++chunkIndex) {
             const bool meant = chunk.back() == L'*';
             if (meant) chunk.pop_back();
             // As the composer does: punctuation after the word is not judged.
@@ -313,7 +353,16 @@ int RunChunks(const ConnectionMatrix& matrix, const JapaneseDictionary& dictiona
             }
             for (const wchar_t key : chunk) composer.Insert(key);
             composer.Convert();
+            const auto choices = written.is_open() ? OnePickAway(composer) : std::vector<std::wstring>{};
             const auto committed = composer.Commit();
+            if (written.is_open()) {
+                written << row.source << '\t' << row.id << '\t' << chunkIndex << '\t' << Narrow(committed) << '\t';
+                for (std::size_t c = 0; c < choices.size(); ++c) {
+                    if (c) written << '\x1f';
+                    written << Narrow(choices[c]);
+                }
+                written << '\n';
+            }
             if (composer.TakeSpaceBefore() && !committed.empty() && output.ends_with(L' ')) output.pop_back();
             output += committed;
         }
@@ -403,6 +452,9 @@ int main(int argc, char** argv) {
         else if (arg == "--japanese-cost" && i + 1 < argc) chunks.thresholds.costPerKana = std::stoll(argv[++i]);
         else if (arg == "--known-name" && i + 1 < argc) chunks.thresholds.knownName = std::stod(argv[++i]);
         else if (arg == "--show-chunks" && i + 1 < argc) chunks.showChunks = std::stoul(argv[++i]);
+        else if (arg == "--japanese-mode") chunks.japaneseMode = true;
+        else if (arg == "--no-slips") chunks.slips = false;
+        else if (arg == "--write-chunks" && i + 1 < argc) chunks.writeChunks = argv[++i];
     }
     tekito::japanese::LanguageModel model;
     if (!modelPack.empty() && !model.Open(modelPack)) {
