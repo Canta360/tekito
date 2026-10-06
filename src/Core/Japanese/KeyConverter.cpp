@@ -117,6 +117,15 @@ std::optional<KeyConversion> KeyConverter::Convert(std::wstring_view keys, std::
         return costs_.typo * percent / 100;
     };
     const std::uint16_t unknown = dictionary_.UnknownId();
+    const auto KindPercent = [&](Slip::Kind kind) {
+        switch (kind) {
+            case Slip::Kind::Replaced: return costs_.replacedPercent;
+            case Slip::Kind::Dropped: return costs_.droppedPercent;
+            case Slip::Kind::Added: return costs_.addedPercent;
+            case Slip::Kind::Swapped: return costs_.swappedPercent;
+        }
+        return std::int64_t{100};
+    };
     // The first key typed twice, in keys long enough to be a phrase.
     const bool doubledFirst = n >= costs_.doubledFirstKeys && keys[0] == keys[1] &&
                               std::wstring_view(L"aiueon").find(keys[0]) == std::wstring_view::npos;
@@ -259,8 +268,12 @@ std::optional<KeyConversion> KeyConverter::Convert(std::wstring_view keys, std::
                     }
                     if (shortest == kNoKey) continue;
                     const bool firstTwice = doubledFirst && slip.kind == Slip::Kind::Added && fromKey + slip.at <= 1;
-                    const std::int64_t slipCost =
-                        firstTwice ? costs_.typo * costs_.doubledFirstPercent / 100 : SlipCost(bounds[start]);
+                    // An n left out stays dear: nn before a vowel reads two
+                    // ways (kakuninnonegai: 確認お願い, not 確認の願い).
+                    const bool droppedN = slip.kind == Slip::Kind::Dropped && slip.keys[slip.at] == L'n';
+                    const std::int64_t kindPercent = droppedN ? 100 : KindPercent(slip.kind);
+                    const std::int64_t slipCost = firstTwice ? costs_.typo * costs_.doubledFirstPercent / 100
+                                                             : SlipCost(bounds[start]) * kindPercent / 100;
                     addWords(bounds[start], kana, keyAfter, true, shortest, slipCost);
                     if (start != from) continue;
                     // Earlier starts: the units before, as typed.
@@ -272,7 +285,8 @@ std::optional<KeyConversion> KeyConverter::Convert(std::wstring_view keys, std::
                         for (std::size_t c = 1; c < unitKana.size(); ++c) front.push_back(kNoKey);
                         keyAfter.insert(keyAfter.begin(), front.begin(), front.end());
                         shortest += unitKana.size();
-                        addWords(bounds[earlier], kana, keyAfter, true, shortest, SlipCost(bounds[earlier]));
+                        addWords(bounds[earlier], kana, keyAfter, true, shortest,
+                                 SlipCost(bounds[earlier]) * kindPercent / 100);
                     }
                 }
             }

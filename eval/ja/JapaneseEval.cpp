@@ -455,6 +455,10 @@ int main(int argc, char** argv) {
         else if (arg == "--typo" && i + 1 < argc) costs.typo = std::stoll(argv[++i]);
         else if (arg == "--typo-early" && i + 1 < argc) costs.earlyPercent = std::stoll(argv[++i]);
         else if (arg == "--typo-late" && i + 1 < argc) costs.latePercent = std::stoll(argv[++i]);
+        else if (arg == "--typo-replaced" && i + 1 < argc) costs.replacedPercent = std::stoll(argv[++i]);
+        else if (arg == "--typo-dropped" && i + 1 < argc) costs.droppedPercent = std::stoll(argv[++i]);
+        else if (arg == "--typo-added" && i + 1 < argc) costs.addedPercent = std::stoll(argv[++i]);
+        else if (arg == "--typo-swapped" && i + 1 < argc) costs.swappedPercent = std::stoll(argv[++i]);
         else if (arg == "--dump-phrases" && i + 1 < argc) dumpPhrases = argv[++i];
         else if (arg == "--by-phrase") byPhrase = true;
         else if (arg == "--lm" && i + 1 < argc) modelPack = argv[++i];

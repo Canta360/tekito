@@ -49,6 +49,15 @@ public:
         // put into text being edited).
         std::int64_t doubledFirstPercent{20};
         std::size_t doubledFirstKeys{6};
+        // Each kind of slip, in percent of the cost above: a neighboring
+        // key, a key left out, a key typed twice or extra, two keys swapped
+        // (eval/typo-study.py: keys left out or swapped cheaper put more
+        // right and change no text typed right; a neighboring key cheaper
+        // converts text typed right worse).
+        std::int64_t replacedPercent{100};
+        std::int64_t droppedPercent{60};
+        std::int64_t addedPercent{100};
+        std::int64_t swappedPercent{60};
     };
 
     KeyConverter(const JapaneseDictionary& dictionary, const ConnectionMatrix& matrix,

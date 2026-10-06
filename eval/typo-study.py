@@ -123,6 +123,7 @@ def main() -> int:
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--limit", type=int, default=100)
     parser.add_argument("--no-english-engine", action="store_true", help="Mix as before English Auto spelled it")
+    parser.add_argument("--ja-args", default="", help="more arguments for tekito_ja_eval (--typo-dropped 60)")
     args = parser.parse_args()
     args.work.mkdir(parents=True, exist_ok=True)
 
@@ -132,7 +133,7 @@ def main() -> int:
                    "--romaji", str(d / "japanese-romaji"), "--lm", str(d / "japanese-lm"),
                    "--english-scores", str(d / "frequency" / "word-scores.tsv"),
                    "--loanwords", str(d / "japanese-loanwords"), "--japanese-english", str(d / "japanese-english"),
-                   "--write-chunks", str(out)]
+                   "--write-chunks", str(out)] + args.ja_args.split()
         if mode == "japanese":
             command.append("--japanese-mode")
         if not slips:
