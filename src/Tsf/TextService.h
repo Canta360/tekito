@@ -192,6 +192,8 @@ private:
     // Mix: removes the space right before the composition (or the caret),
     // the one English was committed with, when it is there.
     void TakeBackSpaceBefore(ITfContext* context, TfEditCookie editCookie);
+    // The text before the composition, or before the caret without one.
+    std::wstring CommitContext(ITfContext* context, TfEditCookie editCookie) const;
     // Mix: the period on Enter after an English sentence.
     HRESULT PutEnglishPeriod(ITfContext* context, TfEditCookie editCookie);
     // Ctrl+Backspace right after a Japanese commit: the text back in the composition.

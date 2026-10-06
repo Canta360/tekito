@@ -54,6 +54,7 @@ const initialSettings = {
   japanesePredictionEnabled: true,
   japaneseLiveConversion: false,
   mixedTypingEnabled: false,
+  japaneseEnglishSpacing: false,
   japaneseIgnoreCapsLock: true,
   dateConversion: true,
   numberConversion: true,
@@ -625,6 +626,9 @@ function JapanesePage({ advanced, settings, setSetting }) {
             </Row>
             <Row title={j.digits.title} description={j.digits.description}>
               <Segmented label={j.digits.title} value={settings.japaneseDigitWidth} options={digits} onChange={(value) => setSetting("japaneseDigitWidth", value)} />
+            </Row>
+            <Row title={j.spacing.title} description={j.spacing.description}>
+              <Toggle label={j.spacing.title} checked={settings.japaneseEnglishSpacing} onChange={(value) => setSetting("japaneseEnglishSpacing", value)} />
             </Row>
             <Row title={j.letters.title} description={j.letters.description}>
               <Segmented label={j.letters.title} value={settings.japaneseLetterWidth} options={letters} onChange={(value) => setSetting("japaneseLetterWidth", value)} />

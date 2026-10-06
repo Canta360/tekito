@@ -43,6 +43,7 @@ function initialState() {
       keyboardType: 0,
       periodOnEnter: false,
       mixedTypingEnabled: false,
+      japaneseEnglishSpacing: false,
       nextWordPrediction: true,
       doubledWordCheck: true,
       doubleSpacePeriod: false,

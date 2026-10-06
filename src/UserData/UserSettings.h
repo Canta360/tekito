@@ -93,6 +93,9 @@ struct UserSettings {
     // in chunks, a Space after each, with no switching between them. On, it
     // comes right after Japanese when the switch key goes round.
     bool mixedTypingEnabled{false};
+    // A half-width space between Japanese and an English word when text is
+    // committed (今日は GitHub に push した).
+    bool japaneseEnglishSpacing{false};
     // Letters typed in Japanese as if Caps Lock were off.
     bool japaneseIgnoreCapsLock{true};
     // Special conversions, in English and Japanese (the special-conversions

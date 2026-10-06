@@ -2185,6 +2185,14 @@ HRESULT TextService::PutEnglishPeriod(ITfContext* context, TfEditCookie editCook
     return ReplaceTrailingWhitespaceAtSelection(context, editCookie, 1, L".");
 }
 
+std::wstring TextService::CommitContext(ITfContext* context, TfEditCookie editCookie) const {
+    if (!composition_) return ReadSelectionContext(context, editCookie);
+    std::wstring preceding;
+    std::wstring following;
+    ReadCompositionContext(composition_, editCookie, preceding, following);
+    return preceding;
+}
+
 void TextService::TakeBackSpaceBefore(ITfContext* context, TfEditCookie editCookie) {
     ComPtr<ITfRange> space;
     if (composition_) {

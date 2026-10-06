@@ -7,7 +7,7 @@
 //
 //   tekito_testbed.exe [--defaults] [--english] [--mixed] [--smart-punctuation]
 //                      [--double-space-period] [--period-on-enter]
-//                      [--no-next-words] [--no-doubled-words]
+//                      [--no-next-words] [--no-doubled-words] [--english-spacing]
 //
 // --defaults types with the default settings and no user words or learning.
 // --english starts in English (Auto) instead of Japanese, --mixed in Mix
@@ -144,6 +144,7 @@ void ApplyOverrides(Testbed& bed, std::wstring_view commandLine) {
     if (has(L"--period-on-enter")) settings.periodOnEnter = true;
     if (has(L"--no-next-words")) settings.nextWordPrediction = false;
     if (has(L"--no-doubled-words")) settings.doubledWordCheck = false;
+    if (has(L"--english-spacing")) settings.japaneseEnglishSpacing = true;
 }
 
 // The English half, as the text service sets it up (ApplySettings).
@@ -437,11 +438,15 @@ void Apply(Testbed& bed, const ja::KeyCommand& command) {
         bed.text.erase(bed.text.size() - outcome.uncommitted->size());
     }
     if (outcome.committed) {
-        // Mix: Japanese after English takes back the space after it.
-        if (bed.composer.TakeSpaceBefore() && !outcome.committed->empty() && bed.text.ends_with(L' ')) {
-            bed.text.pop_back();
+        // Mix: Japanese after English takes back the space after it, unless
+        // Settings spaces English from Japanese.
+        const bool takeSpace = bed.composer.TakeSpaceBefore();
+        if (bed.settings.japaneseEnglishSpacing && !outcome.committed->empty()) {
+            bed.text += ja::JapaneseComposer::SpacedEnglish(bed.text, *outcome.committed);
+        } else {
+            if (takeSpace && !outcome.committed->empty() && bed.text.ends_with(L' ')) bed.text.pop_back();
+            bed.text += *outcome.committed;
         }
-        bed.text += *outcome.committed;
     }
     bed.text += outcome.outside;
 }

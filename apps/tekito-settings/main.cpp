@@ -886,6 +886,8 @@ private:
         json += settings_.advancedSettings ? L"true" : L"false";
         json += L",\"japanesePredictionEnabled\":";
         json += settings_.japanesePredictionEnabled ? L"true" : L"false";
+        json += L",\"japaneseEnglishSpacing\":";
+        json += settings_.japaneseEnglishSpacing ? L"true" : L"false";
         json += L",\"mixedTypingEnabled\":";
         json += settings_.mixedTypingEnabled ? L"true" : L"false";
         json += L",\"japaneseLiveConversion\":";
@@ -1067,6 +1069,7 @@ private:
             else if (key == L"japanesePredictionEnabled") settings_.japanesePredictionEnabled = value;
             else if (key == L"japaneseLiveConversion") settings_.japaneseLiveConversion = value;
             else if (key == L"mixedTypingEnabled") settings_.mixedTypingEnabled = value;
+            else if (key == L"japaneseEnglishSpacing") settings_.japaneseEnglishSpacing = value;
             else if (key == L"japaneseIgnoreCapsLock") settings_.japaneseIgnoreCapsLock = value;
             else if (key == L"uiLanguage") settings_.uiLanguage = std::clamp(integerValue, 0, 2);
             else if (key == L"toggleKey") {

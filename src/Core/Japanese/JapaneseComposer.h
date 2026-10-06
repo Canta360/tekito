@@ -97,6 +97,12 @@ public:
     // Whether text ending in `before` has ended its sentence (nothing, a
     // line break, 。 . ! ? and their full-width forms).
     [[nodiscard]] static bool EndsSentence(std::wstring_view before) noexcept;
+    // `text` to commit after `before`, with a half-width space between
+    // Japanese (kana, kanji) and an English word (letters and digits with a
+    // letter: GitHub, iPhone15) on either side, inside it and at its ends
+    // against `before`: 今日は GitHub に push した. Not next to digits alone
+    // or punctuation; English sentences stay as they are.
+    [[nodiscard]] static std::wstring SpacedEnglish(std::wstring_view before, std::wstring_view text);
     // Mixed typing: an English sentence is open, its last word committed
     // with its space (for the period on Enter, as in English Auto).
     [[nodiscard]] bool EnglishSentenceOpen() const noexcept {

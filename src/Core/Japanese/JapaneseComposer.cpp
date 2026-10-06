@@ -1736,6 +1736,49 @@ void JapaneseComposer::RememberWords(std::wstring_view text) {
     }
 }
 
+namespace {
+
+bool IsJapaneseLetter(wchar_t c) {
+    return (c >= L'\x3041' && c <= L'\x30FA') || c == L'\x30FC' || (c >= L'\x3400' && c <= L'\x4DBF') ||
+           (c >= L'\x4E00' && c <= L'\x9FFF') || c == L'\x3005';
+}
+
+bool IsAsciiWordChar(wchar_t c) {
+    return (c >= L'a' && c <= L'z') || (c >= L'A' && c <= L'Z') || (c >= L'0' && c <= L'9');
+}
+
+}  // namespace
+
+std::wstring JapaneseComposer::SpacedEnglish(std::wstring_view before, std::wstring_view text) {
+    // The text with the character before it, to see the first boundary too.
+    std::wstring all;
+    if (!before.empty()) all.push_back(before.back());
+    const std::size_t offset = all.size();
+    all += text;
+    // Whether the run of letters and digits around `i` has a letter.
+    const auto wordHasLetter = [&](std::size_t i) {
+        std::size_t begin = i, end = i;
+        while (begin > 0 && IsAsciiWordChar(all[begin - 1])) --begin;
+        while (end < all.size() && IsAsciiWordChar(all[end])) ++end;
+        for (std::size_t k = begin; k < end; ++k) {
+            if ((all[k] >= L'a' && all[k] <= L'z') || (all[k] >= L'A' && all[k] <= L'Z')) return true;
+        }
+        return false;
+    };
+    std::wstring out;
+    for (std::size_t i = 0; i < all.size(); ++i) {
+        if (i > 0 && i >= offset) {
+            const wchar_t left = all[i - 1];
+            const wchar_t right = all[i];
+            const bool japaneseThenEnglish = IsJapaneseLetter(left) && IsAsciiWordChar(right) && wordHasLetter(i);
+            const bool englishThenJapanese = IsAsciiWordChar(left) && IsJapaneseLetter(right) && wordHasLetter(i - 1);
+            if (japaneseThenEnglish || englishThenJapanese) out.push_back(L' ');
+        }
+        if (i >= offset) out.push_back(all[i]);
+    }
+    return out;
+}
+
 bool JapaneseComposer::EndsSentence(std::wstring_view before) noexcept {
     std::size_t end = before.size();
     while (end > 0 && (before[end - 1] == L' ' || before[end - 1] == L'\x3000' || before[end - 1] == L'\t')) --end;

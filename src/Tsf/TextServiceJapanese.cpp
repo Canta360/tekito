@@ -610,10 +610,17 @@ HRESULT TextService::CommitJapanese(ITfContext* context, TfEditCookie editCookie
     return WriteJapaneseCommit(context, editCookie, japanese_.Commit());
 }
 
-HRESULT TextService::WriteJapaneseCommit(ITfContext* context, TfEditCookie editCookie, const std::wstring& text) {
+HRESULT TextService::WriteJapaneseCommit(ITfContext* context, TfEditCookie editCookie, const std::wstring& committed) {
+    std::wstring text = committed;
+    // Mix: Japanese after English takes back the space typed after it,
+    // unless Settings spaces English from Japanese.
+    const bool takeSpace = japanese_.TakeSpaceBefore();
+    if (userSettings_.japaneseEnglishSpacing && !text.empty()) {
+        text = japanese::JapaneseComposer::SpacedEnglish(CommitContext(context, editCookie), text);
+    } else if (takeSpace && !text.empty()) {
+        TakeBackSpaceBefore(context, editCookie);
+    }
     lastJapaneseCommit_ = text;
-    // Mix: Japanese after English takes back the space typed after it.
-    if (japanese_.TakeSpaceBefore() && !text.empty()) TakeBackSpaceBefore(context, editCookie);
     if (!composition_) {
         return text.empty() ? S_OK : InsertAtSelection(context, editCookie, text);
     }

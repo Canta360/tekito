@@ -818,6 +818,13 @@ void TestMixedTyping(const RomajiTable& table, const MiniPack& pack) {
     Type(composer, L"push");
     RequireText(composer.Commit(), L"push ", "Enter takes an English chunk as Space would");
 
+    using tekito::japanese::JapaneseComposer;
+    RequireText(JapaneseComposer::SpacedEnglish(L"", L"\u4ECA\u65E5\u306FGitHub\u306Bpush\u3057\u305F"),
+                L"\u4ECA\u65E5\u306F GitHub \u306B push \u3057\u305F", "spaces between Japanese and English");
+    RequireText(JapaneseComposer::SpacedEnglish(L"GitHub", L"\u306B"), L" \u306B", "and against the text before");
+    RequireText(JapaneseComposer::SpacedEnglish(L"", L"3\u6642\u3001iPhone15\u3092"), L"3\u6642\u3001iPhone15 \u3092",
+                "not by digits alone or punctuation");
+    RequireText(JapaneseComposer::SpacedEnglish(L"", L"I want to go"), L"I want to go", "English stays");
     composer.SetMixedTyping(nullptr);
     Type(composer, L"push");
     composer.Convert();
