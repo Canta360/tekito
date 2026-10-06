@@ -106,7 +106,12 @@ public:
     // before the caret; committing keeps it up to date.
     void SetSentenceStart(bool start) noexcept {
         sentenceStart_ = start;
-        if (start) japaneseInSentence_ = false;
+        // A new sentence: what came before is not its English or Japanese.
+        if (start) {
+            japaneseInSentence_ = false;
+            englishRun_ = 0;
+            englishText_.clear();
+        }
     }
     // Whether text ending in `before` has ended its sentence (nothing, a
     // line break, 。 . ! ? and their full-width forms).

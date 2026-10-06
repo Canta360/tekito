@@ -774,7 +774,7 @@ void TestMixedTyping(const RomajiTable& table, const MiniPack& pack) {
     struct WordScores final : tekito::IFrequencyProvider {
         double Score(std::wstring_view word) const noexcept override {
             for (const auto& [listed, score] : {std::pair<std::wstring_view, double>{L"github", 2.7},
-                                                {L"push", 4.2}, {L"to", 6.7}, {L"take", 5.1}}) {
+                                                {L"push", 4.2}, {L"to", 6.7}, {L"take", 5.1}, {L"is", 6.3}}) {
                 if (word == listed) return score;
             }
             return 0.0;
@@ -789,6 +789,10 @@ void TestMixedTyping(const RomajiTable& table, const MiniPack& pack) {
     Require(!judge.Judge(L"to", 1).english, "after one English part too (github ni)");
     Require(judge.Judge(L"to", 2).english, "in an English sentence, to is English");
     Require(!judge.Judge(L"kikai", 0).english, "romaji that is no English word is Japanese");
+    Require(judge.Judge(L"kikai", 2, false, nullptr, L"push is ").english,
+            "an English sentence with grammar in it goes on in English");
+    Require(!judge.Judge(L"kikai", 2, false, nullptr, L"github push ").english,
+            "English nouns and verbs alone do not make one");
     Require(!judge.Judge(L"pcwotukau", 0).english, "English run into Japanese after a particle is Japanese");
     const auto numbered = judge.Judge(L"github15", 0);
     Require(numbered.english && numbered.written == L"github15", "a number after a word keeps the word English");

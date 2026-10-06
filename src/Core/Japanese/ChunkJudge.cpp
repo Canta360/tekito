@@ -190,6 +190,27 @@ ChunkJudge::Judgement ChunkJudge::Judge(std::wstring_view keys, std::size_t engl
     const auto inJapanese = names_ ? names_->InJapaneseText(keys) : std::nullopt;
     const bool writtenInJapanese = !names_ || !names_->HasJapaneseTextCounts() ||
                                    (inJapanese && *inJapanese >= thresholds_.inJapaneseText);
+    // Two English chunks or more with English grammar in them (is, the, a)
+    // and no Japanese yet: the English sentence goes on in English (my name
+    // is tanaka), unless the keys read as natural Japanese of more than one
+    // word. English nouns and verbs alone (version up, npm install) are
+    // often Japanese's (した).
+    constexpr double kGrammarWord = 5.9;
+    bool grammar = false;
+    for (std::size_t at = 0; at < before.size() && !grammar;) {
+        std::size_t end = at;
+        while (end < before.size() && std::iswalpha(before[end])) ++end;
+        if (end > at) {
+            std::wstring word(before.substr(at, end - at));
+            for (auto& c : word) c = static_cast<wchar_t>(std::towlower(c));
+            grammar = english_.Score(word) >= kGrammarWord;
+        }
+        at = end + 1;
+    }
+    if (englishBefore >= kEnglishSentence && !japaneseInSentence && grammar && (japaneseOdd || japaneseWord)) {
+        judgement.english = true;
+        return judgement;
+    }
     // A common English word is English when its romaji is no Japanese
     // word (issue: いっすえ), or when Japanese text writes it in Latin
     // letters; take stays 竹.
