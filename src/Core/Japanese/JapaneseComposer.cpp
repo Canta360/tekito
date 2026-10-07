@@ -673,7 +673,43 @@ void JapaneseComposer::AddOtherWidth(std::vector<PhraseCandidate>& candidates) c
     const auto& first = candidates.front();
     std::wstring other = first.text;
     bool changed = false;
+    // Marks alone (！, ？？, ・) get their other width too, and Japanese
+    // punctuation the ASCII key it was typed with (・: /).
+    const auto japaneseMark = [](wchar_t ch) -> wchar_t {
+        switch (ch) {
+        case L'\x3001': return L',';
+        case L'\x3002': return L'.';
+        case L'\x30FB': return L'/';
+        case L'\x300C': return L'[';
+        case L'\x300D': return L']';
+        case L'\x30FC': return L'-';
+        case L'\x301C': return L'~';
+        default: return L'\0';
+        }
+    };
+    const auto isAlphanumeric = [](wchar_t ch) {
+        return (ch >= L'\xFF21' && ch <= L'\xFF3A') || (ch >= L'\xFF41' && ch <= L'\xFF5A') ||
+               (ch >= L'A' && ch <= L'Z') || (ch >= L'a' && ch <= L'z') ||
+               // Digits have number forms of their own.
+               (ch >= L'\xFF10' && ch <= L'\xFF19') || (ch >= L'0' && ch <= L'9');
+    };
+    const bool marksOnly = std::all_of(other.begin(), other.end(), [&](wchar_t ch) {
+        return !isAlphanumeric(ch) && ((ch >= L'\xFF01' && ch <= L'\xFF5E') || (ch >= L'!' && ch <= L'~') || japaneseMark(ch));
+    });
+    if (marksOnly) {
+        for (auto& ch : other) {
+            if (ch >= L'\xFF01' && ch <= L'\xFF5E') {
+                ch = static_cast<wchar_t>(ch - 0xFEE0);
+            } else if (const wchar_t ascii = japaneseMark(ch)) {
+                ch = ascii;
+            } else {
+                ch = static_cast<wchar_t>(ch + 0xFEE0);
+            }
+        }
+        changed = other != first.text;
+    }
     for (auto& ch : other) {
+        if (marksOnly) break;
         if ((ch >= L'\xFF21' && ch <= L'\xFF3A') || (ch >= L'\xFF41' && ch <= L'\xFF5A')) {
             ch = static_cast<wchar_t>(ch - 0xFEE0);
             changed = true;

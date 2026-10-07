@@ -1388,6 +1388,18 @@ void TestSpecialConversions(const RomajiTable& table, const MiniPack& pack) {
         Require(widths && widths->size() > 1 && widths->front().text == L"\xFF51" && (*widths)[1].text == L"q",
                 "full-width first when letters are full-width");
         symbols.Clear();
+        const auto has = [&](const std::wstring& text) {
+            const auto* list = symbols.FocusedCandidates();
+            return list && std::any_of(list->begin(), list->end(), [&](const auto& c) { return c.text == text; });
+        };
+        Type(symbols, L"!");
+        symbols.Convert();
+        Require(has(L"\xFF01") && has(L"!"), "a symbol alone converts to both widths");
+        symbols.Clear();
+        Type(symbols, L"/");
+        symbols.Convert();
+        Require(has(L"/"), "a Japanese mark alone converts to the key it was typed with");
+        symbols.Clear();
         RequireText(Committed(table, L"!?"), L"\xFF01\xFF1F", "full-width symbols by default");
     }
     {
