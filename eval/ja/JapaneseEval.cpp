@@ -7,6 +7,7 @@
 // tekito_ja_eval --pack <data/ja/japanese-core> --keys-corpus <japanese_eval_keys.tsv>
 //                --romaji <data/ja/japanese-romaji> [--typo N] [--dump-phrases <path>]
 //                [--write-sentences <path>]
+// tekito_ja_eval --pack <data/ja/japanese-core> --guess-readings <sentences.txt> <out.tsv>
 //                [--by-phrase [--no-context]]
 //                [--lm <data/ja/japanese-lm> [--lm-scale N] [--lm-penalty N] [--lm-threshold X] [--topic-scale N]]
 // tekito_ja_eval --pack <data/ja/japanese-core> --keys-corpus <keys.tsv> --romaji <data/ja/japanese-romaji>
@@ -567,7 +568,7 @@ int RunChunks(const ConnectionMatrix& matrix, const JapaneseDictionary& dictiona
 }  // namespace
 
 int main(int argc, char** argv) {
-    std::filesystem::path pack, corpus, keysCorpus, romaji, dumpPhrases, writeSentences;
+    std::filesystem::path pack, corpus, keysCorpus, romaji, dumpPhrases, writeSentences, guessReadings, guessReadingsOut;
     bool byPhrase = false;
     bool useContext = true;
     std::filesystem::path modelPack;
@@ -598,6 +599,10 @@ int main(int argc, char** argv) {
         else if (arg == "--typo-keep" && i + 1 < argc) costs.keepTypedBy = std::stoll(argv[++i]);
         else if (arg == "--dump-phrases" && i + 1 < argc) dumpPhrases = argv[++i];
         else if (arg == "--write-sentences" && i + 1 < argc) writeSentences = argv[++i];
+        else if (arg == "--guess-readings" && i + 2 < argc) {
+            guessReadings = argv[++i];
+            guessReadingsOut = argv[++i];
+        }
         else if (arg == "--by-phrase") byPhrase = true;
         else if (arg == "--lm" && i + 1 < argc) modelPack = argv[++i];
         else if (arg == "--lm-scale" && i + 1 < argc) weights.costPerNat = std::stoll(argv[++i]);
@@ -649,6 +654,32 @@ int main(int argc, char** argv) {
         if (!japaneseEnglishPack.empty()) (void)names.OpenEnglish(japaneseEnglishPack);
         return RunChunks(matrix, dictionary, converter, chunkCorpus, romaji, costs, showMisses, chunks,
                          names.IsOpen() ? &names : nullptr);
+    }
+    // --guess-readings IN OUT: each sentence of IN (one per line) with the
+    // reading the dictionary gives it, as a corpus (source, id, reading,
+    // text), for making whole-sentence lists to train a reranker on.
+    if (!pack.empty() && !guessReadings.empty()) {
+        JapaneseDictionary dictionary;
+        ConnectionMatrix matrix;
+        if (!dictionary.Open(pack / "dictionary.bin") || !matrix.Open(pack / "connection.bin")) {
+            std::cerr << "could not open the japanese-core pack at " << pack.string() << "\n";
+            return 1;
+        }
+        const JapaneseConverter converter(dictionary, matrix);
+        std::ifstream in(guessReadings, std::ios::binary);
+        std::ofstream out(guessReadingsOut, std::ios::binary);
+        std::string line;
+        std::size_t read = 0, written = 0;
+        while (std::getline(in, line)) {
+            if (!line.empty() && line.back() == '\r') line.pop_back();
+            ++read;
+            const auto guess = converter.ReadingOf(ja_eval::Widen(line));
+            if (!guess || guess->reading.empty()) continue;
+            out << "train\t" << read << "\t" << Narrow(guess->reading) << "\t" << line << "\n";
+            ++written;
+        }
+        std::cout << "read " << read << ", wrote " << written << "\n";
+        return 0;
     }
     if (!pack.empty() && !keysCorpus.empty()) {
 #if defined(_WIN32)
