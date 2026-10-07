@@ -379,6 +379,11 @@ std::vector<ChunkJudge::Judgement> ChunkJudge::JudgeSentence(const std::vector<s
                     otherJapanese = true;
                 }
             }
+            // With Japanese in the sentence, English around two letters does
+            // not make them English (server to database wo: と); around a
+            // word it does (node version up sitai).
+            constexpr std::size_t kParticleLength = 2;
+            if (otherJapanese && chunks[i].size() <= kParticleLength) around = std::min<std::size_t>(around, 1);
             auto again = Judge(chunks[i], around, otherJapanese, spelling, others);
             if (again.english != judged[i].english) changed = true;
             judged[i] = std::move(again);
