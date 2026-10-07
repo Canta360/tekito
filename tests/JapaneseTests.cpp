@@ -815,17 +815,17 @@ void TestMixedTyping(const RomajiTable& table, const MiniPack& pack) {
     composer.SetMixedTyping(&judge);
     Type(composer, L"push");
     composer.Convert();
-    RequireText(composer.Commit(), L"Push ", "English that starts a sentence gets a capital, and a space after");
+    RequireText(composer.Commit(), L"Push", "English that starts a sentence gets a capital, and no space after");
     composer.ForgetContext();
     composer.SetSentenceStart(false);
     Type(composer, L"Kikai");
     composer.Convert();
-    RequireText(composer.Commit(), L"Kikai ", "a capital typed in a chunk makes it English, as typed");
+    RequireText(composer.Commit(), L"Kikai", "a capital typed in a chunk makes it English, as typed");
     Type(composer, L"push.");
     composer.Convert();
-    RequireText(composer.Commit(), L"push. ", "punctuation after English stays English");
+    RequireText(composer.Commit(), L" push.", "punctuation after English stays English; English after English is spaced");
     Type(composer, L"push.");
-    RequireText(composer.Commit(), L"Push. ", "and so on Enter (a new sentence)");
+    RequireText(composer.Commit(), L" Push.", "and so on Enter (a new sentence)");
     composer.ForgetContext();
     composer.SetSentenceStart(true);
     Type(composer, L"push");
@@ -846,19 +846,17 @@ void TestMixedTyping(const RomajiTable& table, const MiniPack& pack) {
     Require(candidates && candidates->front().text == L"github" &&
                 candidates->front().kind == tekito::japanese::PhraseCandidate::Kind::English,
             "an English chunk converts to itself");
-    RequireText(composer.Commit(), L"github ", "and is committed so, with a space after it");
-    Require(!composer.TakeSpaceBefore(), "English keeps the space before it");
+    RequireText(composer.Commit(), L"github", "and is committed so");
     Type(composer, L"push");
     composer.Convert();
-    RequireText(composer.Commit(), L"push ", "English after English: the space is already there");
+    RequireText(composer.Commit(), L" push", "English after English takes a space before it");
     Type(composer, L"kikai");
     composer.Convert();
     const auto japanese = composer.Commit();
-    Require(!japanese.empty() && japanese.front() >= 0x3000 && composer.TakeSpaceBefore(),
-            "Japanese after English takes the space back");
-    Require(!composer.TakeSpaceBefore(), "asking clears it");
+    Require(!japanese.empty() && japanese.front() >= 0x3000 && !composer.TakeSpaceBefore(),
+            "Japanese after English takes none, and no space is left to take back");
     Type(composer, L"push");
-    RequireText(composer.Commit(), L"push ", "Enter takes an English chunk as Space would");
+    RequireText(composer.Commit(), L"push", "Enter takes an English chunk as Space would");
 
     using tekito::japanese::JapaneseComposer;
     RequireText(JapaneseComposer::SpacedEnglish(L"", L"\u4ECA\u65E5\u306FGitHub\u306Bpush\u3057\u305F"),

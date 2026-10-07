@@ -1643,10 +1643,29 @@ std::vector<std::wstring> JapaneseComposer::PhraseKeys() const {
 }
 
 std::wstring JapaneseComposer::Commit() {
-    if (!chunkJudge_ || settled_.empty()) return CommitChunk();
-    // Enter takes the chunk being typed as Space would, then the sentence.
-    if (Typing()) SettleChunk();
-    return CommitSentence();
+    if (!chunkJudge_) return CommitChunk();
+    std::wstring text;
+    if (settled_.empty()) {
+        text = CommitChunk();
+    } else {
+        // Enter takes the chunk being typed as Space would, then the sentence.
+        if (Typing()) SettleChunk();
+        text = CommitSentence();
+    }
+    // No space is left after the text (Hello, nice to meet you.); English
+    // committed next takes one before it, Japanese none.
+    const bool owed = spaceOwed_;
+    spaceOwed_ = false;
+    while (!text.empty() && text.back() == L' ') {
+        text.pop_back();
+        spaceOwed_ = true;
+    }
+    const wchar_t first = text.empty() ? L'\0' : text.front();
+    const bool english = (first >= L'a' && first <= L'z') || (first >= L'A' && first <= L'Z') ||
+                         (first >= L'0' && first <= L'9');
+    if (owed && english) text.insert(0, 1, L' ');
+    dropSpaceBefore_ = false;
+    return text;
 }
 
 void JapaneseComposer::SettleChunk() {

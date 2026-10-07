@@ -2253,7 +2253,9 @@ HRESULT TextService::PutEnglishPeriod(ITfContext* context, TfEditCookie editCook
     const auto preceding = ReadSelectionContext(context, editCookie);
     japanese_.ForgetContext();
     japanese_.SetSentenceStart(true);
-    if (!preceding.ends_with(L' ') || !NeedsTerminalPeriod(preceding)) return S_OK;
+    if (!NeedsTerminalPeriod(preceding)) return S_OK;
+    // Mix leaves no space after the sentence; a space typed after it goes.
+    if (!preceding.ends_with(L' ')) return InsertAtSelection(context, editCookie, L".");
     return ReplaceTrailingWhitespaceAtSelection(context, editCookie, 1, L".");
 }
 

@@ -225,6 +225,7 @@ public:
         englishText_.clear();
         spaceAfterEnglish_ = false;
         dropSpaceBefore_ = false;
+        spaceOwed_ = false;
     }
     // Mixed typing: whether the text just committed follows English whose
     // space it takes back (Helloは, not Hello は). The caller removes the
@@ -457,6 +458,9 @@ private:
     std::vector<SettledChunk> settled_;
     // English was committed just before the sentence, with its space after.
     bool spaceBeforeSentence_{false};
+    // Mixed typing: English was committed last; the next English committed
+    // takes a space before it (none is left after text on Enter).
+    bool spaceOwed_{false};
     // The chunk CommitChunk took last was English.
     bool lastChunkEnglish_{false};
     // The chunk being typed (not the settled ones).
