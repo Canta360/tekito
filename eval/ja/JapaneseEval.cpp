@@ -267,6 +267,9 @@ struct ChunkOptions {
     // Also judge each sentence as a whole (ChunkJudge::JudgeSentence) and
     // count the sentences it gets right.
     bool sentenceJudge{false};
+    // Mix as typed since it holds the sentence: each chunk converted with
+    // Space, the next typed on, the whole committed with Enter at the end.
+    bool hold{false};
     std::filesystem::path writeChunks;
 };
 
@@ -378,6 +381,7 @@ int RunChunks(const ConnectionMatrix& matrix, const JapaneseDictionary& dictiona
             }
             for (const wchar_t key : chunk) composer.Insert(key);
             composer.Convert();
+            if (options.hold) continue;
             const auto choices = written.is_open() ? OnePickAway(composer) : std::vector<std::wstring>{};
             const auto committed = composer.Commit();
             if (written.is_open()) {
@@ -396,6 +400,7 @@ int RunChunks(const ConnectionMatrix& matrix, const JapaneseDictionary& dictiona
                 englishText.clear();
             }
         }
+        if (options.hold) output = composer.Commit();
         // English last leaves its space after it.
         while (!output.empty() && output.back() == L' ') output.pop_back();
         const auto [distance, length] = ja_eval::Closest(output, row.expected);
@@ -522,6 +527,7 @@ int main(int argc, char** argv) {
         else if (arg == "--english-engine") chunks.englishEngine = true;
         else if (arg == "--no-run-together") chunks.runTogether = false;
         else if (arg == "--sentence-judge") chunks.sentenceJudge = true;
+        else if (arg == "--hold") chunks.hold = true;
         else if (arg == "--write-chunks" && i + 1 < argc) chunks.writeChunks = argv[++i];
     }
     tekito::japanese::LanguageModel model;
