@@ -6,6 +6,7 @@
 // tekito_ja_eval --pack <data/ja/japanese-core> --corpus <japanese_eval.tsv> [--show-misses N]
 // tekito_ja_eval --pack <data/ja/japanese-core> --keys-corpus <japanese_eval_keys.tsv>
 //                --romaji <data/ja/japanese-romaji> [--typo N] [--dump-phrases <path>]
+//                [--write-sentences <path>]
 //                [--by-phrase [--no-context]]
 //                [--lm <data/ja/japanese-lm> [--lm-scale N] [--lm-penalty N] [--lm-threshold X] [--topic-scale N]]
 // tekito_ja_eval --pack <data/ja/japanese-core> --keys-corpus <keys.tsv> --romaji <data/ja/japanese-romaji>
@@ -46,6 +47,8 @@
 #include <iomanip>
 #include <iostream>
 #include <map>
+#include <queue>
+#include <set>
 #include <sstream>
 #include <string>
 #include <string_view>
@@ -92,6 +95,42 @@ bool ReachableWithin(const std::vector<Phrase>& phrases, const std::vector<std::
     return false;
 }
 
+// The `count` likeliest whole sentences from each phrase's candidate list
+// (likeliest first), taking the sum of the ranks picked as how unlikely a
+// sentence is: the first conversion, then those one pick away, and so on.
+std::vector<std::wstring> SentencesByRank(const std::vector<std::vector<std::wstring>>& lists, std::size_t count) {
+    std::vector<std::wstring> sentences;
+    if (lists.empty() || std::any_of(lists.begin(), lists.end(), [](const auto& l) { return l.empty(); })) {
+        return sentences;
+    }
+    using Picks = std::vector<std::size_t>;
+    const auto rankSum = [](const Picks& picks) {
+        std::size_t sum = 0;
+        for (const std::size_t p : picks) sum += p;
+        return sum;
+    };
+    const auto later = [&](const Picks& a, const Picks& b) { return rankSum(a) > rankSum(b) || (rankSum(a) == rankSum(b) && a > b); };
+    std::priority_queue<Picks, std::vector<Picks>, decltype(later)> queue(later);
+    std::set<Picks> seen;
+    queue.push(Picks(lists.size(), 0));
+    seen.insert(queue.top());
+    std::set<std::wstring> written;
+    while (!queue.empty() && sentences.size() < count) {
+        const Picks picks = queue.top();
+        queue.pop();
+        std::wstring text;
+        for (std::size_t i = 0; i < lists.size(); ++i) text += lists[i][picks[i]];
+        if (written.insert(text).second) sentences.push_back(std::move(text));
+        for (std::size_t i = 0; i < lists.size(); ++i) {
+            if (picks[i] + 1 >= lists[i].size()) continue;
+            Picks next = picks;
+            ++next[i];
+            if (seen.insert(next).second) queue.push(std::move(next));
+        }
+    }
+    return sentences;
+}
+
 struct Totals {
     std::size_t rows{0};
     std::size_t exact{0};
@@ -104,7 +143,8 @@ struct Totals {
 int RunKeys(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary, const JapaneseConverter& converter,
             const std::filesystem::path& corpus, const std::filesystem::path& romaji,
             tekito::japanese::KeyConverter::Costs costs, std::size_t showMisses,
-            const std::filesystem::path& dumpPhrases, bool byPhrase, bool useContext,
+            const std::filesystem::path& dumpPhrases, const std::filesystem::path& writeSentences, bool byPhrase,
+            bool useContext,
             const tekito::japanese::Loanwords* loanwords) {
     const auto table = tekito::japanese::RomajiTable::Load(romaji);
     if (!table) {
@@ -117,8 +157,14 @@ int RunKeys(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary
     composer.SetKeyConverter(&keyConverter);
     if (loanwords) composer.SetLoanwords(loanwords);
 
+    // How many whole sentences are put together, and the counts reported.
+    constexpr std::size_t kSentences = 50;
+    constexpr std::size_t kTops[] = {1, 3, 5, 10, 20, 50};
+    std::ofstream sentencesOut;
+    if (!writeSentences.empty()) sentencesOut.open(writeSentences, std::ios::binary);
     struct KeyTotals {
         std::size_t rows{0}, exact{0}, inList{0}, errors{0}, characters{0};
+        std::size_t top[std::size(kTops)]{};
         std::vector<double> microseconds;
         std::vector<double> listMicroseconds;
     };
@@ -195,10 +241,51 @@ int RunKeys(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary
                 inList = std::find(row.expected.begin(), row.expected.end(), text) != row.expected.end();
             }
         }
+        // Whole sentences from the phrases' lists, likeliest first: where
+        // what was meant is among them (for choosing again with a model).
+        std::size_t sentenceRank = SIZE_MAX;
+        if (!byPhrase) {
+            std::vector<std::vector<std::wstring>> lists;
+            std::vector<std::wstring> wholes;
+            for (std::size_t f = 0; f < phraseCount; ++f) {
+                composer.MoveFocus(-static_cast<int>(phraseCount));
+                composer.MoveFocus(static_cast<int>(f));
+                composer.NextCandidate();
+                composer.PreviousCandidate();
+                const auto* candidates = composer.FocusedCandidates();
+                lists.emplace_back();
+                for (std::size_t j = 0; candidates && j < candidates->size() && lists.back().size() < 20; ++j) {
+                    // A whole-input candidate is a sentence of its own.
+                    if (!(*candidates)[j].reading.empty()) {
+                        wholes.push_back((*candidates)[j].text);
+                    } else if (std::find(lists.back().begin(), lists.back().end(), (*candidates)[j].text) ==
+                               lists.back().end()) {
+                        lists.back().push_back((*candidates)[j].text);
+                    }
+                }
+            }
+            auto sentences = SentencesByRank(lists, kSentences);
+            for (auto& whole : wholes) {
+                if (std::find(sentences.begin(), sentences.end(), whole) == sentences.end()) sentences.push_back(whole);
+            }
+            for (std::size_t s = 0; s < sentences.size() && sentenceRank == SIZE_MAX; ++s) {
+                if (std::find(row.expected.begin(), row.expected.end(), sentences[s]) != row.expected.end()) sentenceRank = s;
+            }
+            if (sentencesOut.is_open()) {
+                for (std::size_t s = 0; s < sentences.size(); ++s) {
+                    const bool meant = std::find(row.expected.begin(), row.expected.end(), sentences[s]) != row.expected.end();
+                    sentencesOut << row.source << "\t" << row.id << "\t" << s << "\t" << (meant ? 1 : 0) << "\t"
+                                 << Narrow(sentences[s]) << "\n";
+                }
+            }
+        }
         for (KeyTotals* t : {&totals[row.source], &totals["all"]}) {
             ++t->rows;
             if (distance == 0) ++t->exact;
             if (inList) ++t->inList;
+            for (std::size_t n = 0; n < std::size(kTops); ++n) {
+                if (sentenceRank < kTops[n]) ++t->top[n];
+            }
             t->listMicroseconds.push_back(listElapsed);
             t->errors += distance;
             t->characters += length;
@@ -229,7 +316,14 @@ int RunKeys(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary
     std::cout << std::fixed << std::setprecision(1);
     for (const auto& [source, t] : totals) {
         std::cout << source << ": rows=" << t.rows << " top1=" << 100.0 * t.exact / t.rows << "%"
-                  << " in_list=" << 100.0 * t.inList / t.rows << "%"
+                  << " in_list=" << 100.0 * t.inList / t.rows << "%";
+        if (!byPhrase) {
+            std::cout << " sentences";
+            for (std::size_t n = 0; n < std::size(kTops); ++n) {
+                std::cout << " top" << kTops[n] << "=" << 100.0 * t.top[n] / t.rows << "%";
+            }
+        }
+        std::cout
                   << " cer=" << (t.characters ? 100.0 * t.errors / t.characters : 0.0) << "%"
                   << " convert_us_p50=" << Percentile(t.microseconds, 0.5)
                   << " p95=" << Percentile(t.microseconds, 0.95)
@@ -473,7 +567,7 @@ int RunChunks(const ConnectionMatrix& matrix, const JapaneseDictionary& dictiona
 }  // namespace
 
 int main(int argc, char** argv) {
-    std::filesystem::path pack, corpus, keysCorpus, romaji, dumpPhrases;
+    std::filesystem::path pack, corpus, keysCorpus, romaji, dumpPhrases, writeSentences;
     bool byPhrase = false;
     bool useContext = true;
     std::filesystem::path modelPack;
@@ -503,6 +597,7 @@ int main(int argc, char** argv) {
         else if (arg == "--typo-vowels-only") costs.consonantsDropped = false;
         else if (arg == "--typo-keep" && i + 1 < argc) costs.keepTypedBy = std::stoll(argv[++i]);
         else if (arg == "--dump-phrases" && i + 1 < argc) dumpPhrases = argv[++i];
+        else if (arg == "--write-sentences" && i + 1 < argc) writeSentences = argv[++i];
         else if (arg == "--by-phrase") byPhrase = true;
         else if (arg == "--lm" && i + 1 < argc) modelPack = argv[++i];
         else if (arg == "--lm-scale" && i + 1 < argc) weights.costPerNat = std::stoll(argv[++i]);
@@ -575,7 +670,7 @@ int main(int argc, char** argv) {
         tekito::japanese::Loanwords loanwords;
         if (!loanwordPack.empty()) (void)loanwords.Open(loanwordPack);
         if (!japaneseEnglishPack.empty()) (void)loanwords.OpenEnglish(japaneseEnglishPack);
-        return RunKeys(matrix, dictionary, converter, keysCorpus, romaji, costs, showMisses, dumpPhrases, byPhrase,
+        return RunKeys(matrix, dictionary, converter, keysCorpus, romaji, costs, showMisses, dumpPhrases, writeSentences, byPhrase,
                        useContext, loanwords.IsOpen() ? &loanwords : nullptr);
     }
     if (pack.empty() || corpus.empty()) {
