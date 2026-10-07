@@ -449,7 +449,6 @@ private:
         std::wstring typed;     // the keys as typed (capitals, punctuation)
         std::wstring keys;      // lower case, without the punctuation after
         std::wstring english;   // as English
-        std::wstring englishAsIs;  // as English without the sentence's first capital
         std::wstring japanese;  // as Japanese
         bool isEnglish{false};
         bool marksOnly{false};  // punctuation of its own (a "." after English)
