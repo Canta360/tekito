@@ -830,6 +830,10 @@ void TestMixedTyping(const RomajiTable& table, const MiniPack& pack) {
     composer.SetSentenceStart(true);
     Type(composer, L"push");
     composer.Convert();
+    const auto converted = composer.Segments();
+    Require(converted.size() == 2 && converted.back().text == L" " &&
+                composer.CaretOffset() == converted.front().text.size() + 1,
+            "English converted with Space shows the space after it, the caret past it");
     Type(composer, L"kikai");
     const auto held = composer.Segments();
     Require(held.size() == 2 && held.front().settled && held.front().text == L"Push ",

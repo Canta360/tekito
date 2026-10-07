@@ -547,8 +547,13 @@ std::size_t JapaneseComposer::CaretOffset() const {
     // After the settled chunks of the sentence (Mix).
     std::size_t settled = 0;
     const auto segments = Segments();
+    if (IsConverted()) {
+        // At the end, after the space English is shown with (Mix).
+        std::size_t end = 0;
+        for (const auto& segment : segments) end += segment.text.size();
+        return end;
+    }
     if (!segments.empty() && segments.front().settled) settled = segments.front().text.size();
-    if (IsConverted()) return settled + Preedit().size();
     if (const auto letters = TypedLetters()) return settled + letters->size();
     return settled + ReadingOffset(caret_) + pending_.size();
 }
@@ -1637,13 +1642,19 @@ std::vector<PreeditSegment> JapaneseComposer::Segments() const {
     }
     if (const auto* whole = WholeChoice()) {
         segments.push_back({whole->text, true, true});
-        return segments;
-    }
-    for (std::size_t i = 0; i < phrases_.size(); ++i) {
-        segments.push_back({PhraseText(phrases_[i]), true, !preview_ && i == focus_});
+    } else {
+        for (std::size_t i = 0; i < phrases_.size(); ++i) {
+            segments.push_back({PhraseText(phrases_[i]), true, !preview_ && i == focus_});
+        }
     }
     // Live: the keys still pending follow, as typed.
     if (preview_ && !pending_.empty()) segments.push_back({PendingText(), false, false});
+    // Mix: English converted with Space shows the space it will be followed
+    // by, so what is typed next is seen as a word of its own.
+    if (chunkJudge_ && ChoseEnglish()) {
+        const auto& last = segments.back().text;
+        if (!last.empty() && last.back() < 0x3000 && last.back() != L' ') segments.push_back({L" ", false, false});
+    }
     return segments;
 }
 
