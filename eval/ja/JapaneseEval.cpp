@@ -725,6 +725,8 @@ int main(int argc, char** argv) {
         return 1;
     }
 
+    std::ofstream readingSentences;
+    if (!writeSentences.empty()) readingSentences.open(writeSentences, std::ios::binary);
     std::map<std::string, Totals> totals;
     std::size_t shown = 0;
     for (const auto& row : rows) {
@@ -742,6 +744,25 @@ int main(int argc, char** argv) {
             if (d < distance) {
                 distance = d;
                 length = expected.size();
+            }
+        }
+        if (readingSentences.is_open()) {
+            // Whole sentences from the phrases' lists, as with --keys-corpus.
+            std::vector<std::vector<std::wstring>> lists;
+            for (const auto& phrase : phrases) {
+                lists.emplace_back();
+                for (const auto& candidate : phrase.candidates) {
+                    if (lists.back().size() == 20) break;
+                    if (std::find(lists.back().begin(), lists.back().end(), candidate.text) == lists.back().end()) {
+                        lists.back().push_back(candidate.text);
+                    }
+                }
+            }
+            const auto sentences = SentencesByRank(lists, 50);
+            for (std::size_t s = 0; s < sentences.size(); ++s) {
+                const bool meant = std::find(row.expected.begin(), row.expected.end(), sentences[s]) != row.expected.end();
+                readingSentences << row.source << "\t" << row.id << "\t" << s << "\t" << (meant ? 1 : 0) << "\t"
+                                 << Narrow(sentences[s]) << "\n";
             }
         }
         for (Totals* t : {&totals[row.source], &totals["all"]}) {
