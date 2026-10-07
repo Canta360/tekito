@@ -1663,9 +1663,12 @@ void JapaneseComposer::SettleChunk() {
     const std::wstring marks = MarksAfterEnglish(std::wstring_view(keys).substr(word));
     if (word > 0) {
         const auto judged = chunkJudge_->Judge(chunk.keys, englishRun_, japaneseInSentence_, englishSpelling_, englishText_);
-        chunk.english = EnglishAsWritten(TypedWithCapitals(chunk.keys).value_or(judged.written)) + marks;
+        const std::wstring written = TypedWithCapitals(chunk.keys).value_or(judged.written);
+        chunk.english = EnglishAsWritten(written) + marks;
+        chunk.englishAsIs = written + marks;
     } else {
         chunk.english = marks;
+        chunk.englishAsIs = marks;
     }
     if (converter_ && word > 0) {
         for (const auto& phrase : ConvertReading(ApplyTypingStyle(Reading()), 0, context_, contextWords_)) {
@@ -1679,19 +1682,25 @@ void JapaneseComposer::SettleChunk() {
     chunk.isEnglish = lastChunkEnglish_;
     lastChunkEnglish_ = false;
     // As it was taken (a candidate picked stays).
+    if (chunk.isEnglish && text != chunk.english) chunk.englishAsIs = text;
     (chunk.isEnglish ? chunk.english : chunk.japanese) = text;
     lastCommit_.reset();
     settled_.push_back(std::move(chunk));
 }
 
 std::wstring JapaneseComposer::SettledText() const {
+    // A sentence with Japanese in it writes English as it is: no capital
+    // for starting the sentence (pushしました, but I and GitHub).
+    const bool japanese = std::any_of(settled_.begin(), settled_.end(),
+                                      [](const SettledChunk& c) { return !c.marksOnly && !c.isEnglish; }) ||
+                          (IsConverted() && !ChoseEnglish());
     std::wstring text;
     bool englishBefore = false;
     for (const auto& chunk : settled_) {
         const bool english = chunk.marksOnly ? englishBefore : chunk.isEnglish;
         // English words apart; punctuation and Japanese against what is before.
         if (!text.empty() && englishBefore && english && !chunk.marksOnly) text.push_back(L' ');
-        text += english ? chunk.english : chunk.japanese;
+        text += !english ? chunk.japanese : japanese && !chunk.englishAsIs.empty() ? chunk.englishAsIs : chunk.english;
         englishBefore = english;
     }
     return text;
