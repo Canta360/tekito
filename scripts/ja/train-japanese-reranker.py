@@ -66,7 +66,13 @@ def prepare(args) -> None:
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     excluded = read_excluded(args.exclude)
-    sentences = [s for s in read_sentences(Path(args.leipzig)) if s not in excluded]
+    if args.text_tsv:
+        # Lines of context, a tab, and text (the context may be empty): the
+        # tab is a character of its own, so text is scored after its context.
+        with open(args.text_tsv, encoding="utf-8") as f:
+            sentences = [line.rstrip("\n") for line in f if line.rstrip("\n").split("\t")[-1] not in excluded]
+    else:
+        sentences = [s for s in read_sentences(Path(args.leipzig)) if s not in excluded]
     sentences = list(dict.fromkeys(sentences))
     random.Random(1).shuffle(sentences)
     counts = collections.Counter(ch for s in sentences for ch in s)
@@ -84,6 +90,11 @@ def load_vocab(out: Path) -> dict[str, int]:
 
 def encode(text: str, vocab: dict[str, int]) -> list[int]:
     return [vocab.get(ch, UNK) for ch in text]
+
+
+def scored_text(text: str, vocab: dict[str, int], context: str = "") -> str:
+    """A model trained with contexts reads text after its context and a tab."""
+    return context + "\t" + text if "\t" in vocab else text
 
 
 def make_model(vocab_size: int, embed: int, hidden: int):
@@ -177,21 +188,33 @@ def train(args) -> None:
     (out / "shape.txt").write_text(f"{len(vocab) + 2} {args.embed} {args.hidden}\n")
 
 
-def read_lists(path: str, top: int) -> list[list[tuple[int, bool, str]]]:
+def read_lists(path: str, top: int, contexts: dict[str, str] | None = None):
+    """Each reading's sentences as (rank, meant, text), with its context
+    (the text before it) when `contexts` has its id."""
     rows = collections.defaultdict(list)
     with open(path, encoding="utf-8") as f:
         for line in f:
             source, sid, rank, meant, text = line.rstrip("\n").split("\t")
             if int(rank) < top:
                 rows[(source, sid)].append((int(rank), meant == "1", text))
-    return list(rows.values())
+    contexts = contexts or {}
+    return [(contexts.get(sid, ""), group) for (_, sid), group in rows.items()]
 
 
-def sentence_scores(model, texts: list[str], vocab: dict[str, int]):
-    """Each text's score, the sum of its characters' self-normalized scores."""
+def read_contexts(path: str | None) -> dict[str, str]:
+    if not path:
+        return {}
+    with open(path, encoding="utf-8") as f:
+        return dict(line.rstrip("\n").partition("\t")[::2] for line in f)
+
+
+def sentence_scores(model, texts: list[str], vocab: dict[str, int], contexts: list[str] | None = None):
+    """Each text's score, the sum of its characters' self-normalized scores
+    (after its context; the context adds the same to every text of a list)."""
     import torch
 
-    seqs = [[BOS] + encode(t, vocab) + [BOS] for t in texts]
+    contexts = contexts or [""] * len(texts)
+    seqs = [[BOS] + encode(scored_text(t, vocab, c), vocab) + [BOS] for t, c in zip(texts, contexts)]
     width = max(map(len, seqs))
     ids = torch.full((len(seqs), width), -1, dtype=torch.long)
     for row, seq in enumerate(seqs):
@@ -216,23 +239,43 @@ def finetune(args) -> None:
     size, embed, hidden = map(int, (out / "shape.txt").read_text().split())
     model = make_model(size, embed, hidden)
     model.load_state_dict(torch.load(out / "model.pt"))
-    lists = [g for g in read_lists(args.sentences_tsv, args.top) if any(m for _, m, _ in g) and len(g) > 1]
+    lists = [(c, g) for c, g in read_lists(args.sentences_tsv, args.top, read_contexts(args.contexts))
+             if any(m for _, m, _ in g) and len(g) > 1]
     random.Random(1).shuffle(lists)
-    print(f"{len(lists)} lists with the meant sentence among the first {args.top}")
+    # Lists kept apart to see whether what is learned holds for new ones.
+    held, lists = lists[:5000], lists[5000:]
+    print(f"{len(lists)} lists with the meant sentence among the first {args.top}, {len(held)} held out")
+
+    def held_right() -> float:
+        right = 0
+        with torch.no_grad():
+            for b in range(0, len(held), 64):
+                batch = held[b : b + 64]
+                scores = sentence_scores(model, [t for _, g in batch for _, _, t in g], vocab,
+                                         [c for c, g in batch for _ in g])
+                at = 0
+                for _, g in batch:
+                    ranks = torch.tensor([math.log1p(r) for r, _, _ in g])
+                    final = scale * scores[at : at + len(g)] - rank_weight * ranks
+                    at += len(g)
+                    right += g[int(final.argmax())][1]
+        return 100 * right / len(held)
     # How much the model's score counts, and the rank (as log(1 + rank)).
     scale = torch.nn.Parameter(torch.tensor(0.3))
     rank_weight = torch.nn.Parameter(torch.tensor(2.0))
     optimizer = torch.optim.Adam([*model.parameters(), scale, rank_weight], lr=args.lr)
+    baseline = 100 * sum(any(m for r, m, _ in g if r == 0) for _, g in held) / len(held)
+    print(f"held out: first right {baseline:.1f}% by rank alone, {held_right():.1f}% with the model", flush=True)
     start = time.time()
     for epoch in range(args.epochs):
         right = total = 0
         for b in range(0, len(lists), args.batch):
             batch = lists[b : b + args.batch]
-            texts = [t for g in batch for _, _, t in g]
-            scores = sentence_scores(model, texts, vocab)
+            texts = [t for _, g in batch for _, _, t in g]
+            scores = sentence_scores(model, texts, vocab, [c for c, g in batch for _ in g])
             loss = 0.0
             at = 0
-            for g in batch:
+            for _, g in batch:
                 ranks = torch.tensor([math.log1p(r) for r, _, _ in g])
                 final = scale * scores[at : at + len(g)] - rank_weight * ranks
                 at += len(g)
@@ -244,8 +287,8 @@ def finetune(args) -> None:
             (loss / len(batch)).backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             optimizer.step()
-            if (b // args.batch) % 200 == 0:
-                print(f"epoch {epoch} lists {b}: first right {100 * right / max(total, 1):.1f}% "
+            if (b // args.batch) % 2000 == 0:
+                print(f"epoch {epoch} lists {b}: first right {100 * right / max(total, 1):.1f}%, held out {held_right():.1f}% "
                       f"scale {scale.item():.3f} rank {rank_weight.item():.3f} ({time.time() - start:.0f}s)", flush=True)
                 right = total = 0
     target = out / "finetuned"
@@ -274,7 +317,7 @@ def rerank(args) -> None:
                 rows[(source, sid)].append((int(rank), meant == "1", text))
 
     def scores(texts):
-        seqs = [[BOS] + encode(t, vocab) + [BOS] for t in texts]
+        seqs = [[BOS] + encode(scored_text(t, vocab), vocab) + [BOS] for t in texts]
         width = max(map(len, seqs))
         ids = torch.full((len(seqs), width), -1, dtype=torch.long)
         for row, seq in enumerate(seqs):
@@ -321,6 +364,7 @@ def main() -> int:
     p.add_argument("--out", required=True)
     p.add_argument("--exclude", action="append", default=[])
     p.add_argument("--leipzig", default=str(LEIPZIG))
+    p.add_argument("--text-tsv")
     t = sub.add_parser("train")
     t.add_argument("--out", required=True)
     t.add_argument("--sentences", type=int, default=0)
@@ -338,6 +382,7 @@ def main() -> int:
     f.add_argument("--out", required=True)
     f.add_argument("--sentences-tsv", required=True)
     f.add_argument("--top", type=int, default=10)
+    f.add_argument("--contexts")
     f.add_argument("--epochs", type=int, default=1)
     f.add_argument("--batch", type=int, default=16)
     f.add_argument("--lr", type=float, default=3e-4)
