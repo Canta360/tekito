@@ -462,6 +462,10 @@ private:
     bool lastChunkEnglish_{false};
     // The chunk being typed (not the settled ones).
     [[nodiscard]] bool Typing() const noexcept { return !units_.empty() || !pending_.empty(); }
+    // Mixed typing: the chunk being typed shown as its letters rather than
+    // kana, when the sentence so far is English or the keys make no kana
+    // (yourself: not ようrせlf); nothing otherwise.
+    [[nodiscard]] std::optional<std::wstring> TypedLetters() const;
     // Mixed typing: the chunk being typed joins the settled ones.
     void SettleChunk();
     // Mixed typing: the settled chunks as one text, and the whole sentence

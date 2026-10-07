@@ -549,6 +549,7 @@ std::size_t JapaneseComposer::CaretOffset() const {
     const auto segments = Segments();
     if (!segments.empty() && segments.front().settled) settled = segments.front().text.size();
     if (IsConverted()) return settled + Preedit().size();
+    if (const auto letters = TypedLetters()) return settled + letters->size();
     return settled + ReadingOffset(caret_) + pending_.size();
 }
 
@@ -1595,7 +1596,7 @@ std::vector<PreeditSegment> JapaneseComposer::Segments() const {
         segments.push_back({std::move(text), true, false, true});
     }
     if (!IsConverted()) {
-        if (Typing()) segments.push_back({RenderTyping(true), false, false});
+        if (Typing()) segments.push_back({TypedLetters().value_or(RenderTyping(true)), false, false});
         return segments;
     }
     if (const auto* whole = WholeChoice()) {
@@ -1686,6 +1687,22 @@ void JapaneseComposer::SettleChunk() {
     (chunk.isEnglish ? chunk.english : chunk.japanese) = text;
     lastCommit_.reset();
     settled_.push_back(std::move(chunk));
+}
+
+std::optional<std::wstring> JapaneseComposer::TypedLetters() const {
+    // Only with the caret at the end, where the letters and kana agree.
+    if (!chunkJudge_ || !Typing() || IsConverted() || caret_ != units_.size() || HasAscii()) return std::nullopt;
+    const bool englishSoFar = !settled_.empty() && std::none_of(settled_.begin(), settled_.end(), [](const SettledChunk& c) {
+                                  return !c.marksOnly && !c.isEnglish;
+                              });
+    // Letters no kana took, in either width.
+    const bool leftover = std::any_of(units_.begin(), units_.end(), [](const Unit& unit) {
+        return !unit.ascii && LeftoverLetters(ToFullWidthAscii(unit.kana)) > 0;
+    });
+    if (!englishSoFar && !leftover) return std::nullopt;
+    const std::wstring keys = Keys(true);
+    if (typedCaseKept_ && typedCase_.size() == keys.size()) return typedCase_;
+    return keys;
 }
 
 std::wstring JapaneseComposer::SettledText() const {
