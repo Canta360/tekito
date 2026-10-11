@@ -455,7 +455,11 @@ std::optional<std::wstring> CandidateGenerator::Recheck(std::wstring_view word, 
         for (wchar_t c = L'a'; c <= L'z'; ++c) near.push_back(lower.substr(0, i) + c + lower.substr(i));
     }
     std::optional<std::wstring> best;
-    double bestFit = typed + kBetterBy;
+    // A common word typed (bug, snow, ate) must fit even worse to be taken
+    // for another: those are what a correct sentence has (eval/en: 5 words
+    // typed right were changed, now 2; slips fixed 313 -> 310 of 400).
+    constexpr double kCommonBetterBy = 35.0;
+    double bestFit = typed + (typedFrequency >= kCommonWord ? kCommonBetterBy : kBetterBy);
     for (const auto& candidate : near) {
         const double frequency = frequencyProvider_.Score(candidate);
         if (candidate == lower || frequency < kCommonWord || frequency < typedFrequency + kCommonerBy) continue;
