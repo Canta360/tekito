@@ -491,6 +491,7 @@ HRESULT TextService::ReplaceJapaneseComposition(ITfContext* context, TfEditCooki
     for (const auto& segment : segments) text += segment.text;
     hr = range->SetText(editCookie, 0, text.c_str(), static_cast<LONG>(text.size()));
     if (FAILED(hr)) return hr;
+    compositionText_ = text;
 
     LONG offset = 0;
     for (const auto& segment : segments) {

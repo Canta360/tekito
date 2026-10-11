@@ -244,6 +244,14 @@ private:
                              const std::wstring& following);
     CapitalizationOrigin capitalizationOrigin_{CapitalizationOrigin::Unknown};
     bool sentenceStart_{false};
+    // What the composition shows now, and the end of what was typed here
+    // since focus or the caret last moved: some applications show TSF only
+    // the text since the last composition, so a sentence start is judged
+    // from this when nothing before the word can be read.
+    std::wstring compositionText_;
+    std::wstring typedTail_;
+    void NoteTyped(std::wstring_view text);
+    void NotePassedKey(WPARAM key);
     InputStateMachine state_;
     UserDictionary userDictionary_;
     UserLearningStore userLearning_;

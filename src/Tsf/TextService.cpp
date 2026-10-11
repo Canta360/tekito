@@ -92,18 +92,22 @@ std::wstring ReadRangeText(ITfRange* range, TfEditCookie editCookie) {
     return text;
 }
 
-void ReadCompositionContext(ITfComposition* composition, TfEditCookie editCookie,
+// Returns whether the text before the composition was read: nothing read
+// is the start of the document only when the range could not move back.
+bool ReadCompositionContext(ITfComposition* composition, TfEditCookie editCookie,
                             std::wstring& preceding, std::wstring& following) {
-    if (!composition) return;
+    if (!composition) return false;
     ComPtr<ITfRange> compositionRange;
-    if (FAILED(composition->GetRange(compositionRange.Put()))) return;
+    if (FAILED(composition->GetRange(compositionRange.Put()))) return false;
 
+    bool read = false;
     ComPtr<ITfRange> before;
     if (SUCCEEDED(compositionRange->Clone(before.Put())) &&
         SUCCEEDED(before->Collapse(editCookie, TF_ANCHOR_START))) {
         LONG moved = 0;
         if (SUCCEEDED(before->ShiftStart(editCookie, -128, &moved, nullptr))) {
             preceding = ReadRangeText(before.Get(), editCookie);
+            read = moved == 0 || !preceding.empty();
         }
     }
 
@@ -115,6 +119,7 @@ void ReadCompositionContext(ITfComposition* composition, TfEditCookie editCookie
             following = ReadRangeText(after.Get(), editCookie);
         }
     }
+    return read;
 }
 
 std::wstring ReadSelectionContext(ITfContext* context, TfEditCookie editCookie) {
@@ -1030,6 +1035,7 @@ HRESULT TextService::OnKeyDown(ITfContext* context, WPARAM wParam, LPARAM lParam
     }
     KeyInput input{};
     if (!TranslateKey(wParam, lParam, input) || !ResolveSpecialKey(context, input)) {
+        NotePassedKey(wParam);
         *eaten = FALSE;
         return S_OK;
     }
@@ -1037,6 +1043,7 @@ HRESULT TextService::OnKeyDown(ITfContext* context, WPARAM wParam, LPARAM lParam
     const bool passThrough = LetsKeyThrough(input);
     const HRESULT hr = RequestKeyEditSession(context, input);
     *eaten = hr == S_OK && !passThrough ? TRUE : FALSE;
+    if (!*eaten) NotePassedKey(wParam);
     if (*eaten) Trace(L"OnKeyDown edit session requested");
     return S_OK;
 }
@@ -1076,6 +1083,7 @@ HRESULT TextService::OnPopContext(ITfContext* context) {
 
 HRESULT TextService::OnSetFocus(ITfDocumentMgr* focus, ITfDocumentMgr*) {
     japanese_.ForgetCommit();
+    typedTail_.clear();
     // Light or dark taskbar: the mode icon follows when focus moves.
     if (modeLangBarItem_) modeLangBarItem_->RefreshTheme();
     ComPtr<ITfContext> top;
@@ -1151,6 +1159,8 @@ HRESULT TextService::OnCompositionTerminated(TfEditCookie, ITfComposition* compo
     if (composition_ == composition) {
         composition_->Release();
         composition_ = nullptr;
+        NoteTyped(compositionText_);
+        compositionText_.clear();
     }
     if (compositionContext_) {
         compositionContext_->Release();
@@ -1671,16 +1681,28 @@ HRESULT TextService::HandleKeyInEditSessionCore(ITfContext* context, TfEditCooki
             rawText_.clear();
         }
 
+        // The text before the word, read from the caret before the new
+        // composition starts: right after one ends, some applications show
+        // the new composition's range nothing before it.
+        const std::wstring atCaret = rawText_.empty() ? ReadSelectionContext(context, editCookie) : std::wstring{};
+
         HRESULT hr = EnsureComposition(context, editCookie);
         if (FAILED(hr)) return hr;
 
         auto character = input.character;
         if (rawText_.empty()) {
             Context conversionContext;
-            ReadCompositionContext(composition_, editCookie,
-                                   conversionContext.precedingText,
-                                   conversionContext.followingText);
-            sentenceStart_ = IsSentenceStart(conversionContext.precedingText);
+            const bool read = ReadCompositionContext(composition_, editCookie,
+                                                     conversionContext.precedingText,
+                                                     conversionContext.followingText);
+            // Nothing read before the word: what was typed here says what is
+            // before it, when anything was.
+            const std::wstring& before = !conversionContext.precedingText.empty() ? conversionContext.precedingText
+                                         : !atCaret.empty()                        ? atCaret
+                                                                                   : typedTail_;
+            // Text that could not be read is no sentence start: a capital
+            // put in mid-sentence is worse than one left out.
+            sentenceStart_ = (read || !before.empty()) && IsSentenceStart(before);
             capitalizationOrigin_ = CapitalizationOrigin::UserTyped;
             if (sentenceStart_ && std::iswlower(character)) {
                 character = static_cast<wchar_t>(std::towupper(character));
@@ -1980,6 +2002,7 @@ HRESULT TextService::ReplaceComposition(ITfContext* context, TfEditCookie editCo
         TraceHr(L"ReplaceComposition SetText failed", hr);
         return hr;
     }
+    compositionText_ = text;
 
     if (!text.empty()) {
         hr = ApplyDisplayAttribute(context, editCookie, range.Get());
@@ -2037,9 +2060,51 @@ HRESULT TextService::ApplyDisplayAttribute(ITfContext* context, TfEditCookie edi
     return property->SetValue(editCookie, range, &value);
 }
 
+void TextService::NoteTyped(std::wstring_view text) {
+    constexpr std::size_t kKept = 64;
+    typedTail_ += text;
+    if (typedTail_.size() > kKept) typedTail_.erase(0, typedTail_.size() - kKept);
+}
+
+void TextService::NotePassedKey(WPARAM key) {
+    switch (key) {
+    case VK_RETURN: NoteTyped(L"\n"); break;
+    case VK_SPACE: NoteTyped(L" "); break;
+    case VK_TAB: NoteTyped(L"\t"); break;
+    case VK_BACK:
+        if (!typedTail_.empty()) typedTail_.pop_back();
+        break;
+    case VK_SHIFT: case VK_LSHIFT: case VK_RSHIFT:
+    case VK_CONTROL: case VK_LCONTROL: case VK_RCONTROL:
+    case VK_MENU: case VK_LMENU: case VK_RMENU: case VK_CAPITAL:
+        break;
+    default: {
+        // A character typed as it is goes on the end; any other key may
+        // have moved the caret (arrows, Home, a shortcut), and what was
+        // typed no longer says what is before it.
+        BYTE keyboardState[256]{};
+        wchar_t buffer[4]{};
+        const bool command = (GetKeyState(VK_CONTROL) & 0x8000) || (GetKeyState(VK_MENU) & 0x8000);
+        // Flag 4: the keyboard state (dead keys) is left as it is.
+        const int count = !command && GetKeyboardState(keyboardState)
+                              ? ToUnicodeEx(static_cast<UINT>(key), MapVirtualKeyW(static_cast<UINT>(key), MAPVK_VK_TO_VSC),
+                                            keyboardState, buffer, 4, 4, GetKeyboardLayout(0))
+                              : 0;
+        if (count == 1 && buffer[0] >= 0x20) {
+            NoteTyped(std::wstring_view(buffer, 1));
+        } else {
+            typedTail_.clear();
+        }
+        break;
+    }
+    }
+}
+
 HRESULT TextService::EndComposition(TfEditCookie editCookie) {
     symbolComposition_ = false;
     if (!composition_) return S_OK;
+    NoteTyped(compositionText_);
+    compositionText_.clear();
     ITfComposition* composition = composition_;
     composition->AddRef();
     HRESULT hr = composition->EndComposition(editCookie);
