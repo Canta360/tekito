@@ -248,8 +248,9 @@ std::optional<std::vector<ChunkJudge::Piece>> ChunkJudge::Split(std::wstring_vie
     constexpr std::size_t kShortestWord = 4;
     constexpr std::size_t kMostWords = 24;
     constexpr std::size_t kLongestKeys = 80;
+    // Letters, and - for ー (to-suto).
     if (keys.size() < kShortestWord + 2 || keys.size() > kLongestKeys ||
-        !std::all_of(keys.begin(), keys.end(), [](wchar_t c) { return c >= L'a' && c <= L'z'; })) {
+        !std::all_of(keys.begin(), keys.end(), [](wchar_t c) { return (c >= L'a' && c <= L'z') || c == L'-'; })) {
         return std::nullopt;
     }
     const auto kanaOf = [&](std::wstring_view part) -> std::optional<std::wstring> {

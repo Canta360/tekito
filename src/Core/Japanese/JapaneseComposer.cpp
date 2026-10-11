@@ -957,23 +957,59 @@ std::optional<std::pair<std::wstring, std::wstring>> JapaneseComposer::BracketPa
 std::optional<std::wstring> JapaneseComposer::RunTogetherEnglish(bool* foreign) const {
     const ChunkJudge* splitter = chunkJudge_ ? chunkJudge_ : splitter_;
     if (!splitter || !converter_ || !table_) return std::nullopt;
-    const auto pieces = splitter->Split(Keys(false));
-    if (!pieces) return std::nullopt;
     if (foreign) *foreign = false;
+    const std::wstring keys = Keys(false);
+    const auto kanaOf = [&](std::wstring_view part) -> std::optional<std::wstring> {
+        std::wstring kana;
+        for (const auto& token : ParseRomaji(*table_, part)) {
+            if (token.leftover) return std::nullopt;
+            kana += token.kana;
+        }
+        return ApplyTypingStyle(kana);
+    };
+    // Each run of keys between punctuation on its own (a post's sentences
+    // and clauses: kyounolunchha..., ...).
     std::wstring text;
-    for (std::size_t i = 0; i < pieces->size(); ++i) {
-        const auto& piece = (*pieces)[i];
-        if (piece.english) {
-            if (foreign && ChunkJudge::ForeignLetters(piece.keys)) *foreign = true;
-            text += i == 0 ? EnglishAsWritten(piece.text) : piece.text;
-            continue;
+    bool split = false;
+    for (std::size_t start = 0; start < keys.size();) {
+        std::size_t end = keys.find_first_of(L".,!?", start);
+        if (end == std::wstring::npos) end = keys.size();
+        const std::uint16_t context = start == 0 ? context_ : 0;
+        if (end > start) {
+            const std::wstring_view part = std::wstring_view(keys).substr(start, end - start);
+            const auto pieces = splitter->Split(part);
+            if (pieces) {
+                split = true;
+            }
+            std::vector<ChunkJudge::Piece> whole;
+            if (!pieces) {
+                const auto kana = kanaOf(part);
+                if (!kana) return std::nullopt;
+                whole.push_back({false, std::wstring(part), *kana});
+            }
+            const auto& parts = pieces ? *pieces : whole;
+            for (std::size_t i = 0; i < parts.size(); ++i) {
+                const auto& piece = parts[i];
+                if (piece.english) {
+                    if (foreign && ChunkJudge::ForeignLetters(piece.keys)) *foreign = true;
+                    text += start == 0 && i == 0 ? EnglishAsWritten(piece.text) : piece.text;
+                    continue;
+                }
+                for (const auto& phrase : ConvertReading(ApplyTypingStyle(piece.text), 0, i == 0 ? context : 0,
+                                                         contextWords_)) {
+                    if (phrase.candidates.empty()) return std::nullopt;
+                    text += phrase.candidates.front().text;
+                }
+            }
         }
-        for (const auto& phrase : ConvertReading(ApplyTypingStyle(piece.text), 0, i == 0 ? context_ : 0,
-                                                 contextWords_)) {
-            if (phrase.candidates.empty()) return std::nullopt;
-            text += phrase.candidates.front().text;
+        if (end < keys.size()) {
+            const auto mark = kanaOf(std::wstring_view(keys).substr(end, 1));
+            if (!mark) return std::nullopt;
+            text += *mark;
         }
+        start = end + 1;
     }
+    if (!split) return std::nullopt;
     return text;
 }
 
