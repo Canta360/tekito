@@ -88,6 +88,10 @@ public:
         std::wstring text;
     };
     [[nodiscard]] std::optional<std::vector<Piece>> Split(std::wstring_view keys) const;
+    // Letters romaji typing hardly uses (l, q, x, v, c without h, and with
+    // `lastConsonant` a word ending in a consonant other than n): `word` is
+    // English, not kana.
+    [[nodiscard]] static bool ForeignLetters(std::wstring_view word, bool lastConsonant = true) noexcept;
 
     // A whole sentence typed in chunks (keys without the punctuation after
     // them), judged as a whole: first left to right as typed, then each

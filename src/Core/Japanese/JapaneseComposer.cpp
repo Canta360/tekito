@@ -880,10 +880,12 @@ void JapaneseComposer::BuildPhrases(bool convert) {
         }
     }
     if (chunk && !chunk->english && !phrases_.empty()) {
-        if (auto split = RunTogetherEnglish()) {
-            // Letters romaji cannot read (the l of mailwo) are the English
-            // word's own: the slip undone to read them as kana comes second.
-            const bool leftover = std::any_of(units_.begin(), units_.end(), [](const Unit& unit) {
+        bool foreign = false;
+        if (auto split = RunTogetherEnglish(&foreign)) {
+            // Letters romaji cannot read (the l of mailwo), or hardly uses
+            // (the g of bugwo, ぶぐぉ), are the English word's own: the slip
+            // undone to read them as kana comes second.
+            const bool leftover = foreign || std::any_of(units_.begin(), units_.end(), [](const Unit& unit) {
                 return !unit.ascii && LeftoverLetters(ToFullWidthAscii(unit.kana)) > 0;
             });
             PhraseCandidate whole{std::move(*split), 0, PhraseCandidate::Kind::Dictionary, false};
@@ -952,15 +954,17 @@ std::optional<std::pair<std::wstring, std::wstring>> JapaneseComposer::BracketPa
     return std::nullopt;
 }
 
-std::optional<std::wstring> JapaneseComposer::RunTogetherEnglish() const {
+std::optional<std::wstring> JapaneseComposer::RunTogetherEnglish(bool* foreign) const {
     const ChunkJudge* splitter = chunkJudge_ ? chunkJudge_ : splitter_;
     if (!splitter || !converter_ || !table_) return std::nullopt;
     const auto pieces = splitter->Split(Keys(false));
     if (!pieces) return std::nullopt;
+    if (foreign) *foreign = false;
     std::wstring text;
     for (std::size_t i = 0; i < pieces->size(); ++i) {
         const auto& piece = (*pieces)[i];
         if (piece.english) {
+            if (foreign && ChunkJudge::ForeignLetters(piece.keys)) *foreign = true;
             text += i == 0 ? EnglishAsWritten(piece.text) : piece.text;
             continue;
         }

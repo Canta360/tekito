@@ -363,7 +363,8 @@ private:
     // Mixed typing: Japanese keys run into an English word with no Space
     // (kyouhagoogle, korehagithub): the Japanese converted and the word,
     // when the keys leave letters romaji cannot read.
-    [[nodiscard]] std::optional<std::wstring> RunTogetherEnglish() const;
+    // `foreign`: an English word in it has letters romaji hardly uses.
+    [[nodiscard]] std::optional<std::wstring> RunTogetherEnglish(bool* foreign = nullptr) const;
     // Keys that leave letters romaji cannot read and spell an English word
     // (mix, which may come out みん): the word and its katakana, offered
     // right after the first candidate for the whole input.

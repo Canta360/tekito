@@ -231,6 +231,16 @@ ChunkJudge::Judgement ChunkJudge::Judge(std::wstring_view keys, std::size_t engl
     return judgement;
 }
 
+bool ChunkJudge::ForeignLetters(std::wstring_view word, bool lastConsonant) noexcept {
+    for (std::size_t i = 0; i < word.size(); ++i) {
+        const wchar_t c = word[i];
+        if (c == L'l' || c == L'q' || c == L'x' || c == L'v') return true;
+        if (c == L'c' && (i + 1 == word.size() || word[i + 1] != L'h')) return true;
+    }
+    if (!lastConsonant || word.empty()) return false;
+    return std::wstring_view(L"aeioun").find(word.back()) == std::wstring_view::npos;
+}
+
 std::optional<std::vector<ChunkJudge::Piece>> ChunkJudge::Split(std::wstring_view keys) const {
     // An English word costs this many kana of ordinary Japanese; shorter
     // than this many letters only names written with capitals (API).
@@ -282,7 +292,12 @@ std::optional<std::vector<ChunkJudge::Piece>> ChunkJudge::Split(std::wstring_vie
     for (std::size_t length = keys.size() - 1; length >= 3; --length) {
         for (std::size_t begin = 0; begin + length <= keys.size() && words.size() < kMostWords; ++begin) {
             const auto word = keys.substr(begin, length);
-            bool known = length >= kShortestWord && english_.Score(word) >= thresholds_.knownWord;
+            // Letters romaji hardly uses make a rarer word (docker, json)
+            // and a shorter one (bug) English enough.
+            constexpr double kForeignBy = 0.6;
+            const bool foreign = ForeignLetters(word, false);
+            bool known = (length >= kShortestWord && english_.Score(word) >= thresholds_.knownWord) ||
+                         (foreign && english_.Score(word) >= thresholds_.knownWord - kForeignBy);
             if (!known && names_) {
                 for (const auto& spelling : names_->ForEnglish(word, 1)) {
                     const bool capitals = std::any_of(spelling.english.begin() + 1, spelling.english.end(),
