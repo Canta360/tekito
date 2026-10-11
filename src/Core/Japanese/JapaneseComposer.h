@@ -181,6 +181,8 @@ public:
     // converts each chunk.
     [[nodiscard]] bool Live() const noexcept { return live_ && !chunkJudge_; }
     static constexpr std::size_t kOpenPhrases = 4;
+    // How many phrases live conversion keeps open (for measuring).
+    void SetLiveOpenPhrases(std::size_t count) noexcept { liveOpenPhrases_ = count; }
 
     // Text is held: the chunk being typed, or (Mix) the sentence's chunks
     // before it.
@@ -536,6 +538,7 @@ private:
     std::size_t focus_{0};
     bool listOpen_{false};
     bool live_{false};
+    std::size_t liveOpenPhrases_{kOpenPhrases};
     // phrases_ is the live conversion shown while typing.
     bool preview_{false};
     // Esc showed the kana: typing brings the live conversion back.

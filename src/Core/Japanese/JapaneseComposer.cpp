@@ -363,8 +363,8 @@ void JapaneseComposer::UpdateLive() {
         PhraseCandidate katakana{ToKatakana(rest), 0, PhraseCandidate::Kind::Katakana, false};
         phrases_.push_back({settledLength_, rest.size(), {hiragana, katakana}});
     }
-    if (phrases_.size() > settledPhrases_ + kOpenPhrases) {
-        settledPhrases_ = phrases_.size() - kOpenPhrases;
+    if (phrases_.size() > settledPhrases_ + liveOpenPhrases_) {
+        settledPhrases_ = phrases_.size() - liveOpenPhrases_;
         settledLength_ = phrases_[settledPhrases_ - 1].begin + phrases_[settledPhrases_ - 1].length;
     }
     preview_ = true;

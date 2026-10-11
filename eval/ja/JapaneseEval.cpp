@@ -182,6 +182,11 @@ int RunKeys(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary
     const char* liveSetting = std::getenv("TEKITO_EVAL_LIVE");
     const bool live = liveSetting && std::string_view(liveSetting) == "1";
     composer.SetLiveConversion(live);
+    // TEKITO_EVAL_LIVE_OPEN=N: phrases kept open (0: none settled).
+    if (const char* open = std::getenv("TEKITO_EVAL_LIVE_OPEN"); open && *open) {
+        const auto count = std::stoul(open);
+        composer.SetLiveOpenPhrases(count == 0 ? std::size_t{1} << 20 : count);
+    }
     for (const auto& row : LoadCorpus(corpus)) {
         composer.Clear();
         for (const wchar_t key : row.reading) composer.Insert(key);
