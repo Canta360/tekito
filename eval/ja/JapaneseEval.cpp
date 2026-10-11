@@ -132,6 +132,16 @@ std::vector<std::wstring> SentencesByRank(const std::vector<std::vector<std::wst
     return sentences;
 }
 
+// TEKITO_EVAL_OUTPUT=<path>: each row's text as committed (source, id, text),
+// in the layout the real-input benchmark writes, to be scored the same way.
+void WriteOutput(const std::string& source, const std::string& id, const std::wstring& text) {
+    static std::ofstream out = [] {
+        const char* path = std::getenv("TEKITO_EVAL_OUTPUT");
+        return path && *path ? std::ofstream(path, std::ios::binary) : std::ofstream();
+    }();
+    if (out.is_open()) out << source << "\t" << id << "\t" << Narrow(text) << "\n";
+}
+
 struct Totals {
     std::size_t rows{0};
     std::size_t exact{0};
@@ -212,6 +222,7 @@ int RunKeys(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary
                 composer.ForgetContext();
             }
         }
+        WriteOutput(row.source, row.id, output);
         std::size_t distance = SIZE_MAX, length = 0;
         for (const auto& expected : row.expected) {
             const std::size_t d = EditDistance(output, expected);
@@ -539,6 +550,7 @@ int RunChunks(const ConnectionMatrix& matrix, const JapaneseDictionary& dictiona
                 std::cout << (right ? "BETTER " : "WORSE  ") << Narrow(row.reading) << "\n";
             }
         }
+        WriteOutput(row.source, row.id, output);
         for (ChunkTotals* t : {&totals[row.source], &totals["all"]}) {
             ++t->rows;
             if (distance == 0) ++t->exact;
