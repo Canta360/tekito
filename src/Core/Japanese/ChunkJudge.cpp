@@ -345,6 +345,17 @@ std::optional<std::vector<ChunkJudge::Piece>> ChunkJudge::Split(std::wstring_vie
     // Better than the keys as Japanese by this many kana of it.
     constexpr std::int64_t kBetterByKana = 2;
     if (!best || (whole && *best + thresholds_.costPerKana * kBetterByKana >= *whole)) return std::nullopt;
+    // Nor than the keys read as Japanese with a slip undone, at a slip's
+    // cost (KeyConverter::Costs::typo): Japanese typed with a slip is not
+    // English (jinkennypuraibashi-wo is 人権のプライバシーを, not JinKenny).
+    constexpr std::int64_t kSlip = 6000;
+    if (slips_) {
+        if (const auto corrected = slips_->Convert(keys)) {
+            if (const auto cost = converter_.Cost(corrected->reading); cost && *best >= *cost + kSlip) {
+                return std::nullopt;
+            }
+        }
+    }
     std::vector<Piece> pieces;
     std::size_t at = 0;
     const auto japanese = [&](std::size_t begin, std::size_t end) {
