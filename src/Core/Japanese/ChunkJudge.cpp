@@ -237,7 +237,7 @@ std::optional<std::vector<ChunkJudge::Piece>> ChunkJudge::Split(std::wstring_vie
     constexpr std::int64_t kEnglishKana = 2;
     constexpr std::size_t kShortestWord = 4;
     constexpr std::size_t kMostWords = 24;
-    constexpr std::size_t kLongestKeys = 40;
+    constexpr std::size_t kLongestKeys = 80;
     if (keys.size() < kShortestWord + 2 || keys.size() > kLongestKeys ||
         !std::all_of(keys.begin(), keys.end(), [](wchar_t c) { return c >= L'a' && c <= L'z'; })) {
         return std::nullopt;
@@ -319,7 +319,11 @@ std::optional<std::vector<ChunkJudge::Piece>> ChunkJudge::Split(std::wstring_vie
     for (std::size_t a = 0; a < words.size(); ++a) {
         tryWords({words[a]});
         for (std::size_t b = 0; b < words.size(); ++b) {
-            if (words[b].begin >= words[a].end) tryWords({words[a], words[b]});
+            if (words[b].begin < words[a].end) continue;
+            tryWords({words[a], words[b]});
+            for (std::size_t c = 0; c < words.size(); ++c) {
+                if (words[c].begin >= words[b].end) tryWords({words[a], words[b], words[c]});
+            }
         }
     }
     // Better than the keys as Japanese by this many kana of it.
