@@ -1842,8 +1842,19 @@ void JapaneseComposer::JudgeWholeSentence(std::optional<ChunkJudge::Judgement>& 
 
 std::wstring JapaneseComposer::CommitChunk() {
     FlushAll();
-    // Live: the keys that were pending are converted too.
-    if (Live() && preview_) UpdateLive();
+    // Live: Enter converts the whole text again as Space does (slips undone,
+    // the whole input read at once), unless a candidate was picked while
+    // typing; then only the keys that were pending are converted too.
+    if (Live() && preview_) {
+        const bool picked = std::any_of(phrases_.begin(), phrases_.end(),
+                                        [](const PhraseState& phrase) { return phrase.selected != 0 || phrase.form; });
+        if (picked) {
+            UpdateLive();
+        } else {
+            ResetLive();
+            BuildPhrases(true);
+        }
+    }
     // A URL, address, path or mention is committed as typed on Enter too.
     if (Typing() && !IsConverted() && !HasAscii() && !chosenPrediction_ && IsProtectedSpan(Keys(false))) {
         BuildPhrases(true);
