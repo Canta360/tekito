@@ -861,6 +861,13 @@ void TestMixedTyping(const RomajiTable& table, const MiniPack& pack) {
             "Japanese after English takes none, and no space is left to take back");
     Type(composer, L"push");
     RequireText(composer.Commit(), L"push", "Enter takes an English chunk as Space would");
+    composer.ForgetContext();
+    Type(composer, L"kikai");
+    composer.Convert();
+    const auto withSpace = composer.Commit();
+    composer.ForgetContext();
+    Type(composer, L"kikai");
+    RequireText(composer.Commit(), withSpace, "and a Japanese one: converted, not left as kana");
 
     using tekito::japanese::JapaneseComposer;
     RequireText(JapaneseComposer::SpacedEnglish(L"", L"\u4ECA\u65E5\u306FGitHub\u306Bpush\u3057\u305F"),

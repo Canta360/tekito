@@ -1691,11 +1691,14 @@ std::vector<std::wstring> JapaneseComposer::PhraseKeys() const {
 
 std::wstring JapaneseComposer::Commit() {
     if (!chunkJudge_) return CommitChunk();
+    // Enter takes the chunk being typed as Space would: judged and
+    // converted (kyouhaamegafuttekita is 今日は雨が降ってきた, not kana).
+    if (Typing() && !IsConverted()) Convert();
     std::wstring text;
     if (settled_.empty()) {
         text = CommitChunk();
     } else {
-        // Enter takes the chunk being typed as Space would, then the sentence.
+        // Then the sentence.
         if (Typing()) SettleChunk();
         text = CommitSentence();
     }
