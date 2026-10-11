@@ -189,6 +189,9 @@ int RunKeys(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary
     }
     for (const auto& row : LoadCorpus(corpus)) {
         composer.Clear();
+        // Each row on its own: Enter (live) commits, which would lead the
+        // next row on from it.
+        if (live) composer.ForgetContext();
         for (const wchar_t key : row.reading) composer.Insert(key);
         const auto start = Clock::now();
         if (!live) composer.Convert();
