@@ -881,10 +881,16 @@ void JapaneseComposer::BuildPhrases(bool convert) {
     }
     if (chunk && !chunk->english && !phrases_.empty()) {
         if (auto split = RunTogetherEnglish()) {
+            // Letters romaji cannot read (the l of mailwo) are the English
+            // word's own: the slip undone to read them as kana comes second.
+            const bool leftover = std::any_of(units_.begin(), units_.end(), [](const Unit& unit) {
+                return !unit.ascii && LeftoverLetters(ToFullWidthAscii(unit.kana)) > 0;
+            });
             PhraseCandidate whole{std::move(*split), 0, PhraseCandidate::Kind::Dictionary, false};
             whole.reading = Reading();
             auto& candidates = phrases_.front().candidates;
-            candidates.insert(candidates.begin() + (slipUndone && !candidates.empty() ? 1 : 0), std::move(whole));
+            candidates.insert(candidates.begin() + (slipUndone && !leftover && !candidates.empty() ? 1 : 0),
+                              std::move(whole));
         }
     }
     // Japanese, but it reads as English too: the English for the whole
