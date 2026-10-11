@@ -177,13 +177,18 @@ int RunKeys(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary
     if (!dumpPhrases.empty()) phrases.open(dumpPhrases, std::ios::binary);
     // Keys files share the layout source, id, keys, expected...: LoadCorpus
     // reads keys where it reads readings.
+    // TEKITO_EVAL_LIVE=1: live conversion, the text shown taken with Enter
+    // (no Space); nothing is left to pick from afterwards.
+    const char* liveSetting = std::getenv("TEKITO_EVAL_LIVE");
+    const bool live = liveSetting && std::string_view(liveSetting) == "1";
+    composer.SetLiveConversion(live);
     for (const auto& row : LoadCorpus(corpus)) {
         composer.Clear();
         for (const wchar_t key : row.reading) composer.Insert(key);
         const auto start = Clock::now();
-        composer.Convert();
+        if (!live) composer.Convert();
         const double elapsed = std::chrono::duration<double, std::micro>(Clock::now() - start).count();
-        std::wstring output = composer.Preedit();
+        std::wstring output = live ? composer.Commit() : composer.Preedit();
         if (byPhrase) {
             const auto pieces = composer.PhraseKeys();
             if (std::none_of(pieces.begin(), pieces.end(), [](const std::wstring& p) { return p.empty(); })) {
