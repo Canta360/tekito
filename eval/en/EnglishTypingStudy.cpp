@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cstdlib>
 #include <cwctype>
 #include <fstream>
 #include <iomanip>
@@ -414,6 +415,17 @@ int RunTyped(const EnglishStudyOptions& options) {
                 }
             }
             done.push_back({word.begin, word.text, after, std::move(choices)});
+        }
+        // TEKITO_EVAL_OUTPUT: the sentence as it ends up (source, id, text),
+        // as the real-input benchmark writes it; an id "source:id" gives both.
+        static std::ofstream sentencesOut = [] {
+            const char* path = std::getenv("TEKITO_EVAL_OUTPUT");
+            return path && *path ? std::ofstream(path, std::ios::binary) : std::ofstream();
+        }();
+        if (sentencesOut.is_open()) {
+            const auto colon = id.find(':');
+            sentencesOut << (colon == std::string::npos ? std::string("en") : id.substr(0, colon)) << '\t'
+                         << (colon == std::string::npos ? id : id.substr(colon + 1)) << '\t' << Narrow(text) << '\n';
         }
         for (std::size_t w = 0; w < done.size(); ++w) {
             out << id << '\t' << w << '\t' << Narrow(done[w].typed) << '\t' << Narrow(done[w].after) << '\t';
