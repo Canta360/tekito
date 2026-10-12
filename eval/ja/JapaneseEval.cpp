@@ -37,6 +37,7 @@
 #include "Core/Japanese/LanguageModel.h"
 #include "Core/Japanese/Loanwords.h"
 #include "Core/Japanese/RomajiTable.h"
+#include "Core/Japanese/SentenceReranker.h"
 #include "JapaneseEvalCommon.h"
 #include "JapaneseTypingStudy.h"
 
@@ -156,7 +157,8 @@ int RunKeys(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary
             tekito::japanese::KeyConverter::Costs costs, std::size_t showMisses,
             const std::filesystem::path& dumpPhrases, const std::filesystem::path& writeSentences, bool byPhrase,
             bool useContext,
-            const tekito::japanese::Loanwords* loanwords) {
+            const tekito::japanese::Loanwords* loanwords,
+            const tekito::japanese::SentenceReranker* reranker) {
     const auto table = tekito::japanese::RomajiTable::Load(romaji);
     if (!table) {
         std::cerr << "could not open the romaji table\n";
@@ -167,6 +169,7 @@ int RunKeys(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary
     composer.SetConverter(&converter);
     composer.SetKeyConverter(&keyConverter);
     if (loanwords) composer.SetLoanwords(loanwords);
+    composer.SetSentenceReranker(reranker);
 
     // How many whole sentences are put together, and the counts reported.
     constexpr std::size_t kSentences = 50;
@@ -597,6 +600,7 @@ int main(int argc, char** argv) {
     bool byPhrase = false;
     bool useContext = true;
     std::filesystem::path modelPack;
+    std::filesystem::path rerankerPack;
     JapaneseConverter::ModelWeights weights;
     std::size_t showMisses = 0;
     TypingStudyOptions study;
@@ -630,6 +634,7 @@ int main(int argc, char** argv) {
         }
         else if (arg == "--by-phrase") byPhrase = true;
         else if (arg == "--lm" && i + 1 < argc) modelPack = argv[++i];
+        else if (arg == "--reranker" && i + 1 < argc) rerankerPack = argv[++i];
         else if (arg == "--lm-scale" && i + 1 < argc) weights.costPerNat = std::stoll(argv[++i]);
         else if (arg == "--lm-penalty" && i + 1 < argc) weights.penaltyPerNat = std::stoll(argv[++i]);
         else if (arg == "--lm-threshold" && i + 1 < argc) weights.threshold = std::stod(argv[++i]);
@@ -726,8 +731,13 @@ int main(int argc, char** argv) {
         tekito::japanese::Loanwords loanwords;
         if (!loanwordPack.empty()) (void)loanwords.Open(loanwordPack);
         if (!japaneseEnglishPack.empty()) (void)loanwords.OpenEnglish(japaneseEnglishPack);
+        tekito::japanese::SentenceReranker reranker;
+        if (!rerankerPack.empty() && !reranker.Open(rerankerPack)) {
+            std::cerr << "could not open the reranker at " << rerankerPack.string() << "\n";
+            return 1;
+        }
         return RunKeys(matrix, dictionary, converter, keysCorpus, romaji, costs, showMisses, dumpPhrases, writeSentences, byPhrase,
-                       useContext, loanwords.IsOpen() ? &loanwords : nullptr);
+                       useContext, loanwords.IsOpen() ? &loanwords : nullptr, reranker.IsOpen() ? &reranker : nullptr);
     }
     if (pack.empty() || corpus.empty()) {
         std::cerr << "usage: tekito_ja_eval --pack <dir> --corpus <japanese_eval.tsv> [--show-misses N]\n";
