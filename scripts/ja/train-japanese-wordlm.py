@@ -362,18 +362,30 @@ def rerank(args) -> None:
     model.eval()
     prior, scale = saved["prior"], saved["scale"]
     top = len(prior)
-    rows: dict[tuple[str, str], list[str]] = {}
+    # Each list starts at rank 0 (an id can come twice in a set).
+    rows: list[tuple[str, str, list[str]]] = []
     for line in open(args.lists, encoding="utf-8", errors="replace"):
         f = line.rstrip("\n").split("\t")
-        if len(f) >= 5 and int(f[2]) < top:
-            rows.setdefault((f[0], f[1]), []).append(f[4])
+        if len(f) < 5:
+            continue
+        if int(f[2]) == 0:
+            rows.append((f[0], f[1], []))
+        if int(f[2]) < top and rows:
+            rows[-1][2].append(f[4])
     with open(args.write, "w", encoding="utf-8", newline="\n") as w, torch.no_grad():
-        for (source, row_id), texts in rows.items():
+        for source, row_id, texts in rows:
             seqs = [[SEP] + t[:MAX_PIECES - 1] + [EOS] for t in sp.encode(texts)]
             x = pad(seqs, torch.device("cpu"))
             lengths = torch.as_tensor([len(s) for s in seqs])
             lp = model.sentence_logprob(x, torch.ones(len(seqs), dtype=torch.long), lengths)
-            best = int((scale * lp + prior[:len(seqs)]).argmax())
+            # Short text gives the model little to go on (names, rare words):
+            # it counts in full from --ramp-chars characters, and must beat
+            # the engine's first by --margin nats to replace it.
+            ramp = min(1.0, len(texts[0]) / args.ramp_chars) if args.ramp_chars > 0 else 1.0
+            scores = args.weight * ramp * scale * lp + prior[:len(seqs)]
+            best = int(scores.argmax())
+            if scores[best] - scores[0] <= args.margin:
+                best = 0
             w.write(f"{source}\t{row_id}\t{texts[best]}\n")
     print(f"{len(rows)} rows chosen again -> {args.write}")
 
@@ -413,6 +425,10 @@ def main() -> int:
     r.add_argument("--model")
     r.add_argument("--lists", required=True)
     r.add_argument("--write", required=True)
+    # Chosen on dev sets only (fresh, jsut, mozc_ajimee, ajimee, freshtypo, pub_mozc).
+    r.add_argument("--weight", type=float, default=1.0)
+    r.add_argument("--ramp-chars", type=float, default=10)
+    r.add_argument("--margin", type=float, default=0.5)
     args = parser.parse_args()
     {"prepare": prepare, "pretrain": pretrain, "finetune": finetune, "rerank": rerank}[args.step](args)
     return 0
