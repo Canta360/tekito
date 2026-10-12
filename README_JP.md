@@ -26,7 +26,7 @@ TEKITO は IME（TSF のテキストサービス）なので、普通の Windows
 
 > TEKITO はプレビュー版です。動作を確認しているのはメモ帳のみです。ほかのアプリの状況は[互換性メモ](docs/compatibility.md)にあります。
 
-## 3 つのモード
+## モード
 
 タスクバーのボタンが今のモードを表しています。クリックで切り替え、右クリックでモードを選べます。
 
@@ -34,7 +34,6 @@ TEKITO は IME（TSF のテキストサービス）なので、普通の Windows
   <tr>
     <td align="center"><img src="docs/images/mode-auto.png" width="48" alt=""></td>
     <td><b>Auto</b><br>英語のスペルを直し、打ちながら単語を提案します。</td>
-    <td><img src="docs/images/taskbar-auto.png" width="216" alt="Auto のときのタスクバー"></td>
   </tr>
   <tr>
     <td align="center">
@@ -44,7 +43,6 @@ TEKITO は IME（TSF のテキストサービス）なので、普通の Windows
       </picture>
     </td>
     <td><b>Direct</b><br>押したキーがそのまま入ります。</td>
-    <td><img src="docs/images/taskbar-direct.png" width="216" alt="Direct のときのタスクバー"></td>
   </tr>
   <tr>
     <td width="72" align="center">
@@ -54,7 +52,10 @@ TEKITO は IME（TSF のテキストサービス）なので、普通の Windows
       </picture>
     </td>
     <td><b>日本語</b><br>ローマ字をかなと漢字にします。</td>
-    <td><img src="docs/images/taskbar-japanese.png" width="216" alt="日本語のときのタスクバー"></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/images/mode-mixed.png" width="48" alt=""></td>
+    <td><b>まぜ打ち</b><br>日本語と英語を切り替えずに、Space で区切りながら打てます。設定の「日本語入力」でオンにすると使えます。</td>
   </tr>
 </table>
 

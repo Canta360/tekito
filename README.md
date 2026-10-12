@@ -30,7 +30,7 @@ kana and kanji. Everything runs on your PC.
 > TEKITO is a preview. It has been tested in Notepad; other apps are listed in
 > [the compatibility notes](docs/compatibility.md).
 
-## Three modes
+## Modes
 
 The button in the taskbar shows the mode. Click it to switch, or right-click
 to pick one.
@@ -39,7 +39,6 @@ to pick one.
   <tr>
     <td align="center"><img src="docs/images/mode-auto.png" width="48" alt=""></td>
     <td><b>Auto</b><br>Corrects English spelling and suggests words as you type.</td>
-    <td><img src="docs/images/taskbar-auto.png" width="216" alt="The taskbar with TEKITO in Auto"></td>
   </tr>
   <tr>
     <td align="center">
@@ -49,7 +48,6 @@ to pick one.
       </picture>
     </td>
     <td><b>Direct</b><br>Types exactly the keys you press.</td>
-    <td><img src="docs/images/taskbar-direct.png" width="216" alt="The taskbar with TEKITO in Direct"></td>
   </tr>
   <tr>
     <td width="72" align="center">
@@ -59,7 +57,10 @@ to pick one.
       </picture>
     </td>
     <td><b>Japanese</b><br>Turns romaji into kana and kanji.</td>
-    <td><img src="docs/images/taskbar-japanese.png" width="216" alt="The taskbar with TEKITO in Japanese"></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/images/mode-mixed.png" width="48" alt=""></td>
+    <td><b>Mix</b><br>Types Japanese and English without switching, a Space after each part. Turn it on in Settings > Japanese.</td>
   </tr>
 </table>
 
