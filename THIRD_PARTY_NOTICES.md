@@ -59,7 +59,9 @@ The data packs in `data/` (and in the installer, or the Japanese data it
 downloads) come from SCOWL, Wikipedia, the Leipzig Corpora Collection,
 WordNet, GeoNames, Wiktionary, the CMU Pronouncing Dictionary, Unicode CLDR,
 the Mozc OSS dictionary, symbol, emoji, emoticon and single-kanji tables (IPAdic, BSD 3-Clause) and the Japanese WordNet
-(NICT), plus data written for TEKITO. Japan Post's postal code data is not
+(NICT), plus data written for TEKITO. The model that checks whole Japanese
+sentences was trained on the zenz-v2.5 dataset (llm-jp-corpus-v3 part, Open
+Data Commons Attribution License 1.0) and holds no text from it. Japan Post's postal code data is not
 included: users add it themselves in Settings. Each
 pack's `NOTICE` and `manifest.json` give its source, version and license, and
 carry the attribution that license asks for; they are the authoritative

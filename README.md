@@ -143,7 +143,8 @@ for the phrase in focus.
 - **The whole sentence counts.** Conversion weighs which words go together,
   learned from Japanese news and Wikipedia text, and carries on from what you
   committed just before, so a phrase converted on its own still reads as
-  part of the sentence.
+  part of the sentence. A small language model then reads the likeliest
+  sentences as a whole and picks the one that reads most naturally.
 - **A slip is not a dead end.** When the keys look like a slip of the finger
   (a neighboring key, a key dropped or doubled, two swapped), what you meant
   is offered in the list, marked TYPO. What you typed stays first; you
