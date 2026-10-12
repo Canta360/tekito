@@ -55,6 +55,7 @@ const initialSettings = {
   advancedSettings: false,
   japanesePredictionEnabled: true,
   japaneseLiveConversion: false,
+  japaneseSentenceCheck: true,
   mixedTypingEnabled: false,
   japaneseEnglishSpacing: false,
   japaneseIgnoreCapsLock: true,
@@ -625,6 +626,9 @@ function JapanesePage({ advanced, settings, setSetting }) {
         </Row>
         {advanced && (
           <>
+            <Row title={j.sentenceCheck.title} description={j.sentenceCheck.description}>
+              <Toggle label={j.sentenceCheck.title} checked={settings.japaneseSentenceCheck} onChange={(value) => setSetting("japaneseSentenceCheck", value)} />
+            </Row>
             <Row title={j.space.title} description={j.space.description}>
               <Segmented label={j.space.title} value={settings.japaneseSpaceWidth} options={spaces} onChange={(value) => setSetting("japaneseSpaceWidth", value)} />
             </Row>

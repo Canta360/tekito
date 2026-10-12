@@ -58,6 +58,7 @@ function initialState() {
       advancedSettings: false,
       japanesePredictionEnabled: true,
       japaneseLiveConversion: false,
+      japaneseSentenceCheck: true,
       japaneseIgnoreCapsLock: true,
       uiLanguage: 0,
       excludedApps: ["Code.exe"],

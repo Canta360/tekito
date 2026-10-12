@@ -96,6 +96,9 @@ struct UserSettings {
     // Japanese shown converted while typing; Space then picks other
     // candidates for the last phrase.
     bool japaneseLiveConversion{false};
+    // Converting checks the likeliest sentences as a whole (the
+    // japanese-reranker pack) and takes the one that reads best.
+    bool japaneseSentenceCheck{true};
     // The mixed typing mode (InputMode::Mixed): Japanese and English typed
     // in chunks, a Space after each, with no switching between them. On, it
     // comes right after Japanese when the switch key goes round.

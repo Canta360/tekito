@@ -49,6 +49,7 @@ inline void ApplyJapaneseSettings(japanese::JapaneseComposer& composer, const Us
     composer.SetLearning(settings.learningEnabled ? learning : nullptr);
     composer.SetPredictionEnabled(settings.japanesePredictionEnabled);
     composer.SetLiveConversion(settings.japaneseLiveConversion);
+    composer.SetSentenceCheck(settings.japaneseSentenceCheck);
     composer.SetSpecialConversions(&SpecialConversions::Installed(), SpecialOptionsFor(settings));
 }
 

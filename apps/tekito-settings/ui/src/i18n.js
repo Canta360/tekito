@@ -185,6 +185,7 @@ const en = {
       description: "Type Japanese and English without switching: a Space after each part.",
     },
     live: { title: "Live conversion" },
+    sentenceCheck: { title: "Check whole sentences", description: "Picks the conversion that reads most naturally as a sentence." },
     prediction: { title: "Predict words", description: "Suggest words as you type. Pick one with Tab." },
     keys: {
       convert: "Convert, then next candidate",
@@ -491,6 +492,7 @@ const ja = {
       description: "日本語と英語を切り替えずに、Space で区切りながら打てます。",
     },
     live: { title: "ライブ変換" },
+    sentenceCheck: { title: "文全体で見直す", description: "文として自然に読める変換を選びます。" },
     prediction: { title: "予測候補", description: "打っている途中で、続きの言葉を出します。Tab で選べます。" },
     keys: {
       convert: "変換、次の候補",
