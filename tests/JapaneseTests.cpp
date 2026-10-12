@@ -15,6 +15,8 @@
 #include "Core/Japanese/Meanings.h"
 #include "Core/Japanese/PostalCodes.h"
 #include "Core/Japanese/RomajiTable.h"
+#include "Core/Japanese/SentenceReranker.h"
+#include "Core/Japanese/SortedTsv.h"
 #include "Core/SpecialConversions.h"
 
 #include <algorithm>
@@ -24,6 +26,7 @@
 #include <fstream>
 #include <iostream>
 #include <memory>
+#include <sstream>
 #include <string>
 #include <string_view>
 
@@ -1515,6 +1518,81 @@ void TestSpecialConversions(const RomajiTable& table, const MiniPack& pack) {
     composer.Clear();
 }
 
+// The sentence check (japanese-reranker): pieces as SentencePiece reads
+// them and ln p as the float model gives it (tests/data/ja/
+// make-japanese-reranker-mini.py wrote both), the choice, and the composer.
+void TestSentenceReranker(const RomajiTable& table, const MiniPack& pack) {
+    tekito::japanese::SentenceReranker reranker;
+    Require(!reranker.Open(std::filesystem::path(TEKITO_TEST_DATA_DIR) / L"no-such-pack"), "a missing pack does not open");
+    const auto root = std::filesystem::path(TEKITO_TEST_DATA_DIR) / L"japanese-reranker-mini";
+    Require(reranker.Open(root), "the test reranker opens");
+    std::ifstream expected(root / L"expected.tsv", std::ios::binary);
+    std::size_t rows = 0;
+    for (std::string line; std::getline(expected, line); ++rows) {
+        const std::size_t tab = line.find('\t'), second = line.find('\t', tab + 1);
+        const std::wstring text = tekito::japanese::FromUtf8(std::string_view(line).substr(0, tab));
+        std::vector<std::uint32_t> ids;
+        std::istringstream pieces(line.substr(tab + 1, second - tab - 1));
+        for (std::uint32_t id = 0; pieces >> id;) ids.push_back(id);
+        Require(reranker.Pieces(text) == ids, ("the pieces of " + Utf8(text)).c_str());
+        const std::wstring sentence[] = {text};
+        const double logProbability = reranker.LogProbabilities(sentence).front();
+        Require(std::abs(logProbability - std::stod(line.substr(second + 1))) < 0.1, ("ln p of " + Utf8(text)).c_str());
+    }
+    Require(rows == 8, "every expected row is read");
+
+    // ln p: abc 12 -22.5, 今日は☃ -35.4; the prior: 0, -0.5, -1; no margin.
+    const std::wstring worseFirst[] = {L"今日は☃", L"abc 12"};
+    Require(reranker.Choose(worseFirst) == 1, "a sentence that reads much better is taken");
+    const std::wstring betterFirst[] = {L"abc 12", L"今日は☃"};
+    Require(reranker.Choose(betterFirst) == 0, "the first stays when it reads best");
+    const std::wstring alone[] = {L"今日は☃"};
+    Require(reranker.Choose(alone) == 0, "one sentence is kept");
+
+    // The composer: the check only picks among the phrases' candidates, and
+    // its switch turns it off.
+    const tekito::japanese::JapaneseConverter converter(pack.dictionary, pack.matrix);
+    JapaneseComposer plain(&table);
+    plain.SetConverter(&converter);
+    JapaneseComposer checked(&table);
+    checked.SetConverter(&converter);
+    checked.SetSentenceReranker(&reranker);
+    for (const wchar_t* keys : {L"watashinonamaehanakanodesu", L"kikaigatomaru", L"kyouhaiitenkidesune"}) {
+        Type(plain, keys);
+        plain.Convert();
+        Type(checked, keys);
+        checked.Convert();
+        const auto expectedSegments = plain.Segments();
+        const auto segments = checked.Segments();
+        Require(segments.size() == expectedSegments.size(), "the check keeps the phrases");
+        Require(!checked.Commit().empty(), "the checked text commits");
+        checked.SetSentenceCheck(false);
+        Type(checked, keys);
+        checked.Convert();
+        RequireText(checked.Preedit(), plain.Preedit(), "with the check off, conversion is as without it");
+        checked.Clear();
+        checked.SetSentenceCheck(true);
+        plain.Clear();
+    }
+
+    // What learning put first stays first.
+    tekito::japanese::JapaneseLearningStore learning;
+    checked.SetLearning(&learning);
+    Type(checked, L"kikaigatomaru");
+    checked.Convert();
+    const auto* candidates = checked.FocusedCandidates();
+    const auto first = checked.Segments().front().text;
+    std::size_t other = 1;
+    while (other < candidates->size() && (*candidates)[other].text == first) ++other;
+    const auto chosen = (*candidates)[other].text;
+    checked.SelectCandidate(other);
+    (void)checked.Commit();
+    Type(checked, L"kikaigatomaru");
+    checked.Convert();
+    RequireText(checked.Segments().front().text, chosen, "the check keeps what learning put first");
+    checked.Clear();
+}
+
 int main(int argc, char** argv) {
     const auto table = LoadTable();
     TestKanaText();
@@ -1544,6 +1622,7 @@ int main(int argc, char** argv) {
     TestPrediction(*table, *pack);
     TestUserWords(*table, *pack);
     TestSpecialConversions(*table, *pack);
+    TestSentenceReranker(*table, *pack);
     TestMeanings();
     if (argc > 1 && std::string_view(argv[1]) == "--dump") DumpConversions(*pack);
     std::cout << "All TEKITO Japanese tests passed.\n";

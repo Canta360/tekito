@@ -8,10 +8,12 @@
 #include "Core/Japanese/Loanwords.h"
 #include "Core/Japanese/PostalCodes.h"
 #include "Core/Japanese/RomajiTable.h"
+#include "Core/Japanese/SentenceReranker.h"
 
 #include <algorithm>
 #include <regex>
 #include <map>
+#include <queue>
 #include <set>
 #include <cwctype>
 #include <limits>
@@ -904,6 +906,68 @@ void JapaneseComposer::BuildPhrases(bool convert) {
         english.reading = conversionReading_;
         candidates.insert(candidates.begin() + 1, std::move(english));
     }
+    if (convert && reranker_ && sentenceCheck_ && !chunkJudge_ && !reconverted_) CheckSentence();
+}
+
+void JapaneseComposer::CheckSentence() {
+    if (phrases_.empty() || (!phrases_.front().candidates.empty() && !phrases_.front().candidates.front().reading.empty())) {
+        return;  // the whole input read another way (English run in) stays first
+    }
+    // Each phrase's candidates for part of the input only, each text once.
+    // Slips undone are left out: finding them for every phrase would take
+    // longer than the conversion itself.
+    constexpr std::size_t kListed = 20;
+    std::vector<std::vector<std::size_t>> lists;
+    for (const auto& phrase : phrases_) {
+        if (phrase.candidates.empty()) return;
+        std::vector<std::size_t> list;
+        for (std::size_t c = 0; c < phrase.candidates.size() && list.size() < kListed; ++c) {
+            const auto& candidate = phrase.candidates[c];
+            if (!candidate.reading.empty()) continue;
+            const bool seen = std::any_of(list.begin(), list.end(), [&](std::size_t other) {
+                return phrase.candidates[other].text == candidate.text;
+            });
+            if (!seen) list.push_back(c);
+            // What learning put first stays.
+            if (phrase.learned) break;
+        }
+        if (list.empty() || list.front() != phrase.selected) return;
+        lists.push_back(std::move(list));
+    }
+    // The sentences by the sum of their candidates' ranks, each text once.
+    using Picks = std::vector<std::size_t>;
+    const auto rankSum = [](const Picks& picks) {
+        std::size_t sum = 0;
+        for (const std::size_t p : picks) sum += p;
+        return sum;
+    };
+    const auto later = [&](const Picks& a, const Picks& b) {
+        return rankSum(a) > rankSum(b) || (rankSum(a) == rankSum(b) && a > b);
+    };
+    std::priority_queue<Picks, std::vector<Picks>, decltype(later)> queue(later);
+    std::set<Picks> seen{Picks(lists.size(), 0)};
+    queue.push(Picks(lists.size(), 0));
+    std::vector<std::wstring> sentences;
+    std::vector<Picks> picked;
+    while (!queue.empty() && sentences.size() < reranker_->Top()) {
+        const Picks picks = queue.top();
+        queue.pop();
+        std::wstring text;
+        for (std::size_t i = 0; i < lists.size(); ++i) text += phrases_[i].candidates[lists[i][picks[i]]].text;
+        if (std::find(sentences.begin(), sentences.end(), text) == sentences.end()) {
+            sentences.push_back(std::move(text));
+            picked.push_back(picks);
+        }
+        for (std::size_t i = 0; i < lists.size(); ++i) {
+            if (picks[i] + 1 >= lists[i].size()) continue;
+            Picks next = picks;
+            ++next[i];
+            if (seen.insert(next).second) queue.push(std::move(next));
+        }
+    }
+    const std::size_t chosen = reranker_->Choose(sentences);
+    if (chosen == 0) return;
+    for (std::size_t i = 0; i < lists.size(); ++i) phrases_[i].selected = lists[i][picked[chosen][i]];
 }
 
 void JapaneseComposer::AddTypedEnglish() {
@@ -1081,11 +1145,14 @@ void JapaneseComposer::AddPhrases(std::vector<Phrase> phrases, const std::wstrin
         if (phrase.candidates.empty()) continue;
         const auto phraseReading = std::wstring_view(reading).substr(phrase.begin, phrase.length);
         if (std::none_of(phraseReading.begin(), phraseReading.end(), IsDigit)) PutDigitsAfterWords(phrase.candidates);
+        const std::wstring first = phrase.candidates.front().text;
         if (learning_) learning_->Reorder(LearningReading(reading, phrase.begin, phrase.length), phrase.candidates);
+        const bool learned = phrase.candidates.front().text != first;
         AddLoanwords(phrase.candidates, phraseReading);
         AddOtherWidth(phrase.candidates);
         AddSpecial(std::wstring_view(reading).substr(phrase.begin, phrase.length), phrase.candidates);
         phrases_.push_back({phrase.begin, phrase.length, std::move(phrase.candidates)});
+        phrases_.back().learned = learned;
     }
 }
 

@@ -1,0 +1,8 @@
+{
+  "pack_id": "japanese-reranker",
+  "type": "japanese-reranker",
+  "format": "ja-rerank-v1",
+  "file": "reranker.bin",
+  "license": "TEKITO-OWNED",
+  "notice_file": "NOTICE"
+}

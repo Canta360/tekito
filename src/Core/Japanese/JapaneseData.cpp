@@ -13,6 +13,7 @@
 #include "Core/Japanese/Meanings.h"
 #include "Core/Japanese/PostalCodes.h"
 #include "Core/Japanese/RomajiTable.h"
+#include "Core/Japanese/SentenceReranker.h"
 
 #include <filesystem>
 #include <mutex>
@@ -24,6 +25,7 @@ struct JapaneseData {
     JapaneseDictionary dictionary;
     ConnectionMatrix matrix;
     LanguageModel model;
+    SentenceReranker reranker;
     Loanwords loanwords;
     UserPartsOfSpeech userParts;
     std::unique_ptr<JapaneseConverter> converter;
@@ -50,6 +52,7 @@ const JapaneseData* ProcessJapaneseData() {
             loaded->keys = std::make_unique<KeyConverter>(loaded->dictionary, loaded->matrix, *loaded->converter,
                                                           *table);
         }
+        (void)loaded->reranker.Open(ExternalLexiconProvider::PackDirectory(L"japanese-reranker"));
         (void)loaded->loanwords.Open(ExternalLexiconProvider::PackDirectory(L"japanese-loanwords"));
         (void)loaded->loanwords.OpenEnglish(ExternalLexiconProvider::PackDirectory(L"japanese-english"));
         loaded->userParts = UserPartsOfSpeech::Load(core / L"pos.tsv");
@@ -117,6 +120,7 @@ void AttachJapaneseData(JapaneseComposer& composer) {
     composer.SetKeyConverter(data ? data->keys.get() : nullptr);
     composer.SetLoanwords(data && data->loanwords.IsOpen() ? &data->loanwords : nullptr);
     composer.SetRunTogether(data ? data->chunks.get() : nullptr);
+    composer.SetSentenceReranker(data && data->reranker.IsOpen() ? &data->reranker : nullptr);
 }
 
 void AttachMixedTyping(JapaneseComposer& composer, bool on) {
@@ -138,6 +142,7 @@ std::vector<std::wstring_view> MissingJapaneseData() {
     }
     if (!data->model.IsOpen()) missing.emplace_back(L"language model");
     if (!data->loanwords.IsOpen()) missing.emplace_back(L"loanwords");
+    if (!data->reranker.IsOpen()) missing.emplace_back(L"sentence check");
     if (data->userParts.Empty()) missing.emplace_back(L"user word parts of speech");
     return missing;
 }

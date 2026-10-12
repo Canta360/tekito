@@ -26,6 +26,7 @@ class JapaneseUserDictionary;
 class Loanwords;
 class PostalCodes;
 class RomajiTable;
+class SentenceReranker;
 
 // One romaji unit: the keys it took and the kana it made. Keys the table
 // cannot read come out as they are, as leftovers.
@@ -102,6 +103,11 @@ public:
     // reflectされた), found with `splitter` in Japanese mode too: first when
     // the keys make no kana, otherwise the next choice. nullptr: off.
     void SetRunTogether(const ChunkJudge* splitter) noexcept { splitter_ = splitter; }
+    // Converting checks the likeliest sentences as a whole with `reranker`
+    // and takes the one that reads best (not in Mix); nullptr: off.
+    void SetSentenceReranker(const SentenceReranker* reranker) noexcept { reranker_ = reranker; }
+    // The user's switch for it (on by default).
+    void SetSentenceCheck(bool on) noexcept { sentenceCheck_ = on; }
     // What `key` types when it types an opening bracket on its own (「 for
     // [ , in the width set), with the bracket that closes it.
     [[nodiscard]] std::optional<std::pair<std::wstring, std::wstring>> BracketPair(wchar_t key) const;
@@ -319,6 +325,8 @@ private:
         int letterCase{0};
         // The list has been given what the keys mean with a slip undone.
         bool slipsAdded{false};
+        // Learning put another candidate first: the sentence check keeps it.
+        bool learned{false};
     };
 
     void Feed(wchar_t key);
@@ -350,6 +358,9 @@ private:
                                         int letterCase) const;
     // Phrases from the converter, or one phrase for the whole text.
     void BuildPhrases(bool convert);
+    // The likeliest sentences the phrases' candidates make, checked as a
+    // whole (SetSentenceReranker); the one taken is selected.
+    void CheckSentence();
     // Mixed typing: the candidates for a chunk judged English, `written`
     // first, then the keys as typed, katakana and the Japanese.
     [[nodiscard]] std::vector<PhraseCandidate> EnglishCandidates(const std::wstring& written,
@@ -511,6 +522,8 @@ private:
     const PostalCodes* postalCodes_{nullptr};
     SpecialConversionOptions specialOptions_;
     JapaneseLearningStore* learning_{nullptr};
+    const SentenceReranker* reranker_{nullptr};
+    bool sentenceCheck_{true};
     std::vector<Unit> units_;
     // Units before the caret; pending keys belong at the caret.
     std::size_t caret_{0};
