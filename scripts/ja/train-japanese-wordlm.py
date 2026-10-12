@@ -347,6 +347,37 @@ def finetune(args) -> None:
     print(f"done: kept apart engine first {before:.1f}%, with the model {after:.1f}%")
 
 
+def rerank(args) -> None:
+    """Chooses again among each row's list (tekito_ja_eval --write-sentences)
+    with the finetuned model, on the CPU, and writes source, id, text: the
+    same layout as TEKITO_EVAL_OUTPUT. The meant column is not looked at."""
+    import torch
+    import sentencepiece as spm
+    torch.backends.cudnn.enabled = False
+    out = Path(args.out)
+    sp = spm.SentencePieceProcessor(model_file=str(out / "pieces.model"))
+    saved = torch.load(Path(args.model) if args.model else out / "finetuned.pt", map_location="cpu")
+    model = make_model(saved["vocab"], saved["embed"], saved["hidden"])
+    model.load_state_dict(saved["model"])
+    model.eval()
+    prior, scale = saved["prior"], saved["scale"]
+    top = len(prior)
+    rows: dict[tuple[str, str], list[str]] = {}
+    for line in open(args.lists, encoding="utf-8", errors="replace"):
+        f = line.rstrip("\n").split("\t")
+        if len(f) >= 5 and int(f[2]) < top:
+            rows.setdefault((f[0], f[1]), []).append(f[4])
+    with open(args.write, "w", encoding="utf-8", newline="\n") as w, torch.no_grad():
+        for (source, row_id), texts in rows.items():
+            seqs = [[SEP] + t[:MAX_PIECES - 1] + [EOS] for t in sp.encode(texts)]
+            x = pad(seqs, torch.device("cpu"))
+            lengths = torch.as_tensor([len(s) for s in seqs])
+            lp = model.sentence_logprob(x, torch.ones(len(seqs), dtype=torch.long), lengths)
+            best = int((scale * lp + prior[:len(seqs)]).argmax())
+            w.write(f"{source}\t{row_id}\t{texts[best]}\n")
+    print(f"{len(rows)} rows chosen again -> {args.write}")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     sub = parser.add_subparsers(dest="step", required=True)
@@ -377,8 +408,13 @@ def main() -> int:
     f.add_argument("--epochs", type=int, default=1)
     f.add_argument("--batch", type=int, default=32)
     f.add_argument("--lr", type=float, default=3e-4)
+    r = sub.add_parser("rerank")
+    r.add_argument("--out", required=True)
+    r.add_argument("--model")
+    r.add_argument("--lists", required=True)
+    r.add_argument("--write", required=True)
     args = parser.parse_args()
-    {"prepare": prepare, "pretrain": pretrain, "finetune": finetune}[args.step](args)
+    {"prepare": prepare, "pretrain": pretrain, "finetune": finetune, "rerank": rerank}[args.step](args)
     return 0
 
 
