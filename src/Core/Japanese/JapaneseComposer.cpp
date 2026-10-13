@@ -916,73 +916,81 @@ void JapaneseComposer::BuildPhrases(bool convert) {
 bool JapaneseComposer::FixSlips() {
     // Readings with slips undone must beat the keys as typed by this much
     // (nats, kana LSTM less the edits) to be converted at all; then the
-    // two conversions are weighed with the sentence model, the kana score
-    // counting half. Chosen on dev sets only.
+    // conversions are weighed with the sentence model, the kana score
+    // counting half. Chosen on dev sets only: lower gates fix more slips
+    // that still read as kana but change sentences typed right.
     constexpr double kSlipGate = 12.0;
+    // ...and the corrected conversion must then win by this much. More
+    // than one corrected reading tried loses: the sentence model likes the
+    // shorter ones.
+    constexpr double kSlipMargin = 3.0;
+    constexpr std::size_t kSlipTries = 1;
     constexpr double kKanaWeight = 0.5;
     const std::wstring keys = Keys(false);
-    const auto found = slips_->Find(keys, *table_, 1);
+    const auto found = slips_->Find(keys, *table_, kSlipTries);
     if (found.size() < 2 || found[1].score - found[0].score <= kSlipGate) return false;
-    const auto& fixed = found[1];
 
-    // The corrected keys converted as typed keys are.
-    std::wstring reading;
-    std::vector<std::size_t> keyAt;
-    std::vector<Phrase> converted;
-    if (auto conversion = keyConverter_ ? keyConverter_->Convert(fixed.keys, context_, contextWords_, userDictionary_)
-                                        : std::nullopt) {
-        reading = ApplyTypingStyle(std::move(conversion->reading));
-        keyAt = std::move(conversion->keyAt);
-        converted = std::move(conversion->phrases);
-    } else {
-        std::wstring kana;
-        std::vector<std::pair<std::size_t, std::size_t>> units;  // kana offset, key offset
-        std::size_t key = 0;
-        for (const auto& token : ParseRomaji(*table_, fixed.keys)) {
-            units.emplace_back(kana.size(), key);
-            kana += ToFullWidthAscii(token.kana);
-            key += token.keys;
-        }
-        reading = ApplyTypingStyle(std::move(kana));
-        keyAt.assign(reading.size() + 1, std::wstring::npos);
-        for (const auto& [offset, at] : units) keyAt[offset] = at;
-        keyAt[reading.size()] = key;
-        converted = ConvertReading(reading, 0, context_, contextWords_);
-    }
-    // Key positions in the corrected keys, back to the typed ones; none
-    // inside what was put in.
-    for (auto& at : keyAt) {
-        if (at == std::wstring::npos) continue;
-        std::ptrdiff_t shift = 0;
-        std::size_t typed = std::wstring::npos;
-        bool inside = false;
-        for (const auto& edit : fixed.edits) {
-            const std::size_t begin = edit.begin + shift;
-            if (at <= begin) break;
-            if (at < begin + edit.with.size()) {
-                inside = true;
-                break;
-            }
-            shift += static_cast<std::ptrdiff_t>(edit.with.size()) - static_cast<std::ptrdiff_t>(edit.end - edit.begin);
-        }
-        if (!inside) typed = static_cast<std::size_t>(static_cast<std::ptrdiff_t>(at) - shift);
-        at = typed;
-    }
-
-    auto typedPhrases = std::move(phrases_);
-    auto typedReading = std::move(conversionReading_);
-    auto typedKeys = std::move(readingKeys_);
-    phrases_.clear();
-    conversionReading_ = reading;
-    readingKeys_ = std::move(keyAt);
-    AddPhrases(std::move(converted), reading);
-    const auto restore = [&] {
-        phrases_ = std::move(typedPhrases);
-        conversionReading_ = std::move(typedReading);
-        readingKeys_ = std::move(typedKeys);
-        return false;
+    struct Converted {
+        std::vector<PhraseState> phrases;
+        std::wstring reading;
+        std::vector<std::size_t> keyAt;
+        double score{0};
     };
-    if (phrases_.empty()) return restore();
+    // Corrected keys converted as typed keys are, their key positions taken
+    // back to the typed keys (none inside what was put in).
+    const auto convert = [&](const KanaSlips::Reading& fixed) {
+        Converted out;
+        out.score = fixed.score;
+        std::vector<Phrase> converted;
+        if (auto conversion = keyConverter_ ? keyConverter_->Convert(fixed.keys, context_, contextWords_, userDictionary_)
+                                            : std::nullopt) {
+            out.reading = ApplyTypingStyle(std::move(conversion->reading));
+            out.keyAt = std::move(conversion->keyAt);
+            converted = std::move(conversion->phrases);
+        } else {
+            std::wstring kana;
+            std::vector<std::pair<std::size_t, std::size_t>> units;  // kana offset, key offset
+            std::size_t key = 0;
+            for (const auto& token : ParseRomaji(*table_, fixed.keys)) {
+                units.emplace_back(kana.size(), key);
+                kana += ToFullWidthAscii(token.kana);
+                key += token.keys;
+            }
+            out.reading = ApplyTypingStyle(std::move(kana));
+            out.keyAt.assign(out.reading.size() + 1, std::wstring::npos);
+            for (const auto& [offset, at] : units) out.keyAt[offset] = at;
+            out.keyAt[out.reading.size()] = key;
+            converted = ConvertReading(out.reading, 0, context_, contextWords_);
+        }
+        for (auto& at : out.keyAt) {
+            if (at == std::wstring::npos) continue;
+            std::ptrdiff_t shift = 0;
+            bool inside = false;
+            for (const auto& edit : fixed.edits) {
+                const std::size_t begin = edit.begin + shift;
+                if (at <= begin) break;
+                if (at < begin + edit.with.size()) {
+                    inside = true;
+                    break;
+                }
+                shift += static_cast<std::ptrdiff_t>(edit.with.size()) - static_cast<std::ptrdiff_t>(edit.end - edit.begin);
+            }
+            at = inside ? std::wstring::npos : static_cast<std::size_t>(static_cast<std::ptrdiff_t>(at) - shift);
+        }
+        std::swap(phrases_, out.phrases);
+        phrases_.clear();
+        AddPhrases(std::move(converted), out.reading);
+        std::swap(phrases_, out.phrases);
+        return out;
+    };
+    std::vector<Converted> tried;
+    for (std::size_t i = 1; i < found.size() && i <= kSlipTries; ++i) {
+        if (found[i].score - found[0].score <= kSlipGate) break;
+        auto converted = convert(found[i]);
+        if (!converted.phrases.empty()) tried.push_back(std::move(converted));
+    }
+    if (tried.empty()) return false;
+    std::size_t chosen = 0;
     if (reranker_) {
         const auto sentenceOf = [](const std::vector<PhraseState>& phrases) {
             std::wstring text;
@@ -991,12 +999,23 @@ bool JapaneseComposer::FixSlips() {
             }
             return text;
         };
-        const std::wstring sentences[] = {sentenceOf(typedPhrases), sentenceOf(phrases_)};
+        std::vector<std::wstring> sentences{sentenceOf(phrases_)};
+        for (const auto& t : tried) sentences.push_back(sentenceOf(t.phrases));
         const auto logProbabilities = reranker_->LogProbabilities(sentences);
-        if (kKanaWeight * found[0].score + logProbabilities[0] >= kKanaWeight * fixed.score + logProbabilities[1]) {
-            return restore();
+        double best = kKanaWeight * found[0].score + logProbabilities[0] + kSlipMargin;
+        chosen = tried.size();
+        for (std::size_t i = 0; i < tried.size(); ++i) {
+            const double score = kKanaWeight * tried[i].score + logProbabilities[i + 1];
+            if (score > best) {
+                best = score;
+                chosen = i;
+            }
         }
+        if (chosen == tried.size()) return false;
     }
+    phrases_ = std::move(tried[chosen].phrases);
+    conversionReading_ = std::move(tried[chosen].reading);
+    readingKeys_ = std::move(tried[chosen].keyAt);
     return true;
 }
 
