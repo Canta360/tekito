@@ -409,6 +409,9 @@ struct ChunkOptions {
     // Space, the next typed on, the whole committed with Enter at the end.
     bool hold{false};
     std::filesystem::path writeChunks;
+    // --reranker, --slips: the sentence check and the slip finder.
+    std::filesystem::path rerankerPack;
+    std::filesystem::path slipsPack;
 };
 
 // The text of the composition with one phrase's choice replaced, for each
@@ -456,6 +459,18 @@ int RunChunks(const ConnectionMatrix& matrix, const JapaneseDictionary& dictiona
     composer.SetConverter(&converter);
     if (options.slips) composer.SetKeyConverter(&keyConverter);
     if (names) composer.SetLoanwords(names);
+    tekito::japanese::SentenceReranker reranker;
+    if (!options.rerankerPack.empty() && !reranker.Open(options.rerankerPack)) {
+        std::cerr << "could not open the reranker at " << options.rerankerPack.string() << "\n";
+        return 1;
+    }
+    if (reranker.IsOpen()) composer.SetSentenceReranker(&reranker);
+    tekito::japanese::KanaSlips kanaSlips;
+    if (!options.slipsPack.empty() && !kanaSlips.Open(options.slipsPack)) {
+        std::cerr << "could not open the slip finder at " << options.slipsPack.string() << "\n";
+        return 1;
+    }
+    if (kanaSlips.IsOpen()) composer.SetKanaSlips(&kanaSlips);
     const tekito::japanese::ChunkJudge judge(*table, converter, options.slips ? &keyConverter : nullptr, english, names,
                                              options.thresholds);
     const auto parts = tekito::japanese::UserPartsOfSpeech::Load(options.pack / "pos.tsv");
@@ -700,6 +715,8 @@ int main(int argc, char** argv) {
         JapaneseConverter converter(dictionary, matrix);
         if (model.IsOpen()) converter.SetLanguageModel(&model, weights);
         chunks.pack = pack;
+        chunks.rerankerPack = rerankerPack;
+        chunks.slipsPack = slipsPack;
         tekito::japanese::Loanwords names;
         if (!loanwordPack.empty()) (void)names.Open(loanwordPack);
         if (!japaneseEnglishPack.empty()) (void)names.OpenEnglish(japaneseEnglishPack);
