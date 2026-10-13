@@ -158,6 +158,53 @@ void ForPicksByRank(const std::vector<std::size_t>& sizes, Visit visit) {
     }
 }
 
+// The text of a conversion's phrases with their next candidates in, by the
+// sum of their ranks: `count` texts at most, the first as converted.
+// Candidates for part of the input only (not another reading of it).
+std::vector<std::wstring> TopConversions(const std::vector<Phrase>& phrases, std::size_t count) {
+    constexpr std::size_t kListed = 8;
+    std::vector<std::wstring> texts;
+    std::vector<std::vector<const std::wstring*>> lists;
+    for (const auto& phrase : phrases) {
+        std::vector<const std::wstring*> list;
+        for (const auto& candidate : phrase.candidates) {
+            if (list.size() >= kListed) break;
+            if (!candidate.reading.empty()) continue;
+            if (std::none_of(list.begin(), list.end(), [&](const std::wstring* t) { return *t == candidate.text; })) {
+                list.push_back(&candidate.text);
+            }
+        }
+        if (list.empty() || *list.front() != phrase.candidates.front().text) {
+            std::wstring text;
+            for (const auto& other : phrases) {
+                if (!other.candidates.empty()) text += other.candidates.front().text;
+            }
+            return {text};
+        }
+        lists.push_back(std::move(list));
+    }
+    std::vector<std::size_t> sizes;
+    for (const auto& list : lists) sizes.push_back(list.size());
+    ForPicksByRank(sizes, [&](const std::vector<std::size_t>& picks) {
+        std::wstring text;
+        for (std::size_t i = 0; i < lists.size(); ++i) text += *lists[i][picks[i]];
+        if (std::find(texts.begin(), texts.end(), text) == texts.end()) texts.push_back(std::move(text));
+        return texts.size() < count;
+    });
+    return texts;
+}
+
+// English as the sentence model reads it in a Japanese sentence: a word it
+// knows in its place, its punctuation kept (it reads English poorly, and a
+// loanword in its place, lunch: ランチ, did worse).
+std::wstring EnglishForModel(std::wstring_view english) {
+    std::wstring text = L"それ";
+    for (const wchar_t c : english) {
+        if (std::wstring_view(L".,!?。、！？").find(c) != std::wstring_view::npos) text.push_back(c);
+    }
+    return text;
+}
+
 }  // namespace
 
 void JapaneseComposer::SetTable(const RomajiTable* table) noexcept {
@@ -1075,14 +1122,28 @@ void JapaneseComposer::CheckSentence() {
         if (list.empty() || list.front() != phrase.selected) return;
         lists.push_back(std::move(list));
     }
-    // The sentences by the sum of their candidates' ranks, each text once.
+    std::vector<std::vector<std::wstring>> parts;
+    for (std::size_t i = 0; i < lists.size(); ++i) {
+        auto& texts = parts.emplace_back();
+        for (const std::size_t c : lists[i]) texts.push_back(phrases_[i].candidates[c].text);
+    }
+    const auto picks = ReadBest(parts);
+    for (std::size_t i = 0; i < lists.size(); ++i) phrases_[i].selected = lists[i][picks[i]];
+}
+
+std::vector<std::size_t> JapaneseComposer::ReadBest(const std::vector<std::vector<std::wstring>>& parts) const {
+    std::vector<std::size_t> keep(parts.size(), 0);
     std::vector<std::size_t> sizes;
-    for (const auto& list : lists) sizes.push_back(list.size());
+    for (const auto& part : parts) {
+        if (part.empty()) return keep;
+        sizes.push_back(part.size());
+    }
+    // The sentences by the sum of their choices' ranks, each text once.
     std::vector<std::wstring> sentences;
     std::vector<std::vector<std::size_t>> picked;
     ForPicksByRank(sizes, [&](const std::vector<std::size_t>& picks) {
         std::wstring text;
-        for (std::size_t i = 0; i < lists.size(); ++i) text += phrases_[i].candidates[lists[i][picks[i]]].text;
+        for (std::size_t i = 0; i < parts.size(); ++i) text += parts[i][picks[i]];
         if (std::find(sentences.begin(), sentences.end(), text) == sentences.end()) {
             sentences.push_back(std::move(text));
             picked.push_back(picks);
@@ -1090,8 +1151,7 @@ void JapaneseComposer::CheckSentence() {
         return sentences.size() < reranker_->Top();
     });
     const std::size_t chosen = reranker_->Choose(sentences);
-    if (chosen == 0) return;
-    for (std::size_t i = 0; i < lists.size(); ++i) phrases_[i].selected = lists[i][picked[chosen][i]];
+    return chosen == 0 ? keep : picked[chosen];
 }
 
 void JapaneseComposer::AddTypedEnglish() {
@@ -1156,8 +1216,12 @@ std::optional<std::wstring> JapaneseComposer::RunTogetherEnglish(bool* foreign) 
         return ApplyTypingStyle(kana);
     };
     // Each run of keys between punctuation on its own (a post's sentences
-    // and clauses: kyounolunchha..., ...).
-    std::wstring text;
+    // and clauses: kyounolunchha..., ...). The pieces' choices, and as the
+    // sentence model reads them, for the sentence check.
+    constexpr std::size_t kChoices = 6;
+    const bool check = reranker_ && sentenceCheck_;
+    std::vector<std::vector<std::wstring>> choices;
+    std::vector<std::vector<std::wstring>> read;
     bool split = false;
     for (std::size_t start = 0; start < keys.size();) {
         std::size_t end = keys.find_first_of(L".,!?", start);
@@ -1180,24 +1244,32 @@ std::optional<std::wstring> JapaneseComposer::RunTogetherEnglish(bool* foreign) 
                 const auto& piece = parts[i];
                 if (piece.english) {
                     if (foreign && ChunkJudge::ForeignLetters(piece.keys)) *foreign = true;
-                    text += start == 0 && i == 0 ? EnglishAsWritten(piece.text) : piece.text;
+                    choices.push_back({start == 0 && i == 0 ? EnglishAsWritten(piece.text) : piece.text});
+                    read.push_back({EnglishForModel(piece.text)});
                     continue;
                 }
-                for (const auto& phrase : ConvertReading(ApplyTypingStyle(piece.text), 0, i == 0 ? context : 0,
-                                                         contextWords_)) {
-                    if (phrase.candidates.empty()) return std::nullopt;
-                    text += phrase.candidates.front().text;
+                const auto phrases = ConvertReading(ApplyTypingStyle(piece.text), 0, i == 0 ? context : 0, contextWords_);
+                if (std::any_of(phrases.begin(), phrases.end(), [](const Phrase& phrase) {
+                        return phrase.candidates.empty();
+                    })) {
+                    return std::nullopt;
                 }
+                choices.push_back(TopConversions(phrases, check ? kChoices : 1));
+                read.push_back(choices.back());
             }
         }
         if (end < keys.size()) {
             const auto mark = kanaOf(std::wstring_view(keys).substr(end, 1));
             if (!mark) return std::nullopt;
-            text += *mark;
+            choices.push_back({*mark});
+            read.push_back({*mark});
         }
         start = end + 1;
     }
     if (!split) return std::nullopt;
+    const auto picks = check ? ReadBest(read) : std::vector<std::size_t>(choices.size(), 0);
+    std::wstring text;
+    for (std::size_t i = 0; i < choices.size(); ++i) text += choices[i][picks[i]];
     return text;
 }
 
@@ -1979,40 +2051,9 @@ void JapaneseComposer::SettleChunk() {
         for (const auto& phrase : phrases) {
             if (!phrase.candidates.empty()) chunk.japanese += phrase.candidates.front().text;
         }
-        // The chunk's next conversions by their phrases' ranks, for the
-        // sentence check on Enter.
+        // Its next conversions, for the sentence check on Enter.
         constexpr std::size_t kChoices = 6;
-        constexpr std::size_t kListed = 8;
-        if (reranker_ && sentenceCheck_ && !phrases.empty()) {
-            std::vector<std::vector<const std::wstring*>> lists;
-            for (const auto& phrase : phrases) {
-                std::vector<const std::wstring*> list;
-                for (const auto& candidate : phrase.candidates) {
-                    if (list.size() >= kListed) break;
-                    if (!candidate.reading.empty()) continue;
-                    if (std::none_of(list.begin(), list.end(), [&](const std::wstring* t) { return *t == candidate.text; })) {
-                        list.push_back(&candidate.text);
-                    }
-                }
-                if (list.empty()) {
-                    lists.clear();
-                    break;
-                }
-                lists.push_back(std::move(list));
-            }
-            std::vector<std::size_t> sizes;
-            for (const auto& list : lists) sizes.push_back(list.size());
-            if (!lists.empty()) {
-                ForPicksByRank(sizes, [&](const std::vector<std::size_t>& picks) {
-                    std::wstring text;
-                    for (std::size_t i = 0; i < lists.size(); ++i) text += *lists[i][picks[i]];
-                    if (std::find(chunk.japaneseChoices.begin(), chunk.japaneseChoices.end(), text) == chunk.japaneseChoices.end()) {
-                        chunk.japaneseChoices.push_back(std::move(text));
-                    }
-                    return chunk.japaneseChoices.size() < kChoices;
-                });
-            }
-        }
+        if (reranker_ && sentenceCheck_) chunk.japaneseChoices = TopConversions(phrases, kChoices);
     }
     if (chunk.japanese.empty()) chunk.japanese = ApplyTypingStyle(Reading());
     if (settled_.empty()) spaceBeforeSentence_ = spaceAfterEnglish_;
@@ -2067,56 +2108,20 @@ void JapaneseComposer::CheckMixedSentence() {
     // Each chunk as taken first, then its other conversions when it was
     // taken as Japanese. Picked or typed with capitals stays as it is; so
     // does each chunk's language (the sentence model knows little English).
-    struct Option {
-        bool english;
-        std::size_t japanese;  // in japaneseChoices
-    };
-    std::vector<std::vector<Option>> options;
+    std::vector<std::vector<std::wstring>> parts;
     for (const auto& chunk : settled_) {
-        std::vector<Option> list{{chunk.isEnglish, 0}};
-        if (!chunk.marksOnly && !chunk.locked && !chunk.isEnglish) {
-            for (std::size_t j = 1; j < chunk.japaneseChoices.size(); ++j) list.push_back({false, j});
+        if (chunk.isEnglish && !chunk.marksOnly) {
+            parts.push_back({EnglishForModel(chunk.english)});
+        } else if (chunk.marksOnly || chunk.locked || chunk.japaneseChoices.empty()) {
+            parts.push_back({chunk.japanese});
+        } else {
+            parts.push_back(chunk.japaneseChoices);
         }
-        options.push_back(std::move(list));
     }
-    std::vector<std::size_t> sizes;
-    for (const auto& list : options) sizes.push_back(list.size());
-    const auto apply = [&](std::vector<SettledChunk>& chunks, const std::vector<std::size_t>& picks) {
-        for (std::size_t i = 0; i < chunks.size(); ++i) {
-            const auto& option = options[i][picks[i]];
-            chunks[i].isEnglish = option.english;
-            if (option.japanese < chunks[i].japaneseChoices.size()) {
-                chunks[i].japanese = chunks[i].japaneseChoices[option.japanese];
-            }
-        }
-    };
-    std::vector<std::wstring> sentences;
-    std::vector<std::vector<std::size_t>> picked;
-    auto chunks = settled_;
-    ForPicksByRank(sizes, [&](const std::vector<std::size_t>& picks) {
-        apply(chunks, picks);
-        // English read as a word the sentence model knows: it reads English
-        // poorly, and a loanword in its place (lunch: ランチ) did worse.
-        for (auto& chunk : chunks) {
-            if (!chunk.isEnglish || chunk.marksOnly) continue;
-            std::wstring marks;
-            for (const wchar_t c : chunk.english) {
-                if (std::wstring_view(L".,!?。、！？").find(c) != std::wstring_view::npos) marks.push_back(c);
-            }
-            chunk.isEnglish = false;
-            chunk.japanese = L"それ" + marks;
-        }
-        auto text = JoinChunks(chunks);
-        if (std::find(sentences.begin(), sentences.end(), text) == sentences.end()) {
-            sentences.push_back(std::move(text));
-            picked.push_back(picks);
-        }
-        return sentences.size() < reranker_->Top();
-    });
-    const std::size_t chosen = reranker_->Choose(sentences);
-    if (chosen == 0) return;
-    apply(settled_, picked[chosen]);
-    RecountSentence();
+    const auto picks = ReadBest(parts);
+    for (std::size_t i = 0; i < settled_.size(); ++i) {
+        if (picks[i] > 0) settled_[i].japanese = parts[i][picks[i]];
+    }
 }
 
 std::wstring JapaneseComposer::CommitSentence() {

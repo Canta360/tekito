@@ -366,6 +366,11 @@ private:
     // The likeliest sentences the phrases' candidates make, checked as a
     // whole (SetSentenceReranker); the one taken is selected.
     void CheckSentence();
+    // A sentence in parts, each with its choices (best first): the choice
+    // of each part the sentence model reads best, all 0 to keep the first.
+    // The phrases of a conversion, the chunks of a mixed sentence and the
+    // pieces of English run into Japanese are checked with it alike.
+    [[nodiscard]] std::vector<std::size_t> ReadBest(const std::vector<std::vector<std::wstring>>& parts) const;
     // The keys with their likeliest slips undone (SetKanaSlips), converted
     // in place of the phrases when that reads better; whether it did.
     bool FixSlips();
