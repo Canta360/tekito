@@ -1,0 +1,7 @@
+What reads as Japanese kana, for finding slips before conversion: kana
+n-gram probabilities and a small character model, both computed by TEKITO
+(scripts/ja/build-japanese-slips-pack.py) from the readings in the
+zenz-v2.5-dataset (https://huggingface.co/datasets/Miwa-Keita/zenz-v2.5-dataset),
+its llm-jp-corpus-v3 part, made available under the Open Data Commons
+Attribution License (ODC-BY 1.0): https://opendatacommons.org/licenses/by/1-0/
+The pack holds statistics and weights only; it contains no sentences.

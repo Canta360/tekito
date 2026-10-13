@@ -1,6 +1,7 @@
 #include "Core/Japanese/JapaneseComposer.h"
 
 #include "Core/Japanese/JapaneseLearning.h"
+#include "Core/Japanese/KanaSlips.h"
 #include "Core/Japanese/KanaText.h"
 #include "Core/TypoModel.h"
 #include "Core/Japanese/KeyConverter.h"
@@ -857,6 +858,9 @@ void JapaneseComposer::BuildPhrases(bool convert) {
         } else {
             AddPhrases(ConvertReading(reading, 0, context_, contextWords_), reading);
         }
+        if (slips_ && table_ && !chunkJudge_ && !HasAscii() && !reconverted_ && !phrases_.empty() && FixSlips()) {
+            slipUndone = true;
+        }
     }
     if (phrases_.empty()) {
         phrases_.push_back({0, reading.size(),
@@ -907,6 +911,93 @@ void JapaneseComposer::BuildPhrases(bool convert) {
         candidates.insert(candidates.begin() + 1, std::move(english));
     }
     if (convert && reranker_ && sentenceCheck_ && !chunkJudge_ && !reconverted_) CheckSentence();
+}
+
+bool JapaneseComposer::FixSlips() {
+    // Readings with slips undone must beat the keys as typed by this much
+    // (nats, kana LSTM less the edits) to be converted at all; then the
+    // two conversions are weighed with the sentence model, the kana score
+    // counting half. Chosen on dev sets only.
+    constexpr double kSlipGate = 12.0;
+    constexpr double kKanaWeight = 0.5;
+    const std::wstring keys = Keys(false);
+    const auto found = slips_->Find(keys, *table_, 1);
+    if (found.size() < 2 || found[1].score - found[0].score <= kSlipGate) return false;
+    const auto& fixed = found[1];
+
+    // The corrected keys converted as typed keys are.
+    std::wstring reading;
+    std::vector<std::size_t> keyAt;
+    std::vector<Phrase> converted;
+    if (auto conversion = keyConverter_ ? keyConverter_->Convert(fixed.keys, context_, contextWords_, userDictionary_)
+                                        : std::nullopt) {
+        reading = ApplyTypingStyle(std::move(conversion->reading));
+        keyAt = std::move(conversion->keyAt);
+        converted = std::move(conversion->phrases);
+    } else {
+        std::wstring kana;
+        std::vector<std::pair<std::size_t, std::size_t>> units;  // kana offset, key offset
+        std::size_t key = 0;
+        for (const auto& token : ParseRomaji(*table_, fixed.keys)) {
+            units.emplace_back(kana.size(), key);
+            kana += ToFullWidthAscii(token.kana);
+            key += token.keys;
+        }
+        reading = ApplyTypingStyle(std::move(kana));
+        keyAt.assign(reading.size() + 1, std::wstring::npos);
+        for (const auto& [offset, at] : units) keyAt[offset] = at;
+        keyAt[reading.size()] = key;
+        converted = ConvertReading(reading, 0, context_, contextWords_);
+    }
+    // Key positions in the corrected keys, back to the typed ones; none
+    // inside what was put in.
+    for (auto& at : keyAt) {
+        if (at == std::wstring::npos) continue;
+        std::ptrdiff_t shift = 0;
+        std::size_t typed = std::wstring::npos;
+        bool inside = false;
+        for (const auto& edit : fixed.edits) {
+            const std::size_t begin = edit.begin + shift;
+            if (at <= begin) break;
+            if (at < begin + edit.with.size()) {
+                inside = true;
+                break;
+            }
+            shift += static_cast<std::ptrdiff_t>(edit.with.size()) - static_cast<std::ptrdiff_t>(edit.end - edit.begin);
+        }
+        if (!inside) typed = static_cast<std::size_t>(static_cast<std::ptrdiff_t>(at) - shift);
+        at = typed;
+    }
+
+    auto typedPhrases = std::move(phrases_);
+    auto typedReading = std::move(conversionReading_);
+    auto typedKeys = std::move(readingKeys_);
+    phrases_.clear();
+    conversionReading_ = reading;
+    readingKeys_ = std::move(keyAt);
+    AddPhrases(std::move(converted), reading);
+    const auto restore = [&] {
+        phrases_ = std::move(typedPhrases);
+        conversionReading_ = std::move(typedReading);
+        readingKeys_ = std::move(typedKeys);
+        return false;
+    };
+    if (phrases_.empty()) return restore();
+    if (reranker_) {
+        const auto sentenceOf = [](const std::vector<PhraseState>& phrases) {
+            std::wstring text;
+            for (const auto& phrase : phrases) {
+                if (!phrase.candidates.empty()) text += phrase.candidates[std::min(phrase.selected, phrase.candidates.size() - 1)].text;
+            }
+            return text;
+        };
+        const std::wstring sentences[] = {sentenceOf(typedPhrases), sentenceOf(phrases_)};
+        const auto logProbabilities = reranker_->LogProbabilities(sentences);
+        if (kKanaWeight * found[0].score + logProbabilities[0] >= kKanaWeight * fixed.score + logProbabilities[1]) {
+            return restore();
+        }
+    }
+    return true;
 }
 
 void JapaneseComposer::CheckSentence() {

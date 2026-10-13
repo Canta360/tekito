@@ -1,0 +1,19 @@
+{
+  "pack_id": "japanese-slips",
+  "display_name": "Japanese Slip Finder",
+  "schema_version": 1,
+  "version": "test",
+  "language": "ja-JP",
+  "type": "japanese-slips",
+  "format": "ja-slips-v1",
+  "file": "slips.bin",
+  "chars_file": "chars.tsv",
+  "entry_count": 225,
+  "sha256": {
+    "file": "604627AD955E780E0412F7A1340066FEDBC5F6D6B83A385D1BC4894A3B039EDA",
+    "chars": "FA490417375BAF1ECFB15096D256202A9BD3F84E2444967D989EFEEB1645DE75"
+  },
+  "license": "TEKITO-OWNED",
+  "source": "scripts/ja/build-japanese-slips-pack.py on zenz-v2.5-dataset (ODC-BY 1.0)",
+  "notice_file": "NOTICE"
+}

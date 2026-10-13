@@ -16,6 +16,7 @@
 #include "Core/Japanese/PostalCodes.h"
 #include "Core/Japanese/RomajiTable.h"
 #include "Core/Japanese/SentenceReranker.h"
+#include "Core/Japanese/KanaSlips.h"
 #include "Core/Japanese/SortedTsv.h"
 #include "Core/SpecialConversions.h"
 
@@ -1593,6 +1594,60 @@ void TestSentenceReranker(const RomajiTable& table, const MiniPack& pack) {
     checked.Clear();
 }
 
+// The slip finder (japanese-slips): ln p of kana by the n-grams and the
+// LSTM as tests/data/ja/make-japanese-slips-mini.py worked them out, the
+// readings it offers, and the composer going back to what was typed.
+void TestKanaSlips(const RomajiTable& table, const MiniPack& pack) {
+    tekito::japanese::KanaSlips slips;
+    Require(!slips.Open(std::filesystem::path(TEKITO_TEST_DATA_DIR) / L"no-such-pack"), "a missing slips pack does not open");
+    const auto root = std::filesystem::path(TEKITO_TEST_DATA_DIR) / L"japanese-slips-mini";
+    Require(slips.Open(root), "the test slips pack opens");
+    std::ifstream expected(root / L"expected.tsv", std::ios::binary);
+    std::size_t rows = 0;
+    for (std::string line; std::getline(expected, line); ++rows) {
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+        const std::size_t tab = line.find('\t'), second = line.find('\t', tab + 1);
+        const std::wstring kana = tekito::japanese::FromUtf8(std::string_view(line).substr(0, tab));
+        const double ngram = std::stod(line.substr(tab + 1, second - tab - 1));
+        const double neural = std::stod(line.substr(second + 1));
+        Require(std::abs(slips.NgramLogProbability(kana) - ngram) < 0.01, ("n-gram ln p of " + Utf8(kana)).c_str());
+        const std::wstring one[] = {kana};
+        Require(std::abs(slips.NeuralLogProbabilities(one).front() - neural) < 0.1, ("LSTM ln p of " + Utf8(kana)).c_str());
+    }
+    Require(rows == 6, "every expected slips row is read");
+
+    // The typed keys come first; each other reading is the typed keys with
+    // its edits made.
+    const std::wstring typed = L"kyouhaiitenkideune.";
+    const auto found = slips.Find(typed, table, 5);
+    Require(!found.empty() && found.front().keys == typed && found.front().edits.empty(), "the typed keys come first");
+    for (std::size_t i = 1; i < found.size(); ++i) {
+        std::wstring keys;
+        std::size_t at = 0;
+        for (const auto& edit : found[i].edits) {
+            keys += typed.substr(at, edit.begin - at) + edit.with;
+            at = edit.end;
+        }
+        keys += typed.substr(at);
+        Require(keys == found[i].keys && keys != typed, "a reading is the typed keys with its edits");
+        Require(found[i].edits.size() <= 2, "at most two slips are undone");
+        Require(i == 1 || found[i].score <= found[i - 1].score, "readings come best first");
+    }
+    Require(slips.Find(std::wstring(400, L'a'), table, 5).empty(), "very long input is left alone");
+
+    // Whatever it converts, Esc goes back to the kana as typed.
+    const tekito::japanese::JapaneseConverter converter(pack.dictionary, pack.matrix);
+    JapaneseComposer composer(&table);
+    composer.SetConverter(&converter);
+    composer.SetKanaSlips(&slips);
+    Type(composer, typed);
+    composer.Convert();
+    Require(composer.IsConverted(), "keys with a slip convert");
+    composer.Cancel();
+    RequireText(composer.Preedit(), L"きょうはいいてんきでうね。", "Esc shows the kana as typed");
+    composer.Clear();
+}
+
 int main(int argc, char** argv) {
     const auto table = LoadTable();
     TestKanaText();
@@ -1623,6 +1678,7 @@ int main(int argc, char** argv) {
     TestUserWords(*table, *pack);
     TestSpecialConversions(*table, *pack);
     TestSentenceReranker(*table, *pack);
+    TestKanaSlips(*table, *pack);
     TestMeanings();
     if (argc > 1 && std::string_view(argv[1]) == "--dump") DumpConversions(*pack);
     std::cout << "All TEKITO Japanese tests passed.\n";

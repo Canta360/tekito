@@ -27,6 +27,7 @@ class Loanwords;
 class PostalCodes;
 class RomajiTable;
 class SentenceReranker;
+class KanaSlips;
 
 // One romaji unit: the keys it took and the kana it made. Keys the table
 // cannot read come out as they are, as leftovers.
@@ -108,6 +109,10 @@ public:
     void SetSentenceReranker(const SentenceReranker* reranker) noexcept { reranker_ = reranker; }
     // The user's switch for it (on by default).
     void SetSentenceCheck(bool on) noexcept { sentenceCheck_ = on; }
+    // Converting looks for slips in the keys with `slips` (one or two keys
+    // dropped, extra, a neighbor or swapped) and converts the keys as
+    // meant when they read clearly better (not in Mix); nullptr: off.
+    void SetKanaSlips(const KanaSlips* slips) noexcept { slips_ = slips; }
     // What `key` types when it types an opening bracket on its own (「 for
     // [ , in the width set), with the bracket that closes it.
     [[nodiscard]] std::optional<std::pair<std::wstring, std::wstring>> BracketPair(wchar_t key) const;
@@ -361,6 +366,9 @@ private:
     // The likeliest sentences the phrases' candidates make, checked as a
     // whole (SetSentenceReranker); the one taken is selected.
     void CheckSentence();
+    // The keys with their likeliest slips undone (SetKanaSlips), converted
+    // in place of the phrases when that reads better; whether it did.
+    bool FixSlips();
     // Mixed typing: the candidates for a chunk judged English, `written`
     // first, then the keys as typed, katakana and the Japanese.
     [[nodiscard]] std::vector<PhraseCandidate> EnglishCandidates(const std::wstring& written,
@@ -524,6 +532,7 @@ private:
     JapaneseLearningStore* learning_{nullptr};
     const SentenceReranker* reranker_{nullptr};
     bool sentenceCheck_{true};
+    const KanaSlips* slips_{nullptr};
     std::vector<Unit> units_;
     // Units before the caret; pending keys belong at the caret.
     std::size_t caret_{0};

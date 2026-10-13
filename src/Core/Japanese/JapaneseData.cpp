@@ -7,6 +7,7 @@
 #include "Core/Japanese/JapaneseConverter.h"
 #include "Core/Japanese/JapaneseDictionary.h"
 #include "Core/Japanese/JapaneseUserDictionary.h"
+#include "Core/Japanese/KanaSlips.h"
 #include "Core/Japanese/KeyConverter.h"
 #include "Core/Japanese/LanguageModel.h"
 #include "Core/Japanese/Loanwords.h"
@@ -26,6 +27,7 @@ struct JapaneseData {
     ConnectionMatrix matrix;
     LanguageModel model;
     SentenceReranker reranker;
+    KanaSlips slips;
     Loanwords loanwords;
     UserPartsOfSpeech userParts;
     std::unique_ptr<JapaneseConverter> converter;
@@ -53,6 +55,7 @@ const JapaneseData* ProcessJapaneseData() {
                                                           *table);
         }
         (void)loaded->reranker.Open(ExternalLexiconProvider::PackDirectory(L"japanese-reranker"));
+        (void)loaded->slips.Open(ExternalLexiconProvider::PackDirectory(L"japanese-slips"));
         (void)loaded->loanwords.Open(ExternalLexiconProvider::PackDirectory(L"japanese-loanwords"));
         (void)loaded->loanwords.OpenEnglish(ExternalLexiconProvider::PackDirectory(L"japanese-english"));
         loaded->userParts = UserPartsOfSpeech::Load(core / L"pos.tsv");
@@ -121,6 +124,7 @@ void AttachJapaneseData(JapaneseComposer& composer) {
     composer.SetLoanwords(data && data->loanwords.IsOpen() ? &data->loanwords : nullptr);
     composer.SetRunTogether(data ? data->chunks.get() : nullptr);
     composer.SetSentenceReranker(data && data->reranker.IsOpen() ? &data->reranker : nullptr);
+    composer.SetKanaSlips(data && data->slips.IsOpen() ? &data->slips : nullptr);
 }
 
 void AttachMixedTyping(JapaneseComposer& composer, bool on) {
@@ -143,6 +147,7 @@ std::vector<std::wstring_view> MissingJapaneseData() {
     if (!data->model.IsOpen()) missing.emplace_back(L"language model");
     if (!data->loanwords.IsOpen()) missing.emplace_back(L"loanwords");
     if (!data->reranker.IsOpen()) missing.emplace_back(L"sentence check");
+    if (!data->slips.IsOpen()) missing.emplace_back(L"slip finder");
     if (data->userParts.Empty()) missing.emplace_back(L"user word parts of speech");
     return missing;
 }
