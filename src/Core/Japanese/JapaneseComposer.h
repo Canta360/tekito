@@ -473,6 +473,8 @@ private:
         std::wstring keys;      // lower case, without the punctuation after
         std::wstring english;   // as English
         std::wstring japanese;  // as Japanese
+        // Its other conversions, for the sentence check (japanese first).
+        std::vector<std::wstring> japaneseChoices;
         bool isEnglish{false};
         bool marksOnly{false};  // punctuation of its own (a "." after English)
         bool locked{false};     // picked from the list or typed with capitals
@@ -496,6 +498,10 @@ private:
     // Mixed typing: the settled chunks as one text, and the whole sentence
     // committed.
     [[nodiscard]] std::wstring SettledText() const;
+    [[nodiscard]] static std::wstring JoinChunks(const std::vector<SettledChunk>& chunks);
+    // Mixed typing: each settled chunk as English or as one of its
+    // conversions, as the sentence model reads the whole sentence best.
+    void CheckMixedSentence();
     [[nodiscard]] std::wstring CommitSentence();
     // The chunk being typed, committed (what Commit was before Mix held
     // sentences).
