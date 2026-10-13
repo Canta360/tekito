@@ -144,6 +144,18 @@ void WriteOutput(const std::string& source, const std::string& id, const std::ws
     if (out.is_open()) out << source << "\t" << id << "\t" << Narrow(text) << "\n";
 }
 
+// TEKITO_EVAL_SHOWN=<path>: what the composition showed just before Enter
+// (live conversion, Mix holding a sentence), in the same layout.
+void WriteShown(const std::string& source, const std::string& id, const tekito::japanese::JapaneseComposer& composer) {
+    std::wstring text;
+    for (const auto& segment : composer.Segments()) text += segment.text;
+    static std::ofstream out = [] {
+        const char* path = std::getenv("TEKITO_EVAL_SHOWN");
+        return path && *path ? std::ofstream(path, std::ios::binary) : std::ofstream();
+    }();
+    if (out.is_open()) out << source << "\t" << id << "\t" << Narrow(text) << "\n";
+}
+
 struct Totals {
     std::size_t rows{0};
     std::size_t exact{0};
@@ -212,6 +224,7 @@ int RunKeys(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary
         const auto start = Clock::now();
         if (!live) composer.Convert();
         const double elapsed = std::chrono::duration<double, std::micro>(Clock::now() - start).count();
+        WriteShown(row.source, row.id, composer);
         std::wstring output = live ? composer.Commit() : composer.Preedit();
         if (byPhrase) {
             const auto pieces = composer.PhraseKeys();
@@ -525,7 +538,10 @@ int RunChunks(const ConnectionMatrix& matrix, const JapaneseDictionary& dictiona
                 englishText.clear();
             }
         }
-        if (options.hold) output = composer.Commit();
+        if (options.hold) {
+            WriteShown(row.source, row.id, composer);
+            output = composer.Commit();
+        }
         // English last leaves its space after it.
         while (!output.empty() && output.back() == L' ') output.pop_back();
         const auto [distance, length] = ja_eval::Closest(output, row.expected);
