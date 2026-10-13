@@ -35,6 +35,8 @@ data/ja/japanese-lm/
 # Built by scripts/ja/build-japanese-reranker-pack.py from a model trained
 # with scripts/ja/train-japanese-wordlm.py on the zenz-v2.5 dataset
 data/ja/japanese-reranker/
+# Built by scripts/ja/build-japanese-slips-pack.py from the zenz-v2.5 readings
+data/ja/japanese-slips/
 # Built by scripts/ja/build-japanese-meaning-packs.py from the slang list,
 # Wiktionary and WordNet
 data/ja/japanese-slang/
