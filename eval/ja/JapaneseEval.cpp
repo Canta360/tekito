@@ -199,6 +199,11 @@ int RunKeys(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary
     };
     std::map<std::string, KeyTotals> totals;
     std::size_t shown = 0;
+    // Live: how long each key takes to show, and the pause before Enter.
+    std::vector<double> keyMicroseconds;
+    std::vector<double> refineMicroseconds;
+    const char* pauseSetting = std::getenv("TEKITO_EVAL_PAUSE");
+    const bool pause = pauseSetting && std::string_view(pauseSetting) == "1";
     // --dump-phrases: the phrases of sentences that convert right, one per
     // row, as a keys file (for typing phrase by phrase).
     std::ofstream phrases;
@@ -220,7 +225,17 @@ int RunKeys(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary
         // Each row on its own: Enter (live) commits, which would lead the
         // next row on from it.
         if (live) composer.ForgetContext();
-        for (const wchar_t key : row.reading) composer.Insert(key);
+        for (const wchar_t key : row.reading) {
+            const auto keyStart = Clock::now();
+            composer.Insert(key);
+            if (live) keyMicroseconds.push_back(std::chrono::duration<double, std::micro>(Clock::now() - keyStart).count());
+        }
+        // TEKITO_EVAL_PAUSE=1 (live): typing pauses before Enter.
+        if (live && pause) {
+            const auto pauseStart = Clock::now();
+            composer.RefineLive();
+            refineMicroseconds.push_back(std::chrono::duration<double, std::micro>(Clock::now() - pauseStart).count());
+        }
         const auto start = Clock::now();
         if (!live) composer.Convert();
         const double elapsed = std::chrono::duration<double, std::micro>(Clock::now() - start).count();
@@ -375,6 +390,15 @@ int RunKeys(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary
                   << " list_us_p50=" << Percentile(t.listMicroseconds, 0.5)
                   << " p95=" << Percentile(t.listMicroseconds, 0.95)
                   << " max=" << Percentile(t.listMicroseconds, 1.0) << "\n";
+    }
+    if (live) {
+        std::cout << "live keys: us_p50=" << Percentile(keyMicroseconds, 0.5) << " p95=" << Percentile(keyMicroseconds, 0.95)
+                  << " p99=" << Percentile(keyMicroseconds, 0.99) << " max=" << Percentile(keyMicroseconds, 1.0) << "\n";
+        if (pause) {
+            std::cout << "live pause: us_p50=" << Percentile(refineMicroseconds, 0.5)
+                      << " p95=" << Percentile(refineMicroseconds, 0.95) << " p99=" << Percentile(refineMicroseconds, 0.99)
+                      << " max=" << Percentile(refineMicroseconds, 1.0) << "\n";
+        }
     }
     return 0;
 }
