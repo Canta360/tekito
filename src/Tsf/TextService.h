@@ -183,6 +183,11 @@ private:
     // Puts committed Japanese `text` in place of the composition and ends it.
     HRESULT WriteJapaneseCommit(ITfContext* context, TfEditCookie editCookie, const std::wstring& text);
     HRESULT ShowJapanesePreedit(ITfContext* context, TfEditCookie editCookie);
+    // Live conversion: once typing pauses, what is shown is converted again
+    // as Enter would convert it.
+    void ScheduleJapaneseRefine();
+    void CancelJapaneseRefine();
+    static void CALLBACK OnJapaneseRefineTimer(HWND, UINT, UINT_PTR id, DWORD);
     // The composition text as the composer's segments, each underlined by
     // what it is.
     HRESULT ReplaceJapaneseComposition(ITfContext* context, TfEditCookie editCookie);
@@ -303,6 +308,7 @@ private:
     // not a word: typing on keeps it as it is, and nothing is learned.
     bool symbolComposition_{false};
     japanese::JapaneseComposer japanese_;
+    UINT_PTR refineTimer_{0};
     // The text the composer committed last (see CheckJapaneseContext).
     std::wstring lastJapaneseCommit_;
     japanese::JapaneseLearningStore japaneseLearning_;

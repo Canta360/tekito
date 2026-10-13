@@ -1646,6 +1646,20 @@ void TestKanaSlips(const RomajiTable& table, const MiniPack& pack) {
     composer.Cancel();
     RequireText(composer.Preedit(), L"きょうはいいてんきでうね。", "Esc shows the kana as typed");
     composer.Clear();
+
+    // Live: once typing pauses, what is shown is what Enter takes.
+    Type(composer, typed);
+    composer.Convert();
+    const std::wstring converted = composer.Preedit();
+    composer.Clear();
+    composer.SetLiveConversion(true);
+    Type(composer, typed);
+    (void)composer.RefineLive();
+    RequireText(composer.Preedit(), converted, "a pause shows the text as Space converts it");
+    Require(!composer.RefineLive(), "a second pause changes nothing");
+    RequireText(composer.Commit(), converted, "Enter takes what the pause showed");
+    composer.Clear();
+    composer.SetLiveConversion(false);
 }
 
 int main(int argc, char** argv) {

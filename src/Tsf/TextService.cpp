@@ -593,6 +593,7 @@ HRESULT TextService::ActivateEx(ITfThreadMgr* threadManager, TfClientId clientId
 
 HRESULT TextService::Deactivate() {
     Trace(L"Deactivate");
+    CancelJapaneseRefine();
     if (settingsLoaded_) SyncRuntimeState();
     if (settingsLoaded_) {
         userdata::UserSettings latestSettings = userSettings_;
@@ -1526,6 +1527,13 @@ void TextService::OnCandidateSelected(std::size_t index) {
 HRESULT TextService::HandleKeyInEditSession(ITfContext* context, TfEditCookie editCookie,
                                             const KeyInput& input) {
     const HRESULT hr = HandleKeyInEditSessionCore(context, editCookie, input);
+    if (input.type != KeyInput::Type::JapaneseRefine) {
+        if (japanese_.Live() && japanese_.IsComposing()) {
+            ScheduleJapaneseRefine();
+        } else {
+            CancelJapaneseRefine();
+        }
+    }
     // An English word typed with Shift in Japanese ends once it is committed.
     if (englishSegment_ && !state_.IsActive()) EndEnglishSegment();
     return hr;
@@ -1561,6 +1569,10 @@ HRESULT TextService::HandleKeyInEditSessionCore(ITfContext* context, TfEditCooki
     if (input.englishSegment && !englishSegment_ && TypesJapanese(mode_)) {
         englishSegment_ = true;
         state_.SetInputMode(InputMode::Convert);
+    }
+    if (input.type == KeyInput::Type::JapaneseRefine) {
+        if (context != compositionContext_ || !composition_ || !japanese_.RefineLive()) return S_OK;
+        return ShowJapanesePreedit(context, editCookie);
     }
     // Japanese typing, and committing it after the mode or focus changed.
     if ((TypesJapanese(mode_) && !englishSegment_) ||

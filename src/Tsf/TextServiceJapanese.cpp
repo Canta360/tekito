@@ -464,6 +464,43 @@ HRESULT TextService::HandleJapaneseKey(ITfContext* context, TfEditCookie editCoo
     return ShowJapanesePreedit(context, editCookie);
 }
 
+namespace {
+// How long typing stops before live conversion converts the text again.
+constexpr UINT kRefinePauseMs = 200;
+// The text service whose pause timer runs on this thread.
+thread_local TextService* refineOwner = nullptr;
+}  // namespace
+
+void TextService::ScheduleJapaneseRefine() {
+    refineOwner = this;
+    // SetTimer with the same id restarts the wait.
+    refineTimer_ = SetTimer(nullptr, refineTimer_, kRefinePauseMs, &TextService::OnJapaneseRefineTimer);
+}
+
+void TextService::CancelJapaneseRefine() {
+    if (refineTimer_) KillTimer(nullptr, refineTimer_);
+    refineTimer_ = 0;
+    if (refineOwner == this) refineOwner = nullptr;
+}
+
+void CALLBACK TextService::OnJapaneseRefineTimer(HWND, UINT, UINT_PTR id, DWORD) {
+    TextService* self = refineOwner;
+    if (!self || id != self->refineTimer_) {
+        KillTimer(nullptr, id);
+        return;
+    }
+    self->CancelJapaneseRefine();
+    if (!self->compositionContext_ || !self->japanese_.Live() || !self->japanese_.IsComposing()) return;
+    KeyInput input{};
+    input.type = KeyInput::Type::JapaneseRefine;
+    auto* session = new (std::nothrow) KeyEditSession(self, self->compositionContext_, input);
+    if (!session) return;
+    HRESULT sessionResult = E_FAIL;
+    (void)self->compositionContext_->RequestEditSession(self->clientId_, session, TF_ES_ASYNCDONTCARE | TF_ES_READWRITE,
+                                                         &sessionResult);
+    session->Release();
+}
+
 HRESULT TextService::ShowJapanesePreedit(ITfContext* context, TfEditCookie editCookie) {
     if (!japanese_.IsComposing()) {
         candidateWindow_.Hide();

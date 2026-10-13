@@ -387,6 +387,7 @@ void JapaneseComposer::StartPicking() {
 }
 
 void JapaneseComposer::UpdateLive() {
+    refinedKeys_.clear();
     const std::wstring reading = Reading();  // the keys still pending stay as typed
     if (!Live() || kanaView_ || !converter_ || reading.empty()) {
         phrases_.clear();
@@ -451,6 +452,27 @@ void JapaneseComposer::UpdateLive() {
     preview_ = true;
     focus_ = phrases_.size() - 1;
     listOpen_ = false;
+}
+
+bool JapaneseComposer::RefineLive() {
+    if (!Live() || !preview_ || kanaView_ || !pending_.empty() || units_.empty() || LiveRefined()) return false;
+    // A candidate picked while typing stays, as on Enter.
+    if (std::any_of(phrases_.begin(), phrases_.end(),
+                    [](const PhraseState& phrase) { return phrase.selected != 0 || phrase.form; })) {
+        return false;
+    }
+    const std::wstring before = Preedit();
+    ResetLive();
+    BuildPhrases(true);
+    preview_ = true;
+    focus_ = phrases_.empty() ? 0 : phrases_.size() - 1;
+    listOpen_ = false;
+    refinedKeys_ = Keys(false);
+    return Preedit() != before;
+}
+
+bool JapaneseComposer::LiveRefined() const {
+    return preview_ && !refinedKeys_.empty() && pending_.empty() && refinedKeys_ == Keys(false);
 }
 
 void JapaneseComposer::UpdatePredictions() {
@@ -2187,7 +2209,7 @@ std::wstring JapaneseComposer::CommitChunk() {
     // Live: Enter converts the whole text again as Space does (slips undone,
     // the whole input read at once), unless a candidate was picked while
     // typing; then only the keys that were pending are converted too.
-    if (Live() && preview_) {
+    if (Live() && preview_ && !LiveRefined()) {
         const bool picked = std::any_of(phrases_.begin(), phrases_.end(),
                                         [](const PhraseState& phrase) { return phrase.selected != 0 || phrase.form; });
         if (picked) {

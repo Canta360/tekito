@@ -41,6 +41,9 @@ struct KeyInput {
         EnglishSegmentEnd,
         // Not a key: commit the Japanese text (the mode or focus changed).
         JapaneseCommit,
+        // Not a key: typing paused in live conversion; the text is converted
+        // again as Enter would (JapaneseComposer::RefineLive).
+        JapaneseRefine,
         // Not a key: show the mode by the caret (the user switched modes).
         ShowModeIndicator,
         // English: `character` finishes a symbol's spelling or a sum before

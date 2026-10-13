@@ -194,6 +194,10 @@ public:
     static constexpr std::size_t kOpenPhrases = 4;
     // How many phrases live conversion keeps open (for measuring).
     void SetLiveOpenPhrases(std::size_t count) noexcept { liveOpenPhrases_ = count; }
+    // Live conversion, once typing pauses: the whole text converted as Enter
+    // converts it (slips undone, checked as a sentence), shown until the
+    // next key; Enter then takes it as shown. Whether what is shown changed.
+    bool RefineLive();
 
     // Text is held: the chunk being typed, or (Mix) the sentence's chunks
     // before it.
@@ -446,6 +450,8 @@ private:
     // From the live conversion to picking, on the last phrase.
     void StartPicking();
     void ResetLive() noexcept;
+    // What is shown is RefineLive's for the keys typed.
+    [[nodiscard]] bool LiveRefined() const;
 
     // What Commit cleared, for UndoCommit.
     struct CommitRecord {
@@ -580,6 +586,8 @@ private:
     // The first phrases, and the reading they cover, that stay as they are.
     std::size_t settledPhrases_{0};
     std::size_t settledLength_{0};
+    // The keys RefineLive converted last.
+    std::wstring refinedKeys_;
     bool predictionEnabled_{false};
     std::vector<Prediction> predictions_;
     std::optional<std::size_t> chosenPrediction_;
