@@ -207,6 +207,26 @@ bool ContextHasPassThroughInputScope(ITfContext* context, TfEditCookie editCooki
     return std::any_of(scopes.begin(), scopes.end(), IsPassThroughInputScope);
 }
 
+// Japanese is typed in more fields than English is corrected in: a
+// browser's address bar (a URL field) searches in Japanese, and addresses,
+// user names and file names may be Japanese too.
+bool ContextHasJapanesePassThroughInputScope(ITfContext* context, TfEditCookie editCookie) {
+    const auto scopes = ContextInputScopes(context, editCookie);
+    return std::any_of(scopes.begin(), scopes.end(), [](InputScope scope) {
+        switch (scope) {
+        case IS_URL:
+        case IS_EMAIL_USERNAME:
+        case IS_EMAIL_SMTPEMAILADDRESS:
+        case IS_LOGINNAME:
+        case IS_FILE_FULLFILEPATH:
+        case IS_FILE_FILENAME:
+            return false;
+        default:
+            return IsPassThroughInputScope(scope);
+        }
+    });
+}
+
 // A field for katakana (a furigana field) types katakana.
 std::optional<japanese::KanaForm> FieldKanaForm(ITfContext* context, TfEditCookie editCookie) {
     for (const auto scope : ContextInputScopes(context, editCookie)) {
@@ -1596,7 +1616,7 @@ HRESULT TextService::HandleKeyInEditSessionCore(ITfContext* context, TfEditCooki
     if ((TypesJapanese(mode_) && !englishSegment_) ||
         input.type == KeyInput::Type::JapaneseCommit || japanese_.IsComposing()) {
         if (input.type != KeyInput::Type::JapaneseCommit &&
-            (ContextHasPassThroughInputScope(context, editCookie) || FocusIsClassicPasswordEdit() ||
+            (ContextHasJapanesePassThroughInputScope(context, editCookie) || FocusIsClassicPasswordEdit() ||
              ProcessPassesThrough())) {
             const HRESULT hr = CommitJapanese(context, editCookie);
             return SUCCEEDED(hr) ? S_FALSE : hr;
