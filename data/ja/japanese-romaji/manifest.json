@@ -8,9 +8,9 @@
   "format": "indexed-tsv-v1",
   "file": "romaji.tsv",
   "index_file": "romaji.tsv.idx",
-  "entry_count": 338,
+  "entry_count": 348,
   "sha256": {
-    "file": "F980E0468CB23DE39F366B219E154A5B2E3A239EA962EAD5A7B9A092531F7008",
+    "file": "90615CB3A5AB8F378778B6BDBE1ED6B9EE669E3907A39165232F0E757A560347",
     "index": "01119591D95760B335EBA5A0A218ED832D8C6CD5B6817CE816A27277D1539A15"
   },
   "license": "TEKITO-OWNED",

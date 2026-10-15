@@ -71,6 +71,9 @@ EXTRA = {
     # Microsoft IME; these few have a Japanese form instead.
     "-": "ー", ",": "、", ".": "。", "[": "「", "]": "」", "/": "・", "~": "〜",
     "\\": "￥", '"': "”", "'": "’", "`": "‘",
+    # z and a key: arrows and marks, as in Microsoft IME.
+    "zh": "←", "zj": "↓", "zk": "↑", "zl": "→",
+    "z.": "…", "z,": "‥", "z/": "・", "z-": "〜", "z[": "『", "z]": "』",
 }
 # A doubled consonant is a small tsu followed by that consonant.
 DOUBLED = "bcdfghjkmpqrstvwxyz"
