@@ -55,6 +55,7 @@ HRESULT ReadEditSession::DoEditSession(TfEditCookie editCookie) {
 }
 
 HRESULT KeyEditSession::DoEditSession(TfEditCookie editCookie) {
+    ran_ = true;
     return service_ ? service_->HandleKeyInEditSession(context_, editCookie, input_) : E_UNEXPECTED;
 }
 

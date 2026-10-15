@@ -1009,10 +1009,18 @@ HRESULT TextService::OnTestKeyDown(ITfContext* context, WPARAM wParam, LPARAM lP
     }
     if (LetsKeyThrough(input)) {
         // Finish the word now; the key itself goes on to the application.
+        // An application that asks about the key again, or calls OnKeyDown
+        // for it anyway, does not get the word written twice.
+        if (keyFinishedInTest_ && keyFinishedInTest_->first == wParam && keyFinishedInTest_->second == lParam) {
+            *eaten = FALSE;
+            return S_OK;
+        }
         if (context) [[maybe_unused]] const auto ignored = RequestKeyEditSession(context, input);
+        keyFinishedInTest_ = std::pair{wParam, lParam};
         *eaten = FALSE;
         return S_OK;
     }
+    keyFinishedInTest_.reset();
     *eaten = TRUE;
     if (*eaten) Trace(L"OnTestKeyDown eaten");
     return S_OK;
@@ -1042,6 +1050,14 @@ HRESULT TextService::OnKeyDown(ITfContext* context, WPARAM wParam, LPARAM lParam
     }
 
     const bool passThrough = LetsKeyThrough(input);
+    if (passThrough && keyFinishedInTest_ && keyFinishedInTest_->first == wParam &&
+        keyFinishedInTest_->second == lParam) {
+        keyFinishedInTest_.reset();
+        NotePassedKey(wParam);
+        *eaten = FALSE;
+        return S_OK;
+    }
+    keyFinishedInTest_.reset();
     const HRESULT hr = RequestKeyEditSession(context, input);
     *eaten = hr == S_OK && !passThrough ? TRUE : FALSE;
     if (!*eaten) NotePassedKey(wParam);
@@ -1495,7 +1511,9 @@ HRESULT TextService::RequestKeyEditSession(ITfContext* context, const KeyInput& 
     const bool guardedTarget = ProcessPassesThrough() || FocusIsClassicPasswordEdit();
     const bool syncRejected = hr == TF_E_SYNCHRONOUS || sessionResult == TF_E_SYNCHRONOUS ||
                               (hr == E_UNEXPECTED && sessionResult == E_FAIL);
-    const bool retryAsync = !guardedTarget && syncRejected;
+    // Retried only when it did not run: a key handled and then failing is
+    // not handled again (the text would be written twice).
+    const bool retryAsync = !guardedTarget && syncRejected && !session->Ran();
     if (retryAsync) {
         Trace(L"RequestEditSession retry async");
         sessionResult = E_FAIL;

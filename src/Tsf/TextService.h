@@ -309,6 +309,9 @@ private:
     bool symbolComposition_{false};
     japanese::JapaneseComposer japanese_;
     UINT_PTR refineTimer_{0};
+    // The key OnTestKeyDown finished the word for and let through (Enter in
+    // English), so that it is not handled a second time.
+    std::optional<std::pair<WPARAM, LPARAM>> keyFinishedInTest_;
     // The text the composer committed last (see CheckJapaneseContext).
     std::wstring lastJapaneseCommit_;
     japanese::JapaneseLearningStore japaneseLearning_;

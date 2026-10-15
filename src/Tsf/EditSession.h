@@ -92,9 +92,13 @@ public:
     ULONG STDMETHODCALLTYPE AddRef() override;
     ULONG STDMETHODCALLTYPE Release() override;
     HRESULT STDMETHODCALLTYPE DoEditSession(TfEditCookie editCookie) override;
+    // Whether the session ran: a key is never handled twice.
+    [[nodiscard]] bool Ran() const noexcept { return ran_; }
 
 private:
     ~KeyEditSession() = default;
+
+    bool ran_{false};
 
     std::atomic<ULONG> refCount_{1};
     TextService* service_{nullptr};
