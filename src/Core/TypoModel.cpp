@@ -37,6 +37,9 @@ std::size_t EditDistance(std::wstring_view left, std::wstring_view right) noexce
 constexpr double kSubstitutionCost = 1.0;
 constexpr double kInsertDeleteCost = 1.15;
 constexpr double kTranspositionCost = 1.0;
+// A letter typed twice (youu, pleasee): the commonest slip, cheaper than a
+// key hit for another (youu is you, not your). Chosen on dev sentences.
+constexpr double kRepeatedKeyCost = 0.7;
 
 double WeightedEditDistance(std::wstring_view left, std::wstring_view right) noexcept {
     std::array<double, 32> beforePrevious{};
@@ -52,7 +55,8 @@ double WeightedEditDistance(std::wstring_view left, std::wstring_view right) noe
         current[0] = static_cast<double>(i) * kInsertDeleteCost;
         for (std::size_t j = 1; j <= right.size(); ++j) {
             const double substitution = left[i - 1] == right[j - 1] ? 0.0 : kSubstitutionCost;
-            current[j] = std::min({previous[j] + kInsertDeleteCost, current[j - 1] + kInsertDeleteCost,
+            const double extra = i > 1 && left[i - 1] == left[i - 2] ? kRepeatedKeyCost : kInsertDeleteCost;
+            current[j] = std::min({previous[j] + extra, current[j - 1] + kInsertDeleteCost,
                                    previous[j - 1] + substitution});
             if (i > 1 && j > 1 && left[i - 1] == right[j - 2] &&
                 left[i - 2] == right[j - 1]) {
