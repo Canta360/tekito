@@ -211,6 +211,10 @@ public:
     // Typing, rather than picking candidates: before conversion, or while
     // the live conversion is shown.
     [[nodiscard]] bool IsTyping() const noexcept { return Typing() && (!IsConverted() || preview_); }
+    // A prediction was picked (Tab) for the text being typed.
+    [[nodiscard]] bool PredictionChosen() const noexcept {
+        return chosenPrediction_ && *chosenPrediction_ < predictions_.size() && IsTyping();
+    }
     // Whether typing a key commits the conversion first (Microsoft IME);
     // live conversion types on instead, and Mix holds the chunk until Enter.
     [[nodiscard]] bool CommitsBeforeTyping() const noexcept { return IsConverted() && !Live() && !chunkJudge_; }

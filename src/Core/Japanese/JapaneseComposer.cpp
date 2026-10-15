@@ -2067,8 +2067,9 @@ std::vector<std::wstring> JapaneseComposer::PhraseKeys() const {
 std::wstring JapaneseComposer::Commit() {
     if (!chunkJudge_) return CommitChunk();
     // Enter takes the chunk being typed as Space would: judged and
-    // converted (kyouhaamegafuttekita is 今日は雨が降ってきた, not kana).
-    if (Typing() && !IsConverted()) Convert();
+    // converted (kyouhaamegafuttekita is 今日は雨が降ってきた, not kana);
+    // a prediction picked with Tab is taken as it is.
+    if (Typing() && !IsConverted() && !PredictionChosen()) Convert();
     std::wstring text;
     if (settled_.empty()) {
         text = CommitChunk();
@@ -2102,7 +2103,7 @@ void JapaneseComposer::SettleChunk() {
     while (word > 0 && std::wstring_view(L".,!?").find(keys[word - 1]) != std::wstring_view::npos) --word;
     chunk.keys = keys.substr(0, word);
     chunk.marksOnly = word == 0;
-    chunk.locked = TypedWithCapitals(chunk.keys).has_value() ||
+    chunk.locked = PredictionChosen() || TypedWithCapitals(chunk.keys).has_value() ||
                    std::any_of(phrases_.begin(), phrases_.end(), [](const PhraseState& p) { return p.selected != 0; });
     // Both ways, for when the sentence judges the chunk again.
     const std::wstring marks = MarksAfterEnglish(std::wstring_view(keys).substr(word));

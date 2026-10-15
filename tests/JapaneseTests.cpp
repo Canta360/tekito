@@ -1033,6 +1033,26 @@ void TestPrediction(const RomajiTable& table, const MiniPack& pack) {
     Require(!composer.Predictions().empty(), "Backspace brings them back");
     composer.Convert();
     Require(composer.Predictions().empty(), "converting puts predictions away");
+    composer.Clear();
+
+    // Mix: Enter takes the prediction picked with Tab, not a conversion.
+    struct NoWords final : tekito::IFrequencyProvider {
+        double Score(std::wstring_view) const noexcept override { return 0.0; }
+    } noWords;
+    const tekito::japanese::ChunkJudge judge(table, converter, nullptr, noWords, nullptr);
+    composer.SetMixedTyping(&judge, 0);
+    Type(composer, L"ariga");
+    composer.NextPrediction();
+    const auto picked = composer.Predictions()[*composer.ChosenPrediction()].text;
+    RequireText(composer.Commit(), picked, "Mix: Enter commits the prediction chosen with Tab");
+    Type(composer, L"ariga");
+    composer.Convert();
+    Type(composer, L"ariga");
+    composer.NextPrediction();
+    const auto second = composer.Predictions()[*composer.ChosenPrediction()].text;
+    const auto sentence = composer.Commit();
+    Require(sentence.ends_with(second), "after another chunk too");
+    composer.SetMixedTyping(nullptr, 0);
 }
 
 void TestUserWords(const RomajiTable& table, const MiniPack& pack) {
