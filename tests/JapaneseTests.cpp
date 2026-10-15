@@ -181,6 +181,15 @@ void TestCaret(const RomajiTable& table) {
     composer.Convert();
     composer.Cancel();
     RequireText(Type(composer, L"ne"), L"あょうはね", "after a conversion, typing goes on at the end");
+
+    composer.Clear();
+    RequireText(Type(composer, L"ktoba"), L"ｋとば", "a consonant without its vowel stays as typed");
+    composer.MoveCaret(-2);
+    RequireText(Type(composer, L"o"), L"ことば", "a vowel typed right after it later joins it");
+    composer.Clear();
+    RequireText(Type(composer, L"zhzjzkzl"), L"←↓↑→", "z and h, j, k, l type arrows");
+    RequireText(Type(composer, L"z.z/"), L"←↓↑→…・", "and z with marks, marks");
+    composer.Clear();
 }
 
 void TestConversionForms(const RomajiTable& table) {
@@ -560,9 +569,17 @@ void TestLiveConversion(const RomajiTable& table, const MiniPack& pack) {
     Type(composer, L"su");
     RequireText(composer.Preedit(), L"私の名前は中野です", "and typing it back gives the same");
 
-    Require(action(press(Key::Left)) == Action::MoveFocus, "Left steps into the phrases");
+    Require(action(press(Key::Left)) == Action::MoveCaret, "Left moves the caret in the typed text");
+    composer.MoveCaret(-2);
+    RequireText(composer.Preedit(), L"わたしのなまえはなかのです", "the kana show while the caret is inside");
+    Require(composer.CaretOffset() == 11, "with the caret where it moved");
+    RequireText(Type(composer, L"ra"), L"わたしのなまえはなかのらです", "typing goes in at the caret");
+    composer.Backspace();
+    composer.MoveCaret(100);
+    RequireText(composer.Preedit(), L"私の名前は中野です", "the conversion shows again at the end");
     composer.MoveFocus(-1);
-    RequireText(SegmentsText(composer), L"私の|名前は|*中野です", "starting from the last one");
+    RequireText(SegmentsText(composer), L"私の|名前は|*中野です", "picking starts from the last phrase");
+    Require(action(press(Key::Left)) == Action::MoveFocus, "then Left steps through the phrases");
     composer.MoveFocus(-1);
     RequireText(SegmentsText(composer), L"私の|*名前は|中野です", "and moving on");
     composer.Cancel();

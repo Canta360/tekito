@@ -353,6 +353,9 @@ private:
     [[nodiscard]] std::size_t ReadingOffset(std::size_t units) const;
     void FlushOnce();
     void FlushAll();
+    // A consonant left on its own right before the caret, taken back into
+    // the pending keys when `key` goes on from it.
+    void RejoinConsonant(wchar_t key);
     void Emit(std::wstring keys, std::wstring kana);
     // The typed kana as the converter reads it.
     [[nodiscard]] std::wstring Reading() const;
@@ -450,6 +453,10 @@ private:
     // From the live conversion to picking, on the last phrase.
     void StartPicking();
     void ResetLive() noexcept;
+    // Live: the converted text left for the typed kana (the caret moves in
+    // it), and the conversion shown again once the caret is at the end.
+    void LeaveLivePreview();
+    void ShowLiveAtEnd();
     // What is shown is RefineLive's for the keys typed.
     [[nodiscard]] bool LiveRefined() const;
 

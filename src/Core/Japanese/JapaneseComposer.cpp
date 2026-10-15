@@ -245,7 +245,12 @@ void JapaneseComposer::Insert(wchar_t key) {
         if (IsConverted() && !preview_) SettleAll();
         kanaView_ = false;
         listOpen_ = false;
-        if (!FeedAscii(key)) Feed(key);
+        if (!FeedAscii(key)) {
+            RejoinConsonant(key);
+            Feed(key);
+        }
+        // Typed inside the text (the caret moved back): kana until the end.
+        kanaView_ = caret_ != units_.size();
         UpdateLive();
         UpdatePredictions();
         return;
@@ -254,8 +259,25 @@ void JapaneseComposer::Insert(wchar_t key) {
     // typing continues from the typed kana.
     phrases_.clear();
     listOpen_ = false;
-    if (!FeedAscii(key)) Feed(key);
+    if (!FeedAscii(key)) {
+        RejoinConsonant(key);
+        Feed(key);
+    }
     UpdatePredictions();
+}
+
+void JapaneseComposer::RejoinConsonant(wchar_t key) {
+    // A consonant left on its own, the caret moved back to right after it,
+    // takes what is typed there (ktoba, then o after the k: ことば).
+    if (!table_ || !pending_.empty() || caret_ == 0) return;
+    const Unit& before = units_[caret_ - 1];
+    const bool lone = !before.ascii && !before.keys.empty() && before.keys == before.kana &&
+                      std::all_of(before.keys.begin(), before.keys.end(), [](wchar_t c) { return c >= L'a' && c <= L'z'; });
+    if (lone && (table_->HasLongerInput(before.keys + key) || table_->Find(before.keys + key))) {
+        pending_ = before.keys;
+        units_.erase(units_.begin() + static_cast<std::ptrdiff_t>(caret_ - 1));
+        --caret_;
+    }
 }
 
 bool JapaneseComposer::FeedAscii(wchar_t key) {
@@ -637,13 +659,30 @@ std::size_t JapaneseComposer::SplitAt(std::size_t offset) {
 }
 
 void JapaneseComposer::MoveCaret(int delta) {
-    if (IsConverted() || !Typing()) return;
+    if ((IsConverted() && !IsLivePreview()) || !Typing()) return;
+    LeaveLivePreview();
     FlushAll();
     predictions_.clear();
     chosenPrediction_.reset();
     const auto total = static_cast<long long>(ReadingOffset(units_.size()));
     const auto target = std::clamp(static_cast<long long>(ReadingOffset(caret_)) + delta, 0LL, total);
     caret_ = SplitAt(static_cast<std::size_t>(target));
+    ShowLiveAtEnd();
+}
+
+void JapaneseComposer::LeaveLivePreview() {
+    if (!IsLivePreview()) return;
+    phrases_.clear();
+    listOpen_ = false;
+    ResetLive();
+}
+
+void JapaneseComposer::ShowLiveAtEnd() {
+    if (!Live()) return;
+    // The kana while the caret is inside the text; converted again once it
+    // is back at the end.
+    kanaView_ = caret_ != units_.size();
+    UpdateLive();
 }
 
 std::size_t JapaneseComposer::CaretOffset() const {
@@ -662,17 +701,22 @@ std::size_t JapaneseComposer::CaretOffset() const {
 }
 
 void JapaneseComposer::Delete() {
-    if (IsConverted() || !Typing()) return;
+    if ((IsConverted() && !IsLivePreview()) || !Typing()) return;
+    LeaveLivePreview();
     FlushAll();
-    if (caret_ >= units_.size()) return;
+    if (caret_ >= units_.size()) {
+        ShowLiveAtEnd();
+        return;
+    }
     auto& next = units_[caret_];
     next.kana.erase(0, 1);
     if (next.kana.empty()) {
         units_.erase(units_.begin() + static_cast<std::ptrdiff_t>(caret_));
-        return;
+    } else {
+        auto keys = table_ ? table_->KeysFor(next.kana) : std::wstring{};
+        next.keys = keys.empty() ? next.kana : std::move(keys);
     }
-    auto keys = table_ ? table_->KeysFor(next.kana) : std::wstring{};
-    next.keys = keys.empty() ? next.kana : std::move(keys);
+    ShowLiveAtEnd();
 }
 
 std::optional<std::wstring> JapaneseComposer::TypedWithCapitals(std::wstring_view keys) const {

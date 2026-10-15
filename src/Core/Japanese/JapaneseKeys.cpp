@@ -69,6 +69,23 @@ std::optional<KeyCommand> TranslateKey(const JapaneseComposer& composer, const K
             break;
         }
     }
+    // Live: the arrows edit the typed text, as before conversion.
+    if (composer.IsLivePreview() && !key.shift) {
+        switch (key.key) {
+        case Key::Left:
+            return WithDelta(Action::MoveCaret, -1);
+        case Key::Right:
+            return WithDelta(Action::MoveCaret, 1);
+        case Key::Home:
+            return WithDelta(Action::MoveCaret, -100000);
+        case Key::End:
+            return WithDelta(Action::MoveCaret, 100000);
+        case Key::Delete:
+            return Make(Action::Delete);
+        default:
+            break;
+        }
+    }
     if (composer.IsConverted()) {
         switch (key.key) {
         case Key::Space:
