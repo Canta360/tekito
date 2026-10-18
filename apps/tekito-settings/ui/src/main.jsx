@@ -63,6 +63,7 @@ const initialSettings = {
   japaneseTypedForms: true,
   japaneseLiveRefine: true,
   japaneseKanaInput: false,
+  japaneseKanaInputKey: true,
   mixedTypingEnabled: false,
   japaneseEnglishSpacing: false,
   japaneseIgnoreCapsLock: true,
@@ -664,6 +665,11 @@ function JapanesePage({ advanced, settings, setSetting, romaji, runAction, setCo
         <Row title={j.kanaInput.title} description={j.kanaInput.description}>
           <Toggle label={j.kanaInput.title} checked={settings.japaneseKanaInput} onChange={(value) => setSetting("japaneseKanaInput", value)} />
         </Row>
+        {advanced && (
+          <Row title={j.kanaInputKey.title} description={j.kanaInputKey.description}>
+            <Toggle label={j.kanaInputKey.title} checked={settings.japaneseKanaInputKey} onChange={(value) => setSetting("japaneseKanaInputKey", value)} />
+          </Row>
+        )}
         <Row title={j.prediction.title} description={j.prediction.description}>
           <Toggle label={j.prediction.title} checked={settings.japanesePredictionEnabled} onChange={(value) => setSetting("japanesePredictionEnabled", value)} />
         </Row>

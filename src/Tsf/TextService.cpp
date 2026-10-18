@@ -600,6 +600,7 @@ HRESULT TextService::ActivateEx(ITfThreadMgr* threadManager, TfClientId clientId
     }
 
     UpdateToggleKey(userdata::PreservedSwitchKey(userSettings_.toggleKey, userSettings_.keyboardType));
+    UpdateKanaInputKey(userSettings_.japaneseKanaInputKey && JapaneseModeAvailable());
     AdviseThreadManagerSinks();
     SyncModeCompartments();
 
@@ -645,6 +646,7 @@ HRESULT TextService::Deactivate() {
     UnadviseContextSinks();
     UnadviseThreadManagerSinks();
     UpdateToggleKey(0);
+    UpdateKanaInputKey(false);
 
     if (threadManager_ && clientId_ != TF_CLIENTID_NULL) {
         ComPtr<ITfKeystrokeMgr> keystrokeManager;
@@ -777,6 +779,7 @@ void TextService::ApplySettings() {
     }
     if (threadManager_) {
         UpdateToggleKey(userdata::PreservedSwitchKey(userSettings_.toggleKey, userSettings_.keyboardType));
+        UpdateKanaInputKey(userSettings_.japaneseKanaInputKey && JapaneseModeAvailable());
     }
     userdata::ApplyJapaneseSettings(japanese_, userSettings_, &japaneseLearning_);
     const auto rows = static_cast<std::size_t>(userSettings_.candidateRows);
@@ -883,6 +886,46 @@ void TextService::UpdateToggleKey(int key) {
         } else {
             TraceHr(L"PreserveKey failed", hr);
         }
+    }
+}
+
+namespace {
+
+// Alt+カタカナひらがな: the ローマ字 key (VK 0xF5) on a JIS keyboard, or
+// Alt with the ひらがな key (VK 0xF2) as some drivers send it.
+constexpr TF_PRESERVEDKEY kKanaInputKeys[] = {{0xF5, 0}, {0xF5, TF_MOD_ALT}, {0xF2, TF_MOD_ALT}};
+
+}  // namespace
+
+void TextService::UpdateKanaInputKey(bool on) {
+    if (ProcessPassesThrough() || !japaneseProfile_) on = false;
+    if (on == kanaInputKeyPreserved_ || !threadManager_ || clientId_ == TF_CLIENTID_NULL) return;
+    ComPtr<ITfKeystrokeMgr> keystrokeManager;
+    if (FAILED(threadManager_->QueryInterface(IID_PPV_ARGS(keystrokeManager.Put())))) return;
+    for (const auto& key : kKanaInputKeys) {
+        if (on) {
+            constexpr wchar_t kDescription[] = L"Kana input on or off";
+            (void)keystrokeManager->PreserveKey(clientId_, GUID_TekitoKanaInputKey, &key, kDescription,
+                                                static_cast<ULONG>(std::size(kDescription) - 1));
+        } else {
+            (void)keystrokeManager->UnpreserveKey(GUID_TekitoKanaInputKey, &key);
+        }
+    }
+    kanaInputKeyPreserved_ = on;
+}
+
+void TextService::ToggleKanaInput(ITfContext* context) {
+    // What is being typed is committed as it stands first, as a mode key does.
+    if (context && japanese_.IsComposing()) {
+        KeyInput commit{};
+        commit.type = KeyInput::Type::JapaneseCommit;
+        [[maybe_unused]] const auto ignored = RequestKeyEditSession(context, commit);
+    }
+    userSettings_.japaneseKanaInput = !userSettings_.japaneseKanaInput;
+    // Kept, and every app told: they read the settings again.
+    if (settingsRepository_ && settingsRepository_->SaveSettings(userSettings_) && runtimeMode_) {
+        runtimeMode_->NotifySettingsChanged();
+        runtimeSettingsGeneration_ = runtimeMode_->SettingsGeneration();
     }
 }
 
@@ -1110,6 +1153,12 @@ HRESULT TextService::OnKeyUp(ITfContext*, WPARAM, LPARAM, BOOL* eaten) {
 HRESULT TextService::OnPreservedKey(ITfContext* context, REFGUID guid, BOOL* eaten) {
     if (!eaten) return E_INVALIDARG;
     *eaten = FALSE;
+    if (guid == GUID_TekitoKanaInputKey) {
+        SyncRuntimeState();
+        ToggleKanaInput(context);
+        *eaten = TRUE;
+        return S_OK;
+    }
     if (guid != GUID_TekitoToggleKey) return S_OK;
     SyncRuntimeState();
     ModeKey key;

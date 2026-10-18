@@ -153,6 +153,11 @@ private:
     void AdviseContextSinks(ITfContext* context);
     void UnadviseContextSinks();
     void UpdateToggleKey(int key);
+    // Alt+カタカナひらがな turns かな入力 on or off, as in Microsoft IME
+    // (UserSettings::japaneseKanaInputKey).
+    void UpdateKanaInputKey(bool on);
+    void ToggleKanaInput(ITfContext* context);
+    bool kanaInputKeyPreserved_{false};
     // Mirrors the mode in the open/close compartment, and in the Japanese
     // profile also in the conversion-mode compartment.
     void SyncModeCompartments();

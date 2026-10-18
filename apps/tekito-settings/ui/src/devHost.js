@@ -66,6 +66,7 @@ function initialState() {
       japaneseTypedForms: true,
       japaneseLiveRefine: true,
       japaneseKanaInput: false,
+      japaneseKanaInputKey: true,
       japaneseIgnoreCapsLock: true,
       uiLanguage: 0,
       excludedApps: ["Code.exe"],

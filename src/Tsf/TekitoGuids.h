@@ -29,6 +29,8 @@ extern const GUID GUID_TekitoDisplayAttributeMixInput;
 extern const GUID GUID_TekitoDisplayAttributeMixConverted;
 extern const GUID GUID_TekitoDisplayAttributeMixFocused;
 extern const GUID GUID_TekitoDisplayAttributeAuto;
+// Alt+カタカナひらがな (the ローマ字 key): かな入力 on or off.
+extern const GUID GUID_TekitoKanaInputKey;
 
 // {3B1E7A52-9C4D-4E0B-8F21-6A5D2C9E4B17}
 extern const GUID GUID_TekitoToggleKey;
