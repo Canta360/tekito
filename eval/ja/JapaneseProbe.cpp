@@ -81,7 +81,10 @@ int main(int argc, char** argv) {
         if (!predictions.empty()) std::cout << "\tpredicted:" << predictions;
         if (settings.japaneseLiveConversion && composer.RefineLive()) std::cout << "\tpaused: " << Narrow(composer.Preedit());
         composer.Convert();
-        std::cout << "\tspace: " << Narrow(composer.Preedit()) << "\n  ";
+        std::cout << "\tspace: " << Narrow(composer.Preedit());
+        std::wstring phrases;
+        for (const auto& segment : composer.Segments()) phrases += (phrases.empty() ? L"" : L"|") + segment.text;
+        std::cout << "\tphrases: " << Narrow(phrases) << "\n  ";
         if (const auto* list = composer.FocusedCandidates()) {
             for (std::size_t i = 0; i < list->size() && i < rows; ++i) {
                 std::cout << (i ? " | " : "") << Narrow((*list)[i].text);
