@@ -486,6 +486,10 @@ private:
     void ShowLiveAtEnd();
     // What is shown is RefineLive's for the keys typed.
     [[nodiscard]] bool LiveRefined() const;
+    // Live: the whole text converted again as Space converts it before live
+    // conversion (slips undone, English run in, the whole input read at
+    // once), unless something was picked while typing. True when it ran.
+    bool RebuildLive();
 
     // What Commit cleared, for UndoCommit.
     struct CommitRecord {

@@ -515,7 +515,13 @@ void JapaneseComposer::UpdateLive() {
 }
 
 bool JapaneseComposer::RefineLive() {
-    if (!liveRefine_ || !Live() || !preview_ || kanaView_ || !pending_.empty() || units_.empty() || LiveRefined()) return false;
+    if (!liveRefine_ || !pending_.empty()) return false;
+    const std::wstring before = Preedit();
+    return RebuildLive() && Preedit() != before;
+}
+
+bool JapaneseComposer::RebuildLive() {
+    if (!Live() || !preview_ || kanaView_ || !pending_.empty() || units_.empty() || LiveRefined()) return false;
     // A candidate picked while typing stays, as on Enter.
     if (std::any_of(phrases_.begin(), phrases_.end(),
                     [](const PhraseState& phrase) { return phrase.selected != 0 || phrase.form; })) {
@@ -523,7 +529,6 @@ bool JapaneseComposer::RefineLive() {
     }
     // A prediction picked with Tab stays as it is shown.
     if (chosenPrediction_) return false;
-    const std::wstring before = Preedit();
     // The predictions stay offered: Tab picks one after the pause too.
     auto predictions = std::move(predictions_);
     ResetLive();
@@ -533,7 +538,7 @@ bool JapaneseComposer::RefineLive() {
     focus_ = phrases_.empty() ? 0 : phrases_.size() - 1;
     listOpen_ = false;
     refinedKeys_ = Keys(false);
-    return Preedit() != before;
+    return true;
 }
 
 bool JapaneseComposer::LiveRefined() const {
@@ -1684,13 +1689,37 @@ std::vector<PhraseCandidate> JapaneseComposer::PostalCandidates(std::wstring_vie
 void JapaneseComposer::Convert() {
     if (!Typing()) return;
     if (Live() && preview_) {
-        // Live: the last phrase's next candidate; the next Space opens the list.
+        // Live: the text converted as Space converts it without live
+        // conversion (it may have been shown as typed so far), then the
+        // next candidate: the whole input read another way (English run in)
+        // when there is one, else the last phrase's. The next Space opens
+        // the list.
+        if (!pending_.empty()) {
+            FlushAll();
+            UpdateLive();
+        }
+        RebuildLive();
         StartPicking();
         if (!IsConverted()) return;
+        std::optional<std::wstring> whole;
+        for (std::size_t i = 0; i < phrases_.size() && !whole; ++i) {
+            const auto& candidates = phrases_[i].candidates;
+            if (phrases_[i].selected == 0 && candidates.size() > 1 && !candidates[1].reading.empty() &&
+                !candidates[1].slip) {
+                focus_ = i;
+                whole = candidates[1].text;
+            }
+        }
         auto& phrase = phrases_[focus_];
         AddSlipCandidates(phrase);
-        if (!phrase.candidates.empty()) phrase.selected = (phrase.selected + 1) % phrase.candidates.size();
         phrase.form.reset();
+        if (phrase.candidates.empty()) return;
+        // The slips just added may come before the whole input's reading.
+        const auto at = whole ? std::find_if(phrase.candidates.begin(), phrase.candidates.end(),
+                                             [&](const PhraseCandidate& c) { return c.text == *whole; })
+                              : phrase.candidates.end();
+        phrase.selected = at != phrase.candidates.end() ? static_cast<std::size_t>(at - phrase.candidates.begin())
+                                                        : (phrase.selected + 1) % phrase.candidates.size();
         return;
     }
     if (!IsConverted()) {
