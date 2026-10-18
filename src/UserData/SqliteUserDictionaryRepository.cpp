@@ -326,6 +326,8 @@ bool SqliteUserDictionaryRepository::LoadSettings(UserSettings& settings) const 
             loaded.japaneseLetterWidth = std::clamp(value, 0, 1);
         } else if (std::strcmp(key, "advanced_settings") == 0) {
             loaded.advancedSettings = value != 0;
+        } else if (std::strcmp(key, "report_menu") == 0) {
+            loaded.reportMenu = value != 0;
         } else if (std::strcmp(key, "japanese_prediction_enabled") == 0) {
             loaded.japanesePredictionEnabled = value != 0;
         } else if (std::strcmp(key, "japanese_live_conversion") == 0) {
@@ -455,6 +457,7 @@ bool SqliteUserDictionaryRepository::SaveSettings(const UserSettings& settings) 
     saveValue("japanese_symbol_width", std::clamp(settings.japaneseSymbolWidth, 0, 1));
     saveValue("japanese_letter_width", std::clamp(settings.japaneseLetterWidth, 0, 1));
     saveValue("advanced_settings", settings.advancedSettings ? 1 : 0);
+    saveValue("report_menu", settings.reportMenu ? 1 : 0);
     saveValue("japanese_prediction_enabled", settings.japanesePredictionEnabled ? 1 : 0);
     saveValue("japanese_live_conversion", settings.japaneseLiveConversion ? 1 : 0);
     saveValue("japanese_sentence_check", settings.japaneseSentenceCheck ? 1 : 0);

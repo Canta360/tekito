@@ -242,6 +242,17 @@ private:
     bool ProcessPassesThrough() const noexcept;
     bool LetsKeyThrough(const KeyInput& input) const noexcept;
     void OpenSettings();
+    // The last Japanese conversion as a GitHub issue form, in the browser:
+    // the user sees and edits it before sending anything.
+    void ReportLastConversion();
+    // What was typed and what it became, kept in memory only for a report.
+    void NoteConversion(std::wstring keys, std::wstring text);
+    struct Conversion {
+        std::wstring keys;
+        std::wstring text;
+        InputMode mode{InputMode::Japanese};
+    };
+    std::optional<Conversion> lastConversion_;
     void RegisterLangBarItem();
     void UnregisterLangBarItem();
 

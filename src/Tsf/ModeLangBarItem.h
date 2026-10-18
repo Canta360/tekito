@@ -20,9 +20,11 @@ public:
     using SettingsLauncher = std::function<void()>;
     using Query = std::function<bool()>;
 
+    // `report` opens a report of the last conversion; `canReport`: there is
+    // one, and the menu item is on.
     ModeLangBarItem(HINSTANCE instance, ModeGetter getMode, ModeSetter setMode,
                     ModeGetter toggledMode, Query japaneseProfile, SettingsLauncher launchSettings,
-                    Query japaneseUi, Query mixedAvailable);
+                    Query japaneseUi, Query mixedAvailable, SettingsLauncher report, Query canReport);
 
     HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void** object) override;
     ULONG STDMETHODCALLTYPE AddRef() override;
@@ -63,6 +65,8 @@ private:
     SettingsLauncher launchSettings_;
     Query japaneseUi_;
     Query mixedAvailable_;
+    SettingsLauncher report_;
+    Query canReport_;
     ITfLangBarItemSink* sink_{nullptr};
 };
 

@@ -62,6 +62,7 @@ const initialSettings = {
   japaneseSymbolWidth: 0,
   japaneseLetterWidth: 1,
   advancedSettings: false,
+  reportMenu: true,
   japanesePredictionEnabled: true,
   japaneseLiveConversion: false,
   japaneseSentenceCheck: true,
@@ -421,6 +422,11 @@ function GeneralPage({ advanced, mode, japanese, japaneseInstalled, settings, ch
         <Row title={t.bracketPairs.title} description={t.bracketPairs.description}>
           <Toggle label={t.bracketPairs.title} checked={settings.bracketPairs} onChange={(value) => setSetting("bracketPairs", value)} />
         </Row>
+        {advanced && japanese && (
+          <Row title={t.reportMenu.title} description={t.reportMenu.description}>
+            <Toggle label={t.reportMenu.title} checked={settings.reportMenu} onChange={(value) => setSetting("reportMenu", value)} />
+          </Row>
+        )}
         {advanced && (
           <Row title={t.restoreMode.title} description={japanese ? t.restoreMode.descriptionJapanese : t.restoreMode.description}>
             <Toggle label={t.restoreMode.title} checked={settings.restoreLastInputMode} onChange={(value) => setSetting("restoreLastInputMode", value)} />

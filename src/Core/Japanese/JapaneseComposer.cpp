@@ -854,6 +854,12 @@ void JapaneseComposer::Cancel() {
     Clear();
 }
 
+std::wstring JapaneseComposer::TypedKeys() const {
+    std::wstring keys;
+    for (const auto& chunk : settled_) keys += chunk.typed + L" ";
+    return keys + Keys(true);
+}
+
 std::wstring JapaneseComposer::Reading() const {
     // Keys the table did not turn into kana are full-width, as in Microsoft
     // IME ("ｋ" while "ka" is being typed); letters after a capital are not.

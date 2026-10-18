@@ -65,6 +65,7 @@ function initialState() {
       japaneseSymbolWidth: 0,
       japaneseLetterWidth: 1,
       advancedSettings: false,
+      reportMenu: true,
       japanesePredictionEnabled: true,
       japaneseLiveConversion: false,
       japaneseSentenceCheck: true,

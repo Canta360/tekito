@@ -45,6 +45,7 @@ const en = {
     title: "Show advanced settings",
     description: "Show more options on each page.",
   },
+  reportMenu: { title: "Report wrong conversions", description: "Add “Report a wrong conversion” to the taskbar menu." },
   restoreMode: {
     title: "Start in the last mode used",
     description: "Off: always start in Auto.",
@@ -424,6 +425,7 @@ const ja = {
     title: "詳細設定を表示",
     description: "細かい設定も表示します。",
   },
+  reportMenu: { title: "誤変換の報告", description: "タスクバーのメニューに「誤変換を報告」を出します。" },
   restoreMode: {
     title: "前回のモードで始める",
     description: "オフにすると、いつも Auto で始まります。",

@@ -14,6 +14,7 @@
 
 #include <inputscope.h>
 #include <algorithm>
+#include <cctype>
 #include <cwchar>
 #include <cwctype>
 #include <shellapi.h>
@@ -1014,6 +1015,49 @@ void TextService::UnadviseContextSinks() {
     sinkContext_.Reset();
 }
 
+namespace {
+
+// UTF-8, percent-encoded for a URL's query.
+std::wstring QueryEncoded(std::wstring_view text) {
+    std::string utf8;
+    if (!text.empty()) {
+        const int size = WideCharToMultiByte(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), nullptr, 0, nullptr,
+                                             nullptr);
+        utf8.resize(static_cast<std::size_t>(size));
+        WideCharToMultiByte(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), utf8.data(), size, nullptr, nullptr);
+    }
+    std::wstring out;
+    constexpr wchar_t kHex[] = L"0123456789ABCDEF";
+    for (const unsigned char c : utf8) {
+        if (std::isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~') {
+            out.push_back(static_cast<wchar_t>(c));
+        } else {
+            out.push_back(L'%');
+            out.push_back(kHex[c >> 4]);
+            out.push_back(kHex[c & 0xF]);
+        }
+    }
+    return out;
+}
+
+}  // namespace
+
+void TextService::NoteConversion(std::wstring keys, std::wstring text) {
+    if (keys.empty() || text.empty()) return;
+    lastConversion_ = Conversion{std::move(keys), std::move(text), mode_};
+}
+
+void TextService::ReportLastConversion() {
+    if (!lastConversion_) return;
+    const wchar_t* mode = lastConversion_->mode == InputMode::Mixed ? L"Mix" : L"Japanese";
+    std::wstring url = L"https://github.com/Canta360/tekito/issues/new?template=wrong-conversion.yml";
+    url += L"&typed=" + QueryEncoded(lastConversion_->keys);
+    url += L"&got=" + QueryEncoded(lastConversion_->text);
+    url += L"&mode=" + QueryEncoded(mode);
+    url += L"&version=" + QueryEncoded(TEKITO_VERSION_STRING);
+    ShellExecuteW(nullptr, L"open", url.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+}
+
 void TextService::OpenSettings() {
     wchar_t modulePath[MAX_PATH]{};
     const DWORD length = GetModuleFileNameW(g_moduleInstance, modulePath, MAX_PATH);
@@ -1052,7 +1096,9 @@ void TextService::RegisterLangBarItem() {
         [this]() { return JapaneseModeAvailable(); },
         [this]() { OpenSettings(); },
         [this]() { return userdata::UseJapaneseUi(userSettings_.uiLanguage); },
-        [this]() { return MixedModeAvailable(); });
+        [this]() { return MixedModeAvailable(); },
+        [this]() { ReportLastConversion(); },
+        [this]() { return userSettings_.reportMenu && lastConversion_.has_value(); });
     if (!item) return;
 
     ComPtr<ModeLangBarItem> ownedItem(item);

@@ -464,11 +464,13 @@ HRESULT TextService::HandleJapaneseKey(ITfContext* context, TfEditCookie editCoo
                    japanese_.IsConverted() ? 1 : 0);
         Trace(line);
     }
+    const std::wstring keysBefore = japanese_.TypedKeys();
     const auto outcome = japanese::ApplyKey(japanese_, command);
     if (!outcome.outside.empty()) return InsertAtSelection(context, editCookie, outcome.outside);
     if (outcome.committed) {
         // A prediction chosen with a click.
         candidateWindow_.Hide();
+        NoteConversion(keysBefore, *outcome.committed);
         return WriteJapaneseCommit(context, editCookie, *outcome.committed);
     }
     return ShowJapanesePreedit(context, editCookie);
@@ -683,7 +685,10 @@ void TextService::ShowJapaneseCandidates(ITfContext* context, TfEditCookie editC
 HRESULT TextService::CommitJapanese(ITfContext* context, TfEditCookie editCookie) {
     candidateWindow_.Hide();
     if (!japanese_.IsComposing()) return EndComposition(editCookie);
-    return WriteJapaneseCommit(context, editCookie, japanese_.Commit());
+    std::wstring keys = japanese_.TypedKeys();
+    std::wstring text = japanese_.Commit();
+    NoteConversion(std::move(keys), text);
+    return WriteJapaneseCommit(context, editCookie, text);
 }
 
 HRESULT TextService::WriteJapaneseCommit(ITfContext* context, TfEditCookie editCookie, const std::wstring& committed) {

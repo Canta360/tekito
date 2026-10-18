@@ -165,6 +165,9 @@ struct UserSettings {
     // Settings shows its finer options (and the Special conversions page);
     // off, only what most people change.
     bool advancedSettings{false};
+    // The taskbar menu offers to report the last conversion (as a GitHub
+    // issue the user reviews in the browser).
+    bool reportMenu{true};
     // Language of TEKITO's own windows: 0 = the Windows display language,
     // 1 = English, 2 = Japanese. See UiLanguage.h.
     int uiLanguage{0};

@@ -969,6 +969,8 @@ private:
         json += L",\"japaneseLetterWidth\":" + std::to_wstring(settings_.japaneseLetterWidth);
         json += L",\"advancedSettings\":";
         json += settings_.advancedSettings ? L"true" : L"false";
+        json += L",\"reportMenu\":";
+        json += settings_.reportMenu ? L"true" : L"false";
         json += L",\"japanesePredictionEnabled\":";
         json += settings_.japanesePredictionEnabled ? L"true" : L"false";
         json += L",\"japaneseEnglishSpacing\":";
@@ -1152,6 +1154,7 @@ private:
             else if (key == L"modeBadgeOnFocus") settings_.modeBadgeOnFocus = value;
             else if (key == L"modePerApp") settings_.modePerApp = value;
             else if (key == L"advancedSettings") settings_.advancedSettings = value;
+            else if (key == L"reportMenu") settings_.reportMenu = value;
             else if (key == L"dateConversion") settings_.dateConversion = value;
             else if (key == L"numberConversion") settings_.numberConversion = value;
             else if (key == L"symbolConversion") settings_.symbolConversion = value;
