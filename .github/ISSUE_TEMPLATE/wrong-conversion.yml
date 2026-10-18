@@ -1,0 +1,47 @@
+name: Wrong conversion / 誤変換
+description: Japanese that converted to the wrong words. / 日本語が思った言葉に変換されなかったとき。
+title: "Wrong conversion: "
+labels: ["wrong conversion"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Issues are public. Remove anything private before you submit.
+        Issue は公開されます。送る前に、知られたくない内容は消してください。
+  - type: input
+    id: typed
+    attributes:
+      label: Typed / 打ったキー
+      placeholder: kikaigaugoku
+    validations:
+      required: true
+  - type: input
+    id: got
+    attributes:
+      label: Converted to / 変換された結果
+      placeholder: 機会が動く
+    validations:
+      required: true
+  - type: input
+    id: wanted
+    attributes:
+      label: Wanted / ほしかった変換
+      placeholder: 機械が動く
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Mode / モード
+      options:
+        - Japanese
+        - Mix
+  - type: input
+    id: version
+    attributes:
+      label: TEKITO version / バージョン
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes / 補足
+      description: The app you typed in, or anything else. / 打ったアプリなど。
