@@ -17,6 +17,7 @@ const iconPaths = {
   candidates: <><rect x="4" y="3.5" width="16" height="17" rx="5" /><rect x="7" y="9.5" width="10" height="5" rx="2.5" /><path d="M8 6.8h6M8 17.3h5" /></>,
   japanese: <text x="12" y="17.2" textAnchor="middle" fontSize="14" fontWeight="600" fill="currentColor" stroke="none">あ</text>,
   english: <text x="12" y="17.4" textAnchor="middle" fontSize="15" fontWeight="600" fill="currentColor" stroke="none">A</text>,
+  mixed: <text x="12" y="16.6" textAnchor="middle" fontSize="11" fontWeight="600" fill="currentColor" stroke="none">あA</text>,
   special: <><path d="m4 20 10.5-10.5" /><path d="m12.5 7.5 4 4" /><path d="M18 3v4M16 5h4M20 11v2M19 12h2M9 3v2M8 4h2" /></>,
   calendar: <><rect x="4" y="5" width="16" height="15" rx="3" /><path d="M4 10h16M9 3v4M15 3v4" /><path d="M8.5 14h.01M12 14h.01M15.5 14h.01M8.5 17h.01M12 17h.01" /></>,
   numbers: <text x="12" y="16.6" textAnchor="middle" fontSize="11" fontWeight="600" fill="currentColor" stroke="none">123</text>,

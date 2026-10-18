@@ -69,35 +69,38 @@ void AttachJapanese(japanese::JapaneseComposer& composer) {
 InputMode TextService::SharedMode() const noexcept {
     if (!runtimeMode_) return mode_;
     if (!japaneseProfile_) return runtimeMode_->Mode();
-    const auto mode = runtimeMode_->JapaneseMode();
-    if (TypesJapanese(mode) && !JapaneseModeAvailable()) return InputMode::Convert;
-    return mode == InputMode::Mixed && !MixedModeAvailable() ? InputMode::Japanese : mode;
+    return AvailableMode(runtimeMode_->JapaneseMode());
+}
+
+InputMode TextService::AvailableMode(InputMode mode) const noexcept {
+    if (mode == InputMode::Japanese && !JapaneseModeAvailable()) {
+        return MixedModeAvailable() ? InputMode::Mixed : InputMode::Convert;
+    }
+    if (mode == InputMode::Mixed && !MixedModeAvailable()) {
+        return JapaneseModeAvailable() ? InputMode::Japanese : InputMode::Convert;
+    }
+    return mode;
 }
 
 InputMode TextService::ToggledMode() const noexcept {
-    if (!JapaneseModeAvailable()) {
+    if (!JapaneseTypingAvailable()) {
         return mode_ == InputMode::Convert ? InputMode::Direct : InputMode::Convert;
     }
-    // With mixed typing on, Mixed comes right after Japanese.
-    const auto afterJapanese = [&](InputMode english) {
-        return MixedModeAvailable() ? InputMode::Mixed : english;
-    };
-    switch (userSettings_.japaneseSwitchOrder) {
-    case 2:
-        // Japanese, Auto, Direct, and round again.
-        return mode_ == InputMode::Japanese ? afterJapanese(InputMode::Convert)
-               : mode_ == InputMode::Mixed   ? InputMode::Convert
-               : mode_ == InputMode::Convert ? InputMode::Direct
-                                             : InputMode::Japanese;
-    case 1:
-        return mode_ == InputMode::Japanese ? afterJapanese(InputMode::Direct)
-               : mode_ == InputMode::Mixed  ? InputMode::Direct
-                                            : InputMode::Japanese;
-    default:
-        return mode_ == InputMode::Japanese ? afterJapanese(InputMode::Convert)
-               : mode_ == InputMode::Mixed  ? InputMode::Convert
-                                            : InputMode::Japanese;
+    // The modes chosen to go round (UserSettings::switchModes) that are on,
+    // in the order Japanese, Mix, Auto, Direct.
+    constexpr std::pair<InputMode, int> kOrder[] = {
+        {InputMode::Japanese, 1}, {InputMode::Mixed, 2}, {InputMode::Convert, 4}, {InputMode::Direct, 8}};
+    std::vector<InputMode> round;
+    for (const auto& [mode, bit] : kOrder) {
+        if ((userSettings_.switchModes & bit) != 0 && AvailableMode(mode) == mode) round.push_back(mode);
     }
+    // Fewer than two: a typing mode and Auto.
+    if (round.size() < 2) {
+        const auto typing = AvailableMode(InputMode::Japanese);
+        return mode_ == typing ? InputMode::Convert : typing;
+    }
+    const auto at = std::find(round.begin(), round.end(), mode_);
+    return at == round.end() || at + 1 == round.end() ? round.front() : *(at + 1);
 }
 
 void TextService::UpdateActiveProfile() {
@@ -189,7 +192,7 @@ HRESULT TextService::OnChange(REFGUID compartment) {
                          open)) {
         return S_OK;
     }
-    if (!JapaneseModeAvailable()) {
+    if (!JapaneseTypingAvailable()) {
         if (!openCloseChanged) return S_OK;
         const auto mode = open != 0 ? InputMode::Convert : InputMode::Direct;
         if (mode != mode_) ChangeInputMode(mode);
@@ -240,7 +243,7 @@ bool TextService::TranslateModeKey(WPARAM wParam, ModeKey& key) const {
     default:
         break;
     }
-    if (!JapaneseModeAvailable()) {
+    if (!JapaneseTypingAvailable()) {
         if (wParam == kVkImeOn || wParam == kVkImeOff) {
             key.mode = wParam == kVkImeOn ? InputMode::Convert : InputMode::Direct;
             return true;

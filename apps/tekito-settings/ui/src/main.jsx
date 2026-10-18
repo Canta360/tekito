@@ -12,6 +12,7 @@ const pages = [
   { id: "candidates", icon: "candidates" },
   { id: "english", icon: "english" },
   { id: "japanese", icon: "japanese" },
+  { id: "mixed", icon: "mixed" },
   { id: "special", icon: "special" },
   { id: "dictionary", icon: "dictionary" },
   { id: "about", icon: "about" },
@@ -37,6 +38,9 @@ const initialSettings = {
   meaningsEnabled: true,
   meaningsInUiLanguage: true,
   japaneseSwitchOrder: 0,
+  switchModes: 7,
+  mixPredictionEnabled: true,
+  mixFirstPageSymbol: true,
   japaneseEnabled: true,
   modeIndicatorEnabled: true,
   modeUnderlineColors: true,
@@ -158,6 +162,8 @@ function App() {
   // Japanese is installed, and turned on in Settings.
   const japaneseInstalled = Boolean(runtime.japanese);
   const japanese = japaneseInstalled && settings.japaneseEnabled !== false;
+  // Mix, on its own switch (it needs the Japanese data, not Japanese mode).
+  const mixed = japaneseInstalled && Boolean(settings.mixedTypingEnabled);
 
   const applyState = useCallback((state) => {
     if (!state) return;
@@ -273,7 +279,9 @@ function App() {
   // Japanese only while it is on; Special conversions only with advanced
   // settings (everything on it is on by default).
   const advanced = Boolean(settings.advancedSettings);
-  const shownPages = pages.filter((item) => (item.id !== "japanese" || japanese) && (item.id !== "special" || advanced));
+  // Japanese settings serve Mix too; Mix has its page wherever Japanese is installed.
+  const shownPages = pages.filter((item) => (item.id !== "japanese" || japanese || mixed) &&
+    (item.id !== "mixed" || japaneseInstalled) && (item.id !== "special" || advanced));
   const current = shownPages.find((item) => item.id === page) || shownPages[0];
 
   return (
@@ -312,11 +320,12 @@ function App() {
             </Glass>
           ) : (
             <div className="page" key={current.id}>
-              {current.id === "general" && <GeneralPage advanced={advanced} mode={mode} japanese={japanese} japaneseInstalled={japaneseInstalled} settings={settings} changeMode={changeMode} setSetting={setSetting} runAction={runAction} />}
-              {current.id === "switching" && <SwitchingPage advanced={advanced} japanese={japanese} japaneseKeyboard={Boolean(runtime.japaneseKeyboard)} settings={settings} setSetting={setSetting} />}
+              {current.id === "general" && <GeneralPage advanced={advanced} mode={mode} japanese={japanese} mixed={mixed} japaneseInstalled={japaneseInstalled} settings={settings} changeMode={changeMode} setSetting={setSetting} runAction={runAction} />}
+              {current.id === "switching" && <SwitchingPage advanced={advanced} japanese={japanese} mixed={mixed} japaneseKeyboard={Boolean(runtime.japaneseKeyboard)} settings={settings} setSetting={setSetting} />}
               {current.id === "candidates" && <CandidatesPage advanced={advanced} settings={settings} setSetting={setSetting} />}
               {current.id === "english" && <EnglishPage advanced={advanced} settings={settings} setSetting={setSetting} />}
               {current.id === "japanese" && <JapanesePage advanced={advanced} settings={settings} setSetting={setSetting} romaji={romaji} runAction={runAction} setConfirm={setConfirm} />}
+              {current.id === "mixed" && <MixedPage advanced={advanced} settings={settings} setSetting={setSetting} />}
               {current.id === "special" && <SpecialPage japanese={japanese} settings={settings} setSetting={setSetting} />}
               {current.id === "dictionary" && <DictionaryPage japanese={japaneseInstalled} postalCodes={postalCodes} japaneseWords={japaneseWords} learning={learning} settings={settings} setSetting={setSetting} dictionary={dictionary} setModal={setModal} setConfirm={setConfirm} runAction={runAction} />}
               {current.id === "about" && <AboutPage version={version} runtime={runtime} packs={packs} runAction={runAction} />}
@@ -395,13 +404,12 @@ const switchKeyCaps = (toggleKey, japaneseKeyboard, t) =>
 // What TEKITO is doing overall: the mode, Japanese, the language, and (with
 // advanced settings) how it starts and the apps where it stays off. The
 // switch for advanced settings is last.
-function GeneralPage({ advanced, mode, japanese, japaneseInstalled, settings, changeMode, setSetting, runAction }) {
+function GeneralPage({ advanced, mode, japanese, mixed, japaneseInstalled, settings, changeMode, setSetting, runAction }) {
   const t = useText();
   // UserSettings::uiLanguage.
   const languages = [[0, t.language.system], [1, "English"], [2, "日本語"]];
-  // Japanese is a mode only when it is installed; Mix, when it is on too.
-  const mixed = japanese && settings.mixedTypingEnabled;
-  const modes = japanese ? ["auto", "direct", "japanese"].concat(mixed ? ["mixed"] : []) : ["auto", "direct"];
+  // Japanese and Mix are modes when installed and each is on.
+  const modes = ["auto", "direct"].concat(japanese ? ["japanese"] : [], mixed ? ["mixed"] : []);
   return (
     <>
       <div className={`tile-grid mode-grid ${modes.length === 3 ? "three" : ""}`}>
@@ -441,21 +449,18 @@ function GeneralPage({ advanced, mode, japanese, japaneseInstalled, settings, ch
 
 // How the mode is switched: the keyboard, the switch key and its order, the
 // badge shown after a switch, and the keys for it.
-function SwitchingPage({ advanced, japanese, japaneseKeyboard, settings, setSetting }) {
+function SwitchingPage({ advanced, japanese, mixed, japaneseKeyboard, settings, setSetting }) {
   const t = useText();
   // UserSettings::keyboardType, ::toggleKey and ::japaneseSwitchOrder. The
   // switch key choices follow the keyboard.
   const keyboards = [[0, t.keyboard.detect], [1, t.keyboard.japanese], [2, t.keyboard.us]];
   const toggleKeys = [1, 2, 3].map((value) => [value, <Keycaps keys={switchKeyCaps(value, japaneseKeyboard, t)} />])
     .concat([[0, t.switchKey.none]]);
-  // With Mix on, it comes right after Japanese.
-  const after = settings.mixedTypingEnabled ? ["japanese", "mixed"] : ["japanese"];
-  const orders = [
-    [0, <ModeOrder ids={[...after, "auto"]} round={after.length > 1} />],
-    [1, <ModeOrder ids={[...after, "direct"]} round={after.length > 1} />],
-    [2, <ModeOrder ids={[...after, "auto", "direct"]} round />],
-  ];
   const switchKey = switchKeyCaps(settings.toggleKey, japaneseKeyboard, t);
+  // UserSettings::switchModes: the modes that are on, in the order the key
+  // goes round them.
+  const roundModes = [["japanese", 1], ["mixed", 2], ["auto", 4], ["direct", 8]]
+    .filter(([id]) => (id !== "japanese" || japanese) && (id !== "mixed" || mixed));
   return (
     <>
       <Glass className="card">
@@ -467,9 +472,19 @@ function SwitchingPage({ advanced, japanese, japaneseKeyboard, settings, setSett
         <Row title={t.switchKey.title} description={japanese ? t.switchKey.descriptionJapanese : t.switchKey.description}>
           <Segmented label={t.switchKey.title} value={settings.toggleKey} options={toggleKeys} onChange={(value) => setSetting("toggleKey", value)} />
         </Row>
-        {japanese && advanced && (
+        {(japanese || mixed) && (
           <Row title={t.order.title} description={t.order.description}>
-            <Segmented label={t.order.title} value={settings.japaneseSwitchOrder} options={orders} onChange={(value) => setSetting("japaneseSwitchOrder", value)} />
+            <div className="mode-chips" role="group" aria-label={t.order.title}>
+              {roundModes.map(([id, bit]) => {
+                const on = (settings.switchModes & bit) !== 0;
+                return (
+                  <button key={id} type="button" className={`mode-chip ${on ? "is-on" : ""}`} aria-pressed={on}
+                    onClick={() => setSetting("switchModes", on ? settings.switchModes & ~bit : settings.switchModes | bit)}>
+                    <ModeIcon id={id} />{t.modeNames[id]}
+                  </button>
+                );
+              })}
+            </div>
           </Row>
         )}
         <Row title={t.modeIndicator.title} description={t.modeIndicator.description}>
@@ -637,6 +652,43 @@ function EnglishPage({ advanced, settings, setSetting }) {
   );
 }
 
+// Mix: Japanese and English typed without switching, on its own switch,
+// with its own choices of what Japanese mode also has.
+function MixedPage({ advanced, settings, setSetting }) {
+  const t = useText();
+  const j = t.japanese;
+  const m = t.mix;
+  const on = Boolean(settings.mixedTypingEnabled);
+  return (
+    <Glass className="card">
+      <Row title={j.mixed.title} description={j.mixed.description}>
+        <Toggle label={j.mixed.title} checked={on} onChange={(value) => setSetting("mixedTypingEnabled", value)} />
+      </Row>
+      {on && (
+        <>
+          <Row title={j.mixLive.title} description={j.mixLive.description}>
+            <Toggle label={j.mixLive.title} checked={settings.mixLiveConversion} onChange={(value) => setSetting("mixLiveConversion", value)} />
+          </Row>
+          <Row title={m.prediction.title} description={m.prediction.description}>
+            <Toggle label={m.prediction.title} checked={settings.mixPredictionEnabled} onChange={(value) => setSetting("mixPredictionEnabled", value)} />
+          </Row>
+          {advanced && (
+            <>
+              <Row title={m.firstPageSymbol.title} description={m.firstPageSymbol.description}>
+                <Toggle label={m.firstPageSymbol.title} checked={settings.mixFirstPageSymbol} onChange={(value) => setSetting("mixFirstPageSymbol", value)} />
+              </Row>
+              <Row title={j.singleVowel.title} description={j.singleVowel.description}>
+                <Toggle label={j.singleVowel.title} checked={settings.mixSingleVowelKana} onChange={(value) => setSetting("mixSingleVowelKana", value)} />
+              </Row>
+            </>
+          )}
+          <p className="muted">{m.shared}</p>
+        </>
+      )}
+    </Glass>
+  );
+}
+
 // Japanese: how romaji becomes Japanese, when Japanese is installed.
 // Shown only while Japanese input is on (see General).
 function JapanesePage({ advanced, settings, setSetting, romaji, runAction, setConfirm }) {
@@ -676,22 +728,9 @@ function JapanesePage({ advanced, settings, setSetting, romaji, runAction, setCo
   return (
     <>
       <Glass className="card">
-        <Row title={j.mixed.title} description={j.mixed.description}>
-          <Toggle label={j.mixed.title} checked={settings.mixedTypingEnabled} onChange={(value) => setSetting("mixedTypingEnabled", value)} />
-        </Row>
-        {advanced && settings.mixedTypingEnabled && (
-          <Row title={j.singleVowel.title} description={j.singleVowel.description}>
-            <Toggle label={j.singleVowel.title} checked={settings.mixSingleVowelKana} onChange={(value) => setSetting("mixSingleVowelKana", value)} />
-          </Row>
-        )}
         <Row title={j.live.title}>
           <Toggle label={j.live.title} checked={settings.japaneseLiveConversion} onChange={(value) => setSetting("japaneseLiveConversion", value)} />
         </Row>
-        {settings.mixedTypingEnabled && (
-          <Row title={j.mixLive.title} description={j.mixLive.description}>
-            <Toggle label={j.mixLive.title} checked={settings.mixLiveConversion} onChange={(value) => setSetting("mixLiveConversion", value)} />
-          </Row>
-        )}
         <Row title={j.kanaInput.title} description={j.kanaInput.description}>
           <Toggle label={j.kanaInput.title} checked={settings.japaneseKanaInput} onChange={(value) => setSetting("japaneseKanaInput", value)} />
         </Row>

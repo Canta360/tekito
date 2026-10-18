@@ -90,6 +90,10 @@ struct UserSettings {
     // Where the switch key goes with Japanese on: 0 = Japanese and Auto,
     // 1 = Japanese and Direct, 2 = round Japanese, Auto, Direct.
     int japaneseSwitchOrder{0};
+    // The modes the switch key goes round, in the order Japanese, Mix, Auto,
+    // Direct: 1 Japanese, 2 Mix, 4 Auto, 8 Direct (those that are on).
+    // Older settings are read from japaneseSwitchOrder.
+    int switchModes{1 | 2 | 4};
     // Space outside a composition in Japanese mode: 0 = full-width in
     // Japanese and half-width otherwise, 1 = always half-width, 2 = always
     // full-width. Shift+Space writes the other one.
@@ -143,6 +147,9 @@ struct UserSettings {
     // Live conversion in Mix, apart from Japanese mode's: the chunk being
     // typed shows converted while it is clearly Japanese.
     bool mixLiveConversion{false};
+    // Mix's own choices of what Japanese mode also has.
+    bool mixPredictionEnabled{true};
+    bool mixFirstPageSymbol{true};
     // Mix: a vowel typed alone (i) is kana (い) first, not the letter (I).
     bool mixSingleVowelKana{true};
     // A half-width space between Japanese and an English word when text is

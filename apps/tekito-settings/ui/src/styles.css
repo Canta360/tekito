@@ -503,3 +503,8 @@ kbd {
 }
 
 .row-actions { display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; }
+
+.mode-chips { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+.mode-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px; border: 1px solid var(--line, rgba(127, 127, 127, 0.3)); background: transparent; color: inherit; font: inherit; cursor: pointer; opacity: 0.6; }
+.mode-chip.is-on { opacity: 1; border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.mode-chip svg, .mode-chip img { width: 16px; height: 16px; }

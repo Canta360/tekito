@@ -14,6 +14,7 @@ const en = {
     candidates: { label: "Candidate list", description: "How the choices look while you type." },
     english: { label: "English", description: "Help while you type English." },
     japanese: { label: "Japanese", description: "How Japanese typing works." },
+    mixed: { label: "Mix", description: "Japanese and English without switching." },
     special: { label: "Special conversions", description: "Dates, symbols and more as choices." },
     dictionary: { label: "Dictionary & learning", description: "Your words, postal codes, and what TEKITO has learned." },
     about: { label: "About", description: "Version and support." },
@@ -84,13 +85,18 @@ const en = {
     description: "Underlines what you type in blue in Auto and orange in Mix.",
   },
   japaneseInput: {
-    title: "Japanese input",
-    description: "Type Japanese in romaji.",
+    title: "Japanese mode",
+    description: "Type Japanese in romaji, converted with Space.",
     missing: "Not installed. Run the installer again and choose Japanese.",
   },
   order: {
     title: "Switch order",
-    description: "Which modes the switch key goes through.",
+    description: "The modes the switch key goes through, in this order.",
+  },
+  mix: {
+    prediction: { title: "Predictions", description: "Suggest words that often come next, as you type in Mix." },
+    firstPageSymbol: { title: "Symbols and emoji first", description: "Put a symbol or emoji for the reading on the first page, in Mix." },
+    shared: "The romaji table, digits, kanji and other Japanese settings apply to Mix too.",
   },
   modeKeys: {
     switch: "Switch the mode, in the order set above",
@@ -406,6 +412,7 @@ const ja = {
     candidates: { label: "候補一覧", description: "入力中に出る候補の見た目を選びます。" },
     english: { label: "英語入力", description: "英語を打つときの手助けを選びます。" },
     japanese: { label: "日本語入力", description: "日本語を打つときの動きを選びます。" },
+    mixed: { label: "まぜ打ち", description: "日本語と英語を切り替えずに打つときの動きです。" },
     special: { label: "特別な変換", description: "日付や記号などを候補に出します。" },
     dictionary: { label: "辞書と学習", description: "自分の単語や郵便番号と、覚えた内容です。" },
     about: { label: "情報", description: "バージョンとサポートの情報です。" },
@@ -475,13 +482,18 @@ const ja = {
     description: "打っている文字の下線を、Auto は青、まぜ打ちはオレンジにします。",
   },
   japaneseInput: {
-    title: "日本語入力",
-    description: "ローマ字で日本語を打てるようにします。",
+    title: "日本語モード",
+    description: "ローマ字で打った日本語を Space で変換します。",
     missing: "入っていません。インストーラーで「日本語」を選ぶと使えます。",
   },
   order: {
     title: "切り替えの順番",
-    description: "切り替えキーで回るモードです。",
+    description: "切り替えキーで回るモードを選びます。この順に切り替わります。",
+  },
+  mix: {
+    prediction: { title: "予測候補", description: "まぜ打ちで、次によく来る言葉を候補に出します。" },
+    firstPageSymbol: { title: "記号や絵文字を最初に出す", description: "まぜ打ちで、読みに合う記号や絵文字を最初の候補に入れます。" },
+    shared: "ローマ字表・数字・漢字などの日本語の設定は、まぜ打ちにも使われます。",
   },
   modeKeys: {
     switch: "モードを切り替える（上の順番で）",

@@ -127,10 +127,8 @@ void ModeLangBarItem::ShowContextMenu(POINT point) {
     };
     AppendMenuW(menu, flags(InputMode::Convert), kMenuAuto, L"Auto");
     AppendMenuW(menu, flags(InputMode::Direct), kMenuDirect, L"Direct");
-    if (JapaneseProfile()) {
-        AppendMenuW(menu, flags(InputMode::Japanese), kMenuJapanese, Text(L"Japanese", L"日本語"));
-        if (MixedAvailable()) AppendMenuW(menu, flags(InputMode::Mixed), kMenuMixed, Text(L"Mix", L"まぜ打ち"));
-    }
+    if (JapaneseProfile()) AppendMenuW(menu, flags(InputMode::Japanese), kMenuJapanese, Text(L"Japanese", L"日本語"));
+    if (MixedAvailable()) AppendMenuW(menu, flags(InputMode::Mixed), kMenuMixed, Text(L"Mix", L"まぜ打ち"));
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(menu, MF_STRING, kMenuSettings, Text(L"Settings...", L"設定..."));
 
@@ -159,10 +157,10 @@ HRESULT ModeLangBarItem::InitMenu(ITfMenu* menu) {
     if (JapaneseProfile()) {
         hr = addItem(kMenuJapanese, checked(InputMode::Japanese), Text(L"Japanese", L"日本語"));
         if (FAILED(hr)) return hr;
-        if (MixedAvailable()) {
-            hr = addItem(kMenuMixed, checked(InputMode::Mixed), Text(L"Mix", L"まぜ打ち"));
-            if (FAILED(hr)) return hr;
-        }
+    }
+    if (MixedAvailable()) {
+        hr = addItem(kMenuMixed, checked(InputMode::Mixed), Text(L"Mix", L"まぜ打ち"));
+        if (FAILED(hr)) return hr;
     }
     hr = addItem(0, TF_LBMENUF_SEPARATOR, nullptr);
     if (FAILED(hr)) return hr;

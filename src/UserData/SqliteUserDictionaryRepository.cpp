@@ -210,6 +210,8 @@ bool SqliteUserDictionaryRepository::Save(const UserDictionary& dictionary) noex
 }
 
 bool SqliteUserDictionaryRepository::LoadSettings(UserSettings& settings) const noexcept {
+    // switch_modes, once saved, wins over the older japanese_switch_order.
+    bool switchModesSaved = false;
     if (!database_) return false;
 
     sqlite3_stmt* statement = nullptr;
@@ -278,6 +280,17 @@ bool SqliteUserDictionaryRepository::LoadSettings(UserSettings& settings) const 
             loaded.japaneseEnabled = value != 0;
         } else if (std::strcmp(key, "japanese_switch_order") == 0) {
             loaded.japaneseSwitchOrder = std::clamp(value, 0, 2);
+            if (!switchModesSaved) {
+                constexpr int kOrders[] = {1 | 2 | 4, 1 | 2 | 8, 1 | 2 | 4 | 8};
+                loaded.switchModes = kOrders[loaded.japaneseSwitchOrder];
+            }
+        } else if (std::strcmp(key, "switch_modes") == 0) {
+            loaded.switchModes = std::clamp(value, 0, 15);
+            switchModesSaved = true;
+        } else if (std::strcmp(key, "mix_prediction") == 0) {
+            loaded.mixPredictionEnabled = value != 0;
+        } else if (std::strcmp(key, "mix_first_page_symbol") == 0) {
+            loaded.mixFirstPageSymbol = value != 0;
         } else if (std::strcmp(key, "candidate_rows") == 0) {
             loaded.candidateRows = value == 5 || value == 7 || value == 9 ? value : 0;
         } else if (std::strcmp(key, "meanings_enabled") == 0) {
@@ -440,6 +453,9 @@ bool SqliteUserDictionaryRepository::SaveSettings(const UserSettings& settings) 
     saveValue("calculator_enabled", settings.calculatorEnabled ? 1 : 0);
     saveValue("japanese_enabled", settings.japaneseEnabled ? 1 : 0);
     saveValue("japanese_switch_order", std::clamp(settings.japaneseSwitchOrder, 0, 2));
+    saveValue("switch_modes", std::clamp(settings.switchModes, 0, 15));
+    saveValue("mix_prediction", settings.mixPredictionEnabled ? 1 : 0);
+    saveValue("mix_first_page_symbol", settings.mixFirstPageSymbol ? 1 : 0);
     saveValue("meanings_enabled", settings.meaningsEnabled ? 1 : 0);
     saveValue("meanings_in_ui_language", settings.meaningsInUiLanguage ? 1 : 0);
     saveValue("toggle_key", std::clamp(settings.toggleKey, 0, 3));

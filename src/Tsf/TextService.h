@@ -187,7 +187,12 @@ private:
     // input turned on in Settings.
     bool JapaneseModeAvailable() const noexcept { return japaneseProfile_ && userSettings_.japaneseEnabled; }
     // Whether Mixed is a mode here: Japanese, with mixed typing on in Settings.
-    bool MixedModeAvailable() const noexcept { return JapaneseModeAvailable() && userSettings_.mixedTypingEnabled; }
+    bool MixedModeAvailable() const noexcept { return japaneseProfile_ && userSettings_.mixedTypingEnabled; }
+    // Japanese is typed in some mode here (Japanese or Mix).
+    bool JapaneseTypingAvailable() const noexcept { return JapaneseModeAvailable() || MixedModeAvailable(); }
+    // `mode`, or the one that stands in for it when it is off (Japanese and
+    // Mix for each other, then Auto).
+    InputMode AvailableMode(InputMode mode) const noexcept;
     SpecialConversionOptions SpecialOptions() const noexcept { return userdata::SpecialOptionsFor(userSettings_); }
     bool TranslateJapaneseKey(WPARAM wParam, KeyInput& input);
     HRESULT HandleJapaneseKey(ITfContext* context, TfEditCookie editCookie, const KeyInput& input);

@@ -37,10 +37,16 @@ namespace tekito::userdata {
     return options;
 }
 
+// What Japanese mode and Mix each choose for themselves (`mixed`: Mix's).
+inline void ApplyModeSettings(japanese::JapaneseComposer& composer, const UserSettings& settings, bool mixed) {
+    composer.SetPredictionEnabled(mixed ? settings.mixPredictionEnabled : settings.japanesePredictionEnabled);
+    composer.SetEmojiOnFirstPage(mixed ? settings.mixFirstPageSymbol : settings.japaneseFirstPageSymbol);
+}
+
 // The user's settings on `composer`; `learning` is used only while learning
-// is on.
+// is on. `mixed`: for Mix (ApplyModeSettings).
 inline void ApplyJapaneseSettings(japanese::JapaneseComposer& composer, const UserSettings& settings,
-                                  japanese::JapaneseLearningStore* learning) {
+                                  japanese::JapaneseLearningStore* learning, bool mixed = false) {
     composer.SetPunctuationStyle(
         static_cast<japanese::PunctuationStyle>(std::clamp(settings.japanesePunctuation, 0, 3)));
     composer.SetHalfWidthDigits(settings.japaneseDigitWidth != 1);
@@ -52,15 +58,14 @@ inline void ApplyJapaneseSettings(japanese::JapaneseComposer& composer, const Us
     composer.SetHalfWidthSymbols(settings.japaneseSymbolWidth == 1);
     composer.SetHalfWidthLetters(settings.japaneseLetterWidth == 1);
     composer.SetLearning(settings.learningEnabled ? learning : nullptr);
-    composer.SetPredictionEnabled(settings.japanesePredictionEnabled);
     composer.SetLiveConversion(settings.japaneseLiveConversion);
     composer.SetSentenceCheck(settings.japaneseSentenceCheck);
-    composer.SetEmojiOnFirstPage(settings.japaneseFirstPageSymbol);
     composer.SetTypedForms(settings.japaneseTypedForms);
     composer.SetSingleVowelKana(settings.mixSingleVowelKana);
     composer.SetLiveRefine(settings.japaneseLiveRefine);
     composer.SetMixLiveConversion(settings.mixLiveConversion);
     composer.SetSpecialConversions(&SpecialConversions::Installed(), SpecialOptionsFor(settings));
+    ApplyModeSettings(composer, settings, mixed);
 }
 
 }  // namespace tekito::userdata

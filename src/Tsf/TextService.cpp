@@ -711,11 +711,7 @@ void TextService::SyncRuntimeState() {
             userSettings_ = std::move(loadedSettings);
             ApplySettings();
             // Japanese, or mixed typing, was turned off in Settings.
-            if (TypesJapanese(mode_) && !JapaneseModeAvailable()) {
-                ChangeInputMode(InputMode::Convert);
-            } else if (mode_ == InputMode::Mixed && !MixedModeAvailable()) {
-                ChangeInputMode(InputMode::Japanese);
-            }
+            if (const auto available = AvailableMode(mode_); available != mode_) ChangeInputMode(available);
         }
         runtimeSettingsGeneration_ = settingsGeneration;
     }
@@ -806,7 +802,7 @@ void TextService::ApplySettings() {
         UpdateToggleKey(userdata::PreservedSwitchKey(userSettings_.toggleKey, userSettings_.keyboardType));
         UpdateKanaInputKey(userSettings_.japaneseKanaInputKey && JapaneseModeAvailable());
     }
-    userdata::ApplyJapaneseSettings(japanese_, userSettings_, &japaneseLearning_);
+    userdata::ApplyJapaneseSettings(japanese_, userSettings_, &japaneseLearning_, mode_ == InputMode::Mixed);
     if (englishSpelling_) {
         englishSpelling_->SetVariety(static_cast<EnglishVariety>(std::clamp(userSettings_.englishSpelling, 0, 2)));
     }
@@ -832,14 +828,14 @@ bool TextService::ProcessPassesThrough() const noexcept {
 }
 
 void TextService::SetInputMode(InputMode mode) {
-    // Only the Japanese profile has a Japanese mode, and only with Japanese on.
-    if (!JapaneseModeAvailable() && TypesJapanese(mode)) mode = InputMode::Convert;
-    if (!MixedModeAvailable() && mode == InputMode::Mixed) mode = InputMode::Japanese;
+    // Only the Japanese profile has Japanese and Mix, each when it is on.
+    mode = AvailableMode(mode);
     englishSegment_ = false;
     const bool finishWord = (mode != InputMode::Convert && state_.IsActive()) ||
                             (mode != mode_ && japanese_.IsComposing());
     mode_ = mode;
     japanese::AttachMixedTyping(japanese_, mode == InputMode::Mixed);
+    userdata::ApplyModeSettings(japanese_, userSettings_, mode == InputMode::Mixed);
     state_.SetInputMode(mode == InputMode::Convert ? InputMode::Convert : InputMode::Direct);
     if (japaneseProfile_) {
         userSettings_.lastJapaneseProfileMode = mode;

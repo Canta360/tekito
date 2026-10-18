@@ -747,10 +747,13 @@ private:
         if (!runtime_) return L"auto";
         if (japaneseAvailable_) {
             const auto mode = runtime_->JapaneseMode();
-            if (mode == tekito::InputMode::Mixed && settings_.japaneseEnabled) {
-                return settings_.mixedTypingEnabled ? L"mixed" : L"japanese";
+            if (mode == tekito::InputMode::Mixed) {
+                return settings_.mixedTypingEnabled ? L"mixed" : settings_.japaneseEnabled ? L"japanese" : L"auto";
             }
-            return mode == tekito::InputMode::Japanese ? (settings_.japaneseEnabled ? L"japanese" : L"auto")
+            if (mode == tekito::InputMode::Japanese && !settings_.japaneseEnabled) {
+                return settings_.mixedTypingEnabled ? L"mixed" : L"auto";
+            }
+            return mode == tekito::InputMode::Japanese ? L"japanese"
                    : mode == tekito::InputMode::Direct ? L"direct"
                                                        : L"auto";
         }
@@ -987,6 +990,11 @@ private:
         json += L",\"candidateWindowStyle\":" + std::to_wstring(settings_.candidateWindowStyle);
         json += L",\"candidateRows\":" + std::to_wstring(settings_.candidateRows);
         json += L",\"japaneseSwitchOrder\":" + std::to_wstring(settings_.japaneseSwitchOrder);
+        json += L",\"switchModes\":" + std::to_wstring(settings_.switchModes);
+        json += L",\"mixPredictionEnabled\":";
+        json += settings_.mixPredictionEnabled ? L"true" : L"false";
+        json += L",\"mixFirstPageSymbol\":";
+        json += settings_.mixFirstPageSymbol ? L"true" : L"false";
         json += L",\"modeIndicatorEnabled\":";
         json += settings_.modeIndicatorEnabled ? L"true" : L"false";
         json += L",\"modeUnderlineColors\":";
@@ -1230,6 +1238,9 @@ private:
             else if (key == L"numberConversion") settings_.numberConversion = value;
             else if (key == L"symbolConversion") settings_.symbolConversion = value;
             else if (key == L"calculatorEnabled") settings_.calculatorEnabled = value;
+            else if (key == L"switchModes") {
+                settings_.switchModes = std::clamp(integerValue, 0, 15);
+            }
             else if (key == L"japaneseSwitchOrder") {
                 settings_.japaneseSwitchOrder = std::clamp(integerValue, 0, 2);
             }
@@ -1270,6 +1281,8 @@ private:
             else if (key == L"japaneseKanaInputKey") settings_.japaneseKanaInputKey = value;
             else if (key == L"mixSingleVowelKana") settings_.mixSingleVowelKana = value;
             else if (key == L"mixLiveConversion") settings_.mixLiveConversion = value;
+            else if (key == L"mixPredictionEnabled") settings_.mixPredictionEnabled = value;
+            else if (key == L"mixFirstPageSymbol") settings_.mixFirstPageSymbol = value;
             else if (key == L"japaneseRoughNumbersKanji") settings_.japaneseRoughNumbersKanji = value;
             else if (key == L"noLearningInPrivate") settings_.noLearningInPrivate = value;
             else if (key == L"mixedTypingEnabled") settings_.mixedTypingEnabled = value;
@@ -1321,7 +1334,7 @@ private:
                               : value == L"mixed"    ? tekito::InputMode::Mixed
                                                      : tekito::InputMode::Convert;
             (void)DataPacksJson();
-            const bool saved = tekito::TypesJapanese(mode) && !settings_.japaneseEnabled ? false
+            const bool saved = mode == tekito::InputMode::Japanese && !settings_.japaneseEnabled ? false
                                : mode == tekito::InputMode::Mixed && !settings_.mixedTypingEnabled ? false
                                : japaneseAvailable_ ? SetCurrentJapaneseMode(mode, error)
                                : tekito::TypesJapanese(mode) ? false
