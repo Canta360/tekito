@@ -88,7 +88,10 @@ public:
     void SetLoanwords(const Loanwords* loanwords) noexcept { loanwords_ = loanwords; }
     // Candidates use only kanji in `range` (教育, 常用, 人名用 from `sets`).
     void SetKanjiSets(const KanjiSets* sets) noexcept { kanjiSets_ = sets; }
-    void SetKanjiRange(KanjiRange range) noexcept { kanjiRange_ = range; }
+    void SetKanjiRange(KanjiRange range, int grade = 6) noexcept {
+        kanjiRange_ = range;
+        kanjiGrade_ = grade;
+    }
     // Mixed typing: Space (and Enter) takes what was typed as one chunk of
     // English or Japanese (ChunkJudge). English stays English, written as
     // it is (GitHub), and is committed with a space after it, as English is
@@ -630,6 +633,7 @@ private:
     bool halfWidthDigits_{false};
     const KanjiSets* kanjiSets_{nullptr};
     KanjiRange kanjiRange_{KanjiRange::All};
+    int kanjiGrade_{6};
     NumberStyle numberStyle_{NumberStyle::AsTyped};
     bool halfWidthSymbols_{false};
     bool halfWidthLetters_{false};

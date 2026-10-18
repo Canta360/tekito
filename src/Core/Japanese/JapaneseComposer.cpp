@@ -572,7 +572,7 @@ void JapaneseComposer::UpdatePredictions() {
     }
     // Only kanji in the range set (KeepKanjiInRange).
     if (kanjiSets_ && kanjiRange_ != KanjiRange::All) {
-        std::erase_if(predictions_, [&](const Prediction& p) { return !kanjiSets_->Allows(p.text, kanjiRange_); });
+        std::erase_if(predictions_, [&](const Prediction& p) { return !kanjiSets_->Allows(p.text, kanjiRange_, kanjiGrade_); });
     }
 }
 
@@ -950,7 +950,7 @@ void JapaneseComposer::KeepKanjiInRange(PhraseState& phrase) const {
     if (!kanjiSets_ || kanjiRange_ == KanjiRange::All || phrase.candidates.empty()) return;
     auto& candidates = phrase.candidates;
     const std::wstring chosen = phrase.selected < candidates.size() ? candidates[phrase.selected].text : std::wstring{};
-    std::erase_if(candidates, [&](const PhraseCandidate& c) { return !kanjiSets_->Allows(c.text, kanjiRange_); });
+    std::erase_if(candidates, [&](const PhraseCandidate& c) { return !kanjiSets_->Allows(c.text, kanjiRange_, kanjiGrade_); });
     if (candidates.empty() && phrase.begin + phrase.length <= conversionReading_.size()) {
         candidates = KanaCandidates(conversionReading_.substr(phrase.begin, phrase.length));
     }

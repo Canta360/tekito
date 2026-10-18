@@ -60,6 +60,7 @@ function initialState() {
       japaneseDigitWidth: 0,
       japaneseNumberStyle: 0,
       japaneseKanjiRange: 0,
+      japaneseKanjiGrade: 6,
       japaneseSymbolWidth: 0,
       japaneseLetterWidth: 1,
       advancedSettings: false,

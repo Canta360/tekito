@@ -44,7 +44,8 @@ inline void ApplyJapaneseSettings(japanese::JapaneseComposer& composer, const Us
     composer.SetPunctuationStyle(
         static_cast<japanese::PunctuationStyle>(std::clamp(settings.japanesePunctuation, 0, 3)));
     composer.SetHalfWidthDigits(settings.japaneseDigitWidth == 0);
-    composer.SetKanjiRange(static_cast<japanese::KanjiRange>(std::clamp(settings.japaneseKanjiRange, 0, 3)));
+    composer.SetKanjiRange(static_cast<japanese::KanjiRange>(std::clamp(settings.japaneseKanjiRange, 0, 3)),
+                           std::clamp(settings.japaneseKanjiGrade, 1, 6));
     composer.SetNumberStyle(static_cast<japanese::JapaneseComposer::NumberStyle>(std::clamp(settings.japaneseNumberStyle, 0, 4)));
     composer.SetHalfWidthSymbols(settings.japaneseSymbolWidth == 1);
     composer.SetHalfWidthLetters(settings.japaneseLetterWidth == 1);

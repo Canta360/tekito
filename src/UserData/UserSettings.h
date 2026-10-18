@@ -108,6 +108,8 @@ struct UserSettings {
     // Kanji candidates may use: 0 = all, 1 = 常用 and 人名用, 2 = 常用,
     // 3 = 教育 (japanese::KanjiRange).
     int japaneseKanjiRange{0};
+    // With 教育: kanji taught up to this school year (1-6).
+    int japaneseKanjiGrade{6};
     // Symbols typed in Japanese (! ? ( )): 0 = full-width, 1 = half-width.
     int japaneseSymbolWidth{0};
     // Letters typed in Japanese that stay letters (k, q): 0 = full-width,

@@ -1375,10 +1375,10 @@ void TestComposerLearning(const RomajiTable& table, const MiniPack& pack) {
 void TestKanjiSets() {
     using tekito::japanese::KanjiRange;
     tekito::japanese::KanjiSets sets;
-    sets.Add(U'本', 1);  // 教育
-    sets.Add(U'鬱', 2);  // 常用
-    sets.Add(U'桜', 1);
-    sets.Add(U'櫻', 3);  // 人名用
+    sets.Add(U'本', 1);  // 教育, 1年
+    sets.Add(U'鬱', 8);  // 常用
+    sets.Add(U'桜', 5);  // 教育, 5年
+    sets.Add(U'櫻', 9);  // 人名用
     Require(sets.Allows(L"薔薇", KanjiRange::All), "all: any kanji");
     Require(!sets.Allows(L"薔薇", KanjiRange::JoyoAndJinmei) && sets.Allows(L"櫻", KanjiRange::JoyoAndJinmei),
             "常用・人名用: 人名用 kanji, not others");
@@ -1389,6 +1389,9 @@ void TestKanjiSets() {
                 sets.Allows(L"本をよむ、ホン abc", KanjiRange::Kyoiku),
             "教育: only 教育 kanji; kana, letters and marks always");
     Require(!sets.Allows(L"𠮟", KanjiRange::JoyoAndJinmei), "kanji outside the BMP are checked too");
+    Require(sets.Allows(L"本", KanjiRange::Kyoiku, 1) && !sets.Allows(L"桜", KanjiRange::Kyoiku, 4) &&
+                sets.Allows(L"桜", KanjiRange::Kyoiku, 5),
+            "教育: up to a school year");
 }
 
 void TestMeanings() {

@@ -31,14 +31,14 @@ bool KanjiSets::Load(const std::filesystem::path& file) {
     for (std::string line; std::getline(input, line);) {
         const auto tab = line.find('\t');
         if (tab == std::string::npos || tab + 1 >= line.size()) continue;
-        Add(FirstCodePoint(std::string_view(line).substr(0, tab)), line[tab + 1] - '0');
+        Add(FirstCodePoint(std::string_view(line).substr(0, tab)), std::stoi(line.substr(tab + 1)));
     }
     return !Empty();
 }
 
-bool KanjiSets::Allows(std::wstring_view text, KanjiRange range) const {
+bool KanjiSets::Allows(std::wstring_view text, KanjiRange range, int grade) const {
     if (range == KanjiRange::All || Empty()) return true;
-    const int highest = range == KanjiRange::Kyoiku ? 1 : range == KanjiRange::Joyo ? 2 : 3;
+    const int highest = range == KanjiRange::Kyoiku ? grade : range == KanjiRange::Joyo ? 8 : 9;
     for (std::size_t i = 0; i < text.size(); ++i) {
         char32_t c = text[i];
         if (c >= 0xD800 && c <= 0xDBFF && i + 1 < text.size()) {

@@ -6,7 +6,7 @@ The source is KANJIDIC2 (EDRDG, CC BY-SA 4.0), whose grade field encodes the
 sets: 1-6 教育漢字, 8 the rest of 常用漢字, 9 and 10 人名用漢字.
 
 Output: data/ja/kanji-sets/kanji.tsv, "kanji<TAB>level" sorted by code point,
-level 1 = 教育, 2 = 常用 (not 教育), 3 = 人名用.
+level 1-6 = 教育 of that school year, 8 = 常用 (not 教育), 9 = 人名用.
 
 Usage: python scripts/ja/build-kanji-sets.py [kanjidic2.xml.gz]
 (default: .cache/tekito-data/kanjidic2 of the main checkout)
@@ -36,11 +36,12 @@ def main() -> int:
         if not grade:
             continue
         g = int(grade.group(1))
-        level = 1 if g <= 6 else 2 if g == 8 else 3 if g in (9, 10) else 0
+        level = g if g <= 6 else 8 if g == 8 else 9 if g in (9, 10) else 0
         if level:
             levels[literal] = level
-    counts = {level: sum(1 for v in levels.values() if v == level) for level in (1, 2, 3)}
-    assert counts[1] == 1026 and counts[1] + counts[2] == 2136 and counts[3] == 863, counts
+    counts = {level: sum(1 for v in levels.values() if v == level) for level in (1, 2, 3, 4, 5, 6, 8, 9)}
+    kyoiku = sum(counts[g] for g in range(1, 7))
+    assert kyoiku == 1026 and kyoiku + counts[8] == 2136 and counts[9] == 863, counts
     OUT.mkdir(parents=True, exist_ok=True)
     data = OUT / "kanji.tsv"
     data.write_text("".join(f"{k}\t{levels[k]}\n" for k in sorted(levels)), encoding="utf-8", newline="\n")
