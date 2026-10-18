@@ -215,10 +215,10 @@ void TestCaret(const RomajiTable& table) {
     RequireText(Type(composer, L"z.z/"), L"←↓↑→…・", "and z with marks, marks");
     composer.Clear();
     // かな入力: kana come as kana, and the sound marks join the kana before them.
-    RequireText(Type(composer, L"か09Bき"), L"がき", "か then ゛ is が");
-    RequireText(Type(composer, L"は09C"), L"がきぱ", "は then ゜ is ぱ");
-    RequireText(Type(composer, L"う09B"), L"がきぱゔ", "う then ゛ is ゔ");
-    RequireText(Type(composer, L"あ09B"), L"がきぱゔあ09B", "a mark that joins nothing stays");
+    RequireText(Type(composer, L"か゛き"), L"がき", "か then ゛ is が");
+    RequireText(Type(composer, L"は゜"), L"がきぱ", "は then ゜ is ぱ");
+    RequireText(Type(composer, L"う゛"), L"がきぱゔ", "う then ゛ is ゔ");
+    RequireText(Type(composer, L"あ゛"), L"がきぱゔあ゛", "a mark that joins nothing stays");
     composer.Clear();
 }
 
