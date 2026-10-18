@@ -226,18 +226,18 @@ void TestCaret(const RomajiTable& table) {
 void TestConversionForms(const RomajiTable& table) {
     JapaneseComposer composer(&table);
     {
-        // One letter typed: the letter, also a capital, on the first page.
+        // Up from the first candidate goes round to the forms of what was
+        // typed: katakana, half-width katakana, the keys in both widths and
+        // cases, small kana.
         JapaneseComposer one(&table);
         Type(one, L"a");
         one.Convert();
-        const auto* list = one.FocusedCandidates();
-        const auto onFirstPage = [&](std::wstring_view text) {
-            if (!list) return false;
-            const auto found = std::find_if(list->begin(), list->end(), [&](const auto& c) { return c.text == text; });
-            return found != list->end() && found - list->begin() < 9;
-        };
-        Require(onFirstPage(L"a") && onFirstPage(L"A") && onFirstPage(L"ａ") && onFirstPage(L"ア"),
-                "a typed alone offers a, A, ａ and ア on the first page");
+        std::wstring reached;
+        for (int i = 0; i < 7; ++i) {
+            one.PreviousCandidate();
+            reached += one.Preedit() + L" ";
+        }
+        RequireText(reached, L"あ ｱ ａ Ａ a A ぁ ", "Up reaches the forms of a typed alone (ア is first)");
     }
     {
         // How a number converts first.
@@ -262,8 +262,8 @@ void TestConversionForms(const RomajiTable& table) {
     composer.Convert();
     Require(composer.IsConverted(), "Space converts");
     RequireText(composer.Preedit(), L"カタカナ", "Space gives katakana before the dictionary");
-    composer.Convert();
-    RequireText(composer.Preedit(), L"かたかな", "Space again goes back to hiragana");
+    composer.PreviousCandidate();
+    RequireText(composer.Preedit(), L"かたかな", "Up goes round to hiragana");
     composer.Cancel();
     Require(!composer.IsConverted() && composer.IsComposing(), "Esc returns to the typed kana");
     RequireText(composer.Preedit(), L"かたかな", "the typed kana is kept");

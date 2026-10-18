@@ -1180,57 +1180,73 @@ void JapaneseComposer::AddTypedForms() {
     // The keys are known for each part of the reading only when it is the
     // reading typed (not one with a slip undone).
     const bool typedReading = conversionReading_ == Reading();
+    // Small kana (っ, ぃ), when every kana has one.
+    const auto small = [](std::wstring text) {
+        constexpr std::wstring_view kLarge = L"あいうえおつやゆよわ";
+        constexpr std::wstring_view kSmall = L"ぁぃぅぇぉっゃゅょゎ";
+        for (auto& c : text) {
+            const auto at = kLarge.find(c);
+            if (at == std::wstring_view::npos) return std::wstring{};
+            c = kSmall[at];
+        }
+        return text;
+    };
+    const auto upper = [](std::wstring text) {
+        for (auto& c : text) c = static_cast<wchar_t>(std::towupper(c));
+        return text;
+    };
     for (auto& phrase : phrases_) {
         if (phrase.candidates.empty() || !phrase.candidates.front().reading.empty()) continue;
         const std::wstring reading = conversionReading_.substr(phrase.begin, phrase.length);
+        // Letters alone (q) already offer the other width next.
+        if (std::none_of(reading.begin(), reading.end(), [](wchar_t c) { return c >= 0x3041 && c <= 0x30FA; })) continue;
+        // In the order Up reaches them from the first candidate (the list
+        // goes round to its end): hiragana, katakana, half-width katakana,
+        // the keys in both widths and cases, small kana.
         std::vector<std::pair<std::wstring, PhraseCandidate::Kind>> forms{
             {ToHiragana(reading), PhraseCandidate::Kind::Hiragana},
             {ToKatakana(reading), PhraseCandidate::Kind::Katakana},
             {ToHalfWidthKatakana(reading), PhraseCandidate::Kind::Katakana}};
-        // One letter typed (i): it may be meant as the letter, also a capital.
-        const bool oneLetter = typedReading && phrases_.size() == 1 && Keys(false).size() == 1 &&
-                               std::iswalpha(Keys(false).front());
-        // One or two kana (i, ki, ai): the kana and letters are likelier than
-        // the long tail of kanji read so, which goes after them.
-        const bool shortInput = typedReading && phrases_.size() == 1 && reading.size() <= 2;
         if (typedReading) {
             const std::wstring keys = KeysFor(phrase.begin, phrase.length);
             if (!keys.empty()) {
                 forms.emplace_back(ToFullWidthAscii(keys), PhraseCandidate::Kind::English);
+                forms.emplace_back(ToFullWidthAscii(upper(keys)), PhraseCandidate::Kind::English);
                 forms.emplace_back(keys, PhraseCandidate::Kind::English);
-                if (oneLetter) {
-                    forms.emplace_back(std::wstring(1, static_cast<wchar_t>(std::towupper(keys.front()))),
-                                       PhraseCandidate::Kind::English);
-                }
+                forms.emplace_back(upper(keys), PhraseCandidate::Kind::English);
             }
         }
-        // Before the symbols, which stay last (やじるし: the words, then →);
-        // for a short input on the first page, after the likeliest words.
-        constexpr std::size_t kOneLetterAt = 3;
+        forms.emplace_back(small(ToHiragana(reading)), PhraseCandidate::Kind::Hiragana);
         auto& candidates = phrase.candidates;
-        std::size_t at = candidates.size();
-        while (at > 1 && candidates[at - 1].kind == PhraseCandidate::Kind::Special) --at;
-        if (shortInput && kanjiSets_) {
-            std::stable_partition(candidates.begin(), candidates.begin() + static_cast<std::ptrdiff_t>(at),
+        // One or two kana (i, ki, ai): kanji outside 常用 and 人名用, the
+        // long tail of kanji read so, after the common ones.
+        if (typedReading && phrases_.size() == 1 && reading.size() <= 2 && kanjiSets_) {
+            std::stable_partition(candidates.begin(), candidates.end(),
                                   [&](const PhraseCandidate& c) { return kanjiSets_->Common(c.text); });
         }
-        if (shortInput) at = std::min(at, kOneLetterAt);
-        const std::int64_t cost = candidates[at - 1].cost;
+        // The forms end the list, the first one last, all but the first
+        // candidate moved there.
+        const std::int64_t cost = candidates.back().cost;
+        std::vector<PhraseCandidate> tail;
         for (auto& [text, kind] : forms) {
             if (text.empty()) continue;
+            if (std::any_of(tail.begin(), tail.end(), [&](const PhraseCandidate& c) { return c.text == text; })) continue;
             const auto seen = std::find_if(candidates.begin(), candidates.end(),
                                            [&](const PhraseCandidate& c) { return c.text == text; });
+            if (seen == candidates.begin()) continue;
             if (seen != candidates.end()) {
-                // A short input: a form already further down comes up with the others.
-                const auto index = static_cast<std::size_t>(seen - candidates.begin());
-                if (!shortInput || index < at) continue;
-                PhraseCandidate moved = std::move(*seen);
+                tail.push_back(std::move(*seen));
                 candidates.erase(seen);
-                candidates.insert(candidates.begin() + static_cast<std::ptrdiff_t>(at++), std::move(moved));
-                continue;
+            } else {
+                tail.push_back({std::move(text), cost, kind, false});
             }
-            candidates.insert(candidates.begin() + static_cast<std::ptrdiff_t>(at++), {std::move(text), cost, kind, false});
         }
+        if (tail.empty()) continue;
+        const std::wstring chosen = phrase.selected < candidates.size() ? candidates[phrase.selected].text : std::wstring{};
+        candidates.insert(candidates.end(), std::make_move_iterator(tail.rbegin()), std::make_move_iterator(tail.rend()));
+        const auto kept = std::find_if(candidates.begin(), candidates.end(),
+                                       [&](const PhraseCandidate& c) { return c.text == chosen; });
+        if (kept != candidates.end()) phrase.selected = static_cast<std::size_t>(kept - candidates.begin());
     }
 }
 
