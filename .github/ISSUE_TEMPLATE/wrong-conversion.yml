@@ -9,12 +9,18 @@ body:
         Issues are public. Remove anything private before you submit.
         Issue は公開されます。送る前に、知られたくない内容は消してください。
   - type: input
-    id: typed
+    id: reading
     attributes:
-      label: Typed / 打ったキー
-      placeholder: kikaigaugoku
+      label: Reading / 読み
+      placeholder: きかいがうごく
     validations:
       required: true
+  - type: input
+    id: keys
+    attributes:
+      label: Keys typed (optional) / 打ったキー（任意）
+      description: The romaji as you typed it, slips included. / 打ったとおりのローマ字（打ち間違いも含めて）。
+      placeholder: kikaigaugoku
   - type: input
     id: got
     attributes:
@@ -40,6 +46,11 @@ body:
     id: version
     attributes:
       label: TEKITO version / バージョン
+  - type: textarea
+    id: settings
+    attributes:
+      label: Settings / 設定
+      description: Filled in by TEKITO. / TEKITO が書き込みます。
   - type: textarea
     id: notes
     attributes:
