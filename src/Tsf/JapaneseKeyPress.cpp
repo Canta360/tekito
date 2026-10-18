@@ -8,9 +8,37 @@ namespace {
 
 bool KeyDown(int key) { return (GetKeyState(key) & 0x8000) != 0; }
 
+// The kana a JIS keyboard has on the key at `scanCode`, with Shift or not;
+// 0 for a key without one.
+wchar_t KanaAt(UINT scanCode, bool shift) {
+    struct KanaKey {
+        UINT scan;
+        wchar_t plain;
+        wchar_t shifted;
+    };
+    static constexpr KanaKey kKeys[] = {
+        {0x02, L'ぬ', 0}, {0x03, L'ふ', 0}, {0x04, L'あ', L'ぁ'}, {0x05, L'う', L'ぅ'}, {0x06, L'え', L'ぇ'},
+        {0x07, L'お', L'ぉ'}, {0x08, L'や', L'ゃ'}, {0x09, L'ゆ', L'ゅ'}, {0x0A, L'よ', L'ょ'}, {0x0B, L'わ', L'を'},
+        {0x0C, L'ほ', 0}, {0x0D, L'へ', 0}, {0x7D, L'ー', 0},
+        {0x10, L'た', 0}, {0x11, L'て', 0}, {0x12, L'い', L'ぃ'}, {0x13, L'す', 0}, {0x14, L'か', 0},
+        {0x15, L'ん', 0}, {0x16, L'な', 0}, {0x17, L'に', 0}, {0x18, L'ら', 0}, {0x19, L'せ', 0},
+        {0x1A, L'゛', 0}, {0x1B, L'゜', L'「'},
+        {0x1E, L'ち', 0}, {0x1F, L'と', 0}, {0x20, L'し', 0}, {0x21, L'は', 0}, {0x22, L'き', 0},
+        {0x23, L'く', 0}, {0x24, L'ま', 0}, {0x25, L'の', 0}, {0x26, L'り', 0}, {0x27, L'れ', 0},
+        {0x28, L'け', 0}, {0x2B, L'む', L'」'},
+        {0x2C, L'つ', L'っ'}, {0x2D, L'さ', 0}, {0x2E, L'そ', 0}, {0x2F, L'ひ', 0}, {0x30, L'こ', 0},
+        {0x31, L'み', 0}, {0x32, L'も', 0}, {0x33, L'ね', L'、'}, {0x34, L'る', L'。'}, {0x35, L'め', L'・'},
+        {0x73, L'ろ', 0},
+    };
+    for (const auto& key : kKeys) {
+        if (key.scan == scanCode) return shift && key.shifted ? key.shifted : key.plain;
+    }
+    return 0;
+}
+
 }  // namespace
 
-japanese::KeyPress JapaneseKeyPressFor(WPARAM virtualKey, bool ignoreCapsLock) {
+japanese::KeyPress JapaneseKeyPressFor(WPARAM virtualKey, bool ignoreCapsLock, bool kanaInput) {
     using Key = japanese::KeyPress::Key;
     japanese::KeyPress press;
     press.shift = KeyDown(VK_SHIFT);
@@ -57,6 +85,15 @@ japanese::KeyPress JapaneseKeyPressFor(WPARAM virtualKey, bool ignoreCapsLock) {
         }
     }
     if (press.command) return press;
+    if (kanaInput) {
+        const UINT scan = MapVirtualKeyW(static_cast<UINT>(virtualKey), MAPVK_VK_TO_VSC);
+        if (const wchar_t kana = KanaAt(scan, press.shift)) {
+            press.key = Key::Character;
+            press.character = kana;
+            press.digit = 0;
+            return press;
+        }
+    }
     // What the key types with the keyboard layout and state now.
     BYTE keyboardState[256]{};
     if (!GetKeyboardState(keyboardState)) return press;

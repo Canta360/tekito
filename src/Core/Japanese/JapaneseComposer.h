@@ -371,6 +371,11 @@ private:
     // A consonant left on its own right before the caret, taken back into
     // the pending keys when `key` goes on from it.
     void RejoinConsonant(wchar_t key);
+    // かな入力: a sound mark (゛ ゜) joined to the kana before it; whether it was.
+    bool JoinSoundMark(wchar_t key);
+    // Some kana were typed as kana (かな入力), not as romaji keys: the romaji
+    // slip corrections do not apply.
+    [[nodiscard]] bool KanaTyped() const;
     void Emit(std::wstring keys, std::wstring kana);
     // The typed kana as the converter reads it.
     [[nodiscard]] std::wstring Reading() const;

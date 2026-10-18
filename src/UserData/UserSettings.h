@@ -126,6 +126,9 @@ struct UserSettings {
     bool japaneseEnglishSpacing{false};
     // Letters typed in Japanese as if Caps Lock were off.
     bool japaneseIgnoreCapsLock{true};
+    // かな入力: the keys type the kana printed on a JIS keyboard (Japanese
+    // mode only, not Mix).
+    bool japaneseKanaInput{false};
     // Special conversions, in English and Japanese (the special-conversions
     // pack): dates and times for "today" and "kyou", a number's other forms,
     // symbols by reading or ASCII spelling, and the sum for "1+2=".

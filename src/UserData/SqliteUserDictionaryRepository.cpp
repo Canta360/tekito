@@ -328,6 +328,8 @@ bool SqliteUserDictionaryRepository::LoadSettings(UserSettings& settings) const 
             loaded.japaneseTypedForms = value != 0;
         } else if (std::strcmp(key, "japanese_live_refine") == 0) {
             loaded.japaneseLiveRefine = value != 0;
+        } else if (std::strcmp(key, "japanese_kana_input") == 0) {
+            loaded.japaneseKanaInput = value != 0;
         } else if (std::strcmp(key, "japanese_ignore_caps_lock") == 0) {
             loaded.japaneseIgnoreCapsLock = value != 0;
         } else if (std::strcmp(key, "mixed_typing_enabled") == 0) {
@@ -436,6 +438,7 @@ bool SqliteUserDictionaryRepository::SaveSettings(const UserSettings& settings) 
     saveValue("japanese_first_page_symbol", settings.japaneseFirstPageSymbol ? 1 : 0);
     saveValue("japanese_typed_forms", settings.japaneseTypedForms ? 1 : 0);
     saveValue("japanese_live_refine", settings.japaneseLiveRefine ? 1 : 0);
+    saveValue("japanese_kana_input", settings.japaneseKanaInput ? 1 : 0);
     saveValue("japanese_ignore_caps_lock", settings.japaneseIgnoreCapsLock ? 1 : 0);
     saveValue("mixed_typing_enabled", settings.mixedTypingEnabled ? 1 : 0);
     saveValue("japanese_english_spacing", settings.japaneseEnglishSpacing ? 1 : 0);

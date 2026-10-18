@@ -385,7 +385,11 @@ bool TextService::TranslateJapaneseKey(WPARAM wParam, KeyInput& input) {
     }
     japanese::KeyOptions options = userdata::JapaneseKeyOptions(userSettings_);
     options.pageSize = japanesePage_;
-    const auto command = japanese::TranslateKey(japanese_, JapaneseKeyPressFor(wParam, userSettings_.japaneseIgnoreCapsLock), options);
+    const auto command = japanese::TranslateKey(
+        japanese_,
+        JapaneseKeyPressFor(wParam, userSettings_.japaneseIgnoreCapsLock,
+                            userSettings_.japaneseKanaInput && mode_ == InputMode::Japanese),
+        options);
     if (!command) {
         // Any other key ends the chance to take the last commit back.
         if (!IsModifierKey(wParam)) japanese_.ForgetCommit();

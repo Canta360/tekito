@@ -246,7 +246,7 @@ void JapaneseComposer::Insert(wchar_t key) {
         if (IsConverted() && !preview_) SettleAll();
         kanaView_ = false;
         listOpen_ = false;
-        if (!FeedAscii(key)) {
+        if (!JoinSoundMark(key) && !FeedAscii(key)) {
             RejoinConsonant(key);
             Feed(key);
         }
@@ -260,11 +260,47 @@ void JapaneseComposer::Insert(wchar_t key) {
     // typing continues from the typed kana.
     phrases_.clear();
     listOpen_ = false;
-    if (!FeedAscii(key)) {
+    if (!JoinSoundMark(key) && !FeedAscii(key)) {
         RejoinConsonant(key);
         Feed(key);
     }
     UpdatePredictions();
+}
+
+bool JapaneseComposer::JoinSoundMark(wchar_t key) {
+    // かな入力: ゛ and ゜ go onto the kana before them (か゛: が, は゜: ぱ).
+    if ((key != L'\x309B' && key != L'\x309C') || !pending_.empty() || caret_ == 0) return false;
+    auto& before = units_[caret_ - 1];
+    if (before.kana.empty()) return false;
+    static constexpr std::wstring_view kPlain = L"かきくけこさしすせそたちつてとはひふへほはひふへほうカキクケコサシスセソタチツテトハヒフヘホハヒフヘホウ";
+    static constexpr std::wstring_view kMarked = L"がぎぐげござじずぜぞだぢづでどばびぶべぼぱぴぷぺぽゔガギグゲゴザジズゼゾダヂヅデドバビブベボパピプペポヴ";
+    // ゜ only for the は row, the second time it is listed.
+    const std::size_t from = key == L'\x309C' ? 20 : 0;
+    const std::size_t to = key == L'\x309C' ? 25 : 20;
+    const wchar_t last = before.kana.back();
+    for (std::size_t row = 0; row < 2; ++row) {
+        const std::size_t offset = row * 26;
+        for (std::size_t i = from; i < to; ++i) {
+            if (kPlain[offset + i] == last) {
+                before.kana.back() = kMarked[offset + i];
+                before.keys += key;
+                return true;
+            }
+        }
+        // う: ゔ, with ゛.
+        if (key == L'\x309B' && kPlain[offset + 25] == last) {
+            before.kana.back() = kMarked[offset + 25];
+            before.keys += key;
+            return true;
+        }
+    }
+    return false;
+}
+
+bool JapaneseComposer::KanaTyped() const {
+    return std::any_of(units_.begin(), units_.end(), [](const Unit& unit) {
+        return std::any_of(unit.keys.begin(), unit.keys.end(), [](wchar_t c) { return c >= 0x3000; });
+    });
 }
 
 void JapaneseComposer::RejoinConsonant(wchar_t key) {
@@ -1000,7 +1036,7 @@ void JapaneseComposer::BuildPhrases(bool convert) {
     if (convert && converter_) {
         // A slip in the keys: converted from the keys as meant. Esc still
         // goes back to what was typed.
-        if (auto conversion = keyConverter_ && !HasAscii() ? keyConverter_->Convert(Keys(false), context_, contextWords_, userDictionary_)
+        if (auto conversion = keyConverter_ && !HasAscii() && !KanaTyped() ? keyConverter_->Convert(Keys(false), context_, contextWords_, userDictionary_)
                                             : std::nullopt) {
             slipUndone = true;
             conversionReading_ = ApplyTypingStyle(std::move(conversion->reading));
@@ -1009,7 +1045,7 @@ void JapaneseComposer::BuildPhrases(bool convert) {
         } else {
             AddPhrases(ConvertReading(reading, 0, context_, contextWords_), reading);
         }
-        if (slips_ && table_ && !chunkJudge_ && !HasAscii() && !reconverted_ && !phrases_.empty() && FixSlips()) {
+        if (slips_ && table_ && !chunkJudge_ && !HasAscii() && !KanaTyped() && !reconverted_ && !phrases_.empty() && FixSlips()) {
             slipUndone = true;
         }
     }
