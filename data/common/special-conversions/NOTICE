@@ -125,7 +125,9 @@ Public Domain Dataです。使用・変更・配布に関しては一切の制�
 
 
 Mozc builds its emoji table from Unicode's emoji data; for the emoji
-and their names the Unicode License V3 also applies:
+and their names, and for the order of a reading's emoji (the Unicode
+Consortium's emoji frequency ranking, https://www.unicode.org/emoji/frequency.html),
+the Unicode License V3 also applies:
 
 UNICODE LICENSE V3
 

@@ -12,7 +12,8 @@ Rows that share a section, language and key keep their order.
   era      Japanese eras and the day each began
   symbol   symbols by reading (Japanese, from Mozc's symbol table) or by
            their ASCII spelling (English, "->" -> "→"); emoji by their
-           Japanese readings (Mozc's emoji table) come after the symbols
+           Japanese readings (Mozc's emoji table) come after the symbols,
+           the most used first (Unicode's emoji frequency ranking)
   emoticon Japanese emoticons (kaomoji) by reading, from Mozc's emoticon
            table; "かおもじ" lists them all
   kanji    the single kanji read a way, all in one value, from Mozc's
@@ -27,14 +28,17 @@ BSD-3-Clause).
 Usage:
   python scripts/build-special-conversions.py --mozc-symbols <symbol.tsv> \\
       --mozc-emoji <emoji_data.tsv> --mozc-emoticons <emoticon.tsv> --mozc-single-kanji <single_kanji.tsv> \\
-      --mozc-license <Mozc LICENSE> --mozc-commit <sha>
+      --mozc-license <Mozc LICENSE> --mozc-commit <sha> \\
+      --emoji-frequency <https://www.unicode.org/emoji/frequency.html saved>
 """
 
 from __future__ import annotations
 
 import argparse
 import hashlib
+import html
 import json
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -205,6 +209,44 @@ def mozc_single_kanji(path: Path) -> list[tuple[str, str]]:
     return rows
 
 
+def emoji_ranks(path: Path) -> dict[str, int]:
+    """Each emoji's place in Unicode's ranking by median frequency of use
+    (the page's "Ranked Order by Median Frequency"), without U+FE0F."""
+    text = html.unescape(re.sub(r"<[^>]+>", " ", path.read_text(encoding="utf-8")))
+    start = text.find("Ranked Order by Median Frequency")
+    if start < 0:
+        raise ValueError(f"no ranking in {path}")
+    ranks: dict[str, int] = {}
+    for token in text[start:].split():
+        if token.isdigit() or not any(ord(c) >= 0x2190 for c in token):
+            continue
+        ranks.setdefault(token.replace("\ufe0f", ""), len(ranks))
+    return ranks
+
+
+def is_emoji(value: str, ranks: dict[str, int]) -> bool:
+    return value.replace("\ufe0f", "") in ranks or "\ufe0f" in value or any(ord(c) >= 0x1F000 for c in value)
+
+
+def rank_emoji(rows: list[tuple[str, str, str, str]], ranks: dict[str, int]) -> list[tuple[str, str, str, str]]:
+    """Each Japanese reading's emoji after its symbols, the most used first;
+    those Unicode does not rank keep their order after them."""
+    groups: dict[tuple[str, str, str], list[int]] = {}
+    for index, (section, language, key, _) in enumerate(rows):
+        if section == "symbol" and language == "ja":
+            groups.setdefault((section, language, key), []).append(index)
+    out = list(rows)
+    for indices in groups.values():
+        values = [rows[i] for i in indices]
+        symbols = [row for row in values if not is_emoji(row[3], ranks)]
+        emoji = [row for row in values if is_emoji(row[3], ranks)]
+        unranked = len(ranks)
+        emoji.sort(key=lambda row: ranks.get(row[3].replace("\ufe0f", ""), unranked))
+        for i, row in zip(indices, symbols + emoji):
+            out[i] = row
+    return out
+
+
 def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest().upper()
 
@@ -220,6 +262,8 @@ def main() -> None:
     parser.add_argument("--unicode-license", type=Path, required=True,
                         help="Unicode License V3 (Mozc builds its emoji table from Unicode data)")
     parser.add_argument("--mozc-commit", required=True, help="the Mozc commit both files are from")
+    parser.add_argument("--emoji-frequency", type=Path, required=True,
+                        help="https://www.unicode.org/emoji/frequency.html, saved")
     args = parser.parse_args()
 
     rows: list[tuple[str, str, str, str]] = []
@@ -238,6 +282,7 @@ def main() -> None:
              if (reading, emoji) not in known]
     rows += [("emoticon", "ja", reading, face) for reading, face in mozc_emoticons(args.mozc_emoticons)]
     rows += [("kanji", "ja", reading, kanji) for reading, kanji in mozc_single_kanji(args.mozc_single_kanji)]
+    rows = rank_emoji(rows, emoji_ranks(args.emoji_frequency))
     for row in rows:
         if any("\t" in field or "\n" in field or not field for field in row):
             raise ValueError(f"bad row: {row!r}")
@@ -263,7 +308,9 @@ def main() -> None:
         "under the following license:\n\n"
         + license_text
         + "\n\nMozc builds its emoji table from Unicode's emoji data; for the emoji\n"
-        "and their names the Unicode License V3 also applies:\n\n"
+        "and their names, and for the order of a reading's emoji (the Unicode\n"
+        "Consortium's emoji frequency ranking, https://www.unicode.org/emoji/frequency.html),\n"
+        "the Unicode License V3 also applies:\n\n"
         + args.unicode_license.read_text(encoding="utf-8"),
         encoding="utf-8", newline="\n")
 
