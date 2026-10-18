@@ -960,6 +960,8 @@ private:
         json += L",\"japanesePunctuation\":" + std::to_wstring(settings_.japanesePunctuation);
         json += L",\"englishSpelling\":" + std::to_wstring(settings_.englishSpelling);
         json += L",\"japaneseNumberStyle\":" + std::to_wstring(settings_.japaneseNumberStyle);
+        json += L",\"japaneseRoughNumbersKanji\":";
+        json += settings_.japaneseRoughNumbersKanji ? L"true" : L"false";
         json += L",\"japaneseKanjiRange\":" + std::to_wstring(settings_.japaneseKanjiRange);
         json += L",\"japaneseKanjiGrade\":" + std::to_wstring(settings_.japaneseKanjiGrade);
         json += L",\"japaneseDigitWidth\":" + std::to_wstring(settings_.japaneseDigitWidth);
@@ -1193,6 +1195,7 @@ private:
             else if (key == L"japaneseKanaInput") settings_.japaneseKanaInput = value;
             else if (key == L"japaneseKanaInputKey") settings_.japaneseKanaInputKey = value;
             else if (key == L"mixSingleVowelKana") settings_.mixSingleVowelKana = value;
+            else if (key == L"japaneseRoughNumbersKanji") settings_.japaneseRoughNumbersKanji = value;
             else if (key == L"noLearningInPrivate") settings_.noLearningInPrivate = value;
             else if (key == L"mixedTypingEnabled") settings_.mixedTypingEnabled = value;
             else if (key == L"japaneseEnglishSpacing") settings_.japaneseEnglishSpacing = value;

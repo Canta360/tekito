@@ -193,6 +193,8 @@ public:
         Official,    // 1億2,345万6,789, as official documents write numbers
     };
     void SetNumberStyle(NumberStyle style) noexcept { numberStyle_ = style; }
+    // Rough numbers in kanji whatever the style: 数十人, 十数人, 二、三日.
+    void SetRoughNumbersInKanji(bool on) noexcept { roughKanji_ = on; }
     // Symbols typed in Japanese that stay as they are (! ? ( )): half-width,
     // or by default full-width. The Japanese marks (、。「」・ー) are not
     // among them.
@@ -636,6 +638,7 @@ private:
     KanjiRange kanjiRange_{KanjiRange::All};
     int kanjiGrade_{6};
     NumberStyle numberStyle_{NumberStyle::AsTyped};
+    bool roughKanji_{true};
     bool halfWidthSymbols_{false};
     bool halfWidthLetters_{false};
     // A capital started letters as typed (Google Japanese Input's "Shift

@@ -56,6 +56,7 @@ const initialSettings = {
   japanesePunctuation: 0,
   japaneseDigitWidth: 0,
   japaneseNumberStyle: 0,
+  japaneseRoughNumbersKanji: true,
   japaneseKanjiRange: 0,
   japaneseKanjiGrade: 6,
   japaneseSymbolWidth: 0,
@@ -720,6 +721,9 @@ function JapanesePage({ advanced, settings, setSetting, romaji, runAction, setCo
             </Row>
             <Row title={j.numbers.title} description={j.numbers.description}>
               <Segmented label={j.numbers.title} value={settings.japaneseNumberStyle} options={numberStyles} onChange={(value) => setSetting("japaneseNumberStyle", value)} />
+            </Row>
+            <Row title={j.roughNumbers.title} description={j.roughNumbers.description}>
+              <Toggle label={j.roughNumbers.title} checked={settings.japaneseRoughNumbersKanji} onChange={(value) => setSetting("japaneseRoughNumbersKanji", value)} />
             </Row>
             <Row title={j.kanji.title} description={j.kanji.description}>
               <Segmented label={j.kanji.title} value={settings.japaneseKanjiRange} options={kanjiRanges} onChange={(value) => setSetting("japaneseKanjiRange", value)} />

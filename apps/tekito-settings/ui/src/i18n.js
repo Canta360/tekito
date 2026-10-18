@@ -202,6 +202,7 @@ const en = {
       description: "How a number is written when you convert it.",
       options: ["As typed", "15", "１５", "３ / 15", "十五", "1万2,345"],
     },
+    roughNumbers: { title: "Rough numbers in kanji", description: "Write 数十人 and 二、三日 in kanji." },
     kanji: {
       title: "Kanji",
       description: "Which kanji conversions may use.",
@@ -580,6 +581,7 @@ const ja = {
       description: "数字を変換したときの書き方です。",
       options: ["打ったとおり", "15", "１５", "３ / 15", "十五", "1万2,345"],
     },
+    roughNumbers: { title: "概数は漢数字", description: "数十人や二、三日のような数を漢数字で書きます。" },
     kanji: {
       title: "漢字の範囲",
       description: "変換で使う漢字の範囲です。",

@@ -59,6 +59,7 @@ function initialState() {
       japanesePunctuation: 0,
       japaneseDigitWidth: 0,
       japaneseNumberStyle: 0,
+      japaneseRoughNumbersKanji: true,
       japaneseKanjiRange: 0,
       japaneseKanjiGrade: 6,
       japaneseSymbolWidth: 0,

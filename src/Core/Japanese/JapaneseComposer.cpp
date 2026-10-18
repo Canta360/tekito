@@ -1132,10 +1132,35 @@ void JapaneseComposer::BuildPhrasesFor(bool convert) {
 }
 
 void JapaneseComposer::ApplyNumberStyle() {
-    for (auto& phrase : phrases_) {
+    // A rough number is part of a word and written in kanji: 数十人, 十数人,
+    // 十余年, 二、三日.
+    constexpr std::wstring_view kNumerals = L"〇一二三四五六七八九";
+    constexpr std::wstring_view kRoughBefore = L"数何幾";
+    constexpr std::wstring_view kRoughAfter = L"数余";
+    const auto digitOf = [](wchar_t c) { return c >= L'\xFF10' ? c - L'\xFF10' : c - L'0'; };
+    for (std::size_t index = 0; index < phrases_.size(); ++index) {
+        auto& phrase = phrases_[index];
         if (phrase.candidates.empty() || phrase.begin + phrase.length > conversionReading_.size()) continue;
         const std::wstring_view reading = std::wstring_view(conversionReading_).substr(phrase.begin, phrase.length);
+        const std::wstring before = index > 0 ? PhraseText(phrases_[index - 1]) : std::wstring{};
+        const std::wstring after = index + 1 < phrases_.size() ? PhraseText(phrases_[index + 1]) : std::wstring{};
+        // 2、3 before a counter (日, 人): 二、三.
+        if (roughKanji_ && reading.size() == 3 && IsDigit(reading[0]) && IsDigit(reading[2]) &&
+            std::wstring_view(L",、，").find(reading[1]) != std::wstring_view::npos &&
+            digitOf(reading[2]) == digitOf(reading[0]) + 1 && digitOf(reading[0]) >= 1 && !after.empty() &&
+            after.front() >= 0x4E00 && after.front() <= 0x9FFF) {
+            const std::wstring rough{kNumerals[digitOf(reading[0])], L'、', kNumerals[digitOf(reading[2])]};
+            auto& candidates = phrase.candidates;
+            std::erase_if(candidates, [&](const PhraseCandidate& c) { return c.text == rough; });
+            candidates.insert(candidates.begin(), {rough, candidates.empty() ? 0 : candidates.front().cost,
+                                                   PhraseCandidate::Kind::Dictionary, false});
+            phrase.selected = 0;
+            phrase.form.reset();
+            continue;
+        }
         if (!IsDigits(reading)) continue;
+        const bool rough = roughKanji_ && ((!before.empty() && kRoughBefore.find(before.back()) != std::wstring_view::npos) ||
+                                           (!after.empty() && kRoughAfter.find(after.front()) != std::wstring_view::npos));
         std::wstring half(reading);
         for (auto& c : half) {
             if (c >= L'\xFF10') c = static_cast<wchar_t>(c - 0xFEE0);
@@ -1143,7 +1168,8 @@ void JapaneseComposer::ApplyNumberStyle() {
         std::wstring full = half;
         for (auto& c : full) c = static_cast<wchar_t>(c + 0xFEE0);
         std::wstring wanted;
-        switch (numberStyle_) {
+        const NumberStyle style = rough ? NumberStyle::Kanji : numberStyle_;
+        switch (style) {
         case NumberStyle::AsTyped: wanted = halfWidthDigits_ ? half : full; break;
         case NumberStyle::HalfWidth: wanted = half; break;
         case NumberStyle::FullWidth: wanted = full; break;
@@ -1153,7 +1179,7 @@ void JapaneseComposer::ApplyNumberStyle() {
         }
         auto& candidates = phrase.candidates;
         auto found = candidates.end();
-        if (numberStyle_ == NumberStyle::Kanji) {
+        if (style == NumberStyle::Kanji) {
             // The first written with kanji numerals as read (十五, not 一五 or 壱拾伍).
             constexpr std::wstring_view kNumerals = L"〇一二三四五六七八九十百千万億兆";
             found = std::find_if(candidates.begin(), candidates.end(), [&](const PhraseCandidate& c) {

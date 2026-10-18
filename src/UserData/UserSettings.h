@@ -106,6 +106,8 @@ struct UserSettings {
     // half-width, 4 = kanji, 5 = official documents' 1億2,345万
     // (JapaneseComposer::NumberStyle).
     int japaneseNumberStyle{0};
+    // Rough numbers in kanji: 数10人 is 数十人, 2、3日 is 二、三日.
+    bool japaneseRoughNumbersKanji{true};
     // Kanji candidates may use: 0 = all, 1 = 常用 and 人名用, 2 = 常用,
     // 3 = 教育 (japanese::KanjiRange).
     int japaneseKanjiRange{0};
