@@ -2229,6 +2229,15 @@ HRESULT TextService::EndComposition(TfEditCookie editCookie) {
     compositionText_.clear();
     ITfComposition* composition = composition_;
     composition->AddRef();
+    // The underline goes with the composition: some apps (WordPad, Word)
+    // keep a display attribute left on committed text.
+    ComPtr<ITfRange> range;
+    ComPtr<ITfContext> context;
+    ComPtr<ITfProperty> attribute;
+    if (SUCCEEDED(composition->GetRange(range.Put())) && SUCCEEDED(range->GetContext(context.Put())) &&
+        SUCCEEDED(context->GetProperty(GUID_PROP_ATTRIBUTE, attribute.Put()))) {
+        (void)attribute->Clear(editCookie, range.Get());
+    }
     HRESULT hr = composition->EndComposition(editCookie);
     if (composition_ == composition) {
         composition_->Release();
