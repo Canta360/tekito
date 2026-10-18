@@ -614,6 +614,17 @@ HRESULT TextService::ActivateEx(ITfThreadMgr* threadManager, TfClientId clientId
     candidateWindow_.Initialize(g_moduleInstance, [this](std::size_t index) {
         OnCandidateSelected(index);
     });
+    candidateElement_ = new (std::nothrow) CandidateListElement(threadManager_, [this](std::size_t index) {
+        OnCandidateSelected(index);
+    });
+    candidateWindow_.SetListObserver(
+        [this](const std::vector<Candidate>& candidates, std::size_t selected, std::size_t pageStart,
+               std::size_t visible) {
+            return !candidateElement_ || candidateElement_->OnListShown(candidates, selected, pageStart, visible);
+        },
+        [this]() {
+            if (candidateElement_) candidateElement_->OnListHidden();
+        });
     Trace(L"ActivateEx ready");
     return S_OK;
 }
@@ -645,6 +656,12 @@ HRESULT TextService::Deactivate() {
         settingsLoaded_ = false;
     }
     candidateWindow_.Hide();
+    candidateWindow_.SetListObserver(nullptr, nullptr);
+    if (candidateElement_) {
+        candidateElement_->Detach();
+        candidateElement_->Release();
+        candidateElement_ = nullptr;
+    }
     state_.Reset();
     rawText_.clear();
     japanese_.Clear();

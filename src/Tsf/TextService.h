@@ -4,6 +4,7 @@
 #include "Core/EnglishSpelling.h"
 #include "Core/InputStateMachine.h"
 #include "Core/UserLearning.h"
+#include "Tsf/CandidateListElement.h"
 #include "Tsf/CandidateWindow.h"
 #include "Tsf/ComPtr.h"
 #include "Tsf/DisplayAttributes.h"
@@ -340,6 +341,8 @@ private:
     std::size_t japanesePage_{9};
     RECT candidateAnchor_{};
     CandidateWindow candidateWindow_;
+    // The list as a TSF UI element, for applications that draw it themselves.
+    CandidateListElement* candidateElement_{nullptr};
     ComPtr<ITfLangBarItemMgr> langBarItemMgr_;
     ComPtr<ModeLangBarItem> modeLangBarItem_;
 };

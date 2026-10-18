@@ -58,18 +58,32 @@ public:
     // Japanese tags (そのまま, スラング, 絵文字) instead of English ones.
     // Takes effect from the next Show.
     void SetJapanese(bool japanese) noexcept { japanese_ = japanese; }
+    // Told about every list before it is drawn, and when it goes, for an
+    // application that may show the list itself (a full-screen game: TSF UI
+    // elements). `shown` returns false when the application shows it: this
+    // window then stays hidden.
+    using ListShown = std::function<bool(const std::vector<Candidate>& candidates, std::size_t selectedIndex,
+                                         std::size_t pageStart, std::size_t visibleCount)>;
+    void SetListObserver(ListShown shown, std::function<void()> hidden) {
+        listShown_ = std::move(shown);
+        listHidden_ = std::move(hidden);
+    }
 
     struct Channel;
 
 private:
     static LRESULT CALLBACK NotifyWindowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);
     void Shutdown() noexcept;
+    // Hide without telling the list observer.
+    void HideWindow() noexcept;
 
     HINSTANCE instance_{nullptr};
     HWND notifyHwnd_{nullptr};
     HANDLE uiThread_{nullptr};
     std::shared_ptr<Channel> channel_;
     std::function<void(std::size_t)> onSelection_;
+    ListShown listShown_;
+    std::function<void()> listHidden_;
 
     // Host-thread copy of what is on screen, used to resolve click selections.
     std::vector<Candidate> candidates_;

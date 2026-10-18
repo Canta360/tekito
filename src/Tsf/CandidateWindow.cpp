@@ -2250,6 +2250,11 @@ void CandidateWindow::Show(const RECT& caretRect,
         return;
     }
 
+    if (listShown_ && !listShown_(candidates_, selectedIndex_, pageStart_, visibleCount_)) {
+        HideWindow();
+        return;
+    }
+
     Frame frame;
     frame.visible = true;
     frame.caret = caretRect;
@@ -2284,6 +2289,13 @@ void CandidateWindow::Show(const RECT& caretRect,
 
 void CandidateWindow::ShowModeBadge(const RECT& caretRect, InputMode mode) {
     if (!channel_) return;
+    // The badge takes the list's place.
+    if (listHidden_) {
+        try {
+            listHidden_();
+        } catch (...) {
+        }
+    }
     candidates_.clear();
     selectedIndex_ = 0;
     pageStart_ = 0;
@@ -2311,6 +2323,16 @@ void CandidateWindow::SetStyle(int style) noexcept {
 }
 
 void CandidateWindow::Hide() noexcept {
+    if (listHidden_) {
+        try {
+            listHidden_();
+        } catch (...) {
+        }
+    }
+    HideWindow();
+}
+
+void CandidateWindow::HideWindow() noexcept {
     if (!channel_ || !shown_) {
         return;
     }

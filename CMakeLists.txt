@@ -103,6 +103,7 @@ set(TEKITO_TSF_OUTPUT_NAME "Tekito.Tsf" CACHE STRING "File name of the input met
 set(TEKITO_CANDIDATE_WINDOW_LIBS d2d1 dwrite dwmapi d3d11 runtimeobject CoreMessaging)
 
 add_library(Tekito.Tsf SHARED
+    src/Tsf/CandidateListElement.cpp
     src/Tsf/CandidateWindow.cpp
     src/Tsf/ClassFactory.cpp
     src/Tsf/DisplayAttributes.cpp
@@ -221,6 +222,12 @@ if(TEKITO_BUILD_TESTS)
     target_compile_options(tekito_typing_demo PRIVATE ${TEKITO_WARNINGS})
     target_link_libraries(tekito_typing_demo PRIVATE
         tekito_core ole32 oleaut32 advapi32 user32 gdi32 ${TEKITO_CANDIDATE_WINDOW_LIBS})
+
+    # A window that draws the input method's candidate list itself, as
+    # full-screen games do, and logs what the list UI element holds.
+    add_executable(tekito_uiless_host WIN32 tests/visual/UilessHost.cpp)
+    target_compile_definitions(tekito_uiless_host PRIVATE ${TEKITO_WINDOWS_DEFINES})
+    target_link_libraries(tekito_uiless_host PRIVATE ole32 oleaut32 user32 uuid)
 
     # A window to try Japanese typing in without registering the input
     # method: the text service's key handling, the real candidate window.
