@@ -830,12 +830,25 @@ std::vector<Candidate> CandidateGenerator::Generate(std::wstring_view rawText,
                 }
             }
             if (!promotedEmoji.empty()) {
-                const auto pageOneIndex = casualInput ? 1u : 4u;
-                const auto insertion = std::min<std::size_t>(pageOneIndex, output.size());
-                output.insert(output.begin() + static_cast<std::ptrdiff_t>(insertion),
-                              std::make_move_iterator(promotedEmoji.rbegin()),
-                              std::make_move_iterator(promotedEmoji.rend()));
-                meaningIndex = insertion + promotedEmoji.size();
+                // Right after the word: a word typed right was most likely
+                // meant, and its emoji is what is wanted next, before words
+                // a slip away (heart: ❤️ before her, year, part).
+                // One on the first page (five rows); the others after it,
+                // not filling it.
+                constexpr std::size_t kPageOneIndex = 1;
+                constexpr std::size_t kSecondPage = 5;
+                std::reverse(promotedEmoji.begin(), promotedEmoji.end());
+                // One emoji before a sequence of them (pizza: 🍕 before 🍄‍🟫).
+                std::stable_partition(promotedEmoji.begin(), promotedEmoji.end(), [](const Candidate& candidate) {
+                    return candidate.text.find(L'\x200D') == std::wstring::npos;
+                });
+                const auto insertion = std::min<std::size_t>(kPageOneIndex, output.size());
+                output.insert(output.begin() + static_cast<std::ptrdiff_t>(insertion), std::move(promotedEmoji.front()));
+                const auto rest = std::min<std::size_t>(std::max(insertion + 1, kSecondPage), output.size());
+                output.insert(output.begin() + static_cast<std::ptrdiff_t>(rest),
+                              std::make_move_iterator(promotedEmoji.begin() + 1),
+                              std::make_move_iterator(promotedEmoji.end()));
+                meaningIndex = insertion + 1;
             }
         }
 
