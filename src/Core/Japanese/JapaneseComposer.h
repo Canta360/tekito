@@ -176,6 +176,15 @@ public:
     // (１２３). A period or comma between digits is a decimal point or a
     // thousands comma of the same width (3.14), not 。 or 、.
     void SetHalfWidthDigits(bool half) noexcept { halfWidthDigits_ = half; }
+    // How a number typed alone in a phrase converts first.
+    enum class NumberStyle {
+        AsTyped,     // in the width digits are typed in
+        HalfWidth,   // 15
+        FullWidth,   // １５
+        Mixed,       // one digit full-width (３), more half-width (15)
+        Kanji,       // 十五
+    };
+    void SetNumberStyle(NumberStyle style) noexcept { numberStyle_ = style; }
     // Symbols typed in Japanese that stay as they are (! ? ( )): half-width,
     // or by default full-width. The Japanese marks (、。「」・ー) are not
     // among them.
@@ -573,6 +582,8 @@ private:
     [[nodiscard]] std::optional<std::wstring> TypedWithCapitals(std::wstring_view keys) const;
     // The chunk judge's judgement of `keys`, with SetSingleVowelKana.
     [[nodiscard]] ChunkJudge::Judgement JudgeChunk(std::wstring_view keys) const;
+    // Phrases that are only digits: the form SetNumberStyle asks for first.
+    void ApplyNumberStyle();
     [[nodiscard]] bool SingleVowelKana(std::wstring_view keys) const noexcept;
     std::uint16_t englishContext_{0};
     // Mixed typing: English chunks committed in a row, just before, and
@@ -607,6 +618,7 @@ private:
     [[nodiscard]] KanaForm TypingForm() const noexcept { return fieldForm_.value_or(inputForm_); }
     PunctuationStyle punctuation_{PunctuationStyle::ToutenKuten};
     bool halfWidthDigits_{false};
+    NumberStyle numberStyle_{NumberStyle::AsTyped};
     bool halfWidthSymbols_{false};
     bool halfWidthLetters_{false};
     // A capital started letters as typed (Google Japanese Input's "Shift

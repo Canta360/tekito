@@ -238,6 +238,25 @@ void TestConversionForms(const RomajiTable& table) {
         Require(onFirstPage(L"a") && onFirstPage(L"A") && onFirstPage(L"ａ") && onFirstPage(L"ア"),
                 "a typed alone offers a, A, ａ and ア on the first page");
     }
+    {
+        // How a number converts first.
+        using Style = JapaneseComposer::NumberStyle;
+        JapaneseComposer number(&table);
+        number.SetHalfWidthDigits(true);
+        const auto converted = [&](std::wstring_view keys, Style style) {
+            number.Clear();
+            number.SetNumberStyle(style);
+            Type(number, keys);
+            number.Convert();
+            return number.Preedit();
+        };
+        RequireText(converted(L"15", Style::AsTyped), L"15", "as typed: in the width digits are typed in");
+        RequireText(converted(L"15", Style::FullWidth), L"１５", "full-width");
+        RequireText(converted(L"3", Style::Mixed), L"３", "mixed: one digit full-width");
+        RequireText(converted(L"15", Style::Mixed), L"15", "and more half-width");
+        number.SetHalfWidthDigits(false);
+        RequireText(converted(L"15", Style::HalfWidth), L"15", "half-width, even typed full-width");
+    }
     Type(composer, L"katakana");
     composer.Convert();
     Require(composer.IsConverted(), "Space converts");

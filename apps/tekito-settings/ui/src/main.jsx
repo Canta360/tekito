@@ -55,6 +55,7 @@ const initialSettings = {
   japaneseSpaceWidth: 0,
   japanesePunctuation: 0,
   japaneseDigitWidth: 0,
+  japaneseNumberStyle: 0,
   japaneseSymbolWidth: 0,
   japaneseLetterWidth: 1,
   advancedSettings: false,
@@ -662,6 +663,7 @@ function JapanesePage({ advanced, settings, setSetting, romaji, runAction, setCo
   const spaces = [[0, j.space.follow], [1, j.space.half], [2, j.space.full]];
   const marks = [[0, "、。"], [1, "，．"], [2, "，。"], [3, "、．"]];
   const digits = [[0, "123"], [1, "１２３"]];
+  const numberStyles = j.numbers.options.map((label, value) => [value, label]);
   const symbols = [[1, "!?"], [0, "！？"]];
   const letters = [[1, "abc"], [0, "ａｂｃ"]];
   return (
@@ -711,6 +713,9 @@ function JapanesePage({ advanced, settings, setSetting, romaji, runAction, setCo
             </Row>
             <Row title={j.digits.title} description={j.digits.description}>
               <Segmented label={j.digits.title} value={settings.japaneseDigitWidth} options={digits} onChange={(value) => setSetting("japaneseDigitWidth", value)} />
+            </Row>
+            <Row title={j.numbers.title} description={j.numbers.description}>
+              <Segmented label={j.numbers.title} value={settings.japaneseNumberStyle} options={numberStyles} onChange={(value) => setSetting("japaneseNumberStyle", value)} />
             </Row>
             <Row title={j.spacing.title} description={j.spacing.description}>
               <Toggle label={j.spacing.title} checked={settings.japaneseEnglishSpacing} onChange={(value) => setSetting("japaneseEnglishSpacing", value)} />

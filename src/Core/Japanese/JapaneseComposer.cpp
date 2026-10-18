@@ -1103,7 +1103,52 @@ void JapaneseComposer::BuildPhrases(bool convert) {
         candidates.insert(candidates.begin() + 1, std::move(english));
     }
     if (convert && reranker_ && sentenceCheck_ && !chunkJudge_ && !reconverted_) CheckSentence();
+    if (convert) ApplyNumberStyle();
     if (convert) AddTypedForms();
+}
+
+void JapaneseComposer::ApplyNumberStyle() {
+    for (auto& phrase : phrases_) {
+        if (phrase.candidates.empty() || phrase.begin + phrase.length > conversionReading_.size()) continue;
+        const std::wstring_view reading = std::wstring_view(conversionReading_).substr(phrase.begin, phrase.length);
+        if (!IsDigits(reading)) continue;
+        std::wstring half(reading);
+        for (auto& c : half) {
+            if (c >= L'\xFF10') c = static_cast<wchar_t>(c - 0xFEE0);
+        }
+        std::wstring full = half;
+        for (auto& c : full) c = static_cast<wchar_t>(c + 0xFEE0);
+        std::wstring wanted;
+        switch (numberStyle_) {
+        case NumberStyle::AsTyped: wanted = halfWidthDigits_ ? half : full; break;
+        case NumberStyle::HalfWidth: wanted = half; break;
+        case NumberStyle::FullWidth: wanted = full; break;
+        case NumberStyle::Mixed: wanted = half.size() == 1 ? full : half; break;
+        case NumberStyle::Kanji: break;
+        }
+        auto& candidates = phrase.candidates;
+        auto found = candidates.end();
+        if (numberStyle_ == NumberStyle::Kanji) {
+            // The first written with kanji numerals as read (十五, not 一五 or 壱拾伍).
+            constexpr std::wstring_view kNumerals = L"〇一二三四五六七八九十百千万億兆";
+            found = std::find_if(candidates.begin(), candidates.end(), [&](const PhraseCandidate& c) {
+                return !c.text.empty() && std::all_of(c.text.begin(), c.text.end(), [&](wchar_t ch) {
+                    return kNumerals.find(ch) != std::wstring_view::npos;
+                });
+            });
+        } else {
+            found = std::find_if(candidates.begin(), candidates.end(),
+                                 [&](const PhraseCandidate& c) { return c.text == wanted; });
+            if (found == candidates.end()) {
+                candidates.insert(candidates.begin(), {wanted, candidates.front().cost, PhraseCandidate::Kind::Hiragana, false});
+                found = candidates.begin();
+            }
+        }
+        if (found == candidates.end()) continue;
+        std::rotate(candidates.begin(), found, found + 1);
+        phrase.selected = 0;
+        phrase.form.reset();
+    }
 }
 
 void JapaneseComposer::AddTypedForms() {

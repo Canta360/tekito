@@ -959,6 +959,7 @@ private:
         json += L",\"japaneseSpaceWidth\":" + std::to_wstring(settings_.japaneseSpaceWidth);
         json += L",\"japanesePunctuation\":" + std::to_wstring(settings_.japanesePunctuation);
         json += L",\"englishSpelling\":" + std::to_wstring(settings_.englishSpelling);
+        json += L",\"japaneseNumberStyle\":" + std::to_wstring(settings_.japaneseNumberStyle);
         json += L",\"japaneseDigitWidth\":" + std::to_wstring(settings_.japaneseDigitWidth);
         json += L",\"japaneseSymbolWidth\":" + std::to_wstring(settings_.japaneseSymbolWidth);
         json += L",\"japaneseLetterWidth\":" + std::to_wstring(settings_.japaneseLetterWidth);
@@ -1162,6 +1163,9 @@ private:
             }
             else if (key == L"englishSpelling") {
                 settings_.englishSpelling = std::clamp(integerValue, 0, 2);
+            }
+            else if (key == L"japaneseNumberStyle") {
+                settings_.japaneseNumberStyle = std::clamp(integerValue, 0, 4);
             }
             else if (key == L"japaneseDigitWidth") {
                 settings_.japaneseDigitWidth = std::clamp(integerValue, 0, 1);

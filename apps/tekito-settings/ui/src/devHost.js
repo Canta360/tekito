@@ -58,6 +58,7 @@ function initialState() {
       japaneseSpaceWidth: 0,
       japanesePunctuation: 0,
       japaneseDigitWidth: 0,
+      japaneseNumberStyle: 0,
       japaneseSymbolWidth: 0,
       japaneseLetterWidth: 1,
       advancedSettings: false,

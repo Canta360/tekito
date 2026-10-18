@@ -101,6 +101,10 @@ struct UserSettings {
     // Digits typed in Japanese: 0 = half-width (123), 1 = full-width
     // (the wide forms). Converting offers the other one.
     int japaneseDigitWidth{0};
+    // How a number converts first: 0 = as typed (japaneseDigitWidth),
+    // 1 = half-width, 2 = full-width, 3 = one digit full-width and more
+    // half-width, 4 = kanji (JapaneseComposer::NumberStyle).
+    int japaneseNumberStyle{0};
     // Symbols typed in Japanese (! ? ( )): 0 = full-width, 1 = half-width.
     int japaneseSymbolWidth{0};
     // Letters typed in Japanese that stay letters (k, q): 0 = full-width,

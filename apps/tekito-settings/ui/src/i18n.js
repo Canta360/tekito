@@ -197,6 +197,11 @@ const en = {
     },
     punctuation: { title: "Punctuation", description: "The comma and period marks." },
     digits: { title: "Digits", description: "The width of the numbers you type." },
+    numbers: {
+      title: "Converted numbers",
+      description: "How a number is written when you convert it.",
+      options: ["As typed", "15", "１５", "３ / 15", "十五"],
+    },
     spacing: { title: "Space around English", description: "A space between Japanese and English words: 今日は GitHub に push した." },
     letters: { title: "Letters", description: "The width of letters typed in Japanese. Converting offers the other." },
     symbols: { title: "Symbols", description: "The width of symbols like ! and ( )." },
@@ -564,6 +569,11 @@ const ja = {
     },
     punctuation: { title: "句読点", description: "句読点の形です。" },
     digits: { title: "数字", description: "打った数字の幅です。" },
+    numbers: {
+      title: "数字の変換",
+      description: "数字を変換したときの書き方です。",
+      options: ["打ったとおり", "15", "１５", "３ / 15", "十五"],
+    },
     spacing: { title: "英単語の前後に空白", description: "日本語と英単語の間に半角スペースを入れます（今日は GitHub に push した）。" },
     letters: { title: "英字", description: "日本語の中で打った英字の幅です。変換するともう一方も選べます。" },
     symbols: { title: "記号", description: "！や（）などの記号の幅です。" },
