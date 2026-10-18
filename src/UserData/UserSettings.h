@@ -105,6 +105,9 @@ struct UserSettings {
     // 1 = half-width, 2 = full-width, 3 = one digit full-width and more
     // half-width, 4 = kanji (JapaneseComposer::NumberStyle).
     int japaneseNumberStyle{0};
+    // Kanji candidates may use: 0 = all, 1 = 常用 and 人名用, 2 = 常用,
+    // 3 = 教育 (japanese::KanjiRange).
+    int japaneseKanjiRange{0};
     // Symbols typed in Japanese (! ? ( )): 0 = full-width, 1 = half-width.
     int japaneseSymbolWidth{0};
     // Letters typed in Japanese that stay letters (k, q): 0 = full-width,

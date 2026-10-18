@@ -52,6 +52,7 @@ add_library(tekito_core STATIC
     src/Core/Japanese/NeuralMath.cpp
     src/Core/Japanese/PostalCodes.cpp
     src/Core/Japanese/Meanings.cpp
+    src/Core/Japanese/KanjiSets.cpp
     src/Core/Japanese/RomajiTable.cpp
     src/Core/Japanese/SentenceReranker.cpp
     src/Core/Japanese/SortedTsv.cpp

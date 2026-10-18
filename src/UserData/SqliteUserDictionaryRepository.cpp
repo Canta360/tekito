@@ -312,6 +312,8 @@ bool SqliteUserDictionaryRepository::LoadSettings(UserSettings& settings) const 
             loaded.japanesePunctuation = std::clamp(value, 0, 3);
         } else if (std::strcmp(key, "japanese_digit_width") == 0) {
             loaded.japaneseDigitWidth = std::clamp(value, 0, 1);
+        } else if (std::strcmp(key, "japanese_kanji_range") == 0) {
+            loaded.japaneseKanjiRange = std::clamp(static_cast<int>(value), 0, 3);
         } else if (std::strcmp(key, "japanese_number_style") == 0) {
             loaded.japaneseNumberStyle = std::clamp(static_cast<int>(value), 0, 4);
         } else if (std::strcmp(key, "japanese_symbol_width") == 0) {
@@ -443,6 +445,7 @@ bool SqliteUserDictionaryRepository::SaveSettings(const UserSettings& settings) 
     saveValue("japanese_punctuation", std::clamp(settings.japanesePunctuation, 0, 3));
     saveValue("japanese_digit_width", std::clamp(settings.japaneseDigitWidth, 0, 1));
     saveValue("japanese_number_style", std::clamp(settings.japaneseNumberStyle, 0, 4));
+    saveValue("japanese_kanji_range", std::clamp(settings.japaneseKanjiRange, 0, 3));
     saveValue("japanese_symbol_width", std::clamp(settings.japaneseSymbolWidth, 0, 1));
     saveValue("japanese_letter_width", std::clamp(settings.japaneseLetterWidth, 0, 1));
     saveValue("advanced_settings", settings.advancedSettings ? 1 : 0);

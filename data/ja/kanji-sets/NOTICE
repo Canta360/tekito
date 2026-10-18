@@ -1,0 +1,7 @@
+Which kanji are 教育漢字, 常用漢字 and 人名用漢字, from KANJIDIC2
+(https://www.edrdg.org/wiki/index.php/KANJIDIC_Project), the property of the
+Electronic Dictionary Research and Development Group, used under its licence,
+Creative Commons Attribution-ShareAlike 4.0 International
+(https://creativecommons.org/licenses/by-sa/4.0/). Only the grade of each
+kanji is kept, by scripts/ja/build-kanji-sets.py. This pack is under the same
+licence.

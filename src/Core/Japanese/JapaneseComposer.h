@@ -2,6 +2,7 @@
 
 #include "Core/Japanese/ChunkJudge.h"
 #include "Core/Japanese/JapaneseConverter.h"
+#include "Core/Japanese/KanjiSets.h"
 #include "Core/SpecialConversions.h"
 
 #include <cstdint>
@@ -85,6 +86,9 @@ public:
     // English words for katakana candidates (ミーティング -> meeting), offered
     // right after them; nullptr offers none.
     void SetLoanwords(const Loanwords* loanwords) noexcept { loanwords_ = loanwords; }
+    // Candidates use only kanji in `range` (教育, 常用, 人名用 from `sets`).
+    void SetKanjiSets(const KanjiSets* sets) noexcept { kanjiSets_ = sets; }
+    void SetKanjiRange(KanjiRange range) noexcept { kanjiRange_ = range; }
     // Mixed typing: Space (and Enter) takes what was typed as one chunk of
     // English or Japanese (ChunkJudge). English stays English, written as
     // it is (GitHub), and is committed with a space after it, as English is
@@ -401,7 +405,12 @@ private:
     [[nodiscard]] std::wstring FormText(KanaForm form, std::size_t begin, std::size_t length,
                                         int letterCase) const;
     // Phrases from the converter, or one phrase for the whole text.
+    // BuildPhrasesFor, then KeepKanjiInRange.
     void BuildPhrases(bool convert);
+    void BuildPhrasesFor(bool convert);
+    // Candidates with kanji outside SetKanjiRange taken out (the phrase's
+    // kana when none is left).
+    void KeepKanjiInRange(PhraseState& phrase) const;
     // The likeliest sentences the phrases' candidates make, checked as a
     // whole (SetSentenceReranker); the one taken is selected.
     void CheckSentence();
@@ -462,6 +471,7 @@ private:
     // short input split into phrases, the whole input too ("hahimemashite":
     // は|秘めまして, and はじめまして).
     void AddSlipCandidates(PhraseState& phrase) const;
+    void AddSlipCandidatesFor(PhraseState& phrase) const;
     // The readings of `keys` with one slip undone that read as known words
     // at most kSlipMargin less likely than `typedCost`, likeliest first,
     // each with its likeliest text; readings in `skip` are left out.
@@ -618,6 +628,8 @@ private:
     [[nodiscard]] KanaForm TypingForm() const noexcept { return fieldForm_.value_or(inputForm_); }
     PunctuationStyle punctuation_{PunctuationStyle::ToutenKuten};
     bool halfWidthDigits_{false};
+    const KanjiSets* kanjiSets_{nullptr};
+    KanjiRange kanjiRange_{KanjiRange::All};
     NumberStyle numberStyle_{NumberStyle::AsTyped};
     bool halfWidthSymbols_{false};
     bool halfWidthLetters_{false};

@@ -29,6 +29,7 @@ struct JapaneseData {
     SentenceReranker reranker;
     KanaSlips slips;
     Loanwords loanwords;
+    KanjiSets kanjiSets;
     UserPartsOfSpeech userParts;
     std::unique_ptr<JapaneseConverter> converter;
     std::unique_ptr<KeyConverter> keys;
@@ -58,6 +59,7 @@ const JapaneseData* ProcessJapaneseData() {
         (void)loaded->slips.Open(ExternalLexiconProvider::PackDirectory(L"japanese-slips"));
         (void)loaded->loanwords.Open(ExternalLexiconProvider::PackDirectory(L"japanese-loanwords"));
         (void)loaded->loanwords.OpenEnglish(ExternalLexiconProvider::PackDirectory(L"japanese-english"));
+        (void)loaded->kanjiSets.Load(ExternalLexiconProvider::PackDirectory(L"kanji-sets") / L"kanji.tsv");
         loaded->userParts = UserPartsOfSpeech::Load(core / L"pos.tsv");
         if (const auto number = loaded->userParts.Number()) {
             loaded->converter->SetNumberWord(JapaneseConverter::NumberWord{number->left, number->right, number->cost});
@@ -144,6 +146,7 @@ void AttachJapaneseData(JapaneseComposer& composer) {
     composer.SetRunTogether(data ? data->chunks.get() : nullptr);
     composer.SetSentenceReranker(data && data->reranker.IsOpen() ? &data->reranker : nullptr);
     composer.SetKanaSlips(data && data->slips.IsOpen() ? &data->slips : nullptr);
+    composer.SetKanjiSets(data && !data->kanjiSets.Empty() ? &data->kanjiSets : nullptr);
 }
 
 void AttachMixedTyping(JapaneseComposer& composer, bool on) {

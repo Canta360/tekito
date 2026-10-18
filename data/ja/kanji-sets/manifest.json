@@ -1,0 +1,16 @@
+{
+  "pack_id": "kanji-sets",
+  "display_name": "Kanji Sets (KANJIDIC2)",
+  "schema_version": 1,
+  "version": "kanjidic2-2026-291",
+  "language": "ja-JP",
+  "type": "kanji-sets",
+  "file": "kanji.tsv",
+  "entry_count": 2999,
+  "sha256": {
+    "file": "9AC85068281D836DF1AAA41C942FEDFE12D6A03D51E40E1BB44A21665E643816"
+  },
+  "license": "CC-BY-SA-4.0",
+  "source": "https://www.edrdg.org/kanjidic/kanjidic2.xml.gz",
+  "notice_file": "NOTICE"
+}

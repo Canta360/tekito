@@ -509,6 +509,7 @@ void JapaneseComposer::UpdateLive() {
         settledPhrases_ = phrases_.size() - liveOpenPhrases_;
         settledLength_ = phrases_[settledPhrases_ - 1].begin + phrases_[settledPhrases_ - 1].length;
     }
+    for (auto& phrase : phrases_) KeepKanjiInRange(phrase);
     preview_ = true;
     focus_ = phrases_.size() - 1;
     listOpen_ = false;
@@ -568,6 +569,10 @@ void JapaneseComposer::UpdatePredictions() {
                                           [&](const Prediction& p) { return p.text == prediction.text; });
             if (!seen) predictions_.push_back(std::move(prediction));
         }
+    }
+    // Only kanji in the range set (KeepKanjiInRange).
+    if (kanjiSets_ && kanjiRange_ != KanjiRange::All) {
+        std::erase_if(predictions_, [&](const Prediction& p) { return !kanjiSets_->Allows(p.text, kanjiRange_); });
     }
 }
 
@@ -936,6 +941,25 @@ std::vector<PhraseCandidate> JapaneseComposer::KanaCandidates(std::wstring_view 
 }
 
 void JapaneseComposer::BuildPhrases(bool convert) {
+    BuildPhrasesFor(convert);
+    if (!convert) return;
+    for (auto& phrase : phrases_) KeepKanjiInRange(phrase);
+}
+
+void JapaneseComposer::KeepKanjiInRange(PhraseState& phrase) const {
+    if (!kanjiSets_ || kanjiRange_ == KanjiRange::All || phrase.candidates.empty()) return;
+    auto& candidates = phrase.candidates;
+    const std::wstring chosen = phrase.selected < candidates.size() ? candidates[phrase.selected].text : std::wstring{};
+    std::erase_if(candidates, [&](const PhraseCandidate& c) { return !kanjiSets_->Allows(c.text, kanjiRange_); });
+    if (candidates.empty() && phrase.begin + phrase.length <= conversionReading_.size()) {
+        candidates = KanaCandidates(conversionReading_.substr(phrase.begin, phrase.length));
+    }
+    const auto kept = std::find_if(candidates.begin(), candidates.end(),
+                                   [&](const PhraseCandidate& c) { return c.text == chosen; });
+    phrase.selected = kept == candidates.end() ? 0 : static_cast<std::size_t>(kept - candidates.begin());
+}
+
+void JapaneseComposer::BuildPhrasesFor(bool convert) {
     FlushAll();
     predictions_.clear();
     chosenPrediction_.reset();
@@ -1864,6 +1888,11 @@ std::vector<std::pair<PhraseCandidate, std::wstring>> JapaneseComposer::SlipRead
 
 void JapaneseComposer::AddSlipCandidates(PhraseState& phrase) const {
     if (phrase.slipsAdded) return;
+    AddSlipCandidatesFor(phrase);
+    KeepKanjiInRange(phrase);
+}
+
+void JapaneseComposer::AddSlipCandidatesFor(PhraseState& phrase) const {
     phrase.slipsAdded = true;
     if (!converter_ || !table_ || HasAscii() || reconverted_) return;
     const auto lettersOnly = [](const std::wstring& keys) {

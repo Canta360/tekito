@@ -12,6 +12,7 @@
 #include "Core/Japanese/ChunkJudge.h"
 #include "Core/RankingData.h"
 #include "Core/Japanese/KanaText.h"
+#include "Core/Japanese/KanjiSets.h"
 #include "Core/Japanese/Meanings.h"
 #include "Core/Japanese/PostalCodes.h"
 #include "Core/Japanese/RomajiTable.h"
@@ -1371,6 +1372,25 @@ void TestComposerLearning(const RomajiTable& table, const MiniPack& pack) {
     RequireText(composer.Segments().front().text, first, "without learning the order is the converter's");
 }
 
+void TestKanjiSets() {
+    using tekito::japanese::KanjiRange;
+    tekito::japanese::KanjiSets sets;
+    sets.Add(U'本', 1);  // 教育
+    sets.Add(U'鬱', 2);  // 常用
+    sets.Add(U'桜', 1);
+    sets.Add(U'櫻', 3);  // 人名用
+    Require(sets.Allows(L"薔薇", KanjiRange::All), "all: any kanji");
+    Require(!sets.Allows(L"薔薇", KanjiRange::JoyoAndJinmei) && sets.Allows(L"櫻", KanjiRange::JoyoAndJinmei),
+            "常用・人名用: 人名用 kanji, not others");
+    Require(!sets.Allows(L"櫻", KanjiRange::Joyo) && sets.Allows(L"憂鬱", KanjiRange::Joyo) == false &&
+                sets.Allows(L"鬱", KanjiRange::Joyo),
+            "常用: not 人名用, nor kanji outside the sets");
+    Require(!sets.Allows(L"鬱", KanjiRange::Kyoiku) && sets.Allows(L"本を読むゆううつ", KanjiRange::Kyoiku) == false &&
+                sets.Allows(L"本をよむ、ホン abc", KanjiRange::Kyoiku),
+            "教育: only 教育 kanji; kana, letters and marks always");
+    Require(!sets.Allows(L"𠮟", KanjiRange::JoyoAndJinmei), "kanji outside the BMP are checked too");
+}
+
 void TestMeanings() {
     tekito::japanese::MeaningDictionary meanings;
     Require(meanings.Open(std::filesystem::path(TEKITO_TEST_DATA_DIR) / L"meanings-mini"), "the meaning packs open");
@@ -1863,6 +1883,7 @@ int main(int argc, char** argv) {
     TestSpecialConversions(*table, *pack);
     TestSentenceReranker(*table, *pack);
     TestKanaSlips(*table, *pack);
+    TestKanjiSets();
     TestMeanings();
     if (argc > 1 && std::string_view(argv[1]) == "--dump") DumpConversions(*pack);
     std::cout << "All TEKITO Japanese tests passed.\n";
