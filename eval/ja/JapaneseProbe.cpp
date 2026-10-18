@@ -3,7 +3,10 @@
 // katakana words...). Each line of the input is keys typed in Japanese
 // mode; for each, the first pages of the list after Space are printed.
 //
-//   TEKITO_DATA_PACK_DIR=<data> tekito_ja_probe <keys file> [rows=27]
+//   TEKITO_DATA_PACK_DIR=<data> tekito_ja_probe <keys file> [rows=27] [live] [mix]
+//
+// "live" turns live conversion on (the text after a pause is printed too);
+// "mix" types in Mix.
 //
 // The composer is set up as the text service sets it up: the installed
 // Japanese data and the default settings.
@@ -47,8 +50,14 @@ int main(int argc, char** argv) {
     const std::size_t rows = argc > 2 ? std::stoul(argv[2]) : 27;
     tekito::japanese::JapaneseComposer composer(tekito::japanese::ProcessRomajiTable());
     tekito::japanese::AttachJapaneseData(composer);
-    const tekito::userdata::UserSettings settings;
+    tekito::userdata::UserSettings settings;
+    bool mix = false;
+    for (int i = 3; i < argc; ++i) {
+        if (std::string(argv[i]) == "live") settings.japaneseLiveConversion = true;
+        if (std::string(argv[i]) == "mix") mix = true;
+    }
     tekito::userdata::ApplyJapaneseSettings(composer, settings, nullptr);
+    tekito::japanese::AttachMixedTyping(composer, mix);
     std::ifstream in(argv[1], std::ios::binary);
     for (std::string line; std::getline(in, line);) {
         if (!line.empty() && line.back() == '\r') line.pop_back();
@@ -60,8 +69,9 @@ int main(int argc, char** argv) {
         std::string predictions;
         for (const auto& prediction : composer.Predictions()) predictions += " " + Narrow(prediction.text);
         if (!predictions.empty()) std::cout << "\tpredicted:" << predictions;
+        if (settings.japaneseLiveConversion && composer.RefineLive()) std::cout << "\tpaused: " << Narrow(composer.Preedit());
         composer.Convert();
-        std::cout << "\n  ";
+        std::cout << "\tspace: " << Narrow(composer.Preedit()) << "\n  ";
         if (const auto* list = composer.FocusedCandidates()) {
             for (std::size_t i = 0; i < list->size() && i < rows; ++i) {
                 std::cout << (i ? " | " : "") << Narrow((*list)[i].text);
