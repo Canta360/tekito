@@ -1055,6 +1055,17 @@ void TestPrediction(const RomajiTable& table, const MiniPack& pack) {
     Require(composer.Predictions().empty(), "converting puts predictions away");
     composer.Clear();
 
+    // Live: a pause converts again but keeps the predictions for Tab.
+    composer.SetLiveConversion(true);
+    Type(composer, L"ariga");
+    Require(!composer.Predictions().empty(), "live: ありが predicts words");
+    (void)composer.RefineLive();
+    Require(!composer.Predictions().empty(), "live: a pause keeps the predictions");
+    composer.NextPrediction();
+    const auto pickedLive = composer.Predictions()[*composer.ChosenPrediction()].text;
+    RequireText(composer.Commit(), pickedLive, "live: Enter commits the prediction Tab picked after the pause");
+    composer.SetLiveConversion(false);
+
     // Mix: Enter takes the prediction picked with Tab, not a conversion.
     struct NoWords final : tekito::IFrequencyProvider {
         double Score(std::wstring_view) const noexcept override { return 0.0; }
