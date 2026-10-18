@@ -1354,6 +1354,20 @@ void TestMeanings() {
             "English meanings are split into senses");
     Require(!meanings.Lookup(L"xyzzy") && !meanings.Lookup(L"犬"), "unknown words have no meaning");
 
+    using tekito::japanese::MeaningLanguage;
+    const auto in = [&](std::wstring_view text, std::wstring_view reading, MeaningLanguage language) {
+        const auto meaning = meanings.Lookup(text, reading, language);
+        return meaning ? meaning->headword + L":" + meaning->senses.front() : std::wstring(L"-");
+    };
+    RequireText(in(L"Meeting", L"", MeaningLanguage::Japanese), L"meeting:会議、ミーティング：公式に準備された集まり",
+                "an English word in Japanese");
+    RequireText(in(L"会った", L"あった", MeaningLanguage::English), L"会う:meet: come together",
+                "a Japanese word in English, from its dictionary form");
+    RequireText(in(L"私", L"わたし", MeaningLanguage::English), L"私:自分自身のことを指す一人称。",
+                "with no English meaning, the Japanese one");
+    RequireText(in(L"Meeting", L"", MeaningLanguage::English), first(L"Meeting", L""),
+                "an English word in English is as before");
+
     tekito::japanese::MeaningDictionary missing;
     Require(!missing.Open(L"Z:/no-such-folder") && !missing.Lookup(L"私"), "missing packs just mean no meanings");
 }

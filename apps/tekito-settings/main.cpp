@@ -938,6 +938,8 @@ private:
         json += settings_.japaneseEnabled ? L"true" : L"false";
         json += L",\"meaningsEnabled\":";
         json += settings_.meaningsEnabled ? L"true" : L"false";
+        json += L",\"meaningsInUiLanguage\":";
+        json += settings_.meaningsInUiLanguage ? L"true" : L"false";
         json += L",\"toggleKey\":" + std::to_wstring(settings_.toggleKey);
         json += L",\"keyboardType\":" + std::to_wstring(settings_.keyboardType);
         json += L",\"periodOnEnter\":";
@@ -1135,6 +1137,7 @@ private:
             else if (key == L"smartPunctuation") settings_.smartPunctuation = value;
             else if (key == L"bracketPairs") settings_.bracketPairs = value;
             else if (key == L"meaningsEnabled") settings_.meaningsEnabled = value;
+            else if (key == L"meaningsInUiLanguage") settings_.meaningsInUiLanguage = value;
             else if (key == L"japaneseEnabled") settings_.japaneseEnabled = value;
             else if (key == L"modeIndicatorEnabled") settings_.modeIndicatorEnabled = value;
             else if (key == L"modeUnderlineColors") settings_.modeUnderlineColors = value;

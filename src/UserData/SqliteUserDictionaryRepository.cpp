@@ -274,6 +274,8 @@ bool SqliteUserDictionaryRepository::LoadSettings(UserSettings& settings) const 
             loaded.candidateRows = value == 5 || value == 7 || value == 9 ? value : 0;
         } else if (std::strcmp(key, "meanings_enabled") == 0) {
             loaded.meaningsEnabled = value != 0;
+        } else if (std::strcmp(key, "meanings_in_ui_language") == 0) {
+            loaded.meaningsInUiLanguage = value != 0;
         } else if (std::strcmp(key, "toggle_key") == 0) {
             loaded.toggleKey = std::clamp(value, 0, 3);
         } else if (std::strcmp(key, "period_on_enter") == 0) {
@@ -415,6 +417,7 @@ bool SqliteUserDictionaryRepository::SaveSettings(const UserSettings& settings) 
     saveValue("japanese_enabled", settings.japaneseEnabled ? 1 : 0);
     saveValue("japanese_switch_order", std::clamp(settings.japaneseSwitchOrder, 0, 2));
     saveValue("meanings_enabled", settings.meaningsEnabled ? 1 : 0);
+    saveValue("meanings_in_ui_language", settings.meaningsInUiLanguage ? 1 : 0);
     saveValue("toggle_key", std::clamp(settings.toggleKey, 0, 3));
     saveValue("period_on_enter", settings.periodOnEnter ? 1 : 0);
     saveValue("next_word_prediction", settings.nextWordPrediction ? 1 : 0);

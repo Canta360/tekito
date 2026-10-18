@@ -35,6 +35,7 @@ const initialSettings = {
   candidateWindowStyle: 0,
   candidateRows: 0,
   meaningsEnabled: true,
+  meaningsInUiLanguage: true,
   japaneseSwitchOrder: 0,
   japaneseEnabled: true,
   modeIndicatorEnabled: true,
@@ -566,6 +567,9 @@ function CandidatesPage({ advanced, settings, setSetting }) {
           </Row>
           <Row title={t.meanings.title} description={t.meanings.description}>
             <Toggle label={t.meanings.title} checked={settings.meaningsEnabled} onChange={(value) => setSetting("meaningsEnabled", value)} />
+          </Row>
+          <Row title={t.meaningsLanguage.title} description={t.meaningsLanguage.description}>
+            <Toggle label={t.meaningsLanguage.title} checked={settings.meaningsInUiLanguage} onChange={(value) => setSetting("meaningsInUiLanguage", value)} />
           </Row>
         </Glass>
       )}

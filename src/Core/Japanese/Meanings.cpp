@@ -30,14 +30,27 @@ bool MeaningDictionary::Open(const std::filesystem::path& dataRoot) noexcept {
     wiktionary_.Open(FindDataPack(dataRoot, L"japanese-wiktionary") / L"meanings.tsv");
     wordnet_.Open(FindDataPack(dataRoot, L"japanese-wordnet") / L"meanings.tsv");
     english_.Open(FindDataPack(dataRoot, L"dictionary-display") / L"entries.tsv");
+    englishInJapanese_.Open(FindDataPack(dataRoot, L"english-meanings-ja") / L"meanings.tsv");
+    japaneseInEnglish_.Open(FindDataPack(dataRoot, L"japanese-meanings-en") / L"meanings.tsv");
     return IsOpen();
 }
 
-std::optional<Meaning> MeaningDictionary::Lookup(std::wstring_view text, std::wstring_view reading) const {
+std::optional<Meaning> MeaningDictionary::Lookup(std::wstring_view text, std::wstring_view reading,
+                                                 MeaningLanguage language) const {
     if (text.empty()) return std::nullopt;
     try {
-        if (IsLatinWord(text)) return English(text);
+        if (IsLatinWord(text)) {
+            if (language == MeaningLanguage::Japanese && text.size() <= kMaxEnglishWord) {
+                std::wstring lower(text);
+                for (wchar_t& c : lower) c = c >= L'A' && c <= L'Z' ? static_cast<wchar_t>(c - L'A' + L'a') : c;
+                if (auto meaning = Japanese(englishInJapanese_, lower, {})) return meaning;
+            }
+            return English(text);
+        }
         const std::wstring hiragana = ToHiragana(reading);
+        if (language == MeaningLanguage::English) {
+            if (auto meaning = Japanese(japaneseInEnglish_, text, hiragana)) return meaning;
+        }
         for (const SortedTsv* source : {&slang_, &wiktionary_, &wordnet_}) {
             if (auto meaning = Japanese(*source, text, hiragana)) return meaning;
         }

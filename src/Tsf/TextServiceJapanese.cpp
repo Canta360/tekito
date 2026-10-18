@@ -597,9 +597,15 @@ RECT TextService::JapaneseCandidateAnchor(ITfContext* context, TfEditCookie edit
     return GetCandidateAnchor(context, editCookie);
 }
 
+japanese::MeaningLanguage TextService::MeaningLanguage() const {
+    if (!userSettings_.meaningsInUiLanguage) return japanese::MeaningLanguage::Word;
+    return userdata::UseJapaneseUi(userSettings_.uiLanguage) ? japanese::MeaningLanguage::Japanese
+                                                             : japanese::MeaningLanguage::English;
+}
+
 CandidateDetail TextService::MeaningFor(std::wstring_view text, std::wstring_view reading) const {
     if (!userSettings_.meaningsEnabled || text.empty()) return {};
-    const auto meaning = japanese::ProcessMeanings().Lookup(text, reading);
+    const auto meaning = japanese::ProcessMeanings().Lookup(text, reading, MeaningLanguage());
     if (!meaning) return {};
     return {meaning->headword, meaning->senses};
 }
@@ -608,8 +614,9 @@ void TextService::MarkMeanings(std::vector<Candidate>& candidates, std::size_t f
                                std::wstring_view reading) const {
     if (!userSettings_.meaningsEnabled) return;
     const auto& meanings = japanese::ProcessMeanings();
+    const auto language = MeaningLanguage();
     for (std::size_t i = first; i < candidates.size() && i < first + count; ++i) {
-        candidates[i].hasMeaning = meanings.Lookup(candidates[i].text, reading).has_value();
+        candidates[i].hasMeaning = meanings.Lookup(candidates[i].text, reading, language).has_value();
     }
 }
 
@@ -647,7 +654,9 @@ void TextService::ShowJapaneseCandidates(ITfContext* context, TfEditCookie editC
         if (list.rows[i].suggestion) row.label = SemanticLabel::Suggestion;
         // Only the rows on the page shown are looked up.
         row.hasMeaning = userSettings_.meaningsEnabled && i >= list.pageStart && i < list.pageStart + list.count &&
-                         japanese::ProcessMeanings().Lookup(list.rows[i].text, list.rows[i].reading).has_value();
+                         japanese::ProcessMeanings()
+                             .Lookup(list.rows[i].text, list.rows[i].reading, MeaningLanguage())
+                             .has_value();
         rows.push_back(std::move(row));
     }
     const auto& selected = list.selected;

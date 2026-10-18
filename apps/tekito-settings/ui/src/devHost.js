@@ -32,6 +32,7 @@ function initialState() {
       candidateWindowStyle: 0,
       candidateRows: 0,
       meaningsEnabled: true,
+      meaningsInUiLanguage: true,
       japaneseSwitchOrder: 0,
       japaneseEnabled: true,
       modeIndicatorEnabled: true,

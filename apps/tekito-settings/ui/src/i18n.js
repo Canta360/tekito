@@ -178,6 +178,10 @@ const en = {
     title: "Word meanings",
     description: "Show what a word means next to the list.",
   },
+  meaningsLanguage: {
+    title: "Meanings in English",
+    description: "Explain Japanese words in English.",
+  },
   japanese: {
     space: {
       title: "Space",
@@ -534,6 +538,10 @@ const ja = {
   meanings: {
     title: "語の意味",
     description: "候補の横に、言葉の意味を出します。",
+  },
+  meaningsLanguage: {
+    title: "意味を日本語で",
+    description: "英語の言葉の意味を日本語で出します。",
   },
   japanese: {
     space: {

@@ -37,6 +37,9 @@ struct UserSettings {
     // beside it (the japanese-slang, japanese-wiktionary, japanese-wordnet
     // and dictionary-display packs).
     bool meaningsEnabled{true};
+    // Meanings are in the language Settings is shown in when one is known
+    // (an English word in Japanese, a Japanese word in English).
+    bool meaningsInUiLanguage{true};
     // Key that switches the mode: 0 = none, 1 = the keyboard's own
     // (Hankaku/Zenkaku on a Japanese keyboard, Alt+` on a US one),
     // 2 = Ctrl+Space, 3 = Ctrl+Shift+Space. Only this key switches.

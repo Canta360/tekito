@@ -22,6 +22,10 @@
 #include <optional>
 #include <string>
 
+namespace tekito::japanese {
+enum class MeaningLanguage;
+}  // namespace tekito::japanese
+
 namespace tekito::tsf {
 
 class TextService final : public ITfTextInputProcessorEx,
@@ -217,6 +221,8 @@ private:
     HRESULT ReconvertJapanese(ITfContext* context, TfEditCookie editCookie);
     // What the candidate means, for the pane beside the list; empty when
     // meanings are off or unknown.
+    // The language meanings are shown in (UserSettings::meaningsInUiLanguage).
+    [[nodiscard]] japanese::MeaningLanguage MeaningLanguage() const;
     CandidateDetail MeaningFor(std::wstring_view text, std::wstring_view reading = {}) const;
     CandidateDetail SelectedEnglishMeaning() const;
     // Marks the candidates of the page shown that have a meaning (the
