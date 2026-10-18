@@ -183,6 +183,8 @@ public:
     // (１２３). A period or comma between digits is a decimal point or a
     // thousands comma of the same width (3.14), not 。 or 、.
     void SetHalfWidthDigits(bool half) noexcept { halfWidthDigits_ = half; }
+    // A number of one digit is full-width (３), longer ones half-width.
+    void SetSingleDigitFullWidth(bool on) noexcept { singleDigitFull_ = on; }
     // How a number typed alone in a phrase converts first.
     enum class NumberStyle {
         AsTyped,     // in the width digits are typed in
@@ -634,6 +636,7 @@ private:
     [[nodiscard]] KanaForm TypingForm() const noexcept { return fieldForm_.value_or(inputForm_); }
     PunctuationStyle punctuation_{PunctuationStyle::ToutenKuten};
     bool halfWidthDigits_{false};
+    bool singleDigitFull_{false};
     const KanjiSets* kanjiSets_{nullptr};
     KanjiRange kanjiRange_{KanjiRange::All};
     int kanjiGrade_{6};

@@ -43,7 +43,8 @@ inline void ApplyJapaneseSettings(japanese::JapaneseComposer& composer, const Us
                                   japanese::JapaneseLearningStore* learning) {
     composer.SetPunctuationStyle(
         static_cast<japanese::PunctuationStyle>(std::clamp(settings.japanesePunctuation, 0, 3)));
-    composer.SetHalfWidthDigits(settings.japaneseDigitWidth == 0);
+    composer.SetHalfWidthDigits(settings.japaneseDigitWidth != 1);
+    composer.SetSingleDigitFullWidth(settings.japaneseDigitWidth == 2);
     composer.SetKanjiRange(static_cast<japanese::KanjiRange>(std::clamp(settings.japaneseKanjiRange, 0, 3)),
                            std::clamp(settings.japaneseKanjiGrade, 1, 6));
     composer.SetRoughNumbersInKanji(settings.japaneseRoughNumbersKanji);

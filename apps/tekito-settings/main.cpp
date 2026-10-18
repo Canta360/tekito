@@ -1178,7 +1178,7 @@ private:
                 settings_.japaneseKanjiGrade = std::clamp(integerValue, 1, 6);
             }
             else if (key == L"japaneseDigitWidth") {
-                settings_.japaneseDigitWidth = std::clamp(integerValue, 0, 1);
+                settings_.japaneseDigitWidth = std::clamp(integerValue, 0, 2);
             }
             else if (key == L"japaneseLetterWidth") {
                 settings_.japaneseLetterWidth = std::clamp(integerValue, 0, 1);

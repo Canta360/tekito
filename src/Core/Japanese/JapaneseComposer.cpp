@@ -1170,7 +1170,9 @@ void JapaneseComposer::ApplyNumberStyle() {
         std::wstring wanted;
         const NumberStyle style = rough ? NumberStyle::Kanji : numberStyle_;
         switch (style) {
-        case NumberStyle::AsTyped: wanted = halfWidthDigits_ ? half : full; break;
+        case NumberStyle::AsTyped:
+            wanted = halfWidthDigits_ && !(singleDigitFull_ && half.size() == 1) ? half : full;
+            break;
         case NumberStyle::HalfWidth: wanted = half; break;
         case NumberStyle::FullWidth: wanted = full; break;
         case NumberStyle::Mixed: wanted = half.size() == 1 ? full : half; break;
@@ -2250,13 +2252,26 @@ std::wstring JapaneseComposer::ApplyTypingStyle(std::wstring text) const {
                        punctuation_ == PunctuationStyle::CommaKuten;
     const bool period = punctuation_ == PunctuationStyle::CommaPeriod ||
                         punctuation_ == PunctuationStyle::ToutenPeriod;
+    // With one digit full-width: whether the number at `i` has one digit
+    // only (marks between digits join them: 1.5 has two).
+    const auto oneDigit = [&](std::size_t i) {
+        const auto joins = [&](std::size_t at) {
+            return at > 0 && at + 1 < text.size() && IsDigit(text[at - 1]) && IsDigit(text[at + 1]) &&
+                   std::wstring_view(L"。．.、，,").find(text[at]) != std::wstring_view::npos;
+        };
+        const bool before = i > 0 && (IsDigit(text[i - 1]) || joins(i - 1));
+        const bool after = i + 1 < text.size() && (IsDigit(text[i + 1]) || joins(i + 1));
+        return !before && !after;
+    };
     for (std::size_t i = 0; i < text.size(); ++i) {
         auto& ch = text[i];
         const bool wide = ch >= L'\xFF01' && ch <= L'\xFF5E';
         const bool digit = ch >= L'\xFF10' && ch <= L'\xFF19';
         const bool letter = (ch >= L'\xFF21' && ch <= L'\xFF3A') || (ch >= L'\xFF41' && ch <= L'\xFF5A');
-        const bool half = digit ? halfWidthDigits_ : letter ? halfWidthLetters_ : halfWidthSymbols_;
+        const bool halfDigit = halfWidthDigits_ && !(singleDigitFull_ && oneDigit(i));
+        const bool half = digit ? halfDigit : letter ? halfWidthLetters_ : halfWidthSymbols_;
         if (wide && half) ch = static_cast<wchar_t>(ch - 0xFEE0);
+        if (singleDigitFull_ && ch >= L'0' && ch <= L'9' && oneDigit(i)) ch = static_cast<wchar_t>(ch + 0xFEE0);
         // Between digits: a decimal point or a thousands comma.
         const bool betweenDigits = i > 0 && i + 1 < text.size() && IsDigit(text[i - 1]) && IsDigit(text[i + 1]);
         if (betweenDigits && (ch == L'。' || ch == L'．')) {

@@ -257,6 +257,20 @@ void TestConversionForms(const RomajiTable& table) {
         RequireText(converted(L"15", Style::Mixed), L"15", "and more half-width");
         number.SetHalfWidthDigits(false);
         RequireText(converted(L"15", Style::HalfWidth), L"15", "half-width, even typed full-width");
+        // Typed with one digit full-width: as it shows before conversion.
+        number.SetHalfWidthDigits(true);
+        number.SetSingleDigitFullWidth(true);
+        const auto typed = [&](std::wstring_view keys) {
+            number.Clear();
+            Type(number, keys);
+            return number.Preedit();
+        };
+        RequireText(typed(L"3"), L"３", "one digit typed is full-width");
+        RequireText(typed(L"15"), L"15", "two are half-width");
+        RequireText(typed(L"1.5"), L"1.5", "a decimal is one number");
+        RequireText(typed(L"3ko"), L"３こ", "a digit before kana too");
+        RequireText(converted(L"3", Style::AsTyped), L"３", "and it converts as typed");
+        number.SetSingleDigitFullWidth(false);
     }
     Type(composer, L"katakana");
     composer.Convert();

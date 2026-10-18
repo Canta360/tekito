@@ -311,7 +311,7 @@ bool SqliteUserDictionaryRepository::LoadSettings(UserSettings& settings) const 
         } else if (std::strcmp(key, "japanese_punctuation") == 0) {
             loaded.japanesePunctuation = std::clamp(value, 0, 3);
         } else if (std::strcmp(key, "japanese_digit_width") == 0) {
-            loaded.japaneseDigitWidth = std::clamp(value, 0, 1);
+            loaded.japaneseDigitWidth = std::clamp(value, 0, 2);
         } else if (std::strcmp(key, "japanese_kanji_grade") == 0) {
             loaded.japaneseKanjiGrade = std::clamp(static_cast<int>(value), 1, 6);
         } else if (std::strcmp(key, "japanese_kanji_range") == 0) {
@@ -447,7 +447,7 @@ bool SqliteUserDictionaryRepository::SaveSettings(const UserSettings& settings) 
                   : static_cast<int>(InputMode::Convert));
     saveValue("japanese_space_width", std::clamp(settings.japaneseSpaceWidth, 0, 2));
     saveValue("japanese_punctuation", std::clamp(settings.japanesePunctuation, 0, 3));
-    saveValue("japanese_digit_width", std::clamp(settings.japaneseDigitWidth, 0, 1));
+    saveValue("japanese_digit_width", std::clamp(settings.japaneseDigitWidth, 0, 2));
     saveValue("japanese_number_style", std::clamp(settings.japaneseNumberStyle, 0, 5));
     saveValue("japanese_rough_numbers_kanji", settings.japaneseRoughNumbersKanji ? 1 : 0);
     saveValue("japanese_kanji_range", std::clamp(settings.japaneseKanjiRange, 0, 3));

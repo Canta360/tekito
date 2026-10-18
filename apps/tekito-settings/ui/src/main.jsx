@@ -665,7 +665,7 @@ function JapanesePage({ advanced, settings, setSetting, romaji, runAction, setCo
   // ::japaneseLetterWidth and ::japaneseSymbolWidth (half-width first in all).
   const spaces = [[0, j.space.follow], [1, j.space.half], [2, j.space.full]];
   const marks = [[0, "、。"], [1, "，．"], [2, "，。"], [3, "、．"]];
-  const digits = [[0, "123"], [1, "１２３"]];
+  const digits = [[0, "123"], [1, "１２３"], [2, "３ / 15"]];
   const numberStyles = j.numbers.options.map((label, value) => [value, label]);
   const kanjiRanges = j.kanji.options.map((label, value) => [value, label]);
   const grades = [1, 2, 3, 4, 5, 6].map((grade) => [grade, j.grade.label(grade)]);
