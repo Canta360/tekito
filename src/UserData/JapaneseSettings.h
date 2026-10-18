@@ -52,6 +52,7 @@ inline void ApplyJapaneseSettings(japanese::JapaneseComposer& composer, const Us
     composer.SetSentenceCheck(settings.japaneseSentenceCheck);
     composer.SetEmojiOnFirstPage(settings.japaneseFirstPageSymbol);
     composer.SetTypedForms(settings.japaneseTypedForms);
+    composer.SetSingleVowelKana(settings.mixSingleVowelKana);
     composer.SetLiveRefine(settings.japaneseLiveRefine);
     composer.SetSpecialConversions(&SpecialConversions::Installed(), SpecialOptionsFor(settings));
 }

@@ -114,6 +114,9 @@ public:
     void SetEmojiOnFirstPage(bool on) noexcept { emojiOnFirstPage_ = on; }
     // The list ends with what was typed in every form (AddTypedForms).
     void SetTypedForms(bool on) noexcept { typedForms_ = on; }
+    // Mixed typing: a vowel typed alone (i, a) with no English just before
+    // is kana (い) rather than the letter (I); the other comes next.
+    void SetSingleVowelKana(bool on) noexcept { singleVowelKana_ = on; }
     // Live conversion converts again once typing pauses (RefineLive).
     void SetLiveRefine(bool on) noexcept { liveRefine_ = on; }
     // Converting looks for slips in the keys with `slips` (one or two keys
@@ -568,6 +571,9 @@ private:
     // Mixed typing: the chunk as typed when a capital was typed in it (I,
     // GitHub): it is English, as typed.
     [[nodiscard]] std::optional<std::wstring> TypedWithCapitals(std::wstring_view keys) const;
+    // The chunk judge's judgement of `keys`, with SetSingleVowelKana.
+    [[nodiscard]] ChunkJudge::Judgement JudgeChunk(std::wstring_view keys) const;
+    [[nodiscard]] bool SingleVowelKana(std::wstring_view keys) const noexcept;
     std::uint16_t englishContext_{0};
     // Mixed typing: English chunks committed in a row, just before, and
     // their text (context for English Auto's spelling).
@@ -589,6 +595,7 @@ private:
     bool sentenceCheck_{true};
     bool emojiOnFirstPage_{true};
     bool typedForms_{true};
+    bool singleVowelKana_{true};
     bool liveRefine_{true};
     const KanaSlips* slips_{nullptr};
     std::vector<Unit> units_;

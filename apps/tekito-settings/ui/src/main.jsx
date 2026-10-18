@@ -65,6 +65,7 @@ const initialSettings = {
   japaneseLiveRefine: true,
   japaneseKanaInput: false,
   japaneseKanaInputKey: true,
+  mixSingleVowelKana: true,
   noLearningInPrivate: true,
   mixedTypingEnabled: false,
   japaneseEnglishSpacing: false,
@@ -664,6 +665,11 @@ function JapanesePage({ advanced, settings, setSetting, romaji, runAction, setCo
         <Row title={j.mixed.title} description={j.mixed.description}>
           <Toggle label={j.mixed.title} checked={settings.mixedTypingEnabled} onChange={(value) => setSetting("mixedTypingEnabled", value)} />
         </Row>
+        {advanced && settings.mixedTypingEnabled && (
+          <Row title={j.singleVowel.title} description={j.singleVowel.description}>
+            <Toggle label={j.singleVowel.title} checked={settings.mixSingleVowelKana} onChange={(value) => setSetting("mixSingleVowelKana", value)} />
+          </Row>
+        )}
         <Row title={j.live.title}>
           <Toggle label={j.live.title} checked={settings.japaneseLiveConversion} onChange={(value) => setSetting("japaneseLiveConversion", value)} />
         </Row>

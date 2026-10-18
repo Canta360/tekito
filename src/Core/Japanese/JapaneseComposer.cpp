@@ -978,8 +978,7 @@ void JapaneseComposer::BuildPhrases(bool convert) {
             return;
         }
         if (word > 0) {
-            chunk = chunkJudge_->Judge(std::wstring_view(keys).substr(0, word), englishRun_, japaneseInSentence_,
-                                       englishSpelling_, englishText_);
+            chunk = JudgeChunk(std::wstring_view(keys).substr(0, word));
             JudgeWholeSentence(chunk, std::wstring_view(keys).substr(0, word));
             // A capital typed in it: English, as typed (I, Have), or as the
             // name is written when only its first letter was (Github: GitHub).
@@ -2293,7 +2292,7 @@ void JapaneseComposer::SettleChunk() {
     // Both ways, for when the sentence judges the chunk again.
     const std::wstring marks = MarksAfterEnglish(std::wstring_view(keys).substr(word));
     if (word > 0) {
-        const auto judged = chunkJudge_->Judge(chunk.keys, englishRun_, japaneseInSentence_, englishSpelling_, englishText_);
+        const auto judged = JudgeChunk(chunk.keys);
         chunk.english = EnglishAsWritten(TypedWithCapitals(chunk.keys).value_or(judged.written)) + marks;
     } else {
         chunk.english = marks;
@@ -2430,8 +2429,28 @@ void JapaneseComposer::JudgeWholeSentence(std::optional<ChunkJudge::Judgement>& 
         auto& chunk = settled_[at[k]];
         if (!chunk.locked) chunk.isEnglish = whole[k].english;
     }
-    if (current && !TypedWithCapitals(currentKeys) && whole.back().english != current->english) current = whole.back();
+    if (current && !TypedWithCapitals(currentKeys) && whole.back().english != current->english &&
+        !(SingleVowelKana(currentKeys) && whole.back().english)) {
+        current = whole.back();
+    }
     RecountSentence();
+}
+
+bool JapaneseComposer::SingleVowelKana(std::wstring_view keys) const noexcept {
+    return singleVowelKana_ && englishRun_ == 0 && keys.size() == 1 && std::wstring_view(L"aiueo").find(keys[0]) != std::wstring_view::npos;
+}
+
+ChunkJudge::Judgement JapaneseComposer::JudgeChunk(std::wstring_view keys) const {
+    auto judged = chunkJudge_->Judge(keys, englishRun_, japaneseInSentence_, englishSpelling_, englishText_);
+    if (judged.english && SingleVowelKana(keys)) {
+        // The letter is the next choice (either).
+        judged.english = false;
+        judged.either = true;
+        judged.word = false;
+        judged.written = std::wstring(keys);
+        judged.written[0] = static_cast<wchar_t>(std::towupper(judged.written[0]));
+    }
+    return judged;
 }
 
 std::wstring JapaneseComposer::CommitChunk() {
@@ -2458,8 +2477,7 @@ std::wstring JapaneseComposer::CommitChunk() {
         const std::wstring keys = Keys(false);
         std::size_t word = keys.size();
         while (word > 0 && std::wstring_view(L".,!?").find(keys[word - 1]) != std::wstring_view::npos) --word;
-        const auto chunk = chunkJudge_->Judge(std::wstring_view(keys).substr(0, word), englishRun_, japaneseInSentence_,
-                                              englishSpelling_, englishText_);
+        const auto chunk = JudgeChunk(std::wstring_view(keys).substr(0, word));
         const bool capitals = TypedWithCapitals(std::wstring_view(keys).substr(0, word)).has_value();
         if ((chunk.english || capitals) && word > 0) BuildPhrases(true);
     }

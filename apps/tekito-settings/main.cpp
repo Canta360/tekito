@@ -983,6 +983,8 @@ private:
         json += settings_.japaneseKanaInput ? L"true" : L"false";
         json += L",\"japaneseKanaInputKey\":";
         json += settings_.japaneseKanaInputKey ? L"true" : L"false";
+        json += L",\"mixSingleVowelKana\":";
+        json += settings_.mixSingleVowelKana ? L"true" : L"false";
         json += L",\"noLearningInPrivate\":";
         json += settings_.noLearningInPrivate ? L"true" : L"false";
         json += L",\"japaneseIgnoreCapsLock\":";
@@ -1174,6 +1176,7 @@ private:
             else if (key == L"japaneseLiveRefine") settings_.japaneseLiveRefine = value;
             else if (key == L"japaneseKanaInput") settings_.japaneseKanaInput = value;
             else if (key == L"japaneseKanaInputKey") settings_.japaneseKanaInputKey = value;
+            else if (key == L"mixSingleVowelKana") settings_.mixSingleVowelKana = value;
             else if (key == L"noLearningInPrivate") settings_.noLearningInPrivate = value;
             else if (key == L"mixedTypingEnabled") settings_.mixedTypingEnabled = value;
             else if (key == L"japaneseEnglishSpacing") settings_.japaneseEnglishSpacing = value;

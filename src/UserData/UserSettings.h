@@ -124,6 +124,8 @@ struct UserSettings {
     // in chunks, a Space after each, with no switching between them. On, it
     // comes right after Japanese when the switch key goes round.
     bool mixedTypingEnabled{false};
+    // Mix: a vowel typed alone (i) is kana (い) first, not the letter (I).
+    bool mixSingleVowelKana{true};
     // A half-width space between Japanese and an English word when text is
     // committed (今日は GitHub に push した).
     bool japaneseEnglishSpacing{false};
