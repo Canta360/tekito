@@ -55,6 +55,7 @@ int main(int argc, char** argv) {
     for (int i = 3; i < argc; ++i) {
         if (std::string(argv[i]) == "live") settings.japaneseLiveConversion = true;
         if (std::string(argv[i]) == "mix") mix = true;
+        if (std::string(argv[i]).starts_with("num=")) settings.japaneseNumberStyle = std::stoi(argv[i] + 4);
     }
     tekito::userdata::ApplyJapaneseSettings(composer, settings, nullptr);
     tekito::japanese::AttachMixedTyping(composer, mix);
