@@ -109,6 +109,11 @@ public:
     void SetSentenceReranker(const SentenceReranker* reranker) noexcept { reranker_ = reranker; }
     // The user's switch for it (on by default).
     void SetSentenceCheck(bool on) noexcept { sentenceCheck_ = on; }
+    // The first emoji for a reading shown on the first page of its list
+    // (off: with the other symbols, last).
+    void SetEmojiOnFirstPage(bool on) noexcept { emojiOnFirstPage_ = on; }
+    // The list ends with what was typed in every form (AddTypedForms).
+    void SetTypedForms(bool on) noexcept { typedForms_ = on; }
     // Converting looks for slips in the keys with `slips` (one or two keys
     // dropped, extra, a neighbor or swapped) and converts the keys as
     // meant when they read clearly better (not in Mix); nullptr: off.
@@ -564,6 +569,8 @@ private:
     JapaneseLearningStore* learning_{nullptr};
     const SentenceReranker* reranker_{nullptr};
     bool sentenceCheck_{true};
+    bool emojiOnFirstPage_{true};
+    bool typedForms_{true};
     const KanaSlips* slips_{nullptr};
     std::vector<Unit> units_;
     // Units before the caret; pending keys belong at the caret.

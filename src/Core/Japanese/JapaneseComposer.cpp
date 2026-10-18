@@ -1060,7 +1060,7 @@ void JapaneseComposer::BuildPhrases(bool convert) {
 }
 
 void JapaneseComposer::AddTypedForms() {
-    if (chunkJudge_ && ChoseEnglish()) return;
+    if (!typedForms_ || (chunkJudge_ && ChoseEnglish())) return;
     // The keys are known for each part of the reading only when it is the
     // reading typed (not one with a slip undone).
     const bool typedReading = conversionReading_ == Reading();
@@ -1480,6 +1480,7 @@ void JapaneseComposer::AddLoanwords(std::vector<PhraseCandidate>& candidates, st
             const std::wstring rest(reading.substr(length));
             std::vector<PhraseCandidate> found;
             for (const auto& word : words) {
+                if (word.find(L' ') != std::wstring::npos) continue;  // a description, not the word
                 PhraseCandidate english{word + rest, candidates.front().cost, PhraseCandidate::Kind::English, false};
                 const auto same = [&](const PhraseCandidate& c) { return c.text == english.text; };
                 if (std::none_of(candidates.begin(), candidates.end(), same)) found.push_back(std::move(english));
@@ -1494,12 +1495,18 @@ void JapaneseComposer::AddLoanwords(std::vector<PhraseCandidate>& candidates, st
         if (candidate.kind != PhraseCandidate::Kind::Dictionary) continue;
         std::size_t length = 0;
         while (length < candidate.text.size() && isKatakana(candidate.text[length])) ++length;
-        if (length < kShortestLoanword) continue;
+        // Only a loanword the reading is first read as (はーと: ハート,
+        // heart); katakana further down is another word written so (さくら:
+        // サクラ), whose English would be a translation (cherry blossom).
+        if (length < kShortestLoanword) return;
         // The word in English, and what follows it as it was ("ミーティングが"
         // -> "meetingが").
         const std::wstring rest = candidate.text.substr(length);
         std::vector<PhraseCandidate> words;
         for (const auto& word : loanwords_->Words(std::wstring_view(candidate.text).substr(0, length), kLoanwords)) {
+            // The word itself, not a description of it (Heart symbol, Google
+            // Play for ハート, グーグル).
+            if (word.find(L' ') != std::wstring::npos) continue;
             PhraseCandidate english{word + rest, candidate.cost, PhraseCandidate::Kind::English, false};
             const auto same = [&](const PhraseCandidate& c) { return c.text == english.text; };
             if (std::none_of(candidates.begin(), candidates.end(), same)) words.push_back(std::move(english));
@@ -1558,6 +1565,28 @@ void JapaneseComposer::AddSpecial(std::wstring_view reading, std::vector<PhraseC
     if (specialOptions_.symbols) {
         insert(candidates.size(), special_->Symbols(SpecialConversions::Language::Japanese, reading), {});
         insert(candidates.size(), special_->Emoticons(reading), {});
+        // The first emoji on the first page, after the words read the same
+        // (わらい: 笑い, 咲い, わらい, 😁): someone who typed a word right
+        // most likely wants it or its emoji. The rest stay last.
+        // One emoji of one character (♥️, 😁, 🐈️), not a sequence of them
+        // (👨‍❤️‍👨) nor a symbol that only looks like one (𓃠).
+        constexpr std::size_t kEmojiAt = 3;
+        const auto emoji = std::find_if(candidates.begin() + 1, candidates.end(), [](const PhraseCandidate& c) {
+            if (c.kind != PhraseCandidate::Kind::Special || c.text.empty()) return false;
+            std::wstring_view text = c.text;
+            if (text.ends_with(L'\xFE0F')) text.remove_suffix(1);
+            if (text.size() == 1) return c.text.size() == 2;  // a symbol shown as emoji: ♥️, ☀️
+            if (text.size() != 2 || text[0] < 0xD800 || text[0] > 0xDBFF || text[1] < 0xDC00 || text[1] > 0xDFFF) {
+                return false;
+            }
+            const char32_t point = 0x10000 + ((static_cast<char32_t>(text[0]) - 0xD800) << 10) +
+                                   (static_cast<char32_t>(text[1]) - 0xDC00);
+            return point >= 0x1F300 && point <= 0x1FAFF;
+        });
+        if (emojiOnFirstPage_ && emoji != candidates.end()) {
+            const auto at = candidates.begin() + static_cast<std::ptrdiff_t>(std::min(kEmojiAt, candidates.size()));
+            if (emoji > at) std::rotate(at, emoji, emoji + 1);
+        }
     }
 }
 
@@ -1784,10 +1813,16 @@ void JapaneseComposer::AddSlipCandidates(PhraseState& phrase) const {
         added.insert(added.begin(), std::make_move_iterator(wholeInput.begin()), std::make_move_iterator(wholeInput.end()));
     }
     if (added.empty()) return;
+    // Only the likeliest on the first page, with the words read the same
+    // and the emoji; the rest after the first page, not filling it.
+    constexpr std::size_t kFirstPage = 9;
     const std::size_t at = std::min(phrase.candidates.size(), likelier ? std::size_t{1} : kSlipPosition);
-    phrase.candidates.insert(phrase.candidates.begin() + static_cast<std::ptrdiff_t>(at),
-                             std::make_move_iterator(added.begin()), std::make_move_iterator(added.end()));
-    if (phrase.selected >= at) phrase.selected += added.size();
+    phrase.candidates.insert(phrase.candidates.begin() + static_cast<std::ptrdiff_t>(at), std::move(added.front()));
+    if (phrase.selected >= at) ++phrase.selected;
+    const std::size_t rest = std::min(phrase.candidates.size(), std::max(at + 1, kFirstPage));
+    phrase.candidates.insert(phrase.candidates.begin() + static_cast<std::ptrdiff_t>(rest),
+                             std::make_move_iterator(added.begin() + 1), std::make_move_iterator(added.end()));
+    if (phrase.selected >= rest) phrase.selected += added.size() - 1;
 }
 
 bool JapaneseComposer::SamePhrasing(const std::wstring& reading, const std::vector<std::size_t>& starts,
