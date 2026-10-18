@@ -6,7 +6,8 @@
 //   TEKITO_DATA_PACK_DIR=<data> tekito_ja_probe <keys file> [rows=27] [live] [mix]
 //
 // "live" turns live conversion on (the text after a pause is printed too);
-// "mix" types in Mix.
+// "mix" types in Mix, "mixlive" with its live conversion; "steps" prints
+// what is shown after each key.
 //
 // The composer is set up as the text service sets it up: the installed
 // Japanese data and the default settings.
@@ -52,7 +53,10 @@ int main(int argc, char** argv) {
     tekito::japanese::AttachJapaneseData(composer);
     tekito::userdata::UserSettings settings;
     bool mix = false;
+    bool steps = false;
     for (int i = 3; i < argc; ++i) {
+        if (std::string(argv[i]) == "mixlive") settings.mixLiveConversion = true;
+        if (std::string(argv[i]) == "steps") steps = true;
         if (std::string(argv[i]) == "live") settings.japaneseLiveConversion = true;
         if (std::string(argv[i]) == "mix") mix = true;
         if (std::string(argv[i]).starts_with("num=")) settings.japaneseNumberStyle = std::stoi(argv[i] + 4);
@@ -66,7 +70,14 @@ int main(int argc, char** argv) {
         if (line.empty() || line[0] == '#') continue;
         composer.Clear();
         composer.ForgetContext();
+        // What is shown: the segments, as the text service writes them.
+        const auto shown = [&] {
+            std::wstring text;
+            for (const auto& segment : composer.Segments()) text += segment.text;
+            return text;
+        };
         // A space is the Space key (Mix settles a chunk with it).
+        std::wstring shownSteps;
         for (const wchar_t key : Widen(line)) {
             if (key != L' ') {
                 if (composer.CommitsBeforeTyping() && !mix) composer.Commit();
@@ -74,8 +85,10 @@ int main(int argc, char** argv) {
             } else {
                 composer.Convert();
             }
+            if (steps) shownSteps += (shownSteps.empty() ? L"" : L" > ") + shown();
         }
-        std::cout << line << "\t" << Narrow(composer.Preedit());
+        std::cout << line << "\t" << Narrow(shown());
+        if (steps) std::cout << "\n  steps: " << Narrow(shownSteps) << "\n ";
         std::string predictions;
         for (const auto& prediction : composer.Predictions()) predictions += " " + Narrow(prediction.text);
         if (!predictions.empty()) std::cout << "\tpredicted:" << predictions;
