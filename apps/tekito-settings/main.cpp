@@ -834,6 +834,74 @@ private:
         return json + L']';
     }
 
+    // The latest conversions, newest first, for reporting a wrong one.
+    std::wstring RecentJson() const {
+        std::wstring json = L"[";
+        std::vector<tekito::userdata::RecentConversion> recent;
+        if (repository_ && repository_->LoadRecentConversions(recent)) {
+            for (const auto& item : recent) {
+                if (json.size() > 1) json += L',';
+                json += L"{\"id\":" + std::to_wstring(item.id) + L",\"reading\":\"" + JsonEscape(item.reading) +
+                        L"\",\"text\":\"" + JsonEscape(item.text) + L"\",\"mode\":\"" + JsonEscape(item.mode) +
+                        L"\",\"time\":" + std::to_wstring(item.time) + L"}";
+            }
+        }
+        return json + L']';
+    }
+
+    // The settings that change how Japanese converts, one per line, for a
+    // report of a wrong conversion.
+    std::wstring ReportSettings() const {
+        const auto onOff = [](bool on) { return on ? L"on" : L"off"; };
+        const wchar_t* keyboards[] = {L"detect", L"JIS", L"US"};
+        const wchar_t* digits[] = {L"half-width", L"full-width", L"one digit full-width"};
+        const wchar_t* numbers[] = {L"as typed", L"half-width", L"full-width", L"one digit full-width", L"kanji",
+                                    L"official"};
+        const wchar_t* kanji[] = {L"all", L"joyo + jinmei", L"joyo", L"kyoiku"};
+        const auto& s = settings_;
+        std::wstring text;
+        text += L"Live conversion: " + std::wstring(onOff(s.japaneseLiveConversion)) + L"\n";
+        text += L"Refine on pause: " + std::wstring(onOff(s.japaneseLiveRefine)) + L"\n";
+        text += L"Sentence check: " + std::wstring(onOff(s.japaneseSentenceCheck)) + L"\n";
+        text += L"Predictions: " + std::wstring(onOff(s.japanesePredictionEnabled)) + L"\n";
+        text += L"Mix: " + std::wstring(onOff(s.mixedTypingEnabled)) + L"\n";
+        text += L"Kana input: " + std::wstring(onOff(s.japaneseKanaInput)) + L"\n";
+        text += L"Keyboard: " + std::wstring(keyboards[std::clamp(s.keyboardType, 0, 2)]) + L"\n";
+        text += L"Digits: " + std::wstring(digits[std::clamp(s.japaneseDigitWidth, 0, 2)]) + L"\n";
+        text += L"Converted numbers: " + std::wstring(numbers[std::clamp(s.japaneseNumberStyle, 0, 5)]) + L"\n";
+        text += L"Kanji: " + std::wstring(kanji[std::clamp(s.japaneseKanjiRange, 0, 3)]);
+        if (s.japaneseKanjiRange == 3) text += L" (grade " + std::to_wstring(s.japaneseKanjiGrade) + L")";
+        text += L"\n";
+        const auto romaji = tekito::japanese::RomajiTable::ReadChanges(tekito::japanese::UserRomajiFile());
+        text += L"Romaji table: " + (romaji.empty() ? std::wstring(L"standard") : std::to_wstring(romaji.size()) + L" changes");
+        return text;
+    }
+
+    // UTF-8, percent-encoded for a URL's query.
+    static std::wstring QueryEncoded(std::wstring_view text) {
+        std::string utf8;
+        if (!text.empty()) {
+            const int size = WideCharToMultiByte(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), nullptr, 0,
+                                                 nullptr, nullptr);
+            utf8.resize(static_cast<std::size_t>(size));
+            WideCharToMultiByte(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), utf8.data(), size, nullptr,
+                                nullptr);
+        }
+        std::wstring out;
+        constexpr wchar_t kHex[] = L"0123456789ABCDEF";
+        for (const unsigned char c : utf8) {
+            if ((c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c == '-' || c == '_' ||
+                c == '.' || c == '~') {
+                out.push_back(static_cast<wchar_t>(c));
+            } else {
+                out.push_back(L'%');
+                out.push_back(kHex[c >> 4]);
+                out.push_back(kHex[c & 0xF]);
+            }
+        }
+        return out;
+    }
+
     std::wstring JapaneseWordsJson() const {
         std::wstring json = L"[";
         for (const auto& word : japaneseWords_) {
@@ -969,8 +1037,8 @@ private:
         json += L",\"japaneseLetterWidth\":" + std::to_wstring(settings_.japaneseLetterWidth);
         json += L",\"advancedSettings\":";
         json += settings_.advancedSettings ? L"true" : L"false";
-        json += L",\"reportMenu\":";
-        json += settings_.reportMenu ? L"true" : L"false";
+        json += L",\"keepRecentConversions\":";
+        json += settings_.keepRecentConversions ? L"true" : L"false";
         json += L",\"japanesePredictionEnabled\":";
         json += settings_.japanesePredictionEnabled ? L"true" : L"false";
         json += L",\"japaneseEnglishSpacing\":";
@@ -1154,7 +1222,7 @@ private:
             else if (key == L"modeBadgeOnFocus") settings_.modeBadgeOnFocus = value;
             else if (key == L"modePerApp") settings_.modePerApp = value;
             else if (key == L"advancedSettings") settings_.advancedSettings = value;
-            else if (key == L"reportMenu") settings_.reportMenu = value;
+            else if (key == L"keepRecentConversions") settings_.keepRecentConversions = value;
             else if (key == L"dateConversion") settings_.dateConversion = value;
             else if (key == L"numberConversion") settings_.numberConversion = value;
             else if (key == L"symbolConversion") settings_.symbolConversion = value;
@@ -1358,6 +1426,35 @@ private:
                 runtime_->NotifyDictionaryChanged();
                 Reply(requestId, true);
             }
+        } else if (type == L"recent.list") {
+            Reply(requestId, true, {}, L",\"items\":" + RecentJson());
+        } else if (type == L"recent.forget") {
+            const auto id = static_cast<std::int64_t>(message.Number(L"id"));
+            if (!repository_ || !repository_->ForgetRecentConversion(id)) {
+                Reply(requestId, false, Text(L"It could not be deleted.", L"削除できませんでした。"));
+                return;
+            }
+            Reply(requestId, true, {}, L",\"items\":" + RecentJson());
+        } else if (type == L"recent.report") {
+            // The conversion in the issue form, to review and send in the
+            // browser; nothing is sent from here.
+            const auto id = static_cast<std::int64_t>(message.Number(L"id"));
+            std::vector<tekito::userdata::RecentConversion> recent;
+            const auto found = repository_ && repository_->LoadRecentConversions(recent)
+                                   ? std::find_if(recent.begin(), recent.end(), [&](const auto& item) { return item.id == id; })
+                                   : recent.end();
+            if (found == recent.end()) {
+                Reply(requestId, false, Text(L"That conversion is gone.", L"その変換はもうありません。"));
+                return;
+            }
+            std::wstring url = L"https://github.com/Canta360/tekito/issues/new?template=wrong-conversion.yml";
+            url += L"&reading=" + QueryEncoded(found->reading) + L"&got=" + QueryEncoded(found->text);
+            const std::string_view version = TEKITO_VERSION_STRING;
+            url += L"&mode=" + QueryEncoded(found->mode) +
+                   L"&version=" + QueryEncoded(std::wstring(version.begin(), version.end())) +
+                   L"&settings=" + QueryEncoded(ReportSettings());
+            ShellExecuteW(nullptr, L"open", url.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+            Reply(requestId, true);
         } else if (type == L"learning.list") {
             Reply(requestId, true, {}, L",\"items\":" + LearnedJson());
         } else if (type == L"learning.forget") {

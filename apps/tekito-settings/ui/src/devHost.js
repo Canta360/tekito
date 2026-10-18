@@ -65,7 +65,7 @@ function initialState() {
       japaneseSymbolWidth: 0,
       japaneseLetterWidth: 1,
       advancedSettings: false,
-      reportMenu: true,
+      keepRecentConversions: true,
       japanesePredictionEnabled: true,
       japaneseLiveConversion: false,
       japaneseSentenceCheck: true,
@@ -156,6 +156,16 @@ export function installMockHost() {
           return code >= 0x30A1 && code <= 0x30F6 ? String.fromCharCode(code - 0x60) : c;
         }).join("");
         state.japaneseWords = [...words, { reading, surface: message.surface, kind: message.kind, action: message.action || "first" }];
+      } else if (type === "recent.list" || type === "recent.forget" || type === "recent.report") {
+        state.recent = state.recent || [
+          { id: 3, reading: "きかいがうごく", text: "機会が動く", mode: "Japanese", time: 0 },
+          { id: 2, reading: "きょうは meeting", text: "今日はmeeting", mode: "Mix", time: 0 },
+          { id: 1, reading: "ありがとう", text: "ありがとう", mode: "Japanese", time: 0 },
+        ];
+        if (type === "recent.forget") state.recent = message.id ? state.recent.filter((item) => item.id !== message.id) : [];
+        const data = JSON.stringify({ requestId, ok: true, error: "", state, items: state.recent });
+        window.setTimeout(() => listeners.forEach((listener) => listener({ data })), 60);
+        return;
       } else if (type === "learning.list" || type === "learning.forget") {
         if (type === "learning.forget") {
           state.learned = state.learned.filter((item) => !(item.kind === message.kind && item.key === message.key && item.value === message.value));

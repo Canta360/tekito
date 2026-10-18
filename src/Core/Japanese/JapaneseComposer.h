@@ -354,9 +354,9 @@ public:
     // the text itself chosen (false when its reading is not known).
     bool Reconvert(std::wstring_view text);
     void ForgetCommit() noexcept { lastCommit_.reset(); }
-    // The keys typed for the text being written (Mix: every chunk, spaced),
-    // for a report of what it became.
-    [[nodiscard]] std::wstring TypedKeys() const;
+    // The reading of the text being written (Mix: every chunk, spaced;
+    // English as typed), for a report of what it became.
+    [[nodiscard]] std::wstring ReportReading() const;
 
 private:
     struct Unit {

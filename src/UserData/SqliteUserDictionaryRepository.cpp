@@ -68,6 +68,14 @@ constexpr const char* kCreateSchema =
     "action TEXT NOT NULL DEFAULT 'first',"
     "PRIMARY KEY (reading, surface)"
     ");"
+    "DROP TABLE IF EXISTS recent_conversions;"
+    "CREATE TABLE IF NOT EXISTS conversion_history ("
+    "id INTEGER PRIMARY KEY NOT NULL,"
+    "reading TEXT NOT NULL,"
+    "result TEXT NOT NULL,"
+    "mode TEXT NOT NULL,"
+    "at INTEGER NOT NULL"
+    ");"
     "CREATE TABLE IF NOT EXISTS excluded_apps ("
     "name TEXT PRIMARY KEY NOT NULL COLLATE NOCASE"
     ");";
@@ -326,8 +334,8 @@ bool SqliteUserDictionaryRepository::LoadSettings(UserSettings& settings) const 
             loaded.japaneseLetterWidth = std::clamp(value, 0, 1);
         } else if (std::strcmp(key, "advanced_settings") == 0) {
             loaded.advancedSettings = value != 0;
-        } else if (std::strcmp(key, "report_menu") == 0) {
-            loaded.reportMenu = value != 0;
+        } else if (std::strcmp(key, "keep_recent_conversions") == 0) {
+            loaded.keepRecentConversions = value != 0;
         } else if (std::strcmp(key, "japanese_prediction_enabled") == 0) {
             loaded.japanesePredictionEnabled = value != 0;
         } else if (std::strcmp(key, "japanese_live_conversion") == 0) {
@@ -457,7 +465,7 @@ bool SqliteUserDictionaryRepository::SaveSettings(const UserSettings& settings) 
     saveValue("japanese_symbol_width", std::clamp(settings.japaneseSymbolWidth, 0, 1));
     saveValue("japanese_letter_width", std::clamp(settings.japaneseLetterWidth, 0, 1));
     saveValue("advanced_settings", settings.advancedSettings ? 1 : 0);
-    saveValue("report_menu", settings.reportMenu ? 1 : 0);
+    saveValue("keep_recent_conversions", settings.keepRecentConversions ? 1 : 0);
     saveValue("japanese_prediction_enabled", settings.japanesePredictionEnabled ? 1 : 0);
     saveValue("japanese_live_conversion", settings.japaneseLiveConversion ? 1 : 0);
     saveValue("japanese_sentence_check", settings.japaneseSentenceCheck ? 1 : 0);
@@ -731,6 +739,64 @@ bool SqliteUserDictionaryRepository::SaveJapaneseLearning(
     if (statement) sqlite3_finalize(statement);
     const char* transaction = success ? "COMMIT;" : "ROLLBACK;";
     if (sqlite3_exec(database_, transaction, nullptr, nullptr, nullptr) != SQLITE_OK) success = false;
+    return success;
+}
+
+bool SqliteUserDictionaryRepository::AddRecentConversion(const RecentConversion& conversion, std::size_t keep) noexcept {
+    if (!database_) return false;
+    sqlite3_stmt* statement = nullptr;
+    constexpr const char* insert = "INSERT INTO conversion_history (reading, result, mode, at) VALUES (?, ?, ?, ?);";
+    if (sqlite3_prepare_v2(database_, insert, -1, &statement, nullptr) != SQLITE_OK) return false;
+    bool success = BindText16(statement, 1, conversion.reading) && BindText16(statement, 2, conversion.text) &&
+                   BindText16(statement, 3, conversion.mode) &&
+                   sqlite3_bind_int64(statement, 4, conversion.time) == SQLITE_OK &&
+                   sqlite3_step(statement) == SQLITE_DONE;
+    sqlite3_finalize(statement);
+    constexpr const char* trim =
+        "DELETE FROM conversion_history WHERE id NOT IN (SELECT id FROM conversion_history ORDER BY id DESC LIMIT ?);";
+    if (success && sqlite3_prepare_v2(database_, trim, -1, &statement, nullptr) == SQLITE_OK) {
+        success = sqlite3_bind_int64(statement, 1, static_cast<sqlite3_int64>(keep)) == SQLITE_OK &&
+                  sqlite3_step(statement) == SQLITE_DONE;
+        sqlite3_finalize(statement);
+    }
+    return success;
+}
+
+bool SqliteUserDictionaryRepository::LoadRecentConversions(std::vector<RecentConversion>& conversions) const noexcept {
+    if (!database_) return false;
+    sqlite3_stmt* statement = nullptr;
+    constexpr const char* query = "SELECT id, reading, result, mode, at FROM conversion_history ORDER BY id DESC;";
+    if (sqlite3_prepare_v2(database_, query, -1, &statement, nullptr) != SQLITE_OK) return false;
+    std::vector<RecentConversion> loaded;
+    bool success = true;
+    int stepResult = SQLITE_OK;
+    try {
+        while ((stepResult = sqlite3_step(statement)) == SQLITE_ROW) {
+            const auto text = [&](int column) {
+                const auto* value = static_cast<const wchar_t*>(sqlite3_column_text16(statement, column));
+                return value ? std::wstring(value) : std::wstring{};
+            };
+            loaded.push_back({sqlite3_column_int64(statement, 0), text(1), text(2), text(3),
+                              sqlite3_column_int64(statement, 4)});
+        }
+    } catch (...) {
+        success = false;
+    }
+    success = success && stepResult == SQLITE_DONE;
+    sqlite3_finalize(statement);
+    if (success) conversions = std::move(loaded);
+    return success;
+}
+
+bool SqliteUserDictionaryRepository::ForgetRecentConversion(std::int64_t id) noexcept {
+    if (!database_) return false;
+    if (id == 0) return sqlite3_exec(database_, "DELETE FROM conversion_history;", nullptr, nullptr, nullptr) == SQLITE_OK;
+    sqlite3_stmt* statement = nullptr;
+    if (sqlite3_prepare_v2(database_, "DELETE FROM conversion_history WHERE id = ?;", -1, &statement, nullptr) != SQLITE_OK) {
+        return false;
+    }
+    const bool success = sqlite3_bind_int64(statement, 1, id) == SQLITE_OK && sqlite3_step(statement) == SQLITE_DONE;
+    sqlite3_finalize(statement);
     return success;
 }
 

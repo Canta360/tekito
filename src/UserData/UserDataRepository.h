@@ -6,10 +6,20 @@
 #include "Core/UserLearning.h"
 #include "UserData/UserSettings.h"
 
+#include <cstdint>
 #include <filesystem>
 #include <memory>
 
 namespace tekito::userdata {
+
+// A conversion TEKITO wrote, kept for a while so it can be reported as wrong.
+struct RecentConversion {
+    std::int64_t id{0};
+    std::wstring reading;  // the reading typed (きかいがうごく)
+    std::wstring text;     // what it became
+    std::wstring mode;   // "Japanese" or "Mix"
+    std::int64_t time{0};  // seconds since 1970
+};
 
 class IUserDataRepository {
 public:
@@ -34,6 +44,11 @@ public:
     // separate from the English user dictionary.
     [[nodiscard]] virtual bool LoadJapaneseUserWords(std::vector<japanese::UserWord>& words) const noexcept = 0;
     [[nodiscard]] virtual bool SaveJapaneseUserWords(const std::vector<japanese::UserWord>& words) noexcept = 0;
+    // The latest conversions, newest first; adding keeps only `keep` of them.
+    [[nodiscard]] virtual bool AddRecentConversion(const RecentConversion& conversion, std::size_t keep) noexcept = 0;
+    [[nodiscard]] virtual bool LoadRecentConversions(std::vector<RecentConversion>& conversions) const noexcept = 0;
+    // id 0: all of them.
+    [[nodiscard]] virtual bool ForgetRecentConversion(std::int64_t id) noexcept = 0;
     [[nodiscard]] virtual bool IsOpen() const noexcept = 0;
 };
 

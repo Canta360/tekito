@@ -62,7 +62,7 @@ const initialSettings = {
   japaneseSymbolWidth: 0,
   japaneseLetterWidth: 1,
   advancedSettings: false,
-  reportMenu: true,
+  keepRecentConversions: true,
   japanesePredictionEnabled: true,
   japaneseLiveConversion: false,
   japaneseSentenceCheck: true,
@@ -422,11 +422,6 @@ function GeneralPage({ advanced, mode, japanese, japaneseInstalled, settings, ch
         <Row title={t.bracketPairs.title} description={t.bracketPairs.description}>
           <Toggle label={t.bracketPairs.title} checked={settings.bracketPairs} onChange={(value) => setSetting("bracketPairs", value)} />
         </Row>
-        {advanced && japanese && (
-          <Row title={t.reportMenu.title} description={t.reportMenu.description}>
-            <Toggle label={t.reportMenu.title} checked={settings.reportMenu} onChange={(value) => setSetting("reportMenu", value)} />
-          </Row>
-        )}
         {advanced && (
           <Row title={t.restoreMode.title} description={japanese ? t.restoreMode.descriptionJapanese : t.restoreMode.description}>
             <Toggle label={t.restoreMode.title} checked={settings.restoreLastInputMode} onChange={(value) => setSetting("restoreLastInputMode", value)} />
@@ -991,6 +986,17 @@ function DictionaryPage({ japanese, postalCodes, japaneseWords, learning, settin
     const matched = needle ? learned.filter((item) => `${item.key} ${item.value}`.toLowerCase().includes(needle)) : learned;
     return matched.slice(0, 200);
   }, [learned, learnedQuery]);
+  // The latest conversions, to report a wrong one (listed on request).
+  const [recent, setRecent] = useState(null);
+  const showRecent = async () => {
+    const response = await runAction("recent.list", {});
+    if (response.ok) setRecent(response.items || []);
+  };
+  const forgetRecent = async (id) => {
+    const response = await runAction("recent.forget", { id }, id ? t.recent.deleted : t.recent.cleared);
+    if (response.ok) setRecent(response.items || []);
+  };
+  const reportRecent = (id) => runAction("recent.report", { id }, t.recent.opened);
   const askForgetJapanese = () => setConfirm({
     title: t.learning.japaneseConfirmTitle,
     message: t.learning.japaneseConfirmMessage,
@@ -1047,6 +1053,47 @@ function DictionaryPage({ japanese, postalCodes, japaneseWords, learning, settin
           </>
         )}
       </Glass>
+
+      {japanese && (
+        <Glass className="card">
+          <Row title={t.recent.title} description={t.recent.description}>
+            <Toggle label={t.recent.title} checked={settings.keepRecentConversions}
+              onChange={(value) => { setSetting("keepRecentConversions", value); if (!value) setRecent(null); }} />
+          </Row>
+          {settings.keepRecentConversions && (
+            <div className="learning-meta">
+              <span className="muted">{t.recent.listDescription}</span>
+              <span className="row-actions">
+                {recent && recent.length > 0 && <Button variant="quiet" onClick={() => forgetRecent(0)}>{t.recent.clear}</Button>}
+                <Button variant="quiet" onClick={recent ? () => setRecent(null) : showRecent}>{recent ? t.learning.hideList : t.learning.showList}</Button>
+              </span>
+            </div>
+          )}
+          {settings.keepRecentConversions && recent && (
+            <>
+              <ul className="word-list" aria-label={t.recent.title}>
+                {recent.map((item) => (
+                  <li key={item.id} className="word">
+                    <div className="word-main">
+                      <b>{item.reading}</b>
+                      <Icon name="arrow" size={15} className="word-arrow" />
+                      <span>{item.text}</span>
+                      {item.mode === "Mix" && <span className="muted">{t.modeNames.mixed}</span>}
+                    </div>
+                    <span className="row-actions">
+                      <Button variant="quiet" onClick={() => reportRecent(item.id)}>{t.recent.report}</Button>
+                      <button type="button" className="icon-btn" aria-label={t.learning.forgetLabel(item.text)} onClick={() => forgetRecent(item.id)}>
+                        <Icon name="trash" size={16} />
+                      </button>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              {recent.length === 0 && <div className="empty">{t.recent.nothing}</div>}
+            </>
+          )}
+        </Glass>
+      )}
 
       <Glass className="card">
         <div className="card-head">

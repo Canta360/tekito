@@ -854,10 +854,16 @@ void JapaneseComposer::Cancel() {
     Clear();
 }
 
-std::wstring JapaneseComposer::TypedKeys() const {
-    std::wstring keys;
-    for (const auto& chunk : settled_) keys += chunk.typed + L" ";
-    return keys + Keys(true);
+std::wstring JapaneseComposer::ReportReading() const {
+    std::wstring reading;
+    for (const auto& chunk : settled_) {
+        std::wstring kana;
+        if (!chunk.isEnglish && table_) {
+            for (const auto& token : ParseRomaji(*table_, chunk.keys)) kana += token.kana;
+        }
+        reading += (kana.empty() ? chunk.typed : ToHiragana(kana)) + L" ";
+    }
+    return reading + ToHiragana(Reading());
 }
 
 std::wstring JapaneseComposer::Reading() const {

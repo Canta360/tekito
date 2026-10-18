@@ -119,7 +119,7 @@ add_library(Tekito.Tsf SHARED
     assets/tekito_tsf.rc
 )
 target_include_directories(Tekito.Tsf PRIVATE src ${CMAKE_SOURCE_DIR})
-target_compile_definitions(Tekito.Tsf PRIVATE ${TEKITO_WINDOWS_DEFINES} TEKITO_VERSION_STRING=L"${PROJECT_VERSION}")
+target_compile_definitions(Tekito.Tsf PRIVATE ${TEKITO_WINDOWS_DEFINES})
 # A DLL named like Tekito.Tsf.Trace writes its diagnostic log without the
 # TEKITO_TSF_TRACE environment variable, which hosts rarely pass through.
 if(TEKITO_TSF_OUTPUT_NAME MATCHES "(^|\\.)Trace[0-9]*$")

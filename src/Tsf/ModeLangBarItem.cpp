@@ -16,7 +16,6 @@ constexpr UINT kMenuDirect = 2;
 constexpr UINT kMenuSettings = 3;
 constexpr UINT kMenuJapanese = 4;
 constexpr UINT kMenuMixed = 5;
-constexpr UINT kMenuReport = 6;
 
 // Whether the taskbar, where the mode icon shows, is dark (Settings >
 // Personalization > Colors > "Choose your default Windows mode").
@@ -33,8 +32,7 @@ bool TaskbarIsDark() {
 
 ModeLangBarItem::ModeLangBarItem(HINSTANCE instance, ModeGetter getMode, ModeSetter setMode,
                                  ModeGetter toggledMode, Query japaneseProfile,
-                                 SettingsLauncher launchSettings, Query japaneseUi, Query mixedAvailable,
-                                 SettingsLauncher report, Query canReport)
+                                 SettingsLauncher launchSettings, Query japaneseUi, Query mixedAvailable)
     : instance_(instance),
       getMode_(std::move(getMode)),
       setMode_(std::move(setMode)),
@@ -42,9 +40,7 @@ ModeLangBarItem::ModeLangBarItem(HINSTANCE instance, ModeGetter getMode, ModeSet
       japaneseProfile_(std::move(japaneseProfile)),
       launchSettings_(std::move(launchSettings)),
       japaneseUi_(std::move(japaneseUi)),
-      mixedAvailable_(std::move(mixedAvailable)),
-      report_(std::move(report)),
-      canReport_(std::move(canReport)) {}
+      mixedAvailable_(std::move(mixedAvailable)) {}
 
 const wchar_t* ModeLangBarItem::Text(const wchar_t* english, const wchar_t* japanese) const {
     return japaneseUi_ && japaneseUi_() ? japanese : english;
@@ -136,9 +132,6 @@ void ModeLangBarItem::ShowContextMenu(POINT point) {
         if (MixedAvailable()) AppendMenuW(menu, flags(InputMode::Mixed), kMenuMixed, Text(L"Mix", L"まぜ打ち"));
     }
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
-    if (canReport_ && canReport_()) {
-        AppendMenuW(menu, MF_STRING, kMenuReport, Text(L"Report a wrong conversion...", L"誤変換を報告..."));
-    }
     AppendMenuW(menu, MF_STRING, kMenuSettings, Text(L"Settings...", L"設定..."));
 
     const HWND owner = GetForegroundWindow();
@@ -173,10 +166,6 @@ HRESULT ModeLangBarItem::InitMenu(ITfMenu* menu) {
     }
     hr = addItem(0, TF_LBMENUF_SEPARATOR, nullptr);
     if (FAILED(hr)) return hr;
-    if (canReport_ && canReport_()) {
-        hr = addItem(kMenuReport, 0, Text(L"Report a wrong conversion...", L"誤変換を報告..."));
-        if (FAILED(hr)) return hr;
-    }
     return addItem(kMenuSettings, 0, Text(L"Settings...", L"設定..."));
 }
 
@@ -185,10 +174,7 @@ HRESULT ModeLangBarItem::OnMenuSelect(UINT id) {
         if (launchSettings_) launchSettings_();
         return S_OK;
     }
-    if (id == kMenuReport) {
-        if (report_) report_();
-        return S_OK;
-    }
+
     if (!setMode_) return S_OK;
     if (id == kMenuAuto) {
         setMode_(InputMode::Convert);

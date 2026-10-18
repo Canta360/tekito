@@ -14,7 +14,7 @@
 
 #include <inputscope.h>
 #include <algorithm>
-#include <cctype>
+#include <ctime>
 #include <cwchar>
 #include <cwctype>
 #include <shellapi.h>
@@ -1015,47 +1015,17 @@ void TextService::UnadviseContextSinks() {
     sinkContext_.Reset();
 }
 
-namespace {
-
-// UTF-8, percent-encoded for a URL's query.
-std::wstring QueryEncoded(std::wstring_view text) {
-    std::string utf8;
-    if (!text.empty()) {
-        const int size = WideCharToMultiByte(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), nullptr, 0, nullptr,
-                                             nullptr);
-        utf8.resize(static_cast<std::size_t>(size));
-        WideCharToMultiByte(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), utf8.data(), size, nullptr, nullptr);
+void TextService::NoteConversion(std::wstring reading, std::wstring text) {
+    constexpr std::size_t kKept = 30;
+    if (!userSettings_.keepRecentConversions || privateField_ || reading.empty() || text.empty() || !settingsRepository_) {
+        return;
     }
-    std::wstring out;
-    constexpr wchar_t kHex[] = L"0123456789ABCDEF";
-    for (const unsigned char c : utf8) {
-        if (std::isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~') {
-            out.push_back(static_cast<wchar_t>(c));
-        } else {
-            out.push_back(L'%');
-            out.push_back(kHex[c >> 4]);
-            out.push_back(kHex[c & 0xF]);
-        }
-    }
-    return out;
-}
-
-}  // namespace
-
-void TextService::NoteConversion(std::wstring keys, std::wstring text) {
-    if (keys.empty() || text.empty()) return;
-    lastConversion_ = Conversion{std::move(keys), std::move(text), mode_};
-}
-
-void TextService::ReportLastConversion() {
-    if (!lastConversion_) return;
-    const wchar_t* mode = lastConversion_->mode == InputMode::Mixed ? L"Mix" : L"Japanese";
-    std::wstring url = L"https://github.com/Canta360/tekito/issues/new?template=wrong-conversion.yml";
-    url += L"&typed=" + QueryEncoded(lastConversion_->keys);
-    url += L"&got=" + QueryEncoded(lastConversion_->text);
-    url += L"&mode=" + QueryEncoded(mode);
-    url += L"&version=" + QueryEncoded(TEKITO_VERSION_STRING);
-    ShellExecuteW(nullptr, L"open", url.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+    userdata::RecentConversion conversion;
+    conversion.reading = std::move(reading);
+    conversion.text = std::move(text);
+    conversion.mode = mode_ == InputMode::Mixed ? L"Mix" : L"Japanese";
+    conversion.time = static_cast<std::int64_t>(std::time(nullptr));
+    (void)settingsRepository_->AddRecentConversion(conversion, kKept);
 }
 
 void TextService::OpenSettings() {
@@ -1096,9 +1066,7 @@ void TextService::RegisterLangBarItem() {
         [this]() { return JapaneseModeAvailable(); },
         [this]() { OpenSettings(); },
         [this]() { return userdata::UseJapaneseUi(userSettings_.uiLanguage); },
-        [this]() { return MixedModeAvailable(); },
-        [this]() { ReportLastConversion(); },
-        [this]() { return userSettings_.reportMenu && lastConversion_.has_value(); });
+        [this]() { return MixedModeAvailable(); });
     if (!item) return;
 
     ComPtr<ModeLangBarItem> ownedItem(item);
@@ -1719,7 +1687,8 @@ HRESULT TextService::HandleKeyInEditSessionCore(ITfContext* context, TfEditCooki
     Trace(L"HandleKeyInEditSession");
     if (!context) return E_INVALIDARG;
     // Nothing is learned from what is typed in a private window.
-    const bool privateField = userSettings_.noLearningInPrivate && ContextIsPrivate(context, editCookie);
+    privateField_ = ContextIsPrivate(context, editCookie);
+    const bool privateField = userSettings_.noLearningInPrivate && privateField_;
     japanese_.SetLearning(userSettings_.learningEnabled && !privateField ? &japaneseLearning_ : nullptr);
     if (input.type == KeyInput::Type::ShowModeIndicator) {
         ShowModeBadge(CaretAnchor(context, editCookie));
