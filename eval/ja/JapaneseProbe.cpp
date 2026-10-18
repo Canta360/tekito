@@ -64,7 +64,15 @@ int main(int argc, char** argv) {
         if (line.empty() || line[0] == '#') continue;
         composer.Clear();
         composer.ForgetContext();
-        for (const wchar_t key : Widen(line)) composer.Insert(key);
+        // A space is the Space key (Mix settles a chunk with it).
+        for (const wchar_t key : Widen(line)) {
+            if (key != L' ') {
+                if (composer.CommitsBeforeTyping() && !mix) composer.Commit();
+                composer.Insert(key);
+            } else {
+                composer.Convert();
+            }
+        }
         std::cout << line << "\t" << Narrow(composer.Preedit());
         std::string predictions;
         for (const auto& prediction : composer.Predictions()) predictions += " " + Narrow(prediction.text);
