@@ -103,7 +103,8 @@ struct UserSettings {
     int japaneseDigitWidth{0};
     // How a number converts first: 0 = as typed (japaneseDigitWidth),
     // 1 = half-width, 2 = full-width, 3 = one digit full-width and more
-    // half-width, 4 = kanji (JapaneseComposer::NumberStyle).
+    // half-width, 4 = kanji, 5 = official documents' 1億2,345万
+    // (JapaneseComposer::NumberStyle).
     int japaneseNumberStyle{0};
     // Kanji candidates may use: 0 = all, 1 = 常用 and 人名用, 2 = 常用,
     // 3 = 教育 (japanese::KanjiRange).

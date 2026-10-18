@@ -200,7 +200,7 @@ const en = {
     numbers: {
       title: "Converted numbers",
       description: "How a number is written when you convert it.",
-      options: ["As typed", "15", "１５", "３ / 15", "十五"],
+      options: ["As typed", "15", "１５", "３ / 15", "十五", "1万2,345"],
     },
     kanji: {
       title: "Kanji",
@@ -578,7 +578,7 @@ const ja = {
     numbers: {
       title: "数字の変換",
       description: "数字を変換したときの書き方です。",
-      options: ["打ったとおり", "15", "１５", "３ / 15", "十五"],
+      options: ["打ったとおり", "15", "１５", "３ / 15", "十五", "1万2,345"],
     },
     kanji: {
       title: "漢字の範囲",

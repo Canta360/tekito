@@ -1482,6 +1482,12 @@ void TestSpecialConversions(const RomajiTable& table, const MiniPack& pack) {
     Require(Contains(special.Numbers(L"10000"), L"一万") && Contains(special.Numbers(L"120000000"), L"一億二千万"),
             "large numbers in kanji");
     Require(special.Numbers(L"0120").size() == 2, "a number that starts with 0 only changes width");
+    using tekito::SpecialConversions;
+    RequireText(SpecialConversions::Official(L"123456789"), L"1億2,345万6,789", "official style: 億 and 万 with commas");
+    RequireText(SpecialConversions::Official(L"120000"), L"12万", "empty groups are left out");
+    RequireText(SpecialConversions::Official(L"100002345"), L"1億2,345", "even in the middle");
+    RequireText(SpecialConversions::Official(L"1234"), L"1,234", "under 万: commas only");
+    Require(Contains(special.Numbers(L"123456789"), L"1億2,345万6,789"), "and it is offered");
     Require(special.Numbers(L"12a").empty(), "not a number");
 
     RequireText(SpecialConversions::Calculate(L"1+2=").value_or(L""), L"3", "a sum");

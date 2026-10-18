@@ -1167,7 +1167,7 @@ private:
                 settings_.englishSpelling = std::clamp(integerValue, 0, 2);
             }
             else if (key == L"japaneseNumberStyle") {
-                settings_.japaneseNumberStyle = std::clamp(integerValue, 0, 4);
+                settings_.japaneseNumberStyle = std::clamp(integerValue, 0, 5);
             }
             else if (key == L"japaneseKanjiRange") {
                 settings_.japaneseKanjiRange = std::clamp(integerValue, 0, 3);

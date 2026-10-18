@@ -83,6 +83,10 @@ public:
     // input types them, ー for minus and ・ for divide). Nothing for anything
     // else, or for dividing by zero.
     [[nodiscard]] static std::optional<std::wstring> Calculate(std::wstring_view expression);
+    // A number as official Japanese documents write it: digits with a comma
+    // every three, 万, 億, 兆 and 京 in kanji (123456789: 1億2,345万6,789).
+    // `digits`: ASCII digits.
+    [[nodiscard]] static std::wstring Official(std::wstring_view digits);
 
 private:
     [[nodiscard]] const std::vector<std::wstring>* Find(std::wstring_view section, Language language,

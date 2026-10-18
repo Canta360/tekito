@@ -190,6 +190,7 @@ public:
         FullWidth,   // １５
         Mixed,       // one digit full-width (３), more half-width (15)
         Kanji,       // 十五
+        Official,    // 1億2,345万6,789, as official documents write numbers
     };
     void SetNumberStyle(NumberStyle style) noexcept { numberStyle_ = style; }
     // Symbols typed in Japanese that stay as they are (! ? ( )): half-width,

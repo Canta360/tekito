@@ -411,6 +411,26 @@ std::wstring SpecialConversions::Kanji(std::wstring_view digits, bool daiji) con
     return out;
 }
 
+std::wstring SpecialConversions::Official(std::wstring_view digits) {
+    while (digits.size() > 1 && digits.front() == L'0') digits.remove_prefix(1);
+    constexpr std::wstring_view kUnits = L" 万億兆京";  // by group, the ones first
+    const std::size_t groups = (digits.size() + 3) / 4;
+    if (digits.empty() || groups > kUnits.size()) return std::wstring(digits);
+    std::wstring out;
+    for (std::size_t group = 0; group < groups; ++group) {
+        // Groups of four digits from the left; the first may be shorter.
+        const std::size_t end = digits.size() - (groups - 1 - group) * 4;
+        const std::size_t begin = end >= 4 ? end - 4 : 0;
+        std::wstring part(digits.substr(begin, end - begin));
+        while (part.size() > 1 && part.front() == L'0') part.erase(0, 1);
+        if (part == L"0" && groups > 1) continue;
+        out += part.size() == 4 ? WithCommas(part) : part;
+        const std::size_t level = groups - 1 - group;
+        if (level > 0) out += kUnits[level];
+    }
+    return out;
+}
+
 std::vector<std::wstring> SpecialConversions::Numbers(std::wstring_view text) const {
     const auto digits = AsciiDigits(text);
     if (!digits) return {};
@@ -420,6 +440,7 @@ std::vector<std::wstring> SpecialConversions::Numbers(std::wstring_view text) co
     // "0120" is a code, not a number: it only changes width.
     if (digits->size() > 1 && digits->front() == L'0') return out;
     if (digits->size() >= 4) AddUnique(out, WithCommas(*digits));
+    if (digits->size() >= 5) AddUnique(out, Official(*digits));
     if (digits->size() <= kLongestKanjiNumber) {
         AddUnique(out, Kanji(*digits, false));
         if (digits->size() >= 2) {

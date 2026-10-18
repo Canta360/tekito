@@ -1149,6 +1149,7 @@ void JapaneseComposer::ApplyNumberStyle() {
         case NumberStyle::FullWidth: wanted = full; break;
         case NumberStyle::Mixed: wanted = half.size() == 1 ? full : half; break;
         case NumberStyle::Kanji: break;
+        case NumberStyle::Official: wanted = SpecialConversions::Official(half); break;
         }
         auto& candidates = phrase.candidates;
         auto found = candidates.end();
