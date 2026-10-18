@@ -1190,6 +1190,9 @@ void JapaneseComposer::AddTypedForms() {
         // One letter typed (i): it may be meant as the letter, also a capital.
         const bool oneLetter = typedReading && phrases_.size() == 1 && Keys(false).size() == 1 &&
                                std::iswalpha(Keys(false).front());
+        // One or two kana (i, ki, ai): the kana and letters are likelier than
+        // the long tail of kanji read so, which goes after them.
+        const bool shortInput = typedReading && phrases_.size() == 1 && reading.size() <= 2;
         if (typedReading) {
             const std::wstring keys = KeysFor(phrase.begin, phrase.length);
             if (!keys.empty()) {
@@ -1202,21 +1205,25 @@ void JapaneseComposer::AddTypedForms() {
             }
         }
         // Before the symbols, which stay last (やじるし: the words, then →);
-        // for one letter on the first page, after the likeliest words.
+        // for a short input on the first page, after the likeliest words.
         constexpr std::size_t kOneLetterAt = 3;
         auto& candidates = phrase.candidates;
         std::size_t at = candidates.size();
         while (at > 1 && candidates[at - 1].kind == PhraseCandidate::Kind::Special) --at;
-        if (oneLetter) at = std::min(at, kOneLetterAt);
+        if (shortInput && kanjiSets_) {
+            std::stable_partition(candidates.begin(), candidates.begin() + static_cast<std::ptrdiff_t>(at),
+                                  [&](const PhraseCandidate& c) { return kanjiSets_->Common(c.text); });
+        }
+        if (shortInput) at = std::min(at, kOneLetterAt);
         const std::int64_t cost = candidates[at - 1].cost;
         for (auto& [text, kind] : forms) {
             if (text.empty()) continue;
             const auto seen = std::find_if(candidates.begin(), candidates.end(),
                                            [&](const PhraseCandidate& c) { return c.text == text; });
             if (seen != candidates.end()) {
-                // One letter: a form already further down comes up with the others.
+                // A short input: a form already further down comes up with the others.
                 const auto index = static_cast<std::size_t>(seen - candidates.begin());
-                if (!oneLetter || index < at) continue;
+                if (!shortInput || index < at) continue;
                 PhraseCandidate moved = std::move(*seen);
                 candidates.erase(seen);
                 candidates.insert(candidates.begin() + static_cast<std::ptrdiff_t>(at++), std::move(moved));
