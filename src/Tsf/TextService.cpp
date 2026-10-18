@@ -44,7 +44,6 @@ bool HasBlockedModifier() {
 bool IsPassThroughInputScope(InputScope scope) {
     switch (scope) {
     case IS_PASSWORD:
-    case IS_PRIVATE:
     case IS_NUMERIC_PASSWORD:
     case IS_NUMERIC_PIN:
     case IS_ALPHANUMERIC_PIN:
@@ -200,6 +199,13 @@ std::vector<InputScope> ContextInputScopes(ITfContext* context, TfEditCookie edi
     std::vector<InputScope> out(scopes, scopes + count);
     CoTaskMemFree(scopes);
     return out;
+}
+
+// A private window (a browser's InPrivate or incognito one marks its fields
+// IS_PRIVATE): typed in as anywhere, but nothing is learned.
+bool ContextIsPrivate(ITfContext* context, TfEditCookie editCookie) {
+    const auto scopes = ContextInputScopes(context, editCookie);
+    return std::find(scopes.begin(), scopes.end(), IS_PRIVATE) != scopes.end();
 }
 
 bool ContextHasPassThroughInputScope(ITfContext* context, TfEditCookie editCookie) {
@@ -1641,6 +1647,9 @@ HRESULT TextService::HandleKeyInEditSessionCore(ITfContext* context, TfEditCooki
                                                 const KeyInput& input) {
     Trace(L"HandleKeyInEditSession");
     if (!context) return E_INVALIDARG;
+    // Nothing is learned from what is typed in a private window.
+    const bool privateField = ContextIsPrivate(context, editCookie);
+    japanese_.SetLearning(userSettings_.learningEnabled && !privateField ? &japaneseLearning_ : nullptr);
     if (input.type == KeyInput::Type::ShowModeIndicator) {
         ShowModeBadge(CaretAnchor(context, editCookie));
         return S_OK;
@@ -1739,7 +1748,7 @@ HRESULT TextService::HandleKeyInEditSessionCore(ITfContext* context, TfEditCooki
             rawText_.clear();
         }
     }
-    const bool learning = userSettings_.learningEnabled && !symbolComposition_;
+    const bool learning = userSettings_.learningEnabled && !symbolComposition_ && !privateField;
 
     const auto recordSocialSelection = [&](const Candidate& candidate) {
         if (userSettings_.socialPersonalization <= 0 ||
