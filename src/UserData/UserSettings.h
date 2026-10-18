@@ -99,6 +99,15 @@ struct UserSettings {
     // Converting checks the likeliest sentences as a whole (the
     // japanese-reranker pack) and takes the one that reads best.
     bool japaneseSentenceCheck{true};
+    // The symbol or emoji a reading names on the first page of its list
+    // (まる: ○, わらい: 😂); off, with the other symbols at the end.
+    bool japaneseFirstPageSymbol{true};
+    // Each list ends with what was typed in every form (kana, half-width
+    // katakana, the keys in both widths).
+    bool japaneseTypedForms{true};
+    // Live conversion converts the whole text again, as Enter would, once
+    // typing pauses.
+    bool japaneseLiveRefine{true};
     // The mixed typing mode (InputMode::Mixed): Japanese and English typed
     // in chunks, a Space after each, with no switching between them. On, it
     // comes right after Japanese when the switch key goes round.

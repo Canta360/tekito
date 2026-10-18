@@ -186,6 +186,9 @@ const en = {
     },
     live: { title: "Live conversion" },
     sentenceCheck: { title: "Check whole sentences", description: "Picks the conversion that reads most naturally as a sentence." },
+    liveRefine: { title: "Recheck when you pause", description: "In live conversion, converts the whole text again when you stop typing." },
+    firstPageSymbol: { title: "Symbol on the first page", description: "Shows the symbol or emoji a word names among the first candidates." },
+    typedForms: { title: "Typed forms in the list", description: "Lists kana, half-width kana and letters at the end." },
     prediction: { title: "Predict words", description: "Suggest words as you type. Pick one with Tab." },
     keys: {
       convert: "Convert, then next candidate",
@@ -493,6 +496,9 @@ const ja = {
     },
     live: { title: "ライブ変換" },
     sentenceCheck: { title: "文全体で見直す", description: "文として自然に読める変換を選びます。" },
+    liveRefine: { title: "手を止めたら見直す", description: "ライブ変換で、手を止めると文全体を変換し直します。" },
+    firstPageSymbol: { title: "記号や絵文字を最初に出す", description: "読みに合う記号や絵文字を、最初の候補に入れます。" },
+    typedForms: { title: "打った形も候補に出す", description: "かな・半角カナ・英字を候補の最後に出します。" },
     prediction: { title: "予測候補", description: "打っている途中で、続きの言葉を出します。Tab で選べます。" },
     keys: {
       convert: "変換、次の候補",

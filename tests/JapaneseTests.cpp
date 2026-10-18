@@ -214,6 +214,15 @@ void TestConversionForms(const RomajiTable& table) {
         RequireText(list ? list->front().text : L"", L"カタカナ", "they come after the rest");
     }
     composer.Cancel();
+    composer.SetTypedForms(false);
+    composer.Convert();
+    {
+        const auto* list = composer.FocusedCandidates();
+        Require(list && std::none_of(list->begin(), list->end(), [](const auto& c) { return c.text == L"katakana"; }),
+                "with the typed forms off, the list does not end with them");
+    }
+    composer.Cancel();
+    composer.SetTypedForms(true);
 
     composer.CycleKana();
     RequireText(composer.Preedit(), L"カタカナ", "Muhenkan: katakana");
@@ -1711,6 +1720,11 @@ void TestKanaSlips(const RomajiTable& table, const MiniPack& pack) {
     RequireText(composer.Preedit(), converted, "a pause shows the text as Space converts it");
     Require(!composer.RefineLive(), "a second pause changes nothing");
     RequireText(composer.Commit(), converted, "Enter takes what the pause showed");
+    composer.SetLiveRefine(false);
+    Type(composer, typed);
+    Require(!composer.RefinesOnPause() && !composer.RefineLive(), "with the pause off, nothing is converted again");
+    composer.Clear();
+    composer.SetLiveRefine(true);
     composer.Clear();
     composer.SetLiveConversion(false);
 }

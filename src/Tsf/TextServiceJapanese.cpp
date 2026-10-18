@@ -490,7 +490,7 @@ void CALLBACK TextService::OnJapaneseRefineTimer(HWND, UINT, UINT_PTR id, DWORD)
         return;
     }
     self->CancelJapaneseRefine();
-    if (!self->compositionContext_ || !self->japanese_.Live() || !self->japanese_.IsComposing()) return;
+    if (!self->compositionContext_ || !self->japanese_.RefinesOnPause()) return;
     KeyInput input{};
     input.type = KeyInput::Type::JapaneseRefine;
     auto* session = new (std::nothrow) KeyEditSession(self, self->compositionContext_, input);

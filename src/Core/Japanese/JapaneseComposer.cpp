@@ -478,7 +478,7 @@ void JapaneseComposer::UpdateLive() {
 }
 
 bool JapaneseComposer::RefineLive() {
-    if (!Live() || !preview_ || kanaView_ || !pending_.empty() || units_.empty() || LiveRefined()) return false;
+    if (!liveRefine_ || !Live() || !preview_ || kanaView_ || !pending_.empty() || units_.empty() || LiveRefined()) return false;
     // A candidate picked while typing stays, as on Enter.
     if (std::any_of(phrases_.begin(), phrases_.end(),
                     [](const PhraseState& phrase) { return phrase.selected != 0 || phrase.form; })) {

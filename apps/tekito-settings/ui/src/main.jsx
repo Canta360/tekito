@@ -56,6 +56,9 @@ const initialSettings = {
   japanesePredictionEnabled: true,
   japaneseLiveConversion: false,
   japaneseSentenceCheck: true,
+  japaneseFirstPageSymbol: true,
+  japaneseTypedForms: true,
+  japaneseLiveRefine: true,
   mixedTypingEnabled: false,
   japaneseEnglishSpacing: false,
   japaneseIgnoreCapsLock: true,
@@ -628,6 +631,15 @@ function JapanesePage({ advanced, settings, setSetting }) {
           <>
             <Row title={j.sentenceCheck.title} description={j.sentenceCheck.description}>
               <Toggle label={j.sentenceCheck.title} checked={settings.japaneseSentenceCheck} onChange={(value) => setSetting("japaneseSentenceCheck", value)} />
+            </Row>
+            <Row title={j.liveRefine.title} description={j.liveRefine.description}>
+              <Toggle label={j.liveRefine.title} checked={settings.japaneseLiveRefine} onChange={(value) => setSetting("japaneseLiveRefine", value)} />
+            </Row>
+            <Row title={j.firstPageSymbol.title} description={j.firstPageSymbol.description}>
+              <Toggle label={j.firstPageSymbol.title} checked={settings.japaneseFirstPageSymbol} onChange={(value) => setSetting("japaneseFirstPageSymbol", value)} />
+            </Row>
+            <Row title={j.typedForms.title} description={j.typedForms.description}>
+              <Toggle label={j.typedForms.title} checked={settings.japaneseTypedForms} onChange={(value) => setSetting("japaneseTypedForms", value)} />
             </Row>
             <Row title={j.space.title} description={j.space.description}>
               <Segmented label={j.space.title} value={settings.japaneseSpaceWidth} options={spaces} onChange={(value) => setSetting("japaneseSpaceWidth", value)} />

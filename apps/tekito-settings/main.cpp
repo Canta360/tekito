@@ -898,6 +898,12 @@ private:
         json += settings_.japaneseLiveConversion ? L"true" : L"false";
         json += L",\"japaneseSentenceCheck\":";
         json += settings_.japaneseSentenceCheck ? L"true" : L"false";
+        json += L",\"japaneseFirstPageSymbol\":";
+        json += settings_.japaneseFirstPageSymbol ? L"true" : L"false";
+        json += L",\"japaneseTypedForms\":";
+        json += settings_.japaneseTypedForms ? L"true" : L"false";
+        json += L",\"japaneseLiveRefine\":";
+        json += settings_.japaneseLiveRefine ? L"true" : L"false";
         json += L",\"japaneseIgnoreCapsLock\":";
         json += settings_.japaneseIgnoreCapsLock ? L"true" : L"false";
         json += L",\"uiLanguage\":" + std::to_wstring(settings_.uiLanguage);
@@ -1077,6 +1083,9 @@ private:
             else if (key == L"japanesePredictionEnabled") settings_.japanesePredictionEnabled = value;
             else if (key == L"japaneseLiveConversion") settings_.japaneseLiveConversion = value;
             else if (key == L"japaneseSentenceCheck") settings_.japaneseSentenceCheck = value;
+            else if (key == L"japaneseFirstPageSymbol") settings_.japaneseFirstPageSymbol = value;
+            else if (key == L"japaneseTypedForms") settings_.japaneseTypedForms = value;
+            else if (key == L"japaneseLiveRefine") settings_.japaneseLiveRefine = value;
             else if (key == L"mixedTypingEnabled") settings_.mixedTypingEnabled = value;
             else if (key == L"japaneseEnglishSpacing") settings_.japaneseEnglishSpacing = value;
             else if (key == L"japaneseIgnoreCapsLock") settings_.japaneseIgnoreCapsLock = value;

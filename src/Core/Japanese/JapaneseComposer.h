@@ -114,6 +114,8 @@ public:
     void SetEmojiOnFirstPage(bool on) noexcept { emojiOnFirstPage_ = on; }
     // The list ends with what was typed in every form (AddTypedForms).
     void SetTypedForms(bool on) noexcept { typedForms_ = on; }
+    // Live conversion converts again once typing pauses (RefineLive).
+    void SetLiveRefine(bool on) noexcept { liveRefine_ = on; }
     // Converting looks for slips in the keys with `slips` (one or two keys
     // dropped, extra, a neighbor or swapped) and converts the keys as
     // meant when they read clearly better (not in Mix); nullptr: off.
@@ -203,6 +205,8 @@ public:
     // converts it (slips undone, checked as a sentence), shown until the
     // next key; Enter then takes it as shown. Whether what is shown changed.
     bool RefineLive();
+    // Whether a pause in typing converts the text again (RefineLive).
+    [[nodiscard]] bool RefinesOnPause() const noexcept { return liveRefine_ && Live() && IsComposing(); }
 
     // Text is held: the chunk being typed, or (Mix) the sentence's chunks
     // before it.
@@ -571,6 +575,7 @@ private:
     bool sentenceCheck_{true};
     bool emojiOnFirstPage_{true};
     bool typedForms_{true};
+    bool liveRefine_{true};
     const KanaSlips* slips_{nullptr};
     std::vector<Unit> units_;
     // Units before the caret; pending keys belong at the caret.

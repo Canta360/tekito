@@ -1566,7 +1566,7 @@ HRESULT TextService::HandleKeyInEditSession(ITfContext* context, TfEditCookie ed
                                             const KeyInput& input) {
     const HRESULT hr = HandleKeyInEditSessionCore(context, editCookie, input);
     if (input.type != KeyInput::Type::JapaneseRefine) {
-        if (japanese_.Live() && japanese_.IsComposing()) {
+        if (japanese_.RefinesOnPause()) {
             ScheduleJapaneseRefine();
         } else {
             CancelJapaneseRefine();
