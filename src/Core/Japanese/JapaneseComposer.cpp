@@ -1072,8 +1072,9 @@ void JapaneseComposer::BuildPhrases(bool convert) {
             PhraseCandidate whole{std::move(*split), 0, PhraseCandidate::Kind::Dictionary, false};
             whole.reading = Reading();
             auto& candidates = phrases_.front().candidates;
-            candidates.insert(candidates.begin() + ((leftover && !slipUndone) || candidates.empty() ? 0 : 1),
-                              std::move(whole));
+            // First when romaji leaves letters of the keys, even with a slip
+            // undone to read them as kana (meetingsimasyou: めえちんしましょう).
+            candidates.insert(candidates.begin() + (leftover || candidates.empty() ? 0 : 1), std::move(whole));
         }
     }
     if (chunk && !chunk->english && !phrases_.empty()) {
@@ -1321,8 +1322,10 @@ void JapaneseComposer::AddTypedEnglish() {
     PhraseCandidate katakana{spellings.front().katakana, 0, PhraseCandidate::Kind::Katakana, false};
     katakana.reading = Reading();
     words.push_back(std::move(katakana));
+    // Keys romaji leaves letters of (the g of meeting) are the English
+    // word's: it comes first.
     auto& candidates = phrases_.front().candidates;
-    std::size_t at = std::min<std::size_t>(1, candidates.size());
+    std::size_t at = 0;
     for (auto& word : words) {
         const bool seen = std::any_of(candidates.begin(), candidates.end(),
                                       [&](const PhraseCandidate& c) { return c.text == word.text; });
@@ -1702,11 +1705,26 @@ void JapaneseComposer::Convert() {
             FlushAll();
             UpdateLive();
         }
-        RebuildLive();
+        const std::wstring shown = Preedit();
+        const bool rebuilt = RebuildLive();
         StartPicking();
         if (!IsConverted()) return;
+        // What was shown changed (English run in, a slip undone): that comes
+        // first, as Space shows it without live conversion.
+        // A whole-input reading shown: Space and its list are that phrase's.
+        bool showingWhole = false;
+        for (std::size_t i = 0; i < phrases_.size(); ++i) {
+            const auto& phrase = phrases_[i];
+            if (!phrase.form && phrase.selected < phrase.candidates.size() &&
+                !phrase.candidates[phrase.selected].reading.empty()) {
+                focus_ = i;
+                showingWhole = true;
+                break;
+            }
+        }
+        if (rebuilt && Preedit() != shown) return;
         std::optional<std::wstring> whole;
-        for (std::size_t i = 0; i < phrases_.size() && !whole; ++i) {
+        for (std::size_t i = 0; i < phrases_.size() && !whole && !showingWhole; ++i) {
             const auto& candidates = phrases_[i].candidates;
             if (phrases_[i].selected == 0 && candidates.size() > 1 && !candidates[1].reading.empty() &&
                 !candidates[1].slip) {
@@ -2149,7 +2167,9 @@ std::wstring JapaneseComposer::PhraseText(const PhraseState& phrase) const {
 }
 
 const PhraseCandidate* JapaneseComposer::WholeChoice() const noexcept {
-    if (!IsConverted() || preview_) return nullptr;
+    // Live: only once the text was converted again after a pause (the
+    // phrases typed on hold no reading of the whole input).
+    if (!IsConverted() || (preview_ && pending_.size() > 0)) return nullptr;
     // A phrase's list may hold readings of the whole input: chosen in any
     // phrase, that reading is the text (the focused phrase first).
     const auto chosen = [](const PhraseState& phrase) -> const PhraseCandidate* {
