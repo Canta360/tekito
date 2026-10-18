@@ -377,6 +377,10 @@ private:
     // The likeliest sentences the phrases' candidates make, checked as a
     // whole (SetSentenceReranker); the one taken is selected.
     void CheckSentence();
+    // Each phrase's list ends with what was typed in every form: hiragana,
+    // katakana, half-width katakana and the keys in full and half width
+    // (what F6-F10 give), for people who look for them there.
+    void AddTypedForms();
     // A sentence in parts, each with its choices (best first): the choice
     // of each part the sentence model reads best, all 0 to keep the first.
     // The phrases of a conversion, the chunks of a mixed sentence and the

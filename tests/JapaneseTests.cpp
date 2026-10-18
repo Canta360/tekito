@@ -203,6 +203,17 @@ void TestConversionForms(const RomajiTable& table) {
     composer.Cancel();
     Require(!composer.IsConverted() && composer.IsComposing(), "Esc returns to the typed kana");
     RequireText(composer.Preedit(), L"かたかな", "the typed kana is kept");
+    composer.Convert();
+    {
+        const auto* list = composer.FocusedCandidates();
+        const auto has = [&](std::wstring_view text) {
+            return list && std::any_of(list->begin(), list->end(), [&](const auto& c) { return c.text == text; });
+        };
+        Require(has(L"ｶﾀｶﾅ") && has(L"ｋａｔａｋａｎａ") && has(L"katakana"),
+                "the list ends with half-width katakana and the keys in both widths");
+        RequireText(list ? list->front().text : L"", L"カタカナ", "they come after the rest");
+    }
+    composer.Cancel();
 
     composer.CycleKana();
     RequireText(composer.Preedit(), L"カタカナ", "Muhenkan: katakana");

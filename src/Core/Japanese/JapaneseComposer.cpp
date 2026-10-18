@@ -406,6 +406,7 @@ void JapaneseComposer::StartPicking() {
     predictions_.clear();
     chosenPrediction_.reset();
     focus_ = phrases_.empty() ? 0 : phrases_.size() - 1;
+    AddTypedForms();
 }
 
 void JapaneseComposer::UpdateLive() {
@@ -1055,6 +1056,40 @@ void JapaneseComposer::BuildPhrases(bool convert) {
         candidates.insert(candidates.begin() + 1, std::move(english));
     }
     if (convert && reranker_ && sentenceCheck_ && !chunkJudge_ && !reconverted_) CheckSentence();
+    if (convert) AddTypedForms();
+}
+
+void JapaneseComposer::AddTypedForms() {
+    if (chunkJudge_ && ChoseEnglish()) return;
+    // The keys are known for each part of the reading only when it is the
+    // reading typed (not one with a slip undone).
+    const bool typedReading = conversionReading_ == Reading();
+    for (auto& phrase : phrases_) {
+        if (phrase.candidates.empty() || !phrase.candidates.front().reading.empty()) continue;
+        const std::wstring reading = conversionReading_.substr(phrase.begin, phrase.length);
+        std::vector<std::pair<std::wstring, PhraseCandidate::Kind>> forms{
+            {ToHiragana(reading), PhraseCandidate::Kind::Hiragana},
+            {ToKatakana(reading), PhraseCandidate::Kind::Katakana},
+            {ToHalfWidthKatakana(reading), PhraseCandidate::Kind::Katakana}};
+        if (typedReading) {
+            const std::wstring keys = KeysFor(phrase.begin, phrase.length);
+            if (!keys.empty()) {
+                forms.emplace_back(ToFullWidthAscii(keys), PhraseCandidate::Kind::English);
+                forms.emplace_back(keys, PhraseCandidate::Kind::English);
+            }
+        }
+        // Before the symbols, which stay last (やじるし: the words, then →).
+        auto& candidates = phrase.candidates;
+        std::size_t at = candidates.size();
+        while (at > 1 && candidates[at - 1].kind == PhraseCandidate::Kind::Special) --at;
+        const std::int64_t cost = candidates[at - 1].cost;
+        for (auto& [text, kind] : forms) {
+            const bool seen = std::any_of(candidates.begin(), candidates.end(),
+                                          [&](const PhraseCandidate& c) { return c.text == text; });
+            if (text.empty() || seen) continue;
+            candidates.insert(candidates.begin() + static_cast<std::ptrdiff_t>(at++), {std::move(text), cost, kind, false});
+        }
+    }
 }
 
 bool JapaneseComposer::FixSlips() {
