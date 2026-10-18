@@ -133,6 +133,7 @@ function App() {
   const [learning, setLearning] = useState({ enabled: true, count: 0 });
   const [dictionary, setDictionary] = useState([]);
   const [japaneseWords, setJapaneseWords] = useState([]);
+  const [romaji, setRomaji] = useState([]);
   const [packs, setPacks] = useState([]);
   const [postalCodes, setPostalCodes] = useState({ installed: false });
   const [version, setVersion] = useState("");
@@ -154,6 +155,7 @@ function App() {
     setLearning((value) => ({ ...value, ...(state.learning || {}) }));
     setDictionary(state.dictionary || []);
     setJapaneseWords(state.japaneseWords || []);
+    setRomaji(state.romaji || []);
     setPacks(state.packs || []);
     if (state.postalCodes) setPostalCodes(state.postalCodes);
     if (state.version) setVersion(state.version);
@@ -302,7 +304,7 @@ function App() {
               {current.id === "switching" && <SwitchingPage advanced={advanced} japanese={japanese} japaneseKeyboard={Boolean(runtime.japaneseKeyboard)} settings={settings} setSetting={setSetting} />}
               {current.id === "candidates" && <CandidatesPage advanced={advanced} settings={settings} setSetting={setSetting} />}
               {current.id === "english" && <EnglishPage advanced={advanced} settings={settings} setSetting={setSetting} />}
-              {current.id === "japanese" && <JapanesePage advanced={advanced} settings={settings} setSetting={setSetting} />}
+              {current.id === "japanese" && <JapanesePage advanced={advanced} settings={settings} setSetting={setSetting} romaji={romaji} runAction={runAction} setConfirm={setConfirm} />}
               {current.id === "special" && <SpecialPage japanese={japanese} settings={settings} setSetting={setSetting} />}
               {current.id === "dictionary" && <DictionaryPage japanese={japaneseInstalled} postalCodes={postalCodes} japaneseWords={japaneseWords} learning={learning} settings={settings} setSetting={setSetting} dictionary={dictionary} setModal={setModal} setConfirm={setConfirm} runAction={runAction} />}
               {current.id === "about" && <AboutPage version={version} runtime={runtime} packs={packs} runAction={runAction} />}
@@ -618,9 +620,30 @@ function EnglishPage({ advanced, settings, setSetting }) {
 
 // Japanese: how romaji becomes Japanese, when Japanese is installed.
 // Shown only while Japanese input is on (see General).
-function JapanesePage({ advanced, settings, setSetting }) {
+function JapanesePage({ advanced, settings, setSetting, romaji, runAction, setConfirm }) {
   const t = useText();
   const j = t.japanese;
+  // A row of the romaji table: the keys, and what they write (none: the
+  // standard row is not used).
+  const [keys, setKeys] = useState("");
+  const [kana, setKana] = useState("");
+  const [unused, setUnused] = useState(false);
+  const addRomaji = async (event) => {
+    event.preventDefault();
+    if (!keys.trim() || (!unused && !kana)) return;
+    const response = await runAction("romaji.save", { input: keys.trim(), output: unused ? "" : kana, pending: "" }, j.romaji.saved);
+    if (response.ok) {
+      setKeys("");
+      setKana("");
+      setUnused(false);
+    }
+  };
+  const askResetRomaji = () => setConfirm({
+    title: j.romaji.resetTitle,
+    message: j.romaji.resetMessage,
+    confirmLabel: j.romaji.reset,
+    action: () => runAction("romaji.reset", {}, j.romaji.wasReset),
+  });
   // UserSettings::japaneseSpaceWidth, ::japanesePunctuation, ::japaneseDigitWidth
   // ::japaneseLetterWidth and ::japaneseSymbolWidth (half-width first in all).
   const spaces = [[0, j.space.follow], [1, j.space.half], [2, j.space.full]];
@@ -677,6 +700,44 @@ function JapanesePage({ advanced, settings, setSetting }) {
             </Row>
           </>
         )}
+      </Glass>
+      <Glass className="card">
+        <div className="card-head">
+          <div>
+            <h2 className="card-title">{j.romaji.title}</h2>
+            <p className="muted">{j.romaji.description}</p>
+          </div>
+        </div>
+        <form className="romaji-form" onSubmit={addRomaji}>
+          <input aria-label={j.romaji.keys} placeholder={j.romaji.keys} value={keys} onChange={(event) => setKeys(event.target.value)} />
+          <input aria-label={j.romaji.kana} placeholder={j.romaji.kana} value={kana} disabled={unused} onChange={(event) => setKana(event.target.value)} />
+          <label className="romaji-unused">
+            <input type="checkbox" checked={unused} onChange={(event) => setUnused(event.target.checked)} />
+            {j.romaji.unused}
+          </label>
+          <Button variant="primary" icon="plus" type="submit">{t.add}</Button>
+        </form>
+        <ul className="word-list" aria-label={j.romaji.title}>
+          {romaji.map((row) => (
+            <li key={row.input} className="word">
+              <div className="word-main">
+                <b>{row.input}</b>
+                <Icon name="arrow" size={15} className="word-arrow" />
+                <span>{row.output || j.romaji.none}</span>
+                {row.standard && <span className="muted">{j.romaji.standard(row.standard)}</span>}
+              </div>
+              <button type="button" className="icon-btn" aria-label={j.romaji.removeLabel(row.input)}
+                onClick={() => runAction("romaji.delete", { input: row.input }, j.romaji.removed)}>
+                <Icon name="trash" size={16} />
+              </button>
+            </li>
+          ))}
+        </ul>
+        {romaji.length === 0 && <div className="empty">{j.romaji.empty}</div>}
+        <div className="card-foot">
+          <Button variant="quiet" icon="import" onClick={() => runAction("romaji.browse", {}, (response) => response.text)}>{j.romaji.import}</Button>
+          <Button variant="quiet" disabled={romaji.length === 0} onClick={askResetRomaji}>{j.romaji.reset}</Button>
+        </div>
       </Glass>
       <Glass className="card">
         <h2 className="card-title">{t.keys.title}</h2>

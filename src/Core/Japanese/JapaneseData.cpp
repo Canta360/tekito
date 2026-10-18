@@ -76,11 +76,30 @@ const JapaneseData* ProcessJapaneseData() {
 
 }  // namespace
 
-const RomajiTable* ProcessRomajiTable() {
+namespace {
+
+RomajiTable* SharedRomajiTable() {
     // A few kilobytes.
-    static const std::unique_ptr<RomajiTable> table =
-        RomajiTable::Load(ExternalLexiconProvider::PackDirectory(L"japanese-romaji"));
+    static const std::unique_ptr<RomajiTable> table = [] {
+        auto loaded = RomajiTable::Load(ExternalLexiconProvider::PackDirectory(L"japanese-romaji"));
+        if (loaded) loaded->ApplyChanges(RomajiTable::ReadChanges(UserRomajiFile()));
+        return loaded;
+    }();
     return table.get();
+}
+
+}  // namespace
+
+const RomajiTable* ProcessRomajiTable() {
+    return SharedRomajiTable();
+}
+
+std::filesystem::path UserRomajiFile() {
+    return ExternalLexiconProvider::PackDirectory(L"user-romaji") / L"romaji.tsv";
+}
+
+void ReloadUserRomaji() {
+    if (auto* table = SharedRomajiTable()) table->ApplyChanges(RomajiTable::ReadChanges(UserRomajiFile()));
 }
 
 const UserPartsOfSpeech* ProcessUserParts() {

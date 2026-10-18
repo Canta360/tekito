@@ -77,6 +77,10 @@ function initialState() {
       japaneseKeyboard: detectedJapaneseKeyboard },
     appearance: { accent: "#0078d4", systemLanguage: navigator.language.startsWith("ja") ? "ja" : "en" },
     learning: { enabled: true, count: 128 },
+    romaji: [
+      { input: "la", output: "ら", pending: "", standard: "ぁ" },
+      { input: "nn", output: "", pending: "", standard: "ん" },
+    ],
     japaneseWords: [
       { reading: "てきとう", surface: "TEKITO", kind: "proper-noun" },
       { reading: "かんた", surface: "カンタ", kind: "given-name", action: "suggest" },
@@ -134,6 +138,14 @@ export function installMockHost() {
           return code >= 0x30A1 && code <= 0x30F6 ? String.fromCharCode(code - 0x60) : c;
         }).join("");
         state.japaneseWords = [...words, { reading, surface: message.surface, kind: message.kind, action: message.action || "first" }];
+      } else if (type === "romaji.save") {
+        const standard = { la: "ぁ", nn: "ん", ka: "か" }[message.input] || "";
+        state.romaji = [...state.romaji.filter((row) => row.input !== message.input),
+          { input: message.input, output: message.output, pending: message.pending, standard }];
+      } else if (type === "romaji.delete") {
+        state.romaji = state.romaji.filter((row) => row.input !== message.input);
+      } else if (type === "romaji.reset") {
+        state.romaji = [];
       } else if (type === "japaneseWords.delete") {
         state.japaneseWords = state.japaneseWords.filter((w) => !(w.reading === message.reading && w.surface === message.surface));
       } else if (type === "settings.set") {

@@ -710,6 +710,8 @@ void TextService::SyncRuntimeState() {
             japaneseUserWords_ = std::move(loadedWords);
             if (japaneseProfile_) RefreshJapaneseUserWords();
         }
+        // The romaji table's changes are kept with the user's words.
+        if (japaneseProfile_) japanese::ReloadUserRomaji();
         runtimeDictionaryGeneration_ = dictionaryGeneration;
     }
 

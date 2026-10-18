@@ -1,5 +1,6 @@
 #pragma once
 
+#include <filesystem>
 #include <memory>
 #include <string_view>
 #include <vector>
@@ -21,8 +22,14 @@ class UserPartsOfSpeech;
 // without the language model, conversion goes by the parts of speech alone;
 // without the loanwords, katakana has no English candidates.
 
-// The romaji table (japanese-romaji); null when it is missing.
+// The romaji table (japanese-romaji) with the user's changes over it; null
+// when it is missing.
 [[nodiscard]] const RomajiTable* ProcessRomajiTable();
+// Where Settings keeps the user's changes to the romaji table, in the Data
+// Pack folder so apps in an app container can read it.
+[[nodiscard]] std::filesystem::path UserRomajiFile();
+// Reads the user's changes again (Settings changed them).
+void ReloadUserRomaji();
 // The parts of speech the user's words take (japanese-core/pos.tsv); null
 // without japanese-core.
 [[nodiscard]] const UserPartsOfSpeech* ProcessUserParts();

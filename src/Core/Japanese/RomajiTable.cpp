@@ -1,7 +1,9 @@
 #include "Core/Japanese/RomajiTable.h"
 
+#include <algorithm>
 #include <fstream>
 #include <iterator>
+#include <system_error>
 #include <vector>
 
 #if defined(_WIN32)
@@ -56,6 +58,13 @@ RomajiTable RomajiTable::FromTsv(std::wstring_view text) {
         table.rules_.insert_or_assign(std::wstring(fields[0]),
                                       RomajiRule{std::wstring(fields[1]), std::wstring(fields[2])});
     }
+    table.packRules_ = table.rules_;
+    table.Index();
+    return table;
+}
+
+void RomajiTable::Index() {
+    keysForKana_.clear();
     // For each kana the shortest spelling; among equally short ones, the
     // usual one rather than an alternative ("ka", not "ca"; "a", not "xa").
     const auto alternative = [](std::wstring_view keys) {
@@ -66,12 +75,132 @@ RomajiTable RomajiTable::FromTsv(std::wstring_view text) {
         if (alternative(a) != alternative(b)) return !alternative(a);
         return a < b;
     };
-    for (const auto& [keys, rule] : table.rules_) {
+    for (const auto& [keys, rule] : rules_) {
         if (!rule.pending.empty()) continue;
-        auto [it, inserted] = table.keysForKana_.try_emplace(rule.output, keys);
+        auto [it, inserted] = keysForKana_.try_emplace(rule.output, keys);
         if (!inserted && better(keys, it->second)) it->second = keys;
     }
-    return table;
+}
+
+void RomajiTable::ApplyChanges(const std::vector<Change>& changes) {
+    rules_ = packRules_;
+    for (const auto& change : changes) {
+        if (change.input.empty()) continue;
+        if (change.output.empty()) {
+            rules_.erase(change.input);
+        } else {
+            rules_.insert_or_assign(change.input, RomajiRule{change.output, change.pending});
+        }
+    }
+    Index();
+}
+
+const RomajiRule* RomajiTable::PackRule(std::wstring_view input) const {
+    const auto it = packRules_.find(input);
+    return it == packRules_.end() ? nullptr : &it->second;
+}
+
+std::vector<RomajiTable::Change> RomajiTable::ChangesFor(const std::vector<Change>& table) const {
+    std::vector<Change> changes;
+    std::map<std::wstring, const Change*, std::less<>> rows;
+    for (const auto& row : table) rows.insert_or_assign(row.input, &row);
+    for (const auto& [input, row] : rows) {
+        const auto* pack = PackRule(input);
+        if (!pack || pack->output != row->output || pack->pending != row->pending) changes.push_back(*row);
+    }
+    // A whole table (not a few rows to add): what it leaves out is not used.
+    constexpr std::size_t kWholeTable = 100;
+    if (rows.size() >= kWholeTable) {
+        for (const auto& [input, rule] : packRules_) {
+            // Marks and letters the table never lists stay as the pack has them.
+            const bool letters = std::any_of(input.begin(), input.end(), [](wchar_t c) { return c >= L'a' && c <= L'z'; });
+            if (letters && !rows.contains(input)) changes.push_back({input, {}, {}});
+        }
+    }
+    return changes;
+}
+
+std::vector<RomajiTable::Change> RomajiTable::ReadChanges(const std::filesystem::path& file) {
+    std::vector<Change> changes;
+    std::ifstream in(file, std::ios::binary);
+    if (!in) return changes;
+    const std::string bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    const std::wstring text = FromUtf8(bytes);
+    std::size_t start = 0;
+    while (start < text.size()) {
+        auto end = text.find(L'\n', start);
+        if (end == std::wstring::npos) end = text.size();
+        auto line = std::wstring_view(text).substr(start, end - start);
+        start = end + 1;
+        if (!line.empty() && line.back() == L'\r') line.remove_suffix(1);
+        const auto fields = SplitTabs(line);
+        if (fields.size() != 3 || fields[0].empty()) continue;
+        changes.push_back({std::wstring(fields[0]), std::wstring(fields[1]), std::wstring(fields[2])});
+    }
+    return changes;
+}
+
+bool RomajiTable::WriteChanges(const std::filesystem::path& file, const std::vector<Change>& changes) {
+    std::error_code error;
+    std::filesystem::create_directories(file.parent_path(), error);
+    std::wstring text;
+    for (const auto& change : changes) text += change.input + L"\t" + change.output + L"\t" + change.pending + L"\n";
+#if defined(_WIN32)
+    std::string bytes;
+    if (!text.empty()) {
+        const int length = WideCharToMultiByte(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), nullptr, 0,
+                                               nullptr, nullptr);
+        bytes.resize(static_cast<std::size_t>(length));
+        WideCharToMultiByte(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), bytes.data(), length, nullptr,
+                            nullptr);
+    }
+#else
+    std::string bytes(text.begin(), text.end());
+#endif
+    std::ofstream out(file, std::ios::binary | std::ios::trunc);
+    if (!out) return false;
+    out.write(bytes.data(), static_cast<std::streamsize>(bytes.size()));
+    return static_cast<bool>(out);
+}
+
+std::vector<RomajiTable::Change> RomajiTable::ParseTable(const std::filesystem::path& file) {
+    std::vector<Change> rows;
+    std::ifstream in(file, std::ios::binary);
+    if (!in) return rows;
+    const std::string bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    std::wstring text;
+    if (bytes.size() >= 2 && static_cast<unsigned char>(bytes[0]) == 0xFF && static_cast<unsigned char>(bytes[1]) == 0xFE) {
+        text.assign(reinterpret_cast<const wchar_t*>(bytes.data() + 2), (bytes.size() - 2) / 2);
+    } else {
+        std::string_view utf8 = bytes;
+        if (utf8.starts_with("\xEF\xBB\xBF")) utf8.remove_prefix(3);
+        text = FromUtf8(utf8);
+#if defined(_WIN32)
+        if (text.empty() && !utf8.empty()) {
+            // Not UTF-8: Shift_JIS, as older Microsoft IME files are.
+            const int length = MultiByteToWideChar(932, 0, utf8.data(), static_cast<int>(utf8.size()), nullptr, 0);
+            if (length > 0) {
+                text.resize(static_cast<std::size_t>(length));
+                MultiByteToWideChar(932, 0, utf8.data(), static_cast<int>(utf8.size()), text.data(), length);
+            }
+        }
+#endif
+    }
+    std::size_t start = 0;
+    while (start < text.size()) {
+        auto end = text.find(L'\n', start);
+        if (end == std::wstring::npos) end = text.size();
+        auto line = std::wstring_view(text).substr(start, end - start);
+        start = end + 1;
+        if (!line.empty() && line.back() == L'\r') line.remove_suffix(1);
+        const auto fields = SplitTabs(line);
+        if (fields.size() < 2 || fields[0].empty() || fields[1].empty()) continue;
+        // Keys are what a keyboard types (a header row is not).
+        if (std::any_of(fields[0].begin(), fields[0].end(), [](wchar_t c) { return c < L'!' || c > L'~'; })) continue;
+        rows.push_back({std::wstring(fields[0]), std::wstring(fields[1]),
+                        fields.size() > 2 ? std::wstring(fields[2]) : std::wstring()});
+    }
+    return rows;
 }
 
 std::unique_ptr<RomajiTable> RomajiTable::Load(const std::filesystem::path& packDirectory) {

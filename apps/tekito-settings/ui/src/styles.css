@@ -482,3 +482,22 @@ kbd {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* The romaji table: keys, kana, "not used", add. */
+.romaji-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin: 8px 0 12px;
+}
+.romaji-form input:not([type="checkbox"]) {
+  flex: 1 1 120px;
+  min-width: 0;
+}
+.romaji-unused {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  white-space: nowrap;
+}

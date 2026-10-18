@@ -13,6 +13,8 @@
 
 #include "Core/DataPackPath.h"
 #include "Core/ExternalLexiconProvider.h"
+#include "Core/Japanese/JapaneseData.h"
+#include "Core/Japanese/RomajiTable.h"
 #include "Dictionary/ExternalDictionaryProvider.h"
 #include "UserData/DataPackValidation.h"
 #include "UserData/KeyboardLayout.h"
@@ -767,6 +769,33 @@ private:
         return json + L']';
     }
 
+    // The romaji table as its pack has it, for the user's changes over it.
+    static const tekito::japanese::RomajiTable* PackRomaji() {
+        static const auto table =
+            tekito::japanese::RomajiTable::Load(tekito::ExternalLexiconProvider::PackDirectory(L"japanese-romaji"));
+        return table.get();
+    }
+
+    // The user's changes to the romaji table, each with the pack's own row.
+    std::wstring RomajiJson() const {
+        std::wstring json = L"[";
+        const auto* pack = PackRomaji();
+        for (const auto& change : tekito::japanese::RomajiTable::ReadChanges(tekito::japanese::UserRomajiFile())) {
+            const auto* standard = pack ? pack->PackRule(change.input) : nullptr;
+            if (json.size() > 1) json += L',';
+            json += L"{\"input\":\"" + JsonEscape(change.input) + L"\",\"output\":\"" + JsonEscape(change.output) +
+                    L"\",\"pending\":\"" + JsonEscape(change.pending) + L"\",\"standard\":\"" +
+                    JsonEscape(standard ? standard->output : std::wstring()) + L"\"}";
+        }
+        return json + L']';
+    }
+
+    bool SaveRomaji(const std::vector<tekito::japanese::RomajiTable::Change>& changes) {
+        if (!tekito::japanese::RomajiTable::WriteChanges(tekito::japanese::UserRomajiFile(), changes)) return false;
+        runtime_->NotifyDictionaryChanged();
+        return true;
+    }
+
     std::wstring JapaneseWordsJson() const {
         std::wstring json = L"[";
         for (const auto& word : japaneseWords_) {
@@ -926,6 +955,7 @@ private:
         json += L",\"count\":" + std::to_wstring(learning_.Entries().size() + learning_.PreferenceCount()) + L"},\"dictionary\":";
         json += DictionaryJson();
         json += L",\"japaneseWords\":" + JapaneseWordsJson();
+        json += L",\"romaji\":" + RomajiJson();
         json += L",\"packs\":" + packs;
         json += L",\"postalCodes\":" + PostalCodesJson();
         json += L",\"appearance\":{\"accent\":\"" + AccentColorHex() + L"\",\"systemLanguage\":\"" +
@@ -1253,6 +1283,62 @@ private:
                 runtime_->NotifyDictionaryChanged();
                 Reply(requestId, true);
             }
+        } else if (type == L"romaji.save") {
+            const auto input = message.String(L"input");
+            const auto output = message.String(L"output");
+            const auto pending = message.String(L"pending");
+            const auto typed = [](std::wstring_view keys) {
+                return !keys.empty() && std::all_of(keys.begin(), keys.end(), [](wchar_t c) { return c >= L'!' && c <= L'~'; });
+            };
+            if (!typed(input) || (!pending.empty() && !typed(pending)) || output.find(L'\t') != std::wstring::npos) {
+                Reply(requestId, false, Text(L"Keys are letters, digits and marks a keyboard types.",
+                                             L"入力はキーボードで打てる英数字と記号で書いてください。"));
+                return;
+            }
+            auto changes = tekito::japanese::RomajiTable::ReadChanges(tekito::japanese::UserRomajiFile());
+            std::erase_if(changes, [&](const auto& change) { return change.input == input; });
+            const auto* standard = PackRomaji() ? PackRomaji()->PackRule(input) : nullptr;
+            // The pack's own row again is no change at all.
+            if (!standard || standard->output != output || standard->pending != pending) {
+                changes.push_back({input, output, pending});
+            }
+            if (!SaveRomaji(changes)) {
+                Reply(requestId, false, Text(L"The romaji table could not be saved.", L"ローマ字表を保存できませんでした。"));
+            } else {
+                Reply(requestId, true);
+            }
+        } else if (type == L"romaji.delete" || type == L"romaji.reset") {
+            auto changes = tekito::japanese::RomajiTable::ReadChanges(tekito::japanese::UserRomajiFile());
+            if (type == L"romaji.reset") {
+                changes.clear();
+            } else {
+                const auto input = message.String(L"input");
+                std::erase_if(changes, [&](const auto& change) { return change.input == input; });
+            }
+            if (!SaveRomaji(changes)) {
+                Reply(requestId, false, Text(L"The romaji table could not be saved.", L"ローマ字表を保存できませんでした。"));
+            } else {
+                Reply(requestId, true);
+            }
+        } else if (type == L"romaji.import" || type == L"romaji.browse") {
+            const auto source = type == L"romaji.browse" ? ChooseRomajiFile() : droppedFile_;
+            if (source.empty()) {
+                Reply(requestId, type == L"romaji.browse");  // the dialog was closed
+                return;
+            }
+            const auto rows = tekito::japanese::RomajiTable::ParseTable(source);
+            if (rows.empty() || !PackRomaji()) {
+                Reply(requestId, false, Text(L"No romaji rows were found in this file.",
+                                             L"このファイルからローマ字表を読み込めませんでした。"));
+                return;
+            }
+            if (!SaveRomaji(PackRomaji()->ChangesFor(rows))) {
+                Reply(requestId, false, Text(L"The romaji table could not be saved.", L"ローマ字表を保存できませんでした。"));
+                return;
+            }
+            const auto count = std::to_wstring(rows.size());
+            const std::wstring text = Text((L"Read " + count + L" rows.").c_str(), (count + L" 行を読み込みました。").c_str());
+            Reply(requestId, true, {}, L",\"text\":\"" + JsonEscape(text) + L"\"");
         } else if (type == L"dictionary.delete") {
             const auto previous = dictionary_;
             if (!dictionary_.Remove(static_cast<std::uint64_t>(message.Number(L"id"))) || !repository_->Save(dictionary_)) {
@@ -1431,6 +1517,19 @@ private:
         dialog.lpstrFilter = L"Text (*.txt)\0*.txt;*.tsv;*.csv\0All files\0*.*\0";
         dialog.lpstrTitle = Text(L"Choose a user dictionary exported from another input method",
                                  L"ほかの IME から書き出したユーザー辞書を選ぶ");
+        dialog.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_NOCHANGEDIR;
+        return GetOpenFileNameW(&dialog) ? std::filesystem::path(buffer) : std::filesystem::path{};
+    }
+
+    std::filesystem::path ChooseRomajiFile() {
+        wchar_t buffer[MAX_PATH]{};
+        OPENFILENAMEW dialog{sizeof(dialog)};
+        dialog.hwndOwner = hwnd_;
+        dialog.lpstrFile = buffer;
+        dialog.nMaxFile = MAX_PATH;
+        dialog.lpstrFilter = L"Text (*.txt)\0*.txt;*.tsv\0All files\0*.*\0";
+        dialog.lpstrTitle = Text(L"Choose a romaji table saved from another input method",
+                                 L"ほかの IME から書き出したローマ字表を選ぶ");
         dialog.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_NOCHANGEDIR;
         return GetOpenFileNameW(&dialog) ? std::filesystem::path(buffer) : std::filesystem::path{};
     }

@@ -99,6 +99,30 @@ void TestKanaText() {
     RequireText(ToKatakana(L"漢字abc"), L"漢字abc", "other text is left alone");
 }
 
+void TestRomajiChanges() {
+    // The user's changes over the pack's rows, kept in a file.
+    auto table = LoadTable();
+    const std::vector<RomajiTable::Change> changes{{L"la", L"ら", L""}, {L"nn", L"", L""}, {L";", L"っ", L""}};
+    table->ApplyChanges(changes);
+    Require(table->Find(L"la") && table->Find(L"la")->output == L"ら", "a changed row types its kana");
+    Require(!table->Find(L"nn"), "a row taken out is not used");
+    Require(table->Find(L";") && table->Find(L";")->output == L"っ", "an added row types its kana");
+    Require(table->PackRule(L"la") && table->PackRule(L"la")->output == L"ぁ", "the pack's own row is still known");
+    const auto file = std::filesystem::temp_directory_path() / L"tekito-test-romaji.tsv";
+    Require(RomajiTable::WriteChanges(file, changes), "changes are written");
+    const auto read = RomajiTable::ReadChanges(file);
+    Require(read.size() == 3 && read[1].input == L"nn" && read[1].output.empty(), "and read back, a taken-out row too");
+    table->ApplyChanges({});
+    Require(table->Find(L"nn") && table->Find(L"la")->output == L"ぁ", "no changes: the pack's table again");
+    // Another IME's whole table: its differences, and what it leaves out.
+    std::vector<RomajiTable::Change> other;
+    for (const wchar_t* row : {L"ka", L"ki", L"ku", L"ke", L"ko"}) other.push_back({row, table->Find(row)->output, L""});
+    other.push_back({L"la", L"ら", L""});
+    const auto few = table->ChangesFor(other);
+    Require(few.size() == 1 && few[0].input == L"la", "a few rows: only what differs");
+    std::filesystem::remove(file);
+}
+
 void TestRomajiTable(const RomajiTable& table) {
     Require(table.Size() > 300, "the romaji table has the usual rows");
     const auto* ka = table.Find(L"ka");
@@ -1752,6 +1776,7 @@ int main(int argc, char** argv) {
     const auto table = LoadTable();
     TestKanaText();
     TestRomajiTable(*table);
+    TestRomajiChanges();
     TestRomajiConversion(*table);
     TestEditing(*table);
     TestCaret(*table);
