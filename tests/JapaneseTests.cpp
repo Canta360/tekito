@@ -1413,10 +1413,15 @@ void TestSpecialConversions(const RomajiTable& table, const MiniPack& pack) {
     Require(arrows && std::any_of(arrows->begin(), arrows->end(), [](const auto& c) { return c.text == L"→"; }),
             "やじるし's candidates have the arrows");
     {
+        // The reading's first symbol on the first page; the others after
+        // the words.
         const auto arrow = std::find_if(arrows->begin(), arrows->end(), [](const auto& c) { return c.text == L"→"; });
-        Require(std::none_of(arrow, arrows->end(),
-                             [](const auto& c) { return c.kind != tekito::japanese::PhraseCandidate::Kind::Special; }),
-                "symbols come after the words");
+        Require(arrow - arrows->begin() <= 3, "the symbol a reading names is on the first page");
+        const auto leftArrow = std::find_if(arrows->begin(), arrows->end(), [](const auto& c) { return c.text == L"←"; });
+        Require(leftArrow != arrows->end() &&
+                    std::none_of(leftArrow, arrows->end(),
+                                 [](const auto& c) { return c.kind == tekito::japanese::PhraseCandidate::Kind::Dictionary; }),
+                "the other symbols come after the words");
     }
     composer.Clear();
 

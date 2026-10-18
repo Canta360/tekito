@@ -1563,29 +1563,23 @@ void JapaneseComposer::AddSpecial(std::wstring_view reading, std::vector<PhraseC
     insert(candidates.size(), special_->SingleKanji(reading), {});
     // Symbols and emoticons after them ("やじるし": 矢印, やじるし, ヤジルシ, →).
     if (specialOptions_.symbols) {
+        const std::size_t symbolsFrom = candidates.size();
         insert(candidates.size(), special_->Symbols(SpecialConversions::Language::Japanese, reading), {});
         insert(candidates.size(), special_->Emoticons(reading), {});
-        // The first emoji on the first page, after the words read the same
-        // (わらい: 笑い, 咲い, わらい, 😁): someone who typed a word right
-        // most likely wants it or its emoji. The rest stay last.
-        // One emoji of one character (♥️, 😁, 🐈️), not a sequence of them
-        // (👨‍❤️‍👨) nor a symbol that only looks like one (𓃠).
-        constexpr std::size_t kEmojiAt = 3;
-        const auto emoji = std::find_if(candidates.begin() + 1, candidates.end(), [](const PhraseCandidate& c) {
-            if (c.kind != PhraseCandidate::Kind::Special || c.text.empty()) return false;
-            std::wstring_view text = c.text;
-            if (text.ends_with(L'\xFE0F')) text.remove_suffix(1);
-            if (text.size() == 1) return c.text.size() == 2;  // a symbol shown as emoji: ♥️, ☀️
-            if (text.size() != 2 || text[0] < 0xD800 || text[0] > 0xDBFF || text[1] < 0xDC00 || text[1] > 0xDFFF) {
-                return false;
-            }
-            const char32_t point = 0x10000 + ((static_cast<char32_t>(text[0]) - 0xD800) << 10) +
-                                   (static_cast<char32_t>(text[1]) - 0xDC00);
-            return point >= 0x1F300 && point <= 0x1FAFF;
-        });
-        if (emojiOnFirstPage_ && emoji != candidates.end()) {
-            const auto at = candidates.begin() + static_cast<std::ptrdiff_t>(std::min(kEmojiAt, candidates.size()));
-            if (emoji > at) std::rotate(at, emoji, emoji + 1);
+        // The reading's first symbol on the first page, after the words read
+        // the same: its symbol when it names one (まる: ○, やじるし: →,
+        // おんぷ: ♪), otherwise its most used emoji (わらい: 😂). The pack
+        // lists a reading's symbols before its emoji. The rest stay last.
+        constexpr std::size_t kSymbolAt = 3;
+        // Not for a number (3: ⚂) nor when a symbol already comes first
+        // (ぱーせんと: %).
+        const bool number = std::all_of(reading.begin(), reading.end(), IsDigit);
+        const bool symbolFirst = std::none_of(candidates.front().text.begin(), candidates.front().text.end(),
+                                              [](wchar_t c) { return c >= L'\x3041'; });
+        if (emojiOnFirstPage_ && symbolsFrom < candidates.size() && !number && !symbolFirst) {
+            const auto symbol = candidates.begin() + static_cast<std::ptrdiff_t>(symbolsFrom);
+            const auto at = candidates.begin() + static_cast<std::ptrdiff_t>(std::min(kSymbolAt, symbolsFrom));
+            std::rotate(at, symbol, symbol + 1);
         }
     }
 }
