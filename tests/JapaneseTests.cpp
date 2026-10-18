@@ -1037,7 +1037,13 @@ void TestRomajiCorrection(const RomajiTable& table, const MiniPack& pack) {
     Require(whole != phraseList->end() && whole->slip && whole->reading == L"はじめまして",
             "the first phrase's list has the whole input read again");
     Require(whole - phraseList->begin() < 9, "on the list's first page");
-    composer.SelectCandidate(static_cast<std::size_t>(whole - phraseList->begin()));
+    const auto wholeAt = static_cast<std::size_t>(whole - phraseList->begin());
+    composer.SelectCandidate(wholeAt);
+    composer.MoveFocus(1);
+    Require(composer.Segments().size() > 1 && composer.Preedit().find(L"はじめまして") == std::wstring::npos,
+            "Right from the whole input shows the phrases, not the whole input and the phrases after it");
+    composer.MoveFocus(-1);
+    composer.SelectCandidate(wholeAt);
     RequireText(composer.Preedit(), L"はじめまして", "choosing it shows the whole input as it");
     Require(composer.Segments().size() == 1, "as one phrase");
     RequireText(composer.Commit(), L"はじめまして", "and commits it");

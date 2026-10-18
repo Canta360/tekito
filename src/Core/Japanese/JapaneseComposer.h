@@ -459,9 +459,12 @@ private:
     // starting at `starts`), apart from where the two differ.
     [[nodiscard]] bool SamePhrasing(const std::wstring& reading, const std::vector<std::size_t>& starts,
                                     const std::wstring& corrected) const;
-    // The focused phrase's chosen candidate when it is the whole input read
+    // The chosen candidate (of the focused phrase, else any) when it is the whole input read
     // again: it is then shown, and committed, in place of every phrase.
     [[nodiscard]] const PhraseCandidate* WholeChoice() const noexcept;
+    // A whole-input reading chosen in any phrase goes back to that phrase's
+    // own first candidate, so the phrases are shown one by one again.
+    void DropWholeChoice() noexcept;
     // The context after committing `text` whose last word is `rightId`.
     [[nodiscard]] static std::uint16_t ContextAfter(std::wstring_view text, std::uint16_t rightId) noexcept;
     // Keeps the content words of committed `text` for the next conversions.

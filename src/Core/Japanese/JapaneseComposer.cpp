@@ -1964,6 +1964,8 @@ void JapaneseComposer::MoveFocus(int delta) {
     const bool fromLive = preview_;
     StartPicking();
     if (phrases_.empty()) return;
+    // The whole input read at once is one piece: moving shows the phrases.
+    if (phrases_.size() > 1) DropWholeChoice();
     const auto count = static_cast<int>(phrases_.size());
     const int from = fromLive ? count : static_cast<int>(focus_);
     focus_ = static_cast<std::size_t>(std::clamp(from + delta, 0, count - 1));
@@ -1972,6 +1974,7 @@ void JapaneseComposer::MoveFocus(int delta) {
 void JapaneseComposer::ResizeFocus(int delta) {
     if (!IsConverted() || !converter_) return;
     StartPicking();
+    DropWholeChoice();
     const std::wstring reading = conversionReading_;
     const auto& focused = phrases_[focus_];
     const auto length = static_cast<long long>(focused.length) + delta;
@@ -2114,10 +2117,31 @@ std::wstring JapaneseComposer::PhraseText(const PhraseState& phrase) const {
 
 const PhraseCandidate* JapaneseComposer::WholeChoice() const noexcept {
     if (!IsConverted() || preview_) return nullptr;
-    const auto& phrase = phrases_[focus_];
-    if (phrase.form || phrase.selected >= phrase.candidates.size()) return nullptr;
-    const auto& candidate = phrase.candidates[phrase.selected];
-    return candidate.reading.empty() ? nullptr : &candidate;
+    // A phrase's list may hold readings of the whole input: chosen in any
+    // phrase, that reading is the text (the focused phrase first).
+    const auto chosen = [](const PhraseState& phrase) -> const PhraseCandidate* {
+        if (phrase.form || phrase.selected >= phrase.candidates.size()) return nullptr;
+        const auto& candidate = phrase.candidates[phrase.selected];
+        return candidate.reading.empty() ? nullptr : &candidate;
+    };
+    if (const auto* whole = chosen(phrases_[focus_])) return whole;
+    for (const auto& phrase : phrases_) {
+        if (const auto* whole = chosen(phrase)) return whole;
+    }
+    return nullptr;
+}
+
+void JapaneseComposer::DropWholeChoice() noexcept {
+    if (preview_) return;
+    for (auto& phrase : phrases_) {
+        if (phrase.form || phrase.selected >= phrase.candidates.size() ||
+            phrase.candidates[phrase.selected].reading.empty()) {
+            continue;
+        }
+        const auto own = std::find_if(phrase.candidates.begin(), phrase.candidates.end(),
+                                      [](const PhraseCandidate& c) { return c.reading.empty(); });
+        phrase.selected = own == phrase.candidates.end() ? 0 : static_cast<std::size_t>(own - phrase.candidates.begin());
+    }
 }
 
 std::wstring JapaneseComposer::Preedit() const {
