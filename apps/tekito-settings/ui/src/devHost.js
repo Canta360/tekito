@@ -67,6 +67,7 @@ function initialState() {
       japaneseLiveRefine: true,
       japaneseKanaInput: false,
       japaneseKanaInputKey: true,
+      noLearningInPrivate: true,
       japaneseIgnoreCapsLock: true,
       uiLanguage: 0,
       excludedApps: ["Code.exe"],
@@ -79,6 +80,13 @@ function initialState() {
       japaneseKeyboard: detectedJapaneseKeyboard },
     appearance: { accent: "#0078d4", systemLanguage: navigator.language.startsWith("ja") ? "ja" : "en" },
     learning: { enabled: true, count: 128 },
+    learned: [
+      { kind: "ja", key: "きしゃ", value: "記者", how: "chosen", count: 3 },
+      { kind: "ja", key: "こうえん", value: "講演", how: "chosen", count: 1 },
+      { kind: "en", key: "teh", value: "the", how: "chosen", count: 5 },
+      { kind: "en", key: "github", value: "GitHub", how: "undone", count: 1 },
+      { kind: "word", key: "tekito", value: "", how: "kept", count: 2 },
+    ],
     romaji: [
       { input: "la", output: "ら", pending: "", standard: "ぁ" },
       { input: "nn", output: "", pending: "", standard: "ん" },
@@ -140,6 +148,13 @@ export function installMockHost() {
           return code >= 0x30A1 && code <= 0x30F6 ? String.fromCharCode(code - 0x60) : c;
         }).join("");
         state.japaneseWords = [...words, { reading, surface: message.surface, kind: message.kind, action: message.action || "first" }];
+      } else if (type === "learning.list" || type === "learning.forget") {
+        if (type === "learning.forget") {
+          state.learned = state.learned.filter((item) => !(item.kind === message.kind && item.key === message.key && item.value === message.value));
+        }
+        const data = JSON.stringify({ requestId, ok: true, error: "", state, items: state.learned });
+        window.setTimeout(() => listeners.forEach((listener) => listener({ data })), 60);
+        return;
       } else if (type === "romaji.save") {
         const standard = { la: "ぁ", nn: "ん", ka: "か" }[message.input] || "";
         state.romaji = [...state.romaji.filter((row) => row.input !== message.input),

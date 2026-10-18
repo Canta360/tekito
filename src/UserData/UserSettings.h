@@ -131,6 +131,9 @@ struct UserSettings {
     bool japaneseKanaInput{false};
     // Alt+カタカナひらがな turns かな入力 on or off.
     bool japaneseKanaInputKey{true};
+    // Nothing is learned from what is typed in a private browser window
+    // (a field marked IS_PRIVATE).
+    bool noLearningInPrivate{true};
     // Special conversions, in English and Japanese (the special-conversions
     // pack): dates and times for "today" and "kyou", a number's other forms,
     // symbols by reading or ASCII spelling, and the sum for "1+2=".

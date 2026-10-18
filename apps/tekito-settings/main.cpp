@@ -796,6 +796,44 @@ private:
         return true;
     }
 
+    // What TEKITO learned, each item on its own for Settings to list and
+    // forget: Japanese conversions (most recent first), English choices and
+    // words. Read again from the store, as the input method keeps it.
+    std::wstring LearnedJson() const {
+        std::wstring json = L"[";
+        const auto add = [&](std::wstring_view kind, std::wstring_view key, std::wstring_view value,
+                             std::wstring_view how, double count) {
+            if (json.size() > 1) json += L',';
+            json += L"{\"kind\":\"" + JsonEscape(std::wstring(kind)) + L"\",\"key\":\"" + JsonEscape(std::wstring(key)) +
+                    L"\",\"value\":\"" + JsonEscape(std::wstring(value)) + L"\",\"how\":\"" + std::wstring(how) +
+                    L"\",\"count\":" + std::to_wstring(static_cast<long long>(count + 0.5)) + L"}";
+        };
+        if (!repository_) return L"[]";
+        tekito::japanese::JapaneseLearningStore japanese;
+        if (repository_->LoadJapaneseLearning(japanese)) {
+            auto entries = japanese.Entries();
+            std::sort(entries.begin(), entries.end(), [](const auto& a, const auto& b) { return a.lastUsed > b.lastUsed; });
+            for (const auto& entry : entries) add(L"ja", entry.reading, entry.surface, L"chosen", entry.selections);
+        }
+        tekito::UserLearningStore english;
+        if (repository_->LoadLearning(english)) {
+            std::vector<tekito::UserLearningPreference> preferences(english.Preferences().begin(), english.Preferences().end());
+            std::sort(preferences.begin(), preferences.end(), [](const auto& a, const auto& b) { return a.exposure > b.exposure; });
+            for (const auto& preference : preferences) {
+                const bool undone = english.Undone(preference.rawText, preference.candidate);
+                add(L"en", preference.rawText, preference.candidate, undone ? L"undone" : L"chosen", preference.alpha);
+            }
+            for (const auto& entry : english.Entries()) {
+                const auto how = entry.undoCount > entry.candidateSelections ? L"undone"
+                                 : entry.rawKeeps > entry.candidateSelections ? L"kept"
+                                                                              : L"chosen";
+                add(L"word", entry.word, {}, how,
+                    static_cast<double>(entry.candidateSelections + entry.rawKeeps + entry.undoCount));
+            }
+        }
+        return json + L']';
+    }
+
     std::wstring JapaneseWordsJson() const {
         std::wstring json = L"[";
         for (const auto& word : japaneseWords_) {
@@ -943,6 +981,8 @@ private:
         json += settings_.japaneseKanaInput ? L"true" : L"false";
         json += L",\"japaneseKanaInputKey\":";
         json += settings_.japaneseKanaInputKey ? L"true" : L"false";
+        json += L",\"noLearningInPrivate\":";
+        json += settings_.noLearningInPrivate ? L"true" : L"false";
         json += L",\"japaneseIgnoreCapsLock\":";
         json += settings_.japaneseIgnoreCapsLock ? L"true" : L"false";
         json += L",\"uiLanguage\":" + std::to_wstring(settings_.uiLanguage);
@@ -1131,6 +1171,7 @@ private:
             else if (key == L"japaneseLiveRefine") settings_.japaneseLiveRefine = value;
             else if (key == L"japaneseKanaInput") settings_.japaneseKanaInput = value;
             else if (key == L"japaneseKanaInputKey") settings_.japaneseKanaInputKey = value;
+            else if (key == L"noLearningInPrivate") settings_.noLearningInPrivate = value;
             else if (key == L"mixedTypingEnabled") settings_.mixedTypingEnabled = value;
             else if (key == L"japaneseEnglishSpacing") settings_.japaneseEnglishSpacing = value;
             else if (key == L"japaneseIgnoreCapsLock") settings_.japaneseIgnoreCapsLock = value;
@@ -1289,6 +1330,30 @@ private:
                 runtime_->NotifyDictionaryChanged();
                 Reply(requestId, true);
             }
+        } else if (type == L"learning.list") {
+            Reply(requestId, true, {}, L",\"items\":" + LearnedJson());
+        } else if (type == L"learning.forget") {
+            const auto kind = message.String(L"kind");
+            const auto key = message.String(L"key");
+            const auto value = message.String(L"value");
+            bool saved = false;
+            if (kind == L"ja") {
+                tekito::japanese::JapaneseLearningStore japanese;
+                saved = repository_->LoadJapaneseLearning(japanese) && japanese.Forget(key, value) &&
+                        repository_->SaveJapaneseLearning(japanese);
+            } else {
+                tekito::UserLearningStore english;
+                saved = repository_->LoadLearning(english) &&
+                        (kind == L"word" ? english.ForgetWord(key) : english.Forget(key, value)) &&
+                        repository_->SaveLearning(english);
+                if (saved) learning_ = std::move(english);
+            }
+            if (!saved) {
+                Reply(requestId, false, Text(L"It could not be forgotten.", L"消去できませんでした。"));
+                return;
+            }
+            runtime_->NotifyLearningChanged();
+            Reply(requestId, true, {}, L",\"items\":" + LearnedJson());
         } else if (type == L"romaji.save") {
             const auto input = message.String(L"input");
             const auto output = message.String(L"output");

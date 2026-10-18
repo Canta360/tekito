@@ -196,6 +196,16 @@ void UserLearningStore::Reset() noexcept {
     preferences_.clear();
 }
 
+bool UserLearningStore::Forget(std::wstring_view rawText, std::wstring_view candidate) {
+    return std::erase_if(preferences_, [&](const UserLearningPreference& preference) {
+               return preference.rawText == rawText && preference.candidate == candidate;
+           }) > 0;
+}
+
+bool UserLearningStore::ForgetWord(std::wstring_view word) {
+    return std::erase_if(entries_, [&](const UserLearningEntry& entry) { return entry.word == word; }) > 0;
+}
+
 std::span<const UserLearningEntry> UserLearningStore::Entries() const noexcept {
     return entries_;
 }

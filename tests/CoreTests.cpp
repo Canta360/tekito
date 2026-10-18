@@ -1655,6 +1655,16 @@ void TestUserDictionaryImportExport() {
 
 void TestUserLearningStore() {
     tekito::UserLearningStore learning;
+    {
+        // Settings forgets one thing learned at a time.
+        tekito::UserLearningStore forgetting;
+        forgetting.RecordSelection(L"teh", L"the");
+        forgetting.RecordSelection(L"recieve", L"receive");
+        forgetting.RecordRawKeep(L"tekito");
+        Require(forgetting.Forget(L"teh", L"the") && forgetting.PreferenceCount() == 1, "one choice is forgotten");
+        Require(!forgetting.Forget(L"teh", L"the"), "forgetting it again does nothing");
+        Require(forgetting.ForgetWord(L"tekito") && forgetting.Entries().empty(), "a word is forgotten");
+    }
     learning.RecordCandidateSelection(L"tomorrow");
     learning.RecordCandidateSelection(L"tomorrow");
     learning.RecordUndo(L"tomorrow");

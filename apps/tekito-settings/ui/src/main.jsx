@@ -64,6 +64,7 @@ const initialSettings = {
   japaneseLiveRefine: true,
   japaneseKanaInput: false,
   japaneseKanaInputKey: true,
+  noLearningInPrivate: true,
   mixedTypingEnabled: false,
   japaneseEnglishSpacing: false,
   japaneseIgnoreCapsLock: true,
@@ -931,6 +932,23 @@ function DictionaryPage({ japanese, postalCodes, japaneseWords, learning, settin
     confirmLabel: t.words.remove,
     action: () => runAction("japaneseWords.delete", { reading: word.reading, surface: word.surface }, t.japaneseWords.removed),
   });
+  // What was learned, listed on request (it can be thousands of items).
+  const [learned, setLearned] = useState(null);
+  const [learnedQuery, setLearnedQuery] = useState("");
+  const showLearned = async () => {
+    const response = await runAction("learning.list", {});
+    if (response.ok) setLearned(response.items || []);
+  };
+  const forgetLearned = async (item) => {
+    const response = await runAction("learning.forget", { kind: item.kind, key: item.key, value: item.value }, t.learning.forgotten);
+    if (response.ok) setLearned(response.items || []);
+  };
+  const shownLearned = useMemo(() => {
+    if (!learned) return [];
+    const needle = learnedQuery.trim().toLowerCase();
+    const matched = needle ? learned.filter((item) => `${item.key} ${item.value}`.toLowerCase().includes(needle)) : learned;
+    return matched.slice(0, 200);
+  }, [learned, learnedQuery]);
   const askForgetJapanese = () => setConfirm({
     title: t.learning.japaneseConfirmTitle,
     message: t.learning.japaneseConfirmMessage,
@@ -952,6 +970,39 @@ function DictionaryPage({ japanese, postalCodes, japaneseWords, learning, settin
           <Row title={t.learning.japaneseTitle} description={t.learning.japaneseDescription}>
             <Button variant="quiet" onClick={askForgetJapanese}>{t.learning.forget}</Button>
           </Row>
+        )}
+        <Row title={t.learning.privateTitle} description={t.learning.privateDescription}>
+          <Toggle label={t.learning.privateTitle} checked={settings.noLearningInPrivate} onChange={(value) => setSetting("noLearningInPrivate", value)} />
+        </Row>
+        <div className="learning-meta">
+          <span className="muted">{t.learning.listDescription}</span>
+          <Button variant="quiet" onClick={learned ? () => setLearned(null) : showLearned}>{learned ? t.learning.hideList : t.learning.showList}</Button>
+        </div>
+        {learned && (
+          <>
+            {learned.length > 0 && (
+              <label className="search">
+                <Icon name="search" size={17} />
+                <input aria-label={t.learning.search} placeholder={t.learning.search} value={learnedQuery} onChange={(event) => setLearnedQuery(event.target.value)} />
+              </label>
+            )}
+            <ul className="word-list" aria-label={t.learning.listTitle}>
+              {shownLearned.map((item) => (
+                <li key={`${item.kind}\u0000${item.key}\u0000${item.value}`} className="word">
+                  <div className="word-main">
+                    <b>{item.key}</b>
+                    {item.value && <><Icon name="arrow" size={15} className="word-arrow" /><span>{item.value}</span></>}
+                    <span className="muted">{t.learning.how[item.how](item.count)}</span>
+                  </div>
+                  <button type="button" className="icon-btn" aria-label={t.learning.forgetLabel(item.value || item.key)} onClick={() => forgetLearned(item)}>
+                    <Icon name="trash" size={16} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+            {shownLearned.length === 0 && <div className="empty">{learned.length === 0 ? t.learning.nothing : t.words.noMatch}</div>}
+            {learned.length > shownLearned.length && !learnedQuery && <div className="muted">{t.learning.more(learned.length - shownLearned.length)}</div>}
+          </>
         )}
       </Glass>
 

@@ -47,6 +47,10 @@ public:
     // Undone at least once, and more than it was taken.
     [[nodiscard]] bool Undone(std::wstring_view rawText, std::wstring_view candidate) const noexcept;
     void Reset() noexcept;
+    // One thing learned taken out (Settings lists them): a choice of
+    // `candidate` for `rawText`, or what was learned about `word`.
+    bool Forget(std::wstring_view rawText, std::wstring_view candidate);
+    bool ForgetWord(std::wstring_view word);
     [[nodiscard]] std::span<const UserLearningEntry> Entries() const noexcept;
     [[nodiscard]] std::span<const UserLearningPreference> Preferences() const noexcept;
     [[nodiscard]] std::size_t PreferenceCount() const noexcept { return preferences_.size(); }

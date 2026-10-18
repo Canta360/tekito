@@ -1648,7 +1648,7 @@ HRESULT TextService::HandleKeyInEditSessionCore(ITfContext* context, TfEditCooki
     Trace(L"HandleKeyInEditSession");
     if (!context) return E_INVALIDARG;
     // Nothing is learned from what is typed in a private window.
-    const bool privateField = ContextIsPrivate(context, editCookie);
+    const bool privateField = userSettings_.noLearningInPrivate && ContextIsPrivate(context, editCookie);
     japanese_.SetLearning(userSettings_.learningEnabled && !privateField ? &japaneseLearning_ : nullptr);
     if (input.type == KeyInput::Type::ShowModeIndicator) {
         ShowModeBadge(CaretAnchor(context, editCookie));
