@@ -68,6 +68,10 @@ private:
     // "the the": the second one taken out, or offered to be.
     void ApplyDoubledWord(std::vector<Candidate>& output, std::wstring_view rawText, std::wstring_view lower,
                           std::wstring_view context, const ConversionOptions& options) const;
+    // Words in the other spelling (colour, for American) offered in the one
+    // chosen; the word typed in it put right on Space.
+    void ApplySpellingVariety(std::vector<Candidate>& output, std::wstring_view rawText, std::wstring_view lower,
+                              const ConversionOptions& options) const;
     // Words that often follow the words before, starting with what is typed.
     void AddPredictions(std::vector<Candidate>& output, std::unordered_set<std::wstring>& seen,
                         std::wstring_view rawText, std::wstring_view lower, std::wstring_view context,

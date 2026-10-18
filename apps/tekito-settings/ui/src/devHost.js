@@ -50,6 +50,7 @@ function initialState() {
       japaneseEnglishSpacing: false,
       nextWordPrediction: true,
       doubledWordCheck: true,
+      englishSpelling: 0,
       recheckPreviousWord: true,
       bracketPairs: false,
       doubleSpacePeriod: false,

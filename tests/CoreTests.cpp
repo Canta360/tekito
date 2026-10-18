@@ -9,6 +9,7 @@
 #include "Core/LexiconProvider.h"
 #include "Core/PolicyEngine.h"
 #include "Core/SpaceBoundaryPolicy.h"
+#include "Core/SpellingVariants.h"
 #include "Core/UserDictionary.h"
 #include "Core/UserLexiconProvider.h"
 #include "Core/UserLearning.h"
@@ -1201,6 +1202,39 @@ void TestEnglishWritingRules() {
     Require(spaceGives(L"'hi'", L"Say ") == L"'hi'", "a word typed with both quotes stays");
     Require(spaceGives(L"hi'") == L"hi'","a closing quote is not turned into a letter (hi' is not his)");
     Require(spaceGives(L"students'") == L"students'", "a plural's apostrophe stays");
+}
+
+// American or British spelling.
+void TestEnglishSpelling() {
+    tekito::SpellingVariants variants;
+    variants.Add(L"color", L"colour");
+    Require(variants.InVariety(L"colour", tekito::EnglishVariety::American) == L"color" &&
+                variants.InVariety(L"color", tekito::EnglishVariety::British) == L"colour" &&
+                !variants.InVariety(L"color", tekito::EnglishVariety::American) &&
+                !variants.InVariety(L"colour", tekito::EnglishVariety::Either),
+            "a spelling in the other variety, and nothing for its own");
+    if (tekito::SpellingVariants::Installed().Empty()) return;  // the pack is not installed
+
+    const auto engine = tekito::CreateDefaultConversionEngine();
+    const tekito::SpaceBoundaryPolicy space;
+    const auto spaceGives = [&](std::wstring_view raw, tekito::EnglishVariety variety) {
+        tekito::ConversionRequest request;
+        request.rawText = std::wstring(raw);
+        request.options.spelling = variety;
+        const auto candidates = engine->Convert(request).candidates;
+        const auto selected = space.SelectCorrection(raw, candidates);
+        return selected ? candidates[*selected].text : std::wstring(raw);
+    };
+    using tekito::EnglishVariety;
+    Require(spaceGives(L"colour", EnglishVariety::Either) == L"colour" &&
+                spaceGives(L"color", EnglishVariety::Either) == L"color",
+            "either spelling is kept as typed");
+    Require(spaceGives(L"color", EnglishVariety::British) == L"colour", "British: color is written colour");
+    Require(spaceGives(L"colour", EnglishVariety::American) == L"color", "American: colour is written color");
+    Require(spaceGives(L"colour", EnglishVariety::British) == L"colour", "a word in the chosen spelling stays");
+    Require(spaceGives(L"organized", EnglishVariety::British) == L"organised", "and its other forms");
+    Require(spaceGives(L"favorit", EnglishVariety::British) == L"favourite" && spaceGives(L"neighbr", EnglishVariety::British) == L"neighbour", "a slip is put right in the chosen spelling");
+    Require(spaceGives(L"check", EnglishVariety::British) == L"check", "a word British English also writes stays");
 }
 
 // A word typed twice, the next words, and Space twice for a period.
@@ -2403,6 +2437,7 @@ int main() {
     TestImeDictionaryImport();
     TestEnglishWritingRules();
     TestEnglishWritingOptions();
+    TestEnglishSpelling();
     TestRankingDataBoundaries();
     TestCompositeLexiconProvider();
     TestPolicyEngineBoundary();

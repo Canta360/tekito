@@ -958,6 +958,7 @@ private:
         json += settings_.smartPunctuation ? L"true" : L"false";
         json += L",\"japaneseSpaceWidth\":" + std::to_wstring(settings_.japaneseSpaceWidth);
         json += L",\"japanesePunctuation\":" + std::to_wstring(settings_.japanesePunctuation);
+        json += L",\"englishSpelling\":" + std::to_wstring(settings_.englishSpelling);
         json += L",\"japaneseDigitWidth\":" + std::to_wstring(settings_.japaneseDigitWidth);
         json += L",\"japaneseSymbolWidth\":" + std::to_wstring(settings_.japaneseSymbolWidth);
         json += L",\"japaneseLetterWidth\":" + std::to_wstring(settings_.japaneseLetterWidth);
@@ -1158,6 +1159,9 @@ private:
             }
             else if (key == L"japanesePunctuation") {
                 settings_.japanesePunctuation = std::clamp(integerValue, 0, 3);
+            }
+            else if (key == L"englishSpelling") {
+                settings_.englishSpelling = std::clamp(integerValue, 0, 2);
             }
             else if (key == L"japaneseDigitWidth") {
                 settings_.japaneseDigitWidth = std::clamp(integerValue, 0, 1);

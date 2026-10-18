@@ -762,6 +762,7 @@ bool TextService::EnsureEngine() {
         return false;
     }
     englishSpelling_ = std::make_unique<EnglishSpelling>(*candidateEngine_);
+    englishSpelling_->SetVariety(static_cast<EnglishVariety>(std::clamp(userSettings_.englishSpelling, 0, 2)));
     japanese_.SetEnglishSpelling(englishSpelling_.get());
     return true;
 }
@@ -788,6 +789,9 @@ void TextService::ApplySettings() {
         UpdateKanaInputKey(userSettings_.japaneseKanaInputKey && JapaneseModeAvailable());
     }
     userdata::ApplyJapaneseSettings(japanese_, userSettings_, &japaneseLearning_);
+    if (englishSpelling_) {
+        englishSpelling_->SetVariety(static_cast<EnglishVariety>(std::clamp(userSettings_.englishSpelling, 0, 2)));
+    }
     const auto rows = static_cast<std::size_t>(userSettings_.candidateRows);
     state_.SetPageSizes(rows ? rows : 5, rows ? rows : 10);
     state_.SetDoubleSpacePeriod(userSettings_.doubleSpacePeriod);
@@ -2325,6 +2329,7 @@ void TextService::RefreshCandidates(ITfContext* context, TfEditCookie editCookie
     request.options.socialExpressionRange = userSettings_.socialExpressionRange;
     request.options.nextWordPrediction = userSettings_.nextWordPrediction;
     request.options.doubledWords = userSettings_.doubledWordCheck;
+    request.options.spelling = static_cast<EnglishVariety>(std::clamp(userSettings_.englishSpelling, 0, 2));
     request.options.special = SpecialOptions();
     {
         ScopedTraceDuration duration(L"Perf CandidateEngine");

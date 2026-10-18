@@ -28,6 +28,7 @@ EnglishSpelling::Result EnglishSpelling::Spell(std::wstring_view typed, std::wst
     request.context.sentenceStart = false;
     request.context.precedingText = std::wstring(before);
     request.capitalization.origin = CapitalizationOrigin::UserTyped;
+    request.options.spelling = variety_;
     auto candidates = engine_.Convert(request).candidates;
     for (const auto& candidate : candidates) {
         if (candidate.text.empty() || SameIgnoringCase(candidate.text, typed)) continue;

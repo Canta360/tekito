@@ -47,6 +47,7 @@ const initialSettings = {
   periodOnEnter: false,
   nextWordPrediction: true,
   doubledWordCheck: true,
+  englishSpelling: 0,
   recheckPreviousWord: true,
   bracketPairs: false,
   doubleSpacePeriod: false,
@@ -585,6 +586,7 @@ const writingOptions = ["nextWordPrediction", "doubledWordCheck", "recheckPrevio
 function EnglishPage({ advanced, settings, setSetting }) {
   const t = useText();
   const expressionRanges = t.casual.ranges.map((label, value) => [value, label]);
+  const spellings = t.spelling.options.map((label, value) => [value, label]);
   const features = englishFeatures.filter((feature) => advanced || !feature.advanced);
   return (
     <>
@@ -601,6 +603,9 @@ function EnglishPage({ advanced, settings, setSetting }) {
         </Row>
         {advanced && (
           <>
+            <Row title={t.spelling.title} description={t.spelling.description}>
+              <Segmented label={t.spelling.title} value={settings.englishSpelling} options={spellings} onChange={(value) => setSetting("englishSpelling", value)} />
+            </Row>
             <Row title={t.period.title} description={t.period.description}>
               <Toggle label={t.period.title} checked={settings.periodOnEnter} onChange={(value) => setSetting("periodOnEnter", value)} />
             </Row>

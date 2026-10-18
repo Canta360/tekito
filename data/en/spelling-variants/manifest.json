@@ -1,0 +1,16 @@
+{
+  "pack_id": "spelling-variants",
+  "display_name": "American and British Spellings",
+  "schema_version": 1,
+  "version": "varcon-2020.12.07",
+  "language": "en-US+en-GB",
+  "type": "spelling-variants",
+  "file": "variants.tsv",
+  "entry_count": 14497,
+  "sha256": {
+    "file": "45416BBE34C8606D42F0CA9B29C5337BAE85A55E8864884E76717E1769CBC081"
+  },
+  "license": "VarCon (permissive, notice required)",
+  "source": "https://github.com/en-wl/wordlist/tree/v1/varcon",
+  "notice_file": "NOTICE"
+}

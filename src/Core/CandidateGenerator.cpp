@@ -1,4 +1,5 @@
 #include "Core/CandidateGenerator.h"
+#include "Core/SpellingVariants.h"
 
 #include "Core/UserLearning.h"
 
@@ -884,9 +885,55 @@ std::vector<Candidate> CandidateGenerator::Generate(std::wstring_view rawText,
             }
         }
     }
+    ApplySpellingVariety(output, rawText, lower, options);
     AddPredictions(output, seen, rawText, lower, context, options);
     FinalizeCandidates(output, rawText);
     return output;
+}
+
+void CandidateGenerator::ApplySpellingVariety(std::vector<Candidate>& output, std::wstring_view rawText,
+                                              std::wstring_view lower, const ConversionOptions& options) const {
+    if (options.spelling == EnglishVariety::Either) return;
+    const auto& variants = SpellingVariants::Installed();
+    if (variants.Empty()) return;
+    // The other spelling written as `like` is (Colour: Color, COLOUR: COLOR).
+    const auto cased = [](std::wstring_view like, std::wstring word) {
+        if (like.size() > 1 && std::all_of(like.begin(), like.end(), [](wchar_t c) { return !std::iswlower(c); })) {
+            for (auto& c : word) c = static_cast<wchar_t>(std::towupper(c));
+        } else if (!like.empty() && std::iswupper(like.front()) && !word.empty()) {
+            word.front() = static_cast<wchar_t>(std::towupper(word.front()));
+        }
+        return word;
+    };
+    for (auto& candidate : output) {
+        if (candidate.isOriginal || candidate.text.empty()) continue;
+        if (auto other = variants.InVariety(Lower(candidate.text), options.spelling)) {
+            candidate.text = cased(candidate.text, std::move(*other));
+        }
+    }
+    std::unordered_set<std::wstring> texts;
+    std::erase_if(output, [&](const Candidate& candidate) {
+        return !texts.insert(candidate.text).second && !candidate.isOriginal;
+    });
+    // The word typed in the other spelling: this one, put right on Space as
+    // the only change, the word as typed still offered.
+    if (!options.correctionEnabled) return;
+    auto preferred = variants.InVariety(lower, options.spelling);
+    if (!preferred) return;
+    const std::wstring text = cased(rawText, std::move(*preferred));
+    std::erase_if(output, [&](const Candidate& candidate) { return !candidate.isOriginal && candidate.text == text; });
+    for (auto& candidate : output) {
+        if (!candidate.isOriginal && (candidate.policyFlags & (CandidatePolicyCorrect | CandidatePolicyNormalize)) != 0) {
+            candidate.policyFlags = (candidate.policyFlags & ~(CandidatePolicyCorrect | CandidatePolicyNormalize)) |
+                                    CandidatePolicySuggestOnly;
+        }
+    }
+    Candidate spelled;
+    spelled.text = text;
+    spelled.label = SemanticLabel::Suggestion;
+    spelled.score = 100.0;
+    spelled.policyFlags = CandidatePolicyNormalize;
+    output.insert(output.begin(), std::move(spelled));
 }
 
 bool CandidateGenerator::IsWord(std::wstring_view lower) const {

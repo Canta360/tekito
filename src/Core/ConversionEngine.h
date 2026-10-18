@@ -2,6 +2,7 @@
 
 #include "Core/Candidate.h"
 #include "Core/SpecialConversions.h"
+#include "Core/SpellingVariants.h"
 
 #include <memory>
 #include <optional>
@@ -45,6 +46,9 @@ struct ConversionOptions {
     // A word typed twice in a row ("the the") is taken out; one that may be
     // meant twice ("that that") only offers it.
     bool doubledWords{true};
+    // American or British spelling: a word typed in the other is put right,
+    // and words are offered in this one (UserSettings::englishSpelling).
+    EnglishVariety spelling{EnglishVariety::Either};
     // English uses the dates ("today"); the rest is typed outside words.
     SpecialConversionOptions special;
 };

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Core/SpellingVariants.h"
+
 #include <string>
 #include <string_view>
 #include <vector>
@@ -25,9 +27,12 @@ public:
     // `typed`: lower-case letters. `before`: the English typed just before
     // it in the sentence, as context.
     [[nodiscard]] Result Spell(std::wstring_view typed, std::wstring_view before) const;
+    // American or British, as English Auto spells (UserSettings::englishSpelling).
+    void SetVariety(EnglishVariety variety) noexcept { variety_ = variety; }
 
 private:
     const IConversionEngine& engine_;
+    EnglishVariety variety_{EnglishVariety::Either};
 };
 
 }  // namespace tekito

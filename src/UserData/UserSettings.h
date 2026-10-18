@@ -50,6 +50,9 @@ struct UserSettings {
     bool nextWordPrediction{true};
     // English: a word typed twice in a row ("the the") is taken out on Space.
     bool doubledWordCheck{true};
+    // English spelling: 0 = either (as typed), 1 = American, 2 = British
+    // (tekito::EnglishVariety).
+    int englishSpelling{0};
     // English: a word kept as typed is looked at again once the next word
     // is typed, and put right when the words around it say it was a slip
     // (have to urn the: run).

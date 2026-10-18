@@ -148,6 +148,11 @@ const en = {
     description: "How many chat words like “gonna” or “lol” to suggest.",
     ranges: ["Off", "Common", "Familiar", "Broad", "Full"],
   },
+  spelling: {
+    title: "Spelling",
+    description: "Write color or colour the way you choose.",
+    options: ["As typed", "American", "British"],
+  },
   period: { title: "Period at the end of a line", description: "Add a period when you press Enter." },
   writing: {
     nextWordPrediction: { title: "Next words", description: "Suggest words that often come next." },
@@ -509,6 +514,11 @@ const ja = {
     title: "カジュアルな表現",
     description: "「gonna」「lol」のようなくだけた言葉を、どこまで出すかです。",
     ranges: ["オフ", "定番", "親しい", "広め", "すべて"],
+  },
+  spelling: {
+    title: "つづり",
+    description: "color と colour のどちらで書くかを選べます。",
+    options: ["打ったとおり", "米国式", "英国式"],
   },
   period: { title: "行末のピリオド", description: "Enter を押したとき、文末にピリオドを付けます。" },
   writing: {
