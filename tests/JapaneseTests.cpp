@@ -224,6 +224,20 @@ void TestCaret(const RomajiTable& table) {
 
 void TestConversionForms(const RomajiTable& table) {
     JapaneseComposer composer(&table);
+    {
+        // One letter typed: the letter, also a capital, on the first page.
+        JapaneseComposer one(&table);
+        Type(one, L"a");
+        one.Convert();
+        const auto* list = one.FocusedCandidates();
+        const auto onFirstPage = [&](std::wstring_view text) {
+            if (!list) return false;
+            const auto found = std::find_if(list->begin(), list->end(), [&](const auto& c) { return c.text == text; });
+            return found != list->end() && found - list->begin() < 9;
+        };
+        Require(onFirstPage(L"a") && onFirstPage(L"A") && onFirstPage(L"ａ") && onFirstPage(L"ア"),
+                "a typed alone offers a, A, ａ and ア on the first page");
+    }
     Type(composer, L"katakana");
     composer.Convert();
     Require(composer.IsConverted(), "Space converts");

@@ -1118,22 +1118,41 @@ void JapaneseComposer::AddTypedForms() {
             {ToHiragana(reading), PhraseCandidate::Kind::Hiragana},
             {ToKatakana(reading), PhraseCandidate::Kind::Katakana},
             {ToHalfWidthKatakana(reading), PhraseCandidate::Kind::Katakana}};
+        // One letter typed (i): it may be meant as the letter, also a capital.
+        const bool oneLetter = typedReading && phrases_.size() == 1 && Keys(false).size() == 1 &&
+                               std::iswalpha(Keys(false).front());
         if (typedReading) {
             const std::wstring keys = KeysFor(phrase.begin, phrase.length);
             if (!keys.empty()) {
                 forms.emplace_back(ToFullWidthAscii(keys), PhraseCandidate::Kind::English);
                 forms.emplace_back(keys, PhraseCandidate::Kind::English);
+                if (oneLetter) {
+                    forms.emplace_back(std::wstring(1, static_cast<wchar_t>(std::towupper(keys.front()))),
+                                       PhraseCandidate::Kind::English);
+                }
             }
         }
-        // Before the symbols, which stay last (やじるし: the words, then →).
+        // Before the symbols, which stay last (やじるし: the words, then →);
+        // for one letter on the first page, after the likeliest words.
+        constexpr std::size_t kOneLetterAt = 3;
         auto& candidates = phrase.candidates;
         std::size_t at = candidates.size();
         while (at > 1 && candidates[at - 1].kind == PhraseCandidate::Kind::Special) --at;
+        if (oneLetter) at = std::min(at, kOneLetterAt);
         const std::int64_t cost = candidates[at - 1].cost;
         for (auto& [text, kind] : forms) {
-            const bool seen = std::any_of(candidates.begin(), candidates.end(),
-                                          [&](const PhraseCandidate& c) { return c.text == text; });
-            if (text.empty() || seen) continue;
+            if (text.empty()) continue;
+            const auto seen = std::find_if(candidates.begin(), candidates.end(),
+                                           [&](const PhraseCandidate& c) { return c.text == text; });
+            if (seen != candidates.end()) {
+                // One letter: a form already further down comes up with the others.
+                const auto index = static_cast<std::size_t>(seen - candidates.begin());
+                if (!oneLetter || index < at) continue;
+                PhraseCandidate moved = std::move(*seen);
+                candidates.erase(seen);
+                candidates.insert(candidates.begin() + static_cast<std::ptrdiff_t>(at++), std::move(moved));
+                continue;
+            }
             candidates.insert(candidates.begin() + static_cast<std::ptrdiff_t>(at++), {std::move(text), cost, kind, false});
         }
     }
