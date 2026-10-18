@@ -2281,6 +2281,23 @@ HRESULT TextService::InsertPairAtSelection(ITfContext* context, TfEditCookie edi
     selection.style.ase = TF_AE_END;
     selection.style.fInterimChar = FALSE;
     (void)context->SetSelection(editCookie, 1, &selection);
+    // An application TSF only bridges to (CUAS: an older edit control) puts
+    // the caret after the committed text whatever the selection: Left takes
+    // it back between the brackets.
+    TF_STATUS status{};
+    if (SUCCEEDED(context->GetStatus(&status)) && (status.dwStaticFlags & TF_SS_TRANSITORY) != 0) {
+        std::vector<INPUT> keys;
+        for (std::size_t i = 0; i < close.size(); ++i) {
+            INPUT down{};
+            down.type = INPUT_KEYBOARD;
+            down.ki.wVk = VK_LEFT;
+            INPUT up = down;
+            up.ki.dwFlags = KEYEVENTF_KEYUP;
+            keys.push_back(down);
+            keys.push_back(up);
+        }
+        (void)SendInput(static_cast<UINT>(keys.size()), keys.data(), sizeof(INPUT));
+    }
     return S_OK;
 }
 
