@@ -37,6 +37,7 @@ function initialState() {
       modeIndicatorEnabled: true,
       modeUnderlineColors: true,
       modeBadgeOnFocus: true,
+      modePerApp: false,
       dateConversion: true,
       numberConversion: true,
       symbolConversion: true,

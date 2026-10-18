@@ -735,7 +735,9 @@ void TextService::SyncRuntimeState() {
 
     const auto modeGeneration = runtimeMode_->ModeGeneration();
     if (modeGeneration != runtimeModeGeneration_) {
-        SetInputMode(SharedMode());
+        // Each app keeps the mode it was left in, if Settings says so; a mode
+        // changed here is still shared, for apps that start next.
+        if (!userSettings_.modePerApp) SetInputMode(SharedMode());
         runtimeModeGeneration_ = modeGeneration;
     }
 }

@@ -75,6 +75,9 @@ struct UserSettings {
     // The mode shown by the caret on the first key typed after focus moves
     // (with modeIndicatorEnabled).
     bool modeBadgeOnFocus{true};
+    // Each app keeps the mode last used in it, instead of following a mode
+    // changed in another app.
+    bool modePerApp{false};
     // Japanese input, when its data is installed. Off, the Japanese profile
     // has only Auto and Direct, like the English one.
     bool japaneseEnabled{true};

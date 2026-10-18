@@ -40,6 +40,7 @@ const initialSettings = {
   modeIndicatorEnabled: true,
   modeUnderlineColors: true,
   modeBadgeOnFocus: true,
+  modePerApp: false,
   toggleKey: 1,
   keyboardType: 0,
   periodOnEnter: false,
@@ -467,6 +468,9 @@ function SwitchingPage({ advanced, japanese, japaneseKeyboard, settings, setSett
             </Row>
             <Row title={t.modeUnderline.title} description={t.modeUnderline.description}>
               <Toggle label={t.modeUnderline.title} checked={settings.modeUnderlineColors} onChange={(value) => setSetting("modeUnderlineColors", value)} />
+            </Row>
+            <Row title={t.modePerApp.title} description={t.modePerApp.description}>
+              <Toggle label={t.modePerApp.title} checked={settings.modePerApp} onChange={(value) => setSetting("modePerApp", value)} />
             </Row>
           </>
         )}

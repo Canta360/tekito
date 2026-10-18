@@ -64,6 +64,10 @@ const en = {
     title: "Show the mode in a new field",
     description: "Briefly show the mode when you start typing somewhere else.",
   },
+  modePerApp: {
+    title: "Remember the mode for each app",
+    description: "Each app stays in the mode you last used in it.",
+  },
   modeUnderline: {
     title: "Underline in the mode's color",
     description: "Underlines what you type in blue in Auto and orange in Mix.",
@@ -381,6 +385,10 @@ const ja = {
   modeBadgeOnFocus: {
     title: "別の場所で打ち始めたらモードを表示",
     description: "別の欄やアプリで打ち始めたとき、モードを少しだけ出します。",
+  },
+  modePerApp: {
+    title: "アプリごとにモードを覚える",
+    description: "アプリを切り替えても、それぞれ最後に使ったモードのままにします。",
   },
   modeUnderline: {
     title: "モードの色で下線を引く",

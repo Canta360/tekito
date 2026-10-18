@@ -857,6 +857,8 @@ private:
         json += settings_.modeUnderlineColors ? L"true" : L"false";
         json += L",\"modeBadgeOnFocus\":";
         json += settings_.modeBadgeOnFocus ? L"true" : L"false";
+        json += L",\"modePerApp\":";
+        json += settings_.modePerApp ? L"true" : L"false";
         json += L",\"dateConversion\":";
         json += settings_.dateConversion ? L"true" : L"false";
         json += L",\"numberConversion\":";
@@ -1063,6 +1065,7 @@ private:
             else if (key == L"modeIndicatorEnabled") settings_.modeIndicatorEnabled = value;
             else if (key == L"modeUnderlineColors") settings_.modeUnderlineColors = value;
             else if (key == L"modeBadgeOnFocus") settings_.modeBadgeOnFocus = value;
+            else if (key == L"modePerApp") settings_.modePerApp = value;
             else if (key == L"advancedSettings") settings_.advancedSettings = value;
             else if (key == L"dateConversion") settings_.dateConversion = value;
             else if (key == L"numberConversion") settings_.numberConversion = value;
