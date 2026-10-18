@@ -853,6 +853,10 @@ private:
         json += L",\"japaneseSwitchOrder\":" + std::to_wstring(settings_.japaneseSwitchOrder);
         json += L",\"modeIndicatorEnabled\":";
         json += settings_.modeIndicatorEnabled ? L"true" : L"false";
+        json += L",\"modeUnderlineColors\":";
+        json += settings_.modeUnderlineColors ? L"true" : L"false";
+        json += L",\"modeBadgeOnFocus\":";
+        json += settings_.modeBadgeOnFocus ? L"true" : L"false";
         json += L",\"dateConversion\":";
         json += settings_.dateConversion ? L"true" : L"false";
         json += L",\"numberConversion\":";
@@ -1057,6 +1061,8 @@ private:
             else if (key == L"meaningsEnabled") settings_.meaningsEnabled = value;
             else if (key == L"japaneseEnabled") settings_.japaneseEnabled = value;
             else if (key == L"modeIndicatorEnabled") settings_.modeIndicatorEnabled = value;
+            else if (key == L"modeUnderlineColors") settings_.modeUnderlineColors = value;
+            else if (key == L"modeBadgeOnFocus") settings_.modeBadgeOnFocus = value;
             else if (key == L"advancedSettings") settings_.advancedSettings = value;
             else if (key == L"dateConversion") settings_.dateConversion = value;
             else if (key == L"numberConversion") settings_.numberConversion = value;

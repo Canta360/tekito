@@ -35,8 +35,10 @@ private:
 // The three Japanese underlines, in the order input, converted, focused;
 // new references the caller releases.
 // Settled: Mix chunks held until Enter, marked like a highlighter.
-enum class JapaneseUnderline { Input, Converted, Focused, Settled };
-inline constexpr int kJapaneseUnderlineCount = 4;
+// MixInput, MixConverted, MixFocused: the first three in Mix's colour;
+// AutoInput: English Auto's word in its colour (UserSettings::modeUnderlineColors).
+enum class JapaneseUnderline { Input, Converted, Focused, Settled, MixInput, MixConverted, MixFocused, AutoInput };
+inline constexpr int kJapaneseUnderlineCount = 8;
 [[nodiscard]] const GUID& JapaneseUnderlineGuid(JapaneseUnderline underline) noexcept;
 [[nodiscard]] ITfDisplayAttributeInfo* CreateJapaneseUnderline(JapaneseUnderline underline);
 

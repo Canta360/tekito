@@ -38,6 +38,8 @@ const initialSettings = {
   japaneseSwitchOrder: 0,
   japaneseEnabled: true,
   modeIndicatorEnabled: true,
+  modeUnderlineColors: true,
+  modeBadgeOnFocus: true,
   toggleKey: 1,
   keyboardType: 0,
   periodOnEnter: false,
@@ -458,6 +460,16 @@ function SwitchingPage({ advanced, japanese, japaneseKeyboard, settings, setSett
         <Row title={t.modeIndicator.title} description={t.modeIndicator.description}>
           <Toggle label={t.modeIndicator.title} checked={settings.modeIndicatorEnabled} onChange={(value) => setSetting("modeIndicatorEnabled", value)} />
         </Row>
+        {advanced && (
+          <>
+            <Row title={t.modeBadgeOnFocus.title} description={t.modeBadgeOnFocus.description}>
+              <Toggle label={t.modeBadgeOnFocus.title} checked={settings.modeBadgeOnFocus} onChange={(value) => setSetting("modeBadgeOnFocus", value)} />
+            </Row>
+            <Row title={t.modeUnderline.title} description={t.modeUnderline.description}>
+              <Toggle label={t.modeUnderline.title} checked={settings.modeUnderlineColors} onChange={(value) => setSetting("modeUnderlineColors", value)} />
+            </Row>
+          </>
+        )}
       </Glass>
       <Glass className="card">
         <h2 className="card-title">{t.keys.title}</h2>

@@ -35,6 +35,8 @@ function initialState() {
       japaneseSwitchOrder: 0,
       japaneseEnabled: true,
       modeIndicatorEnabled: true,
+      modeUnderlineColors: true,
+      modeBadgeOnFocus: true,
       dateConversion: true,
       numberConversion: true,
       symbolConversion: true,

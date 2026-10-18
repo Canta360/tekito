@@ -23,6 +23,12 @@ extern const GUID GUID_TekitoDisplayAttributeConverted;
 // {04CA9009-05C3-440D-B34F-9D1CE12362D5}
 extern const GUID GUID_TekitoDisplayAttributeFocused;
 extern const GUID GUID_TekitoDisplayAttributeSettled;
+// The same underlines in the mode's colour (UserSettings::modeUnderlineColors):
+// Mix's three, and English Auto's.
+extern const GUID GUID_TekitoDisplayAttributeMixInput;
+extern const GUID GUID_TekitoDisplayAttributeMixConverted;
+extern const GUID GUID_TekitoDisplayAttributeMixFocused;
+extern const GUID GUID_TekitoDisplayAttributeAuto;
 
 // {3B1E7A52-9C4D-4E0B-8F21-6A5D2C9E4B17}
 extern const GUID GUID_TekitoToggleKey;

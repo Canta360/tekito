@@ -6,6 +6,7 @@
 #include "Core/UserLearning.h"
 #include "Tsf/CandidateWindow.h"
 #include "Tsf/ComPtr.h"
+#include "Tsf/DisplayAttributes.h"
 #include "Tsf/EditSession.h"
 #include "Tsf/TekitoGuids.h"
 #include "Tsf/ModeLangBarItem.h"
@@ -276,9 +277,12 @@ private:
     std::uint32_t runtimeSettingsGeneration_{0};
     std::uint32_t runtimeDictionaryGeneration_{0};
     std::uint32_t runtimeLearningGeneration_{0};
-    // Atoms of the English underline and the three Japanese ones.
-    TfGuidAtom displayAttributeAtoms_[5]{TF_INVALID_GUIDATOM, TF_INVALID_GUIDATOM, TF_INVALID_GUIDATOM,
-                                         TF_INVALID_GUIDATOM, TF_INVALID_GUIDATOM};
+    // Atoms of the English underline and the JapaneseUnderline ones
+    // (TF_INVALID_GUIDATOM, 0, until registered).
+    TfGuidAtom displayAttributeAtoms_[1 + kJapaneseUnderlineCount]{};
+    // Focus moved to another document: the first key typed there shows the
+    // mode by the caret (UserSettings::modeBadgeOnFocus).
+    bool badgeOnNextKey_{false};
     bool processIsElevated_{false};
     bool processPrefersPassThrough_{false};
     bool processExcludedByUser_{false};

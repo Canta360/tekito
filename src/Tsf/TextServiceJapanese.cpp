@@ -539,10 +539,11 @@ HRESULT TextService::ReplaceJapaneseComposition(ITfContext* context, TfEditCooki
             SUCCEEDED(part->Collapse(editCookie, TF_ANCHOR_START)) &&
             SUCCEEDED(part->ShiftEnd(editCookie, offset + length, &moved, nullptr)) &&
             SUCCEEDED(part->ShiftStart(editCookie, offset, &moved, nullptr))) {
+            const bool mix = mode_ == InputMode::Mixed && userSettings_.modeUnderlineColors;
             const auto underline = segment.settled    ? JapaneseUnderline::Settled
-                                   : !segment.converted ? JapaneseUnderline::Input
-                                   : segment.focused  ? JapaneseUnderline::Focused
-                                                      : JapaneseUnderline::Converted;
+                                   : !segment.converted ? (mix ? JapaneseUnderline::MixInput : JapaneseUnderline::Input)
+                                   : segment.focused  ? (mix ? JapaneseUnderline::MixFocused : JapaneseUnderline::Focused)
+                                                      : (mix ? JapaneseUnderline::MixConverted : JapaneseUnderline::Converted);
             (void)ApplyDisplayAttribute(context, editCookie, part.Get(), JapaneseUnderlineGuid(underline));
         }
         offset += length;

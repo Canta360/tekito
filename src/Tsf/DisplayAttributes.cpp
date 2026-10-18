@@ -53,6 +53,10 @@ const GUID& JapaneseUnderlineGuid(JapaneseUnderline underline) noexcept {
     case JapaneseUnderline::Converted: return GUID_TekitoDisplayAttributeConverted;
     case JapaneseUnderline::Focused: return GUID_TekitoDisplayAttributeFocused;
     case JapaneseUnderline::Settled: return GUID_TekitoDisplayAttributeSettled;
+    case JapaneseUnderline::MixInput: return GUID_TekitoDisplayAttributeMixInput;
+    case JapaneseUnderline::MixConverted: return GUID_TekitoDisplayAttributeMixConverted;
+    case JapaneseUnderline::MixFocused: return GUID_TekitoDisplayAttributeMixFocused;
+    case JapaneseUnderline::AutoInput: return GUID_TekitoDisplayAttributeAuto;
     case JapaneseUnderline::Input: break;
     }
     return GUID_TekitoDisplayAttributeInput;
@@ -67,15 +71,19 @@ ITfDisplayAttributeInfo* CreateJapaneseUnderline(JapaneseUnderline underline) {
     const wchar_t* description = L"TEKITO Japanese typed text";
     switch (underline) {
     case JapaneseUnderline::Input:
+    case JapaneseUnderline::MixInput:
+    case JapaneseUnderline::AutoInput:
         attribute.lsStyle = TF_LS_DOT;
         attribute.bAttr = TF_ATTR_INPUT;
         break;
     case JapaneseUnderline::Converted:
+    case JapaneseUnderline::MixConverted:
         attribute.lsStyle = TF_LS_SOLID;
         attribute.bAttr = TF_ATTR_CONVERTED;
         description = L"TEKITO Japanese converted phrase";
         break;
     case JapaneseUnderline::Focused:
+    case JapaneseUnderline::MixFocused:
         attribute.lsStyle = TF_LS_SOLID;
         attribute.fBoldLine = TRUE;
         attribute.bAttr = TF_ATTR_TARGET_CONVERTED;
@@ -90,6 +98,24 @@ ITfDisplayAttributeInfo* CreateJapaneseUnderline(JapaneseUnderline underline) {
         attribute.crBk.cr = RGB(255, 236, 160);
         attribute.bAttr = TF_ATTR_CONVERTED;
         description = L"TEKITO Mix sentence held until Enter";
+        break;
+    }
+    // The mode's colour, as its icon has it: Mix orange, Auto blue.
+    // Japanese keeps the text's colour.
+    switch (underline) {
+    case JapaneseUnderline::MixInput:
+    case JapaneseUnderline::MixConverted:
+    case JapaneseUnderline::MixFocused:
+        attribute.crLine.type = TF_CT_COLORREF;
+        attribute.crLine.cr = RGB(245, 150, 25);
+        description = L"TEKITO Mix text";
+        break;
+    case JapaneseUnderline::AutoInput:
+        attribute.crLine.type = TF_CT_COLORREF;
+        attribute.crLine.cr = RGB(0, 103, 248);
+        description = L"TEKITO Auto word";
+        break;
+    default:
         break;
     }
     return new (std::nothrow) DisplayAttributeInfo(JapaneseUnderlineGuid(underline), description, attribute);

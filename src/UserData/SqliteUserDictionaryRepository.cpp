@@ -252,6 +252,10 @@ bool SqliteUserDictionaryRepository::LoadSettings(UserSettings& settings) const 
             loaded.candidateWindowStyle = std::clamp(value, 0, 1);
         } else if (std::strcmp(key, "mode_indicator_enabled") == 0) {
             loaded.modeIndicatorEnabled = value != 0;
+        } else if (std::strcmp(key, "mode_underline_colors") == 0) {
+            loaded.modeUnderlineColors = value != 0;
+        } else if (std::strcmp(key, "mode_badge_on_focus") == 0) {
+            loaded.modeBadgeOnFocus = value != 0;
         } else if (std::strcmp(key, "date_conversion") == 0) {
             loaded.dateConversion = value != 0;
         } else if (std::strcmp(key, "number_conversion") == 0) {
@@ -393,6 +397,8 @@ bool SqliteUserDictionaryRepository::SaveSettings(const UserSettings& settings) 
     saveValue("candidate_window_style", std::clamp(settings.candidateWindowStyle, 0, 1));
     saveValue("candidate_rows", settings.candidateRows);
     saveValue("mode_indicator_enabled", settings.modeIndicatorEnabled ? 1 : 0);
+    saveValue("mode_underline_colors", settings.modeUnderlineColors ? 1 : 0);
+    saveValue("mode_badge_on_focus", settings.modeBadgeOnFocus ? 1 : 0);
     saveValue("date_conversion", settings.dateConversion ? 1 : 0);
     saveValue("number_conversion", settings.numberConversion ? 1 : 0);
     saveValue("symbol_conversion", settings.symbolConversion ? 1 : 0);

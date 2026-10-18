@@ -69,6 +69,12 @@ struct UserSettings {
     // After the user switches modes, the new mode's icon shows by the caret
     // for a moment.
     bool modeIndicatorEnabled{true};
+    // The word being typed underlined in its mode's colour (Mix orange, Auto
+    // blue; Japanese as the text).
+    bool modeUnderlineColors{true};
+    // The mode shown by the caret on the first key typed after focus moves
+    // (with modeIndicatorEnabled).
+    bool modeBadgeOnFocus{true};
     // Japanese input, when its data is installed. Off, the Japanese profile
     // has only Auto and Direct, like the English one.
     bool japaneseEnabled{true};

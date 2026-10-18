@@ -60,6 +60,14 @@ const en = {
     title: "Show the mode when switching",
     description: "Briefly show the new mode where you type.",
   },
+  modeBadgeOnFocus: {
+    title: "Show the mode in a new field",
+    description: "Briefly show the mode when you start typing somewhere else.",
+  },
+  modeUnderline: {
+    title: "Underline in the mode's color",
+    description: "Underlines what you type in blue in Auto and orange in Mix.",
+  },
   japaneseInput: {
     title: "Japanese input",
     description: "Type Japanese in romaji.",
@@ -369,6 +377,14 @@ const ja = {
   modeIndicator: {
     title: "切り替えたときにモードを表示",
     description: "切り替えたとき、入力している場所にモードを少しだけ出します。",
+  },
+  modeBadgeOnFocus: {
+    title: "別の場所で打ち始めたらモードを表示",
+    description: "別の欄やアプリで打ち始めたとき、モードを少しだけ出します。",
+  },
+  modeUnderline: {
+    title: "モードの色で下線を引く",
+    description: "打っている文字の下線を、Auto は青、まぜ打ちはオレンジにします。",
   },
   japaneseInput: {
     title: "日本語入力",

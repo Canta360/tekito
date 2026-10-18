@@ -1080,6 +1080,12 @@ HRESULT TextService::OnKeyDown(ITfContext* context, WPARAM wParam, LPARAM lParam
     keyFinishedInTest_.reset();
     const HRESULT hr = RequestKeyEditSession(context, input);
     *eaten = hr == S_OK && !passThrough ? TRUE : FALSE;
+    // The first key typed after focus moved: the mode by the caret, so typing
+    // in the wrong one is seen at once.
+    if (*eaten && std::exchange(badgeOnNextKey_, false) && userSettings_.modeIndicatorEnabled &&
+        userSettings_.modeBadgeOnFocus) {
+        ShowModeIndicator(context);
+    }
     if (!*eaten) NotePassedKey(wParam);
     if (*eaten) Trace(L"OnKeyDown edit session requested");
     return S_OK;
@@ -1120,6 +1126,7 @@ HRESULT TextService::OnPopContext(ITfContext* context) {
 
 HRESULT TextService::OnSetFocus(ITfDocumentMgr* focus, ITfDocumentMgr*) {
     japanese_.ForgetCommit();
+    badgeOnNextKey_ = focus != nullptr;
     typedTail_.clear();
     // Light or dark taskbar: the mode icon follows when focus moves.
     if (modeLangBarItem_) modeLangBarItem_->RefreshTheme();
@@ -2055,7 +2062,10 @@ HRESULT TextService::ReplaceComposition(ITfContext* context, TfEditCookie editCo
     compositionText_ = text;
 
     if (!text.empty()) {
-        hr = ApplyDisplayAttribute(context, editCookie, range.Get());
+        hr = ApplyDisplayAttribute(context, editCookie, range.Get(),
+                                   mode_ == InputMode::Convert && userSettings_.modeUnderlineColors
+                                       ? JapaneseUnderlineGuid(JapaneseUnderline::AutoInput)
+                                       : GUID_TekitoDisplayAttribute);
         if (FAILED(hr)) {
             TraceHr(L"ReplaceComposition ApplyDisplayAttribute failed", hr);
             return hr;
