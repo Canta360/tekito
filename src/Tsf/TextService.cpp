@@ -1101,7 +1101,11 @@ HRESULT TextService::OnTestKeyDown(ITfContext* context, WPARAM wParam, LPARAM lP
 
 HRESULT TextService::OnKeyDown(ITfContext* context, WPARAM wParam, LPARAM lParam, BOOL* eaten) {
     ScopedTraceDuration duration(L"Perf OnKeyDown");
-    Trace(L"OnKeyDown");
+    if (TraceEnabled()) {
+        wchar_t line[48]{};
+        swprintf_s(line, L"OnKeyDown vk=0x%02X", static_cast<unsigned>(wParam));
+        Trace(line);
+    }
     if (!context || !eaten) return E_INVALIDARG;
     SyncRuntimeState();
     activationSettling_ = false;

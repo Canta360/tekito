@@ -458,6 +458,12 @@ HRESULT TextService::HandleJapaneseKey(ITfContext* context, TfEditCookie editCoo
         const HRESULT hr = EnsureComposition(context, editCookie);
         if (FAILED(hr)) return hr;
     }
+    if (TraceEnabled()) {
+        wchar_t line[96]{};
+        swprintf_s(line, L"Japanese key action=%d delta=%d converted=%d", static_cast<int>(command.action), command.delta,
+                   japanese_.IsConverted() ? 1 : 0);
+        Trace(line);
+    }
     const auto outcome = japanese::ApplyKey(japanese_, command);
     if (!outcome.outside.empty()) return InsertAtSelection(context, editCookie, outcome.outside);
     if (outcome.committed) {
@@ -533,6 +539,7 @@ HRESULT TextService::ReplaceJapaneseComposition(ITfContext* context, TfEditCooki
     hr = range->SetText(editCookie, 0, text.c_str(), static_cast<LONG>(text.size()));
     if (FAILED(hr)) return hr;
     compositionText_ = text;
+    if (TraceEnabled()) Trace((L"Japanese composition " + text).c_str());
 
     LONG offset = 0;
     for (const auto& segment : segments) {
