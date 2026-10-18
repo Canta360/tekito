@@ -22,8 +22,14 @@ public:
     // in file order, until it returns false.
     void ForEachRow(std::string_view key,
                     const std::function<bool(const std::vector<std::string_view>& fields)>& row) const;
+    // The same for every row whose first field starts with `prefix`, in
+    // file order.
+    void ForEachRowStartingWith(std::string_view prefix,
+                                const std::function<bool(const std::vector<std::string_view>& fields)>& row) const;
 
 private:
+    void ForEachRowFrom(std::string_view key, bool prefix,
+                        const std::function<bool(const std::vector<std::string_view>& fields)>& row) const;
     [[nodiscard]] std::size_t LineStart(std::size_t at) const noexcept;
     [[nodiscard]] std::string_view KeyAt(std::size_t lineStart) const noexcept;
 

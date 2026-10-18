@@ -75,6 +75,7 @@ function initialState() {
       japaneseKanaInput: false,
       japaneseKanaInputKey: true,
       mixSingleVowelKana: true,
+      mixLiveConversion: false,
       noLearningInPrivate: true,
       japaneseIgnoreCapsLock: true,
       uiLanguage: 0,

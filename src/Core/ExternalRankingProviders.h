@@ -27,6 +27,8 @@ public:
         std::size_t stride = 256) noexcept;
     [[nodiscard]] bool IsLoaded() const noexcept { return loaded_; }
     [[nodiscard]] double Score(std::wstring_view word) const noexcept override;
+    [[nodiscard]] bool CommonWordStartsWith(std::wstring_view prefix, double minimum,
+                                            std::size_t limit = 2000) const noexcept override;
 
 private:
     std::filesystem::path path_;

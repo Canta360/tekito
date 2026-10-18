@@ -140,6 +140,9 @@ struct UserSettings {
     // in chunks, a Space after each, with no switching between them. On, it
     // comes right after Japanese when the switch key goes round.
     bool mixedTypingEnabled{false};
+    // Live conversion in Mix, apart from Japanese mode's: the chunk being
+    // typed shows converted while it is clearly Japanese.
+    bool mixLiveConversion{false};
     // Mix: a vowel typed alone (i) is kana (い) first, not the letter (I).
     bool mixSingleVowelKana{true};
     // A half-width space between Japanese and an English word when text is

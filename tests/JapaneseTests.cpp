@@ -995,6 +995,28 @@ void TestMixedTyping(const RomajiTable& table, const MiniPack& pack) {
     composer.ForgetContext();
     Type(composer, L"kikai");
     RequireText(composer.Commit(), withSpace, "and a Japanese one: converted, not left as kana");
+    {
+        // Mix live conversion: Japanese shows converted as it is typed;
+        // English stays as typed.
+        composer.ForgetContext();
+        composer.SetMixLiveConversion(true);
+        Type(composer, L"kikai");
+        const std::wstring live = SegmentsText(composer);
+        composer.Cancel();
+        composer.Clear();
+        Type(composer, L"push");
+        const std::wstring english = SegmentsText(composer);
+        composer.Clear();
+        composer.SetMixLiveConversion(false);
+        Type(composer, L"kikai");
+        const std::wstring off = SegmentsText(composer);
+        composer.Clear();
+        Type(composer, L"push");
+        const std::wstring englishOff = SegmentsText(composer);
+        composer.Clear();
+        Require(!live.empty() && live.front() >= 0x4E00 && english == englishOff && off == L"きかい",
+                "Mix live conversion shows Japanese converted, English as typed, and is off by default");
+    }
 
     using tekito::japanese::JapaneseComposer;
     RequireText(JapaneseComposer::SpacedEnglish(L"", L"\u4ECA\u65E5\u306FGitHub\u306Bpush\u3057\u305F"),

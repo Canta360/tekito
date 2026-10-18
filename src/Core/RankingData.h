@@ -18,6 +18,12 @@ class IFrequencyProvider {
 public:
     virtual ~IFrequencyProvider() = default;
     [[nodiscard]] virtual double Score(std::wstring_view word) const noexcept = 0;
+    // A word scoring `minimum` or more starts with `prefix` (the word itself
+    // counts). Looks at no more than `limit` words.
+    [[nodiscard]] virtual bool CommonWordStartsWith(std::wstring_view /*prefix*/, double /*minimum*/,
+                                                    std::size_t /*limit*/ = 2000) const noexcept {
+        return false;
+    }
 };
 
 class IPhraseContextProvider {

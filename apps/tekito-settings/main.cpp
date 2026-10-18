@@ -865,6 +865,7 @@ private:
         text += L"Sentence check: " + std::wstring(onOff(s.japaneseSentenceCheck)) + L"\n";
         text += L"Predictions: " + std::wstring(onOff(s.japanesePredictionEnabled)) + L"\n";
         text += L"Mix: " + std::wstring(onOff(s.mixedTypingEnabled)) + L"\n";
+        text += L"Mix live conversion: " + std::wstring(onOff(s.mixLiveConversion)) + L"\n";
         text += L"Kana input: " + std::wstring(onOff(s.japaneseKanaInput)) + L"\n";
         text += L"Keyboard: " + std::wstring(keyboards[std::clamp(s.keyboardType, 0, 2)]) + L"\n";
         text += L"Digits: " + std::wstring(digits[std::clamp(s.japaneseDigitWidth, 0, 2)]) + L"\n";
@@ -1061,6 +1062,8 @@ private:
         json += settings_.japaneseKanaInputKey ? L"true" : L"false";
         json += L",\"mixSingleVowelKana\":";
         json += settings_.mixSingleVowelKana ? L"true" : L"false";
+        json += L",\"mixLiveConversion\":";
+        json += settings_.mixLiveConversion ? L"true" : L"false";
         json += L",\"noLearningInPrivate\":";
         json += settings_.noLearningInPrivate ? L"true" : L"false";
         json += L",\"japaneseIgnoreCapsLock\":";
@@ -1266,6 +1269,7 @@ private:
             else if (key == L"japaneseKanaInput") settings_.japaneseKanaInput = value;
             else if (key == L"japaneseKanaInputKey") settings_.japaneseKanaInputKey = value;
             else if (key == L"mixSingleVowelKana") settings_.mixSingleVowelKana = value;
+            else if (key == L"mixLiveConversion") settings_.mixLiveConversion = value;
             else if (key == L"japaneseRoughNumbersKanji") settings_.japaneseRoughNumbersKanji = value;
             else if (key == L"noLearningInPrivate") settings_.noLearningInPrivate = value;
             else if (key == L"mixedTypingEnabled") settings_.mixedTypingEnabled = value;

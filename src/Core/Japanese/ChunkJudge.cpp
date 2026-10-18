@@ -14,6 +14,11 @@
 
 namespace tekito::japanese {
 
+bool ChunkJudge::MayStartEnglishWord(std::wstring_view keys) const noexcept {
+    constexpr double kCommon = 3.5;
+    return english_.CommonWordStartsWith(keys, kCommon);
+}
+
 namespace {
 
 // The particles that follow an English noun (Stack Overflowで, GitHubに).

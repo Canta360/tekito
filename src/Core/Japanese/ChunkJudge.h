@@ -53,6 +53,9 @@ public:
         : table_(table), converter_(converter), slips_(slips), english_(english), names_(names),
           thresholds_(thresholds) {}
 
+    // `keys` may be the start of a common English word (meetin: meeting), so
+    // Mix's live conversion leaves them as typed.
+    [[nodiscard]] bool MayStartEnglishWord(std::wstring_view keys) const noexcept;
     struct Judgement {
         bool english{false};
         // The English as it is written (GitHub, API), or the keys.

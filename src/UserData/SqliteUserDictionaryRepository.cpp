@@ -354,6 +354,8 @@ bool SqliteUserDictionaryRepository::LoadSettings(UserSettings& settings) const 
             loaded.japaneseKanaInputKey = value != 0;
         } else if (std::strcmp(key, "mix_single_vowel_kana") == 0) {
             loaded.mixSingleVowelKana = value != 0;
+        } else if (std::strcmp(key, "mix_live_conversion") == 0) {
+            loaded.mixLiveConversion = value != 0;
         } else if (std::strcmp(key, "english_spelling") == 0) {
             loaded.englishSpelling = std::clamp(static_cast<int>(value), 0, 2);
         } else if (std::strcmp(key, "no_learning_in_private") == 0) {
@@ -475,6 +477,7 @@ bool SqliteUserDictionaryRepository::SaveSettings(const UserSettings& settings) 
     saveValue("japanese_kana_input", settings.japaneseKanaInput ? 1 : 0);
     saveValue("japanese_kana_input_key", settings.japaneseKanaInputKey ? 1 : 0);
     saveValue("mix_single_vowel_kana", settings.mixSingleVowelKana ? 1 : 0);
+    saveValue("mix_live_conversion", settings.mixLiveConversion ? 1 : 0);
     saveValue("english_spelling", std::clamp(settings.englishSpelling, 0, 2));
     saveValue("no_learning_in_private", settings.noLearningInPrivate ? 1 : 0);
     saveValue("japanese_ignore_caps_lock", settings.japaneseIgnoreCapsLock ? 1 : 0);

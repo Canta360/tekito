@@ -750,6 +750,7 @@ std::size_t JapaneseComposer::CaretOffset() const {
     }
     if (!segments.empty() && segments.front().settled) settled = segments.front().text.size();
     if (const auto letters = TypedLetters()) return settled + letters->size();
+    if (const auto live = MixLiveText()) return settled + live->size();
     return settled + ReadingOffset(caret_) + pending_.size();
 }
 
@@ -2391,7 +2392,11 @@ std::vector<PreeditSegment> JapaneseComposer::Segments() const {
         segments.push_back({std::move(text), true, false, true});
     }
     if (!IsConverted()) {
-        if (Typing()) segments.push_back({TypedLetters().value_or(RenderTyping(true)), false, false});
+        if (const auto live = MixLiveText()) {
+            segments.push_back({*live, true, false});
+        } else if (Typing()) {
+            segments.push_back({TypedLetters().value_or(RenderTyping(true)), false, false});
+        }
         return segments;
     }
     if (const auto* whole = WholeChoice()) {
@@ -2531,6 +2536,45 @@ std::optional<std::wstring> JapaneseComposer::TypedLetters() const {
     const std::wstring keys = Keys(true);
     if (typedCaseKept_ && typedCase_.size() == keys.size()) return typedCase_;
     return keys;
+}
+
+std::optional<std::wstring> JapaneseComposer::MixLiveText() const {
+    if (!mixLive_ || !chunkJudge_ || !converter_ || !Typing() || IsConverted() || caret_ != units_.size() ||
+        HasAscii() || KanaTyped() || TypedLetters()) {
+        return std::nullopt;
+    }
+    // The letters of a syllable still being typed (kyouhas) stay as typed.
+    const std::wstring reading = Reading();
+    std::size_t end = reading.size();
+    const auto letter = [](wchar_t c) {
+        return (c >= L'a' && c <= L'z') || (c >= L'A' && c <= L'Z') || (c >= L'\xFF21' && c <= L'\xFF3A') ||
+               (c >= L'\xFF41' && c <= L'\xFF5A');
+    };
+    while (end > 0 && letter(reading[end - 1])) --end;
+    if (end == 0 || LeftoverLetters(std::wstring_view(reading).substr(0, end)) > 0) return std::nullopt;
+    // Clearly Japanese: the chunk judge takes the keys for Japanese and not
+    // as English too (me, to may be either: they stay as typed).
+    // The keys still being typed count (push is not ぷ).
+    std::wstring keys = Keys(true);
+    for (auto& c : keys) c = static_cast<wchar_t>(std::towlower(c));
+    while (!keys.empty() && std::wstring_view(L".,!?").find(keys.back()) != std::wstring_view::npos) keys.pop_back();
+    if (keys.empty()) return std::nullopt;
+    const auto judged = JudgeChunk(keys);
+    if (judged.english || judged.either || TypedWithCapitals(keys)) return std::nullopt;
+    // Keys an English word may still be typed from (meetin) stay as typed,
+    // so the display does not turn Japanese, then English.
+    if (chunkJudge_->MayStartEnglishWord(keys)) return std::nullopt;
+    const std::wstring kana = reading.substr(0, end);
+    if (kana != mixLiveReading_) {
+        std::wstring text;
+        for (const auto& phrase : ConvertReading(kana, 0, context_, contextWords_)) {
+            if (phrase.candidates.empty()) return std::nullopt;
+            text += phrase.candidates.front().text;
+        }
+        mixLiveReading_ = kana;
+        mixLiveText_ = std::move(text);
+    }
+    return mixLiveText_ + reading.substr(end);
 }
 
 std::wstring JapaneseComposer::SettledText() const {

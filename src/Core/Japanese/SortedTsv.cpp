@@ -60,6 +60,16 @@ std::string_view SortedTsv::KeyAt(std::size_t lineStart) const noexcept {
 
 void SortedTsv::ForEachRow(std::string_view key,
                            const std::function<bool(const std::vector<std::string_view>& fields)>& row) const {
+    ForEachRowFrom(key, false, row);
+}
+
+void SortedTsv::ForEachRowStartingWith(std::string_view prefix,
+                                       const std::function<bool(const std::vector<std::string_view>& fields)>& row) const {
+    ForEachRowFrom(prefix, true, row);
+}
+
+void SortedTsv::ForEachRowFrom(std::string_view key, bool prefix,
+                               const std::function<bool(const std::vector<std::string_view>& fields)>& row) const {
     if (!IsOpen() || key.empty()) return;
     const std::size_t size = file_.Size();
     std::size_t lo = 0, hi = size;
@@ -71,7 +81,8 @@ void SortedTsv::ForEachRow(std::string_view key,
     const auto* data = reinterpret_cast<const char*>(file_.Data());
     std::vector<std::string_view> fields;
     for (std::size_t start = LineStart(lo); start < size;) {
-        if (KeyAt(start) != key) return;
+        const auto at = KeyAt(start);
+        if (prefix ? !at.starts_with(key) : at != key) return;
         std::size_t end = start;
         while (end < size && data[end] != '\n') ++end;
         std::string_view line(data + start, end - start);

@@ -208,6 +208,24 @@ double ExternalFrequencyProvider::Score(std::wstring_view word) const noexcept {
     return score;
 }
 
+bool ExternalFrequencyProvider::CommonWordStartsWith(std::wstring_view prefix, double minimum,
+                                                     std::size_t limit) const noexcept {
+    if (!loaded_ || prefix.empty()) return false;
+    bool found = false;
+    std::size_t seen = 0;
+    try {
+        table_.ForEachRowStartingWith(ToAscii(prefix), [&](const std::vector<std::string_view>& fields) {
+            double score = 0.0;
+            if (fields.size() >= 2) std::from_chars(fields[1].data(), fields[1].data() + fields[1].size(), score);
+            found = score >= minimum;
+            return !found && ++seen < limit;
+        });
+    } catch (...) {
+        return false;
+    }
+    return found;
+}
+
 ExternalPhraseContextProvider::ExternalPhraseContextProvider(std::filesystem::path path)
     : path_(Absolute(std::move(path))), indexPath_(RuntimeIndexPath(path_)) {
     std::vector<std::pair<std::string, std::uint64_t>> rows;

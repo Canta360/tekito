@@ -59,6 +59,7 @@ inline void ApplyJapaneseSettings(japanese::JapaneseComposer& composer, const Us
     composer.SetTypedForms(settings.japaneseTypedForms);
     composer.SetSingleVowelKana(settings.mixSingleVowelKana);
     composer.SetLiveRefine(settings.japaneseLiveRefine);
+    composer.SetMixLiveConversion(settings.mixLiveConversion);
     composer.SetSpecialConversions(&SpecialConversions::Installed(), SpecialOptionsFor(settings));
 }
 

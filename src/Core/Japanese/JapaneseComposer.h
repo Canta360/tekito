@@ -126,6 +126,10 @@ public:
     void SetSingleVowelKana(bool on) noexcept { singleVowelKana_ = on; }
     // Live conversion converts again once typing pauses (RefineLive).
     void SetLiveRefine(bool on) noexcept { liveRefine_ = on; }
+    // Mixed typing: the chunk being typed is shown converted while it is
+    // clearly Japanese (kyouha: 今日は); English, or keys that may be
+    // either, show as before.
+    void SetMixLiveConversion(bool on) noexcept { mixLive_ = on; }
     // Converting looks for slips in the keys with `slips` (one or two keys
     // dropped, extra, a neighbor or swapped) and converts the keys as
     // meant when they read clearly better (not in Mix); nullptr: off.
@@ -575,6 +579,9 @@ private:
     // kana, when the sentence so far is English or the keys make no kana
     // (yourself: not ようrせlf); nothing otherwise.
     [[nodiscard]] std::optional<std::wstring> TypedLetters() const;
+    // Mix live conversion: the chunk being typed, converted, while it is
+    // clearly Japanese (SetMixLiveConversion).
+    [[nodiscard]] std::optional<std::wstring> MixLiveText() const;
     // Mixed typing: the chunk being typed joins the settled ones.
     void SettleChunk();
     // Mixed typing: the settled chunks as one text, and the whole sentence
@@ -629,6 +636,10 @@ private:
     bool typedForms_{true};
     bool singleVowelKana_{true};
     bool liveRefine_{true};
+    bool mixLive_{false};
+    // MixLiveText's last conversion, by the reading it was for.
+    mutable std::wstring mixLiveReading_;
+    mutable std::wstring mixLiveText_;
     const KanaSlips* slips_{nullptr};
     std::vector<Unit> units_;
     // Units before the caret; pending keys belong at the caret.
