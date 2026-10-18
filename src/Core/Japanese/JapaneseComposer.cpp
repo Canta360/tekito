@@ -1467,6 +1467,11 @@ std::vector<PhraseCandidate> JapaneseComposer::EnglishCandidates(const std::wstr
         }
         add(std::move(japanese), PhraseCandidate::Kind::Dictionary);
         for (auto& kana : KanaCandidates(reading)) add(std::move(kana.text), kana.kind);
+        // A reading of one phrase: its other words too (i: 位, 胃, 意).
+        auto phrases = ConvertReading(reading, 0, context_, contextWords_);
+        if (phrases.size() == 1) {
+            for (auto& candidate : phrases.front().candidates) add(std::move(candidate.text), candidate.kind);
+        }
     }
     return candidates;
 }
