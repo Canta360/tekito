@@ -13,7 +13,10 @@ Rows that share a section, language and key keep their order.
   symbol   symbols by reading (Japanese, from Mozc's symbol table) or by
            their ASCII spelling (English, "->" -> "→"); emoji by their
            Japanese readings (Mozc's emoji table) come after the symbols,
-           the most used first (Unicode's emoji frequency ranking)
+           the most used first (Unicode's emoji frequency ranking); a
+           reading's symbols are ordered by how often Japanese text uses
+           them, those a key types itself (。「」＊) last, and its emoji
+           come first when none of its symbols is in common use (ねこ)
   emoticon Japanese emoticons (kaomoji) by reading, from Mozc's emoticon
            table; "かおもじ" lists them all
   kanji    the single kanji read a way, all in one value, from Mozc's
@@ -29,7 +32,8 @@ Usage:
   python scripts/build-special-conversions.py --mozc-symbols <symbol.tsv> \\
       --mozc-emoji <emoji_data.tsv> --mozc-emoticons <emoticon.tsv> --mozc-single-kanji <single_kanji.tsv> \\
       --mozc-license <Mozc LICENSE> --mozc-commit <sha> \\
-      --emoji-frequency <https://www.unicode.org/emoji/frequency.html saved>
+      --emoji-frequency <https://www.unicode.org/emoji/frequency.html saved> \\
+      --symbol-counts <character TAB count, from Japanese text>
 """
 
 from __future__ import annotations
@@ -228,9 +232,35 @@ def is_emoji(value: str, ranks: dict[str, int]) -> bool:
     return value.replace("\ufe0f", "") in ranks or "\ufe0f" in value or any(ord(c) >= 0x1F000 for c in value)
 
 
-def rank_emoji(rows: list[tuple[str, str, str, str]], ranks: dict[str, int]) -> list[tuple[str, str, str, str]]:
-    """Each Japanese reading's emoji after its symbols, the most used first;
-    those Unicode does not rank keep their order after them."""
+# What the Japanese romaji table types by itself: never the symbol a
+# reading is converted for.
+TYPED_MARKS = set("。、・「」ー〜￥”’‘") | {chr(c) for c in range(0xFF01, 0xFF5F)}
+
+
+def symbol_counts(path: Path) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if line.startswith("#") or "\t" not in line:
+            continue
+        char, count = line.split("\t", 1)
+        counts[char] = int(count)
+    return counts
+
+
+def common_symbol(value: str) -> bool:
+    """One of the symbols Japanese has long had (JIS X 0208): ♪ ○ △ ★."""
+    try:
+        value.encode("iso2022_jp")
+        return True
+    except UnicodeEncodeError:
+        return False
+
+
+def rank_emoji(rows: list[tuple[str, str, str, str]], ranks: dict[str, int],
+               counts: dict[str, int]) -> list[tuple[str, str, str, str]]:
+    """Each Japanese reading's symbols by use, then its emoji, the most used
+    first (those Unicode does not rank keep their order after them); the
+    emoji first when no symbol of the reading is in common use."""
     groups: dict[tuple[str, str, str], list[int]] = {}
     for index, (section, language, key, _) in enumerate(rows):
         if section == "symbol" and language == "ja":
@@ -242,7 +272,10 @@ def rank_emoji(rows: list[tuple[str, str, str, str]], ranks: dict[str, int]) -> 
         emoji = [row for row in values if is_emoji(row[3], ranks)]
         unranked = len(ranks)
         emoji.sort(key=lambda row: ranks.get(row[3].replace("\ufe0f", ""), unranked))
-        for i, row in zip(indices, symbols + emoji):
+        symbols.sort(key=lambda row: (row[3] in TYPED_MARKS, -counts.get(row[3], 0), not common_symbol(row[3])))
+        first = next((row for row in symbols if row[3] not in TYPED_MARKS), None)
+        used = first is not None and (counts.get(first[3], 0) > 0 or common_symbol(first[3]))
+        for i, row in zip(indices, symbols + emoji if used or not emoji else emoji + symbols):
             out[i] = row
     return out
 
@@ -264,6 +297,8 @@ def main() -> None:
     parser.add_argument("--mozc-commit", required=True, help="the Mozc commit both files are from")
     parser.add_argument("--emoji-frequency", type=Path, required=True,
                         help="https://www.unicode.org/emoji/frequency.html, saved")
+    parser.add_argument("--symbol-counts", type=Path, required=True,
+                        help="character TAB count, how often Japanese text uses each symbol")
     args = parser.parse_args()
 
     rows: list[tuple[str, str, str, str]] = []
@@ -282,7 +317,7 @@ def main() -> None:
              if (reading, emoji) not in known]
     rows += [("emoticon", "ja", reading, face) for reading, face in mozc_emoticons(args.mozc_emoticons)]
     rows += [("kanji", "ja", reading, kanji) for reading, kanji in mozc_single_kanji(args.mozc_single_kanji)]
-    rows = rank_emoji(rows, emoji_ranks(args.emoji_frequency))
+    rows = rank_emoji(rows, emoji_ranks(args.emoji_frequency), symbol_counts(args.symbol_counts))
     for row in rows:
         if any("\t" in field or "\n" in field or not field for field in row):
             raise ValueError(f"bad row: {row!r}")
