@@ -1866,6 +1866,18 @@ bool JapaneseComposer::SamePhrasing(const std::wstring& reading, const std::vect
     return before && after && *before == *after;
 }
 
+void JapaneseComposer::ShowCandidates() {
+    if (!IsConverted()) Convert();
+    if (!IsConverted()) return;
+    StartPicking();
+    auto& phrase = phrases_[focus_];
+    AddSlipCandidates(phrase);
+    if (phrase.candidates.empty()) {
+        phrase.candidates = KanaCandidates(conversionReading_.substr(phrase.begin, phrase.length));
+    }
+    listOpen_ = true;
+}
+
 void JapaneseComposer::NextCandidate() {
     if (!IsConverted()) {
         Convert();

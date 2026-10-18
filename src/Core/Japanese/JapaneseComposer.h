@@ -269,6 +269,8 @@ public:
     // Space and Henkan: converts, then steps through the candidates.
     void Convert();
     void NextCandidate();
+    // Converted, if it was not, with the focused phrase's list open (Tab).
+    void ShowCandidates();
     void PreviousCandidate();
     void SelectCandidate(std::size_t index);
     // Left and Right: which phrase the candidates are for.

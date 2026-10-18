@@ -497,6 +497,14 @@ void TestKeys(const RomajiTable& table, const MiniPack& pack) {
         return command ? std::optional<Action>(command->action) : std::nullopt;
     };
 
+    Require(!action(press(Key::Tab)), "Tab with nothing typed is the application's");
+    Type(composer, L"kana");
+    Require(action(press(Key::Tab)) == Action::ShowCandidates, "Tab while typing shows the candidates");
+    hit(press(Key::Tab));
+    Require(composer.IsConverted() && composer.IsCandidateListOpen(), "converted, with the list open");
+    Require(action(press(Key::Tab)) == Action::NextCandidate, "Tab then steps through them");
+    Require(action(press(Key::Tab, true)) == Action::PreviousCandidate, "Shift+Tab goes back");
+    composer.Clear();
     Require(!action(press(Key::Enter)), "Enter with nothing typed is the application's");
     Require(!action(press(Key::Backspace)), "so is Backspace");
     Require(action(press(Key::Space)) == Action::InsertOutside, "Space with nothing typed types a full-width space");

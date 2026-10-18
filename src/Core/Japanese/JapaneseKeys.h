@@ -81,6 +81,7 @@ struct KeyCommand {
         UndoCommit,         // Ctrl+Backspace right after committing: the text comes back
         ForgetChosen,       // Ctrl+Delete: the chosen prediction or candidate is unlearned
         Reconvert,          // Henkan with nothing typed: the selected text, converted again
+        ShowCandidates,     // Tab while typing: converted, with the candidate list open
     };
     Action action{Action::Commit};
     wchar_t character{0};

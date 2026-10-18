@@ -178,6 +178,15 @@ std::optional<KeyCommand> TranslateKey(const JapaneseComposer& composer, const K
     default:
         break;
     }
+    // Tab while typing shows the candidates rather than ending the text with
+    // a tab (the predictions come first, above, when there are some); once
+    // converted it steps through them.
+    if (key.key == Key::Tab && (composer.IsTyping() || composer.IsConverted())) {
+        if (composer.IsConverted() && !composer.IsLivePreview()) {
+            return Make(key.shift ? Action::PreviousCandidate : Action::NextCandidate);
+        }
+        return Make(Action::ShowCandidates);
+    }
     if (IsCaretKey(key.key)) {
         if (!composing) return std::nullopt;
         auto command = Make(Action::Commit);
@@ -195,6 +204,9 @@ std::optional<KeyCommand> TranslateKey(const JapaneseComposer& composer, const K
 KeyOutcome ApplyKey(JapaneseComposer& composer, const KeyCommand& command) {
     KeyOutcome outcome;
     switch (command.action) {
+    case Action::ShowCandidates:
+        composer.ShowCandidates();
+        break;
     case Action::Reconvert:
         break;
     case Action::ForgetChosen:
