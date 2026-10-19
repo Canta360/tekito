@@ -45,8 +45,14 @@
 #include <windows.h>
 #include <imm.h>
 
+#include <shellapi.h>
+
 #include <algorithm>
+#include <cstdio>
 #include <cwctype>
+#include <filesystem>
+#include <fstream>
+#include <locale>
 #include <iterator>
 #include <memory>
 #include <optional>
@@ -112,6 +118,13 @@ struct Testbed {
 };
 
 Testbed* g_bed = nullptr;
+// Recording a sample clip (--record): no status line on the page, which is
+// dark with the dark candidate list (TEKITO_PREVIEW_THEME=dark).
+bool g_recording = false;
+bool g_darkPage = false;
+// The key the recording just pressed, shown as a keycap at the bottom right
+// until the next one (an empty label: none).
+std::wstring g_keyLabel;
 
 // One character laid out on the page, and how it is underlined.
 enum class Style { Committed, Input, Converted, Focused, Settled };
@@ -304,23 +317,26 @@ void Paint(Testbed& bed, HDC target) {
     HDC dc = CreateCompatibleDC(target);
     HBITMAP bitmap = CreateCompatibleBitmap(target, client.right, client.bottom);
     HGDIOBJ oldBitmap = SelectObject(dc, bitmap);
-    FillRect(dc, &client, static_cast<HBRUSH>(GetStockObject(WHITE_BRUSH)));
+    HBRUSH paper = CreateSolidBrush(g_darkPage ? RGB(32, 32, 32) : RGB(255, 255, 255));
+    FillRect(dc, &client, paper);
+    DeleteObject(paper);
     SetBkMode(dc, TRANSPARENT);
 
     // The status line.
     HGDIOBJ oldFont = SelectObject(dc, bed.smallFont);
     SetTextColor(dc, RGB(96, 96, 96));
     RECT status{kMargin, Scale(bed, 8), client.right - kMargin, Scale(bed, 30)};
-    const auto line = StatusLine(bed);
+    // A recording (--record) shows the page only.
+    const auto line = g_recording ? std::wstring() : StatusLine(bed);
     DrawTextW(dc, line.c_str(), static_cast<int>(line.size()), &status, DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX);
 
     SelectObject(dc, bed.font);
-    SetTextColor(dc, RGB(20, 20, 20));
+    SetTextColor(dc, g_darkPage ? RGB(240, 240, 240) : RGB(20, 20, 20));
     std::size_t caretCell = 0;
     const auto cells = Layout(bed, dc, Scale(bed, 44), client.right, caretCell);
-    HPEN thin = CreatePen(PS_SOLID, Scale(bed, 1), RGB(40, 40, 40));
-    HPEN thick = CreatePen(PS_SOLID, Scale(bed, 2), RGB(40, 40, 40));
-    HPEN dotted = CreatePen(PS_DOT, 1, RGB(90, 90, 90));
+    HPEN thin = CreatePen(PS_SOLID, Scale(bed, 1), g_darkPage ? RGB(220, 220, 220) : RGB(40, 40, 40));
+    HPEN thick = CreatePen(PS_SOLID, Scale(bed, 2), g_darkPage ? RGB(220, 220, 220) : RGB(40, 40, 40));
+    HPEN dotted = CreatePen(PS_DOT, 1, g_darkPage ? RGB(170, 170, 170) : RGB(90, 90, 90));
     bed.hasFocusRect = false;
     RECT focus{};
     for (std::size_t i = 0; i + 1 < cells.size(); ++i) {
@@ -352,7 +368,7 @@ void Paint(Testbed& bed, HDC target) {
     // The caret.
     const RECT caret = cells[std::min(caretCell, cells.size() - 1)].rect;
     RECT bar{caret.left, caret.top, caret.left + Scale(bed, 2), caret.bottom};
-    FillRect(dc, &bar, static_cast<HBRUSH>(GetStockObject(BLACK_BRUSH)));
+    FillRect(dc, &bar, static_cast<HBRUSH>(GetStockObject(g_darkPage ? WHITE_BRUSH : BLACK_BRUSH)));
 
     // Screen coordinates for the candidate window.
     POINT corners[4] = {{caret.left, caret.top}, {caret.right, caret.bottom}, {focus.left, focus.top},
@@ -365,6 +381,27 @@ void Paint(Testbed& bed, HDC target) {
     DeleteObject(thin);
     DeleteObject(thick);
     DeleteObject(dotted);
+        if (g_recording && !g_keyLabel.empty()) {
+        SelectObject(dc, bed.smallFont);
+        RECT measure{};
+        DrawTextW(dc, g_keyLabel.c_str(), static_cast<int>(g_keyLabel.size()), &measure, DT_CALCRECT | DT_SINGLELINE | DT_NOPREFIX);
+        const int padX = Scale(bed, 12);
+        const int padY = Scale(bed, 6);
+        const int w = measure.right + padX * 2;
+        const int h = measure.bottom + padY * 2;
+        RECT keycap{client.right - kMargin - w, client.bottom - kMargin - h, client.right - kMargin, client.bottom - kMargin};
+        HBRUSH face = CreateSolidBrush(g_darkPage ? RGB(58, 58, 58) : RGB(246, 246, 246));
+        HPEN edge = CreatePen(PS_SOLID, Scale(bed, 1), g_darkPage ? RGB(90, 90, 90) : RGB(200, 200, 200));
+        HGDIOBJ oldBrush = SelectObject(dc, face);
+        HGDIOBJ oldPen = SelectObject(dc, edge);
+        RoundRect(dc, keycap.left, keycap.top, keycap.right, keycap.bottom, Scale(bed, 10), Scale(bed, 10));
+        SelectObject(dc, oldBrush);
+        SelectObject(dc, oldPen);
+        DeleteObject(face);
+        DeleteObject(edge);
+        SetTextColor(dc, g_darkPage ? RGB(240, 240, 240) : RGB(30, 30, 30));
+        DrawTextW(dc, g_keyLabel.c_str(), static_cast<int>(g_keyLabel.size()), &keycap, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+    }
     BitBlt(target, 0, 0, client.right, client.bottom, dc, 0, 0, SRCCOPY);
     SelectObject(dc, oldBitmap);
     DeleteObject(bitmap);
@@ -1064,6 +1101,213 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
     return DefWindowProcW(window, message, wParam, lParam);
 }
 
+// --record <script> <folder>: types a script into the page, key by key,
+// and saves what the page and the candidate list show as BMP frames with
+// how long each stays (frames.txt), for the sample clips in Settings
+// (tests/visual/samples). Script lines (# starts a comment):
+//   page <w> <h>             page size in DIPs
+//   mode japanese|mixed|english
+//   live on|off              Japanese live conversion
+//   speed <ms>               time after each key typed with "type"
+//   type <keys>              keys as typed: letters, digits, marks, " " for Space
+//   key <name>[+<name>] [ms] space, enter, tab, esc, backspace, left, right,
+//                            up, down, f6-f10, with shift or ctrl held: shift+left
+//   hold <ms>                keep the screen as it is
+bool SaveScreenRect(const RECT& rect, const std::filesystem::path& path) {
+    const int width = rect.right - rect.left;
+    const int height = rect.bottom - rect.top;
+    HDC screen = GetDC(nullptr);
+    HDC memory = CreateCompatibleDC(screen);
+    HBITMAP bitmap = CreateCompatibleBitmap(screen, width, height);
+    HGDIOBJ old = SelectObject(memory, bitmap);
+    BitBlt(memory, 0, 0, width, height, screen, rect.left, rect.top, SRCCOPY | CAPTUREBLT);
+    BITMAPINFOHEADER header{sizeof(header), width, -height, 1, 32, BI_RGB};
+    std::vector<unsigned char> pixels(static_cast<std::size_t>(width) * height * 4);
+    BITMAPINFO info{};
+    info.bmiHeader = header;
+    GetDIBits(memory, bitmap, 0, height, pixels.data(), &info, DIB_RGB_COLORS);
+    SelectObject(memory, old);
+    DeleteObject(bitmap);
+    DeleteDC(memory);
+    ReleaseDC(nullptr, screen);
+    BITMAPFILEHEADER file{};
+    file.bfType = 0x4D42;
+    file.bfOffBits = sizeof(file) + sizeof(header);
+    file.bfSize = file.bfOffBits + static_cast<DWORD>(pixels.size());
+    std::ofstream output(path, std::ios::binary);
+    output.write(reinterpret_cast<const char*>(&file), sizeof(file));
+    output.write(reinterpret_cast<const char*>(&header), sizeof(header));
+    output.write(reinterpret_cast<const char*>(pixels.data()), static_cast<std::streamsize>(pixels.size()));
+    return static_cast<bool>(output);
+}
+
+class Recorder {
+public:
+    Recorder(Testbed& bed, std::filesystem::path folder) : bed_(bed), folder_(std::move(folder)) {
+        std::filesystem::create_directories(folder_);
+        timing_.open(folder_ / L"frames.txt");
+    }
+
+    // Lets the page and the list settle, saving a frame each 1/30 s for the
+    // first part of `milliseconds` (the list's animation) and holding the
+    // last one for the rest.
+    void Record(int milliseconds) {
+        constexpr int kFrame = 33;
+        constexpr int kMotion = 400;
+        int left = std::max(milliseconds, kFrame);
+        int moving = std::min(left, kMotion);
+        while (moving >= kFrame) {
+            Pump(kFrame);
+            Save(kFrame);
+            moving -= kFrame;
+            left -= kFrame;
+        }
+        if (left > 0) {
+            Pump(std::min(left, 50));
+            Save(left);
+        }
+    }
+
+    // `vk` with Shift or Ctrl held as given, as the page receives it.
+    void Press(WPARAM vk, bool shift, bool ctrl) {
+        BYTE state[256]{};
+        if (shift) state[VK_SHIFT] = state[VK_LSHIFT] = 0x80;
+        if (ctrl) state[VK_CONTROL] = state[VK_LCONTROL] = 0x80;
+        SetKeyboardState(state);
+        (void)OnKey(bed_, vk);
+        BYTE released[256]{};
+        SetKeyboardState(released);
+    }
+
+private:
+    static void Pump(int milliseconds) {
+        const auto start = GetTickCount64();
+        MSG message{};
+        while (GetTickCount64() - start < static_cast<ULONGLONG>(milliseconds)) {
+            while (PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE)) DispatchMessageW(&message);
+            Sleep(1);
+        }
+    }
+
+    void Save(int milliseconds) {
+        RECT rect{};
+        GetWindowRect(bed_.window, &rect);
+        char name[32]{};
+        sprintf_s(name, "frame%05d.bmp", frame_++);
+        SaveScreenRect(rect, folder_ / name);
+        timing_ << name << ' ' << milliseconds << '\n';
+        // The list must sit inside the page, or the clip shows it cut off.
+        RECT list{};
+        HWND panel = FindWindowW(L"TekitoCandidateWindow", nullptr);
+        if (panel && IsWindowVisible(panel) && GetWindowRect(panel, &list) &&
+            (list.left < rect.left || list.top < rect.top || list.right > rect.right || list.bottom > rect.bottom)) {
+            fprintf(stderr, "%s: the list runs past the page\n", name);
+        }
+    }
+
+    Testbed& bed_;
+    std::filesystem::path folder_;
+    std::ofstream timing_;
+    int frame_{0};
+};
+
+std::optional<WPARAM> KeyNamed(std::wstring_view name) {
+    struct Named { std::wstring_view name; WPARAM key; };
+    static constexpr Named kKeys[] = {
+        {L"space", VK_SPACE}, {L"enter", VK_RETURN}, {L"tab", VK_TAB}, {L"esc", VK_ESCAPE},
+        {L"backspace", VK_BACK}, {L"left", VK_LEFT}, {L"right", VK_RIGHT}, {L"up", VK_UP}, {L"down", VK_DOWN},
+        {L"f6", VK_F6}, {L"f7", VK_F7}, {L"f8", VK_F8}, {L"f9", VK_F9}, {L"f10", VK_F10}, {L"delete", VK_DELETE},
+    };
+    for (const auto& key : kKeys) {
+        if (key.name == name) return key.key;
+    }
+    if (name.size() == 1 && std::iswalnum(name[0])) return static_cast<WPARAM>(std::towupper(name[0]));
+    return std::nullopt;
+}
+
+// How the keycap names a key: Space, Enter, Shift + ←.
+std::wstring KeyLabel(std::wstring_view name, bool shift, bool ctrl) {
+    struct Named { std::wstring_view name; std::wstring_view label; };
+    static constexpr Named kLabels[] = {
+        {L"space", L"Space"}, {L"enter", L"Enter"}, {L"tab", L"Tab"}, {L"esc", L"Esc"}, {L"backspace", L"Backspace"},
+        {L"left", L"\u2190"}, {L"right", L"\u2192"}, {L"up", L"\u2191"}, {L"down", L"\u2193"}, {L"delete", L"Delete"},
+        {L"f6", L"F6"}, {L"f7", L"F7"}, {L"f8", L"F8"}, {L"f9", L"F9"}, {L"f10", L"F10"},
+    };
+    std::wstring label(name);
+    for (const auto& named : kLabels) {
+        if (named.name == name) label = named.label;
+    }
+    if (shift) label = L"Shift + " + label;
+    if (ctrl) label = L"Ctrl + " + label;
+    return label;
+}
+
+int RunScript(Testbed& bed, const std::filesystem::path& script, const std::filesystem::path& folder) {
+    std::wifstream input(script);
+    input.imbue(std::locale(".UTF-8"));
+    // Skips a UTF-8 byte order mark.
+    if (input.peek() == 0xFEFF) input.get();
+    if (!input) return 2;
+    Recorder recorder(bed, folder);
+    int speed = 110;
+    for (std::wstring line; std::getline(input, line);) {
+        if (!line.empty() && line.back() == L'\r') line.pop_back();
+        if (line.empty() || line.front() == L'#') continue;
+        const auto space = line.find(L' ');
+        const std::wstring command = line.substr(0, space);
+        const std::wstring rest = space == std::wstring::npos ? std::wstring() : line.substr(space + 1);
+        if (command == L"page") {
+            int width = 640;
+            int height = 320;
+            swscanf_s(rest.c_str(), L"%d %d", &width, &height);
+            const UINT dpi = GetDpiForWindow(bed.window);
+            RECT work{};
+            SystemParametersInfoW(SPI_GETWORKAREA, 0, &work, 0);
+            SetWindowPos(bed.window, HWND_TOPMOST, work.left + 40, work.top + 40, MulDiv(width, static_cast<int>(dpi), 96),
+                         MulDiv(height, static_cast<int>(dpi), 96), SWP_NOACTIVATE | SWP_SHOWWINDOW);
+            Refresh(bed);
+        } else if (command == L"mode") {
+            bed.english = rest == L"english";
+            if (bed.english || rest == L"mixed") (void)EnsureEngine(bed);
+            ja::AttachMixedTyping(bed.composer, rest == L"mixed");
+            Refresh(bed);
+        } else if (command == L"live") {
+            bed.composer.SetLiveConversion(rest == L"on");
+        } else if (command == L"speed") {
+            speed = std::max(1, _wtoi(rest.c_str()));
+        } else if (command == L"hold") {
+            recorder.Record(_wtoi(rest.c_str()));
+        } else if (command == L"type") {
+            g_keyLabel.clear();
+            for (const wchar_t c : rest) {
+                const SHORT scan = VkKeyScanW(c);
+                if (scan == -1) continue;
+                recorder.Press(static_cast<WPARAM>(LOBYTE(scan)), (HIBYTE(scan) & 1) != 0, false);
+                recorder.Record(speed);
+            }
+        } else if (command == L"key") {
+            const auto gap = rest.find(L' ');
+            std::wstring keys = rest.substr(0, gap);
+            const int milliseconds = gap == std::wstring::npos ? 500 : _wtoi(rest.c_str() + gap + 1);
+            bool shift = false;
+            bool ctrl = false;
+            for (std::size_t plus; (plus = keys.find(L'+')) != std::wstring::npos; keys.erase(0, plus + 1)) {
+                const auto modifier = keys.substr(0, plus);
+                shift = shift || modifier == L"shift";
+                ctrl = ctrl || modifier == L"ctrl";
+            }
+            const auto key = KeyNamed(keys);
+            if (!key) return 3;
+            g_keyLabel = KeyLabel(keys, shift, ctrl);
+            recorder.Press(*key, shift, ctrl);
+            recorder.Record(milliseconds);
+        } else {
+            return 3;
+        }
+    }
+    return 0;
+}
+
 }  // namespace
 
 int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR commandLine, int show) {
@@ -1091,8 +1335,29 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR commandLine, int show) 
     windowClass.hCursor = LoadCursorW(nullptr, IDC_IBEAM);
     windowClass.lpszClassName = L"TekitoTestbed";
     RegisterClassExW(&windowClass);
-    bed->window = CreateWindowExW(0, windowClass.lpszClassName, L"TEKITO Testbed", WS_OVERLAPPEDWINDOW,
-                                  CW_USEDEFAULT, CW_USEDEFAULT, 1100, 640, nullptr, nullptr, instance, nullptr);
+    // --record <script> <folder>: a page that never takes the focus, typed
+    // into by the script (RunScript).
+    std::filesystem::path script;
+    std::filesystem::path folder;
+    int argumentCount = 0;
+    if (LPWSTR* arguments = CommandLineToArgvW(GetCommandLineW(), &argumentCount)) {
+        for (int i = 1; i + 2 < argumentCount; ++i) {
+            if (std::wstring_view(arguments[i]) == L"--record") {
+                script = arguments[i + 1];
+                folder = arguments[i + 2];
+            }
+        }
+        LocalFree(arguments);
+    }
+    g_recording = !script.empty();
+    if (wchar_t theme[16]{}; g_recording && GetEnvironmentVariableW(L"TEKITO_PREVIEW_THEME", theme, 16) > 0) {
+        g_darkPage = std::wstring_view(theme) == L"dark";
+    }
+    bed->window = g_recording
+        ? CreateWindowExW(WS_EX_TOPMOST | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW, windowClass.lpszClassName, L"TEKITO Testbed",
+                          WS_POPUP, 40, 40, 640, 320, nullptr, nullptr, instance, nullptr)
+        : CreateWindowExW(0, windowClass.lpszClassName, L"TEKITO Testbed", WS_OVERLAPPEDWINDOW,
+                          CW_USEDEFAULT, CW_USEDEFAULT, 1100, 640, nullptr, nullptr, instance, nullptr);
     if (!bed->window) return 1;
     if (!bed->candidates.Initialize(instance, [](std::size_t index) {
             if (!g_bed) return;
@@ -1111,6 +1376,14 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR commandLine, int show) 
             Refresh(*g_bed);
         })) {
         return 1;
+    }
+    if (g_recording) {
+        ShowWindow(bed->window, SW_SHOWNOACTIVATE);
+        const int result = RunScript(*bed, script, folder);
+        bed->candidates.Hide();
+        DestroyWindow(bed->window);
+        g_bed = nullptr;
+        return result;
     }
     ShowWindow(bed->window, show);
     UpdateWindow(bed->window);

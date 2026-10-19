@@ -242,7 +242,7 @@ if(TEKITO_BUILD_TESTS)
         ${TEKITO_WINDOWS_DEFINES} TEKITO_CANDIDATE_WINDOW_PREVIEW)
     target_compile_options(tekito_testbed PRIVATE ${TEKITO_WARNINGS})
     target_link_libraries(tekito_testbed PRIVATE
-        tekito_userdata tekito_core imm32 ole32 oleaut32 advapi32 user32 gdi32 ${TEKITO_CANDIDATE_WINDOW_LIBS})
+        tekito_userdata tekito_core imm32 ole32 oleaut32 advapi32 user32 gdi32 shell32 ${TEKITO_CANDIDATE_WINDOW_LIBS})
 
     # Renders one setup screen without elevation and saves a screenshot.
     add_executable(tekito_setup_preview WIN32 installer/TekitoSetup.cpp installer/TekitoSetup.rc)

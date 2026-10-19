@@ -1,0 +1,67 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Sample clip encoder</title>
+<script src="mp4.js"></script>
+<script>
+// Turns a recording's frames (frames.txt: "frameNNNNN.bmp <ms>") into an
+// H.264 MP4 at 30 fps and posts it back to encode.py.
+"use strict";
+const FPS = 30;
+
+async function post(path, body) {
+  await fetch(path, { method: "POST", body });
+}
+
+async function encode() {
+  const list = (await (await fetch("/frames/frames.txt")).text()).trim().split(/\r?\n/).map((line) => {
+    const [name, ms] = line.split(" ");
+    return { name, ms: Number(ms) };
+  });
+  const first = await createImageBitmap(await (await fetch(`/frames/${list[0].name}`)).blob());
+  // H.264 wants even sizes.
+  const width = first.width & ~1;
+  const height = first.height & ~1;
+  const canvas = new OffscreenCanvas(width, height);
+  const ctx = canvas.getContext("2d");
+  const chunks = [];
+  let description = null;
+  let failure = null;
+  const encoder = new VideoEncoder({
+    output: (chunk, meta) => {
+      if (meta?.decoderConfig?.description) description = new Uint8Array(meta.decoderConfig.description);
+      const data = new Uint8Array(chunk.byteLength);
+      chunk.copyTo(data);
+      chunks.push({ data, key: chunk.type === "key", timestamp: chunk.timestamp });
+    },
+    error: (e) => { failure = e; },
+  });
+  encoder.configure({
+    codec: "avc1.640028", width, height, framerate: FPS,
+    bitrate: 1_500_000, latencyMode: "quality", avc: { format: "avc" },
+  });
+  let index = 0;
+  let elapsed = 0;
+  for (const item of list) {
+    const image = await createImageBitmap(await (await fetch(`/frames/${item.name}`)).blob());
+    ctx.drawImage(image, 0, 0);
+    image.close();
+    elapsed += item.ms;
+    // As many video frames as the recorded frame lasts.
+    while ((index * 1000) / FPS < elapsed) {
+      const frame = new VideoFrame(canvas, { timestamp: Math.round((index * 1e6) / FPS), duration: Math.round(1e6 / FPS) });
+      encoder.encode(frame, { keyFrame: index % (FPS * 2) === 0 });
+      frame.close();
+      index += 1;
+      while (encoder.encodeQueueSize > 6) await new Promise((r) => setTimeout(r, 2));
+      if (failure) throw failure;
+    }
+  }
+  await encoder.flush();
+  if (failure) throw failure;
+  const mp4 = Mp4.write({ chunks, description, width, height, fps: FPS });
+  await post("/save", mp4);
+  await post("/log", `${index} frames, ${(elapsed / 1000).toFixed(1)} s, ${(mp4.size / 1e3).toFixed(0)} KB`);
+}
+
+encode().then(() => post("/done", "ok"), async (e) => { await post("/log", String(e)); await post("/done", "failed"); });
+</script>
