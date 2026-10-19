@@ -334,9 +334,16 @@ void Paint(Testbed& bed, HDC target) {
     SetTextColor(dc, g_darkPage ? RGB(240, 240, 240) : RGB(20, 20, 20));
     std::size_t caretCell = 0;
     const auto cells = Layout(bed, dc, Scale(bed, 44), client.right, caretCell);
-    HPEN thin = CreatePen(PS_SOLID, Scale(bed, 1), g_darkPage ? RGB(220, 220, 220) : RGB(40, 40, 40));
-    HPEN thick = CreatePen(PS_SOLID, Scale(bed, 2), g_darkPage ? RGB(220, 220, 220) : RGB(40, 40, 40));
-    HPEN dotted = CreatePen(PS_DOT, 1, g_darkPage ? RGB(170, 170, 170) : RGB(90, 90, 90));
+    // The underline in the mode's colour, as the text service draws it with
+    // modeUnderlineColors: Auto blue, Mix orange, Japanese the text's.
+    const COLORREF ink = g_darkPage ? RGB(220, 220, 220) : RGB(40, 40, 40);
+    const COLORREF underline = !bed.settings.modeUnderlineColors ? ink
+                          : bed.english                     ? RGB(0, 103, 248)
+                          : bed.composer.MixedTyping()      ? RGB(245, 150, 25)
+                                                            : ink;
+    HPEN thin = CreatePen(PS_SOLID, Scale(bed, 1), underline);
+    HPEN thick = CreatePen(PS_SOLID, Scale(bed, 2), underline);
+    HPEN dotted = CreatePen(PS_DOT, 1, underline == ink ? (g_darkPage ? RGB(170, 170, 170) : RGB(90, 90, 90)) : underline);
     bed.hasFocusRect = false;
     RECT focus{};
     for (std::size_t i = 0; i + 1 < cells.size(); ++i) {
@@ -344,10 +351,12 @@ void Paint(Testbed& bed, HDC target) {
         if (cell.text == L"\n") continue;
         // Mix: the sentence held until Enter, behind a marker.
         if (cell.style == Style::Settled) {
-            HBRUSH marker = CreateSolidBrush(RGB(255, 236, 160));
+            HBRUSH marker = CreateSolidBrush(RGB(245, 150, 25));
             FillRect(dc, &cell.rect, marker);
             DeleteObject(marker);
         }
+        // Dark text on the marker, as the display attribute has it.
+        SetTextColor(dc, cell.style == Style::Settled ? RGB(32, 32, 32) : g_darkPage ? RGB(240, 240, 240) : RGB(20, 20, 20));
         TextOutW(dc, cell.rect.left, cell.rect.top, cell.text.c_str(), static_cast<int>(cell.text.size()));
         if (cell.style == Style::Committed || cell.style == Style::Settled) continue;
         HPEN pen = cell.style == Style::Focused ? thick : cell.style == Style::Converted ? thin : dotted;
