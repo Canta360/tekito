@@ -36,7 +36,7 @@ bool KanjiSets::Load(const std::filesystem::path& file) {
     return !Empty();
 }
 
-bool KanjiSets::Allows(std::wstring_view text, KanjiRange range, int grade) const {
+bool KanjiSets::Allows(std::wstring_view text, KanjiRange range, int grade, bool names) const {
     if (range == KanjiRange::All || Empty()) return true;
     const int highest = range == KanjiRange::Kyoiku ? grade : range == KanjiRange::Joyo ? 8 : 9;
     for (std::size_t i = 0; i < text.size(); ++i) {
@@ -47,7 +47,8 @@ bool KanjiSets::Allows(std::wstring_view text, KanjiRange range, int grade) cons
         }
         if (!IsKanji(c)) continue;
         const auto found = levels_.find(c);
-        if (found == levels_.end() || found->second > highest) return false;
+        if (found == levels_.end()) return false;
+        if (found->second > highest && !(names && found->second == 9)) return false;
     }
     return true;
 }

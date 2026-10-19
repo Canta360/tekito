@@ -2200,7 +2200,13 @@ void TestSqliteUserSettingsRepository() {
     tekito::userdata::UserSettings source;
     source.defaultInputMode = tekito::InputMode::Direct;
     source.lastInputMode = tekito::InputMode::Direct;
-    source.restoreLastInputMode = false;
+    source.startMode = 2;
+    source.switchOrder = 3142;
+    source.japaneseKanjiRange = 3;
+    source.japaneseKanjiGrade = 4;
+    source.japaneseKanjiNames = true;
+    source.japaneseNumberStyle = 4;
+    source.mixCorrection = false;
     source.learningEnabled = false;
     source.correctionEnabled = false;
     source.commonMisspellingsEnabled = false;
@@ -2253,9 +2259,36 @@ void TestSqliteUserSettingsRepository() {
         Require(repository.LoadSettings(loaded), "settings repository loads input mode settings");
     }
     Require(loaded.defaultInputMode == tekito::InputMode::Direct &&
-                loaded.lastInputMode == tekito::InputMode::Direct &&
-                !loaded.restoreLastInputMode,
+                loaded.lastInputMode == tekito::InputMode::Direct && loaded.startMode == 2 &&
+                loaded.switchOrder == 3142,
             "settings repository restores all input mode settings");
+    Require(loaded.japaneseKanjiRange == 3 && loaded.japaneseKanjiGrade == 4 && loaded.japaneseKanjiNames &&
+                loaded.japaneseNumberStyle == 4 && !loaded.mixCorrection,
+            "settings repository restores kanji, numbers and Mix correction");
+    {
+        const auto modes = tekito::userdata::SwitchOrderModes(3142);
+        Require(modes[0].first == tekito::InputMode::Convert && modes[1].first == tekito::InputMode::Japanese &&
+                    modes[2].first == tekito::InputMode::Direct && modes[3].first == tekito::InputMode::Mixed &&
+                    !tekito::userdata::ValidSwitchOrder(1224) && !tekito::userdata::ValidSwitchOrder(12345),
+                "the switch order lists each mode once, in the order chosen");
+    }
+    {
+        // Older values: 常用 and 人名用, and numbers as typed.
+        tekito::userdata::UserSettings older;
+        older.japaneseKanjiRange = 1;
+        older.japaneseNumberStyle = 0;
+        older.japaneseDigitWidth = 2;
+        tekito::userdata::UserSettings read;
+        {
+            tekito::userdata::SqliteUserDictionaryRepository repository(path);
+            Require(repository.Open() && repository.SaveSettings(older) && repository.LoadSettings(read),
+                    "settings repository saves and loads older values");
+        }
+        Require(read.japaneseKanjiRange == 2 && read.japaneseKanjiNames && read.japaneseNumberStyle == 3,
+                "older kanji and number settings are read as the new ones");
+        tekito::userdata::SqliteUserDictionaryRepository repository(path);
+        Require(repository.Open() && repository.SaveSettings(source), "settings repository saves the settings again");
+    }
     Require(!loaded.learningEnabled && !loaded.correctionEnabled &&
                 !loaded.commonMisspellingsEnabled &&
                 !loaded.contextSuggestionsEnabled && !loaded.completionEnabled &&

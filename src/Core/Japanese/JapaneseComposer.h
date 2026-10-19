@@ -88,9 +88,10 @@ public:
     void SetLoanwords(const Loanwords* loanwords) noexcept { loanwords_ = loanwords; }
     // Candidates use only kanji in `range` (教育, 常用, 人名用 from `sets`).
     void SetKanjiSets(const KanjiSets* sets) noexcept { kanjiSets_ = sets; }
-    void SetKanjiRange(KanjiRange range, int grade = 6) noexcept {
+    void SetKanjiRange(KanjiRange range, int grade = 6, bool names = false) noexcept {
         kanjiRange_ = range;
         kanjiGrade_ = grade;
+        kanjiNames_ = names;
     }
     // Mixed typing: Space (and Enter) takes what was typed as one chunk of
     // English or Japanese (ChunkJudge). English stays English, written as
@@ -107,6 +108,8 @@ public:
     // Mixed typing: English Auto's spelling, so English with a slip in it
     // is put right as in English (rveiew: review). nullptr: as typed.
     void SetEnglishSpelling(const EnglishSpelling* spelling) noexcept { englishSpelling_ = spelling; }
+    // Mix: Space puts a slip in an English word right (UserSettings::mixCorrection).
+    void SetEnglishCorrection(bool on) noexcept { englishCorrection_ = on; }
     // English words typed into Japanese without spaces (reflectsareta:
     // reflectされた), found with `splitter` in Japanese mode too: first when
     // the keys make no kana, otherwise the next choice. nullptr: off.
@@ -551,6 +554,7 @@ private:
     const Loanwords* loanwords_{nullptr};
     const ChunkJudge* chunkJudge_{nullptr};
     const EnglishSpelling* englishSpelling_{nullptr};
+    bool englishCorrection_{true};
     const ChunkJudge* splitter_{nullptr};
     // Mixed typing: the sentence's chunks before the one being typed, each
     // as English and as Japanese, shown as the whole sentence judges it.
@@ -654,6 +658,7 @@ private:
     const KanjiSets* kanjiSets_{nullptr};
     KanjiRange kanjiRange_{KanjiRange::All};
     int kanjiGrade_{6};
+    bool kanjiNames_{false};
     NumberStyle numberStyle_{NumberStyle::AsTyped};
     bool roughKanji_{true};
     bool halfWidthSymbols_{false};

@@ -572,7 +572,7 @@ void JapaneseComposer::UpdatePredictions() {
     }
     // Only kanji in the range set (KeepKanjiInRange).
     if (kanjiSets_ && kanjiRange_ != KanjiRange::All) {
-        std::erase_if(predictions_, [&](const Prediction& p) { return !kanjiSets_->Allows(p.text, kanjiRange_, kanjiGrade_); });
+        std::erase_if(predictions_, [&](const Prediction& p) { return !kanjiSets_->Allows(p.text, kanjiRange_, kanjiGrade_, kanjiNames_); });
     }
 }
 
@@ -963,7 +963,7 @@ void JapaneseComposer::KeepKanjiInRange(PhraseState& phrase) const {
     if (!kanjiSets_ || kanjiRange_ == KanjiRange::All || phrase.candidates.empty()) return;
     auto& candidates = phrase.candidates;
     const std::wstring chosen = phrase.selected < candidates.size() ? candidates[phrase.selected].text : std::wstring{};
-    std::erase_if(candidates, [&](const PhraseCandidate& c) { return !kanjiSets_->Allows(c.text, kanjiRange_, kanjiGrade_); });
+    std::erase_if(candidates, [&](const PhraseCandidate& c) { return !kanjiSets_->Allows(c.text, kanjiRange_, kanjiGrade_, kanjiNames_); });
     if (candidates.empty() && phrase.begin + phrase.length <= conversionReading_.size()) {
         candidates = KanaCandidates(conversionReading_.substr(phrase.begin, phrase.length));
     }
@@ -2663,7 +2663,7 @@ void JapaneseComposer::JudgeWholeSentence(std::optional<ChunkJudge::Judgement>& 
         at.push_back(i);
     }
     keys.emplace_back(currentKeys);
-    const auto whole = chunkJudge_->JudgeSentence(keys, englishSpelling_);
+    const auto whole = chunkJudge_->JudgeSentence(keys, englishCorrection_ ? englishSpelling_ : nullptr);
     for (std::size_t k = 0; k < at.size(); ++k) {
         auto& chunk = settled_[at[k]];
         if (!chunk.locked) chunk.isEnglish = whole[k].english;
@@ -2680,7 +2680,7 @@ bool JapaneseComposer::SingleVowelKana(std::wstring_view keys) const noexcept {
 }
 
 ChunkJudge::Judgement JapaneseComposer::JudgeChunk(std::wstring_view keys) const {
-    auto judged = chunkJudge_->Judge(keys, englishRun_, japaneseInSentence_, englishSpelling_, englishText_);
+    auto judged = chunkJudge_->Judge(keys, englishRun_, japaneseInSentence_, englishCorrection_ ? englishSpelling_ : nullptr, englishText_);
     if (judged.english && SingleVowelKana(keys)) {
         // The letter is the next choice (either).
         judged.english = false;

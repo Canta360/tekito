@@ -1428,6 +1428,9 @@ void TestKanjiSets() {
     Require(sets.Allows(L"本", KanjiRange::Kyoiku, 1) && !sets.Allows(L"桜", KanjiRange::Kyoiku, 4) &&
                 sets.Allows(L"桜", KanjiRange::Kyoiku, 5),
             "教育: up to a school year");
+    Require(sets.Allows(L"本櫻", KanjiRange::Kyoiku, 1, true) && !sets.Allows(L"鬱", KanjiRange::Kyoiku, 6, true) &&
+                sets.Allows(L"鬱櫻", KanjiRange::Joyo, 6, true),
+            "人名用 kanji added to 教育 or 常用");
 }
 
 void TestMeanings() {

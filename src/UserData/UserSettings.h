@@ -2,7 +2,10 @@
 
 #include "Core/InputMode.h"
 
+#include <array>
+#include <cstddef>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace tekito::userdata {
@@ -17,7 +20,12 @@ inline constexpr const wchar_t* kBuiltInExcludedApps[] = {
 struct UserSettings {
     InputMode defaultInputMode{InputMode::Convert};
     InputMode lastInputMode{InputMode::Convert};
-    bool restoreLastInputMode{true};
+    // The mode TEKITO starts in: 0 = the one last used, 1 = Japanese,
+    // 2 = Mix, 3 = Auto, 4 = Direct. A mode that is off or not installed
+    // falls back as AvailableMode does (Japanese and Mix to Auto in the
+    // English profile). Older settings are read from
+    // restore_last_input_mode.
+    int startMode{0};
     bool learningEnabled{true};
     bool correctionEnabled{true};
     bool commonMisspellingsEnabled{true};
@@ -94,6 +102,9 @@ struct UserSettings {
     // Direct: 1 Japanese, 2 Mix, 4 Auto, 8 Direct (those that are on).
     // Older settings are read from japaneseSwitchOrder.
     int switchModes{1 | 2 | 4};
+    // The order the switch key goes round them, as the digits 1 Japanese,
+    // 2 Mix, 3 Auto, 4 Direct (1234: Japanese, Mix, Auto, Direct).
+    int switchOrder{1234};
     // Space outside a composition in Japanese mode: 0 = full-width in
     // Japanese and half-width otherwise, 1 = always half-width, 2 = always
     // full-width. Shift+Space writes the other one.
@@ -106,18 +117,21 @@ struct UserSettings {
     // (the wide forms), 2 = one digit full-width (３) and longer numbers
     // half-width (15). Converting offers the other one.
     int japaneseDigitWidth{0};
-    // How a number converts first: 0 = as typed (japaneseDigitWidth),
-    // 1 = half-width, 2 = full-width, 3 = one digit full-width and more
-    // half-width, 4 = kanji, 5 = official documents' 1億2,345万
-    // (JapaneseComposer::NumberStyle).
-    int japaneseNumberStyle{0};
+    // How a number converts first: 1 = half-width, 2 = full-width, 3 = one
+    // digit full-width and more half-width, 4 = kanji, 5 = official
+    // documents' 1億2,345万 (JapaneseComposer::NumberStyle). Older settings'
+    // 0 (as typed) is read as the one japaneseDigitWidth gives.
+    int japaneseNumberStyle{1};
     // Rough numbers in kanji: 数10人 is 数十人, 2、3日 is 二、三日.
     bool japaneseRoughNumbersKanji{true};
-    // Kanji candidates may use: 0 = all, 1 = 常用 and 人名用, 2 = 常用,
-    // 3 = 教育 (japanese::KanjiRange).
+    // Kanji candidates may use: 0 = all, 2 = 常用, 3 = 教育
+    // (japanese::KanjiRange). 1 (常用 and 人名用) is read as 2 with
+    // japaneseKanjiNames.
     int japaneseKanjiRange{0};
     // With 教育: kanji taught up to this school year (1-6).
     int japaneseKanjiGrade{6};
+    // With 教育 or 常用: 人名用 kanji too.
+    bool japaneseKanjiNames{false};
     // Symbols typed in Japanese (! ? ( )): 0 = full-width, 1 = half-width.
     int japaneseSymbolWidth{0};
     // Letters typed in Japanese that stay letters (k, q): 0 = full-width,
@@ -152,6 +166,9 @@ struct UserSettings {
     bool mixFirstPageSymbol{true};
     // Mix: a vowel typed alone (i) is kana (い) first, not the letter (I).
     bool mixSingleVowelKana{true};
+    // Mix: Space puts a slip in an English word right (teh: the), as Auto
+    // does.
+    bool mixCorrection{true};
     // A half-width space between Japanese and an English word when text is
     // committed (今日は GitHub に push した).
     bool japaneseEnglishSpacing{false};
@@ -185,5 +202,39 @@ struct UserSettings {
     // through, in addition to the built-in terminal list.
     std::vector<std::wstring> excludedApps;
 };
+
+// UserSettings::switchOrder holds each of the digits 1-4 once.
+[[nodiscard]] inline bool ValidSwitchOrder(int order) noexcept {
+    if (order < 1234 || order > 4321) return false;
+    int seen = 0;
+    for (int i = 0; i < 4; ++i, order /= 10) {
+        const int digit = order % 10;
+        if (digit < 1 || digit > 4 || (seen & (1 << digit)) != 0) return false;
+        seen |= 1 << digit;
+    }
+    return true;
+}
+
+// The modes of UserSettings::switchOrder, first to last, each with its
+// UserSettings::switchModes bit.
+[[nodiscard]] inline std::array<std::pair<InputMode, int>, 4> SwitchOrderModes(int order) noexcept {
+    constexpr std::pair<InputMode, int> kModes[] = {
+        {InputMode::Japanese, 1}, {InputMode::Mixed, 2}, {InputMode::Convert, 4}, {InputMode::Direct, 8}};
+    if (!ValidSwitchOrder(order)) order = 1234;
+    std::array<std::pair<InputMode, int>, 4> modes{};
+    for (int i = 3; i >= 0; --i, order /= 10) modes[static_cast<std::size_t>(i)] = kModes[order % 10 - 1];
+    return modes;
+}
+
+// The mode UserSettings::startMode names; `last` for 0.
+[[nodiscard]] inline InputMode StartMode(const UserSettings& settings, InputMode last) noexcept {
+    switch (settings.startMode) {
+    case 1: return InputMode::Japanese;
+    case 2: return InputMode::Mixed;
+    case 3: return InputMode::Convert;
+    case 4: return InputMode::Direct;
+    default: return last;
+    }
+}
 
 }  // namespace tekito::userdata

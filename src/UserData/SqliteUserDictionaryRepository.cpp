@@ -210,8 +210,11 @@ bool SqliteUserDictionaryRepository::Save(const UserDictionary& dictionary) noex
 }
 
 bool SqliteUserDictionaryRepository::LoadSettings(UserSettings& settings) const noexcept {
-    // switch_modes, once saved, wins over the older japanese_switch_order.
+    // switch_modes, once saved, wins over the older japanese_switch_order;
+    // start_mode over restore_last_input_mode.
     bool switchModesSaved = false;
+    bool startModeSaved = false;
+    bool restoreLast = true;
     if (!database_) return false;
 
     sqlite3_stmt* statement = nullptr;
@@ -239,7 +242,16 @@ bool SqliteUserDictionaryRepository::LoadSettings(UserSettings& settings) const 
                                        ? InputMode::Direct
                                        : InputMode::Convert;
         } else if (std::strcmp(key, "restore_last_input_mode") == 0) {
-            loaded.restoreLastInputMode = value != 0;
+            restoreLast = value != 0;
+        } else if (std::strcmp(key, "start_mode") == 0) {
+            loaded.startMode = std::clamp(value, 0, 4);
+            startModeSaved = true;
+        } else if (std::strcmp(key, "switch_order") == 0) {
+            loaded.switchOrder = ValidSwitchOrder(value) ? value : 1234;
+        } else if (std::strcmp(key, "japanese_kanji_names") == 0) {
+            loaded.japaneseKanjiNames = value != 0;
+        } else if (std::strcmp(key, "mix_correction") == 0) {
+            loaded.mixCorrection = value != 0;
         } else if (std::strcmp(key, "learning_enabled") == 0) {
             loaded.learningEnabled = value != 0;
         } else if (std::strcmp(key, "correction_enabled") == 0) {
@@ -383,6 +395,15 @@ bool SqliteUserDictionaryRepository::LoadSettings(UserSettings& settings) const 
     }
     success = success && stepResult == SQLITE_DONE;
     sqlite3_finalize(statement);
+    // Older settings: off meant Japanese mode (Auto in the English profile).
+    if (!startModeSaved && !restoreLast) loaded.startMode = 1;
+    // 常用 and 人名用 is 常用 with the 人名用 kanji.
+    if (loaded.japaneseKanjiRange == 1) {
+        loaded.japaneseKanjiRange = 2;
+        loaded.japaneseKanjiNames = true;
+    }
+    // As typed is the style the digit width gives.
+    if (loaded.japaneseNumberStyle == 0) loaded.japaneseNumberStyle = loaded.japaneseDigitWidth + 1;
 
     if (success) {
         statement = nullptr;
@@ -430,7 +451,8 @@ bool SqliteUserDictionaryRepository::SaveSettings(const UserSettings& settings) 
     };
     saveValue("default_input_mode", static_cast<int>(settings.defaultInputMode));
     saveValue("last_input_mode", static_cast<int>(settings.lastInputMode));
-    saveValue("restore_last_input_mode", settings.restoreLastInputMode ? 1 : 0);
+    saveValue("start_mode", std::clamp(settings.startMode, 0, 4));
+    saveValue("switch_order", ValidSwitchOrder(settings.switchOrder) ? settings.switchOrder : 1234);
     saveValue("learning_enabled", settings.learningEnabled ? 1 : 0);
     saveValue("correction_enabled", settings.correctionEnabled ? 1 : 0);
     saveValue("common_misspellings_enabled", settings.commonMisspellingsEnabled ? 1 : 0);
@@ -480,6 +502,7 @@ bool SqliteUserDictionaryRepository::SaveSettings(const UserSettings& settings) 
     saveValue("japanese_rough_numbers_kanji", settings.japaneseRoughNumbersKanji ? 1 : 0);
     saveValue("japanese_kanji_range", std::clamp(settings.japaneseKanjiRange, 0, 3));
     saveValue("japanese_kanji_grade", std::clamp(settings.japaneseKanjiGrade, 1, 6));
+    saveValue("japanese_kanji_names", settings.japaneseKanjiNames ? 1 : 0);
     saveValue("japanese_symbol_width", std::clamp(settings.japaneseSymbolWidth, 0, 1));
     saveValue("japanese_letter_width", std::clamp(settings.japaneseLetterWidth, 0, 1));
     saveValue("advanced_settings", settings.advancedSettings ? 1 : 0);
@@ -493,6 +516,7 @@ bool SqliteUserDictionaryRepository::SaveSettings(const UserSettings& settings) 
     saveValue("japanese_kana_input", settings.japaneseKanaInput ? 1 : 0);
     saveValue("japanese_kana_input_key", settings.japaneseKanaInputKey ? 1 : 0);
     saveValue("mix_single_vowel_kana", settings.mixSingleVowelKana ? 1 : 0);
+    saveValue("mix_correction", settings.mixCorrection ? 1 : 0);
     saveValue("mix_live_conversion", settings.mixLiveConversion ? 1 : 0);
     saveValue("english_spelling", std::clamp(settings.englishSpelling, 0, 2));
     saveValue("no_learning_in_private", settings.noLearningInPrivate ? 1 : 0);

@@ -52,7 +52,7 @@ inline void ApplyJapaneseSettings(japanese::JapaneseComposer& composer, const Us
     composer.SetHalfWidthDigits(settings.japaneseDigitWidth != 1);
     composer.SetSingleDigitFullWidth(settings.japaneseDigitWidth == 2);
     composer.SetKanjiRange(static_cast<japanese::KanjiRange>(std::clamp(settings.japaneseKanjiRange, 0, 3)),
-                           std::clamp(settings.japaneseKanjiGrade, 1, 6));
+                           std::clamp(settings.japaneseKanjiGrade, 1, 6), settings.japaneseKanjiNames);
     composer.SetRoughNumbersInKanji(settings.japaneseRoughNumbersKanji);
     composer.SetNumberStyle(static_cast<japanese::JapaneseComposer::NumberStyle>(std::clamp(settings.japaneseNumberStyle, 0, 5)));
     composer.SetHalfWidthSymbols(settings.japaneseSymbolWidth == 1);
@@ -62,6 +62,7 @@ inline void ApplyJapaneseSettings(japanese::JapaneseComposer& composer, const Us
     composer.SetSentenceCheck(settings.japaneseSentenceCheck);
     composer.SetTypedForms(settings.japaneseTypedForms);
     composer.SetSingleVowelKana(settings.mixSingleVowelKana);
+    composer.SetEnglishCorrection(settings.mixCorrection);
     composer.SetLiveRefine(settings.japaneseLiveRefine);
     composer.SetMixLiveConversion(settings.mixLiveConversion);
     composer.SetSpecialConversions(&SpecialConversions::Installed(), SpecialOptionsFor(settings));

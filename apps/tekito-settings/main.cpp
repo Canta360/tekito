@@ -391,11 +391,11 @@ public:
         (void)repository_->LoadJapaneseUserWords(japaneseWords_);
         (void)repository_->LoadSettings(settings_);
         (void)repository_->LoadLearning(learning_);
-        const auto startupMode = settings_.restoreLastInputMode
-                                     ? settings_.lastInputMode
-                                     : settings_.defaultInputMode;
+        auto startupMode = tekito::userdata::StartMode(settings_, settings_.lastInputMode);
+        if (startupMode != tekito::InputMode::Direct) startupMode = tekito::InputMode::Convert;
         runtime_ = std::make_unique<tekito::userdata::RuntimeModeState>(
-            startupMode, tekito::userdata::kRuntimeStateName, settings_.lastJapaneseProfileMode);
+            startupMode, tekito::userdata::kRuntimeStateName,
+            tekito::userdata::StartMode(settings_, settings_.lastJapaneseProfileMode));
 
         WNDCLASSW windowClass{};
         windowClass.hInstance = instance_;
@@ -869,12 +869,14 @@ private:
         text += L"Predictions: " + std::wstring(onOff(s.japanesePredictionEnabled)) + L"\n";
         text += L"Mix: " + std::wstring(onOff(s.mixedTypingEnabled)) + L"\n";
         text += L"Mix live conversion: " + std::wstring(onOff(s.mixLiveConversion)) + L"\n";
+        text += L"Mix English correction: " + std::wstring(onOff(s.mixCorrection)) + L"\n";
         text += L"Kana input: " + std::wstring(onOff(s.japaneseKanaInput)) + L"\n";
         text += L"Keyboard: " + std::wstring(keyboards[std::clamp(s.keyboardType, 0, 2)]) + L"\n";
         text += L"Digits: " + std::wstring(digits[std::clamp(s.japaneseDigitWidth, 0, 2)]) + L"\n";
         text += L"Converted numbers: " + std::wstring(numbers[std::clamp(s.japaneseNumberStyle, 0, 5)]) + L"\n";
         text += L"Kanji: " + std::wstring(kanji[std::clamp(s.japaneseKanjiRange, 0, 3)]);
         if (s.japaneseKanjiRange == 3) text += L" (grade " + std::to_wstring(s.japaneseKanjiGrade) + L")";
+        if (s.japaneseKanjiRange != 0 && s.japaneseKanjiNames) text += L" + jinmei";
         text += L"\n";
         const auto romaji = tekito::japanese::RomajiTable::ReadChanges(tekito::japanese::UserRomajiFile());
         text += L"Romaji table: " + (romaji.empty() ? std::wstring(L"standard") : std::to_wstring(romaji.size()) + L" changes");
@@ -969,8 +971,12 @@ private:
         const auto registeredDll = RegisteredTsfDll();
         const auto tsf = !registeredDll.empty() && std::filesystem::exists(registeredDll) ? L"Loaded" : L"Unavailable";
         const auto packs = DataPacksJson();
-        std::wstring json = L"{\"version\":\"" + std::wstring(kVersion) + L"\",\"settings\":{\"restoreLastInputMode\":";
-        json += settings_.restoreLastInputMode ? L"true" : L"false";
+        std::wstring json = L"{\"version\":\"" + std::wstring(kVersion) + L"\",\"settings\":{\"startMode\":" + std::to_wstring(settings_.startMode);
+        json += L",\"switchOrder\":" + std::to_wstring(settings_.switchOrder);
+        json += L",\"japaneseKanjiNames\":";
+        json += settings_.japaneseKanjiNames ? L"true" : L"false";
+        json += L",\"mixCorrection\":";
+        json += settings_.mixCorrection ? L"true" : L"false";
         json += L",\"correctionEnabled\":";
         json += settings_.correctionEnabled ? L"true" : L"false";
         json += L",\"commonMisspellingsEnabled\":";
@@ -1196,7 +1202,12 @@ private:
             const int integerValue = static_cast<int>(message.Number(L"value"));
             const auto previous = settings_;
             bool known = true;
-            if (key == L"restoreLastInputMode") settings_.restoreLastInputMode = value;
+            if (key == L"startMode") settings_.startMode = std::clamp(integerValue, 0, 4);
+            else if (key == L"switchOrder") {
+                if (tekito::userdata::ValidSwitchOrder(integerValue)) settings_.switchOrder = integerValue;
+            }
+            else if (key == L"japaneseKanjiNames") settings_.japaneseKanjiNames = value;
+            else if (key == L"mixCorrection") settings_.mixCorrection = value;
             else if (key == L"correctionEnabled") settings_.correctionEnabled = value;
             else if (key == L"commonMisspellingsEnabled") settings_.commonMisspellingsEnabled = value;
             else if (key == L"contextSuggestionsEnabled") settings_.contextSuggestionsEnabled = value;
@@ -1254,7 +1265,7 @@ private:
                 settings_.englishSpelling = std::clamp(integerValue, 0, 2);
             }
             else if (key == L"japaneseNumberStyle") {
-                settings_.japaneseNumberStyle = std::clamp(integerValue, 0, 5);
+                settings_.japaneseNumberStyle = std::clamp(integerValue, 1, 5);
             }
             else if (key == L"japaneseKanjiRange") {
                 settings_.japaneseKanjiRange = std::clamp(integerValue, 0, 3);

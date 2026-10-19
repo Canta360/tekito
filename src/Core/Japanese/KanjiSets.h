@@ -26,8 +26,9 @@ public:
     [[nodiscard]] bool Empty() const noexcept { return levels_.empty(); }
 
     // Every kanji in `text` is in `range` (kana, letters and marks always
-    // are); for 教育, taught by school year `grade` (1-6).
-    [[nodiscard]] bool Allows(std::wstring_view text, KanjiRange range, int grade = 6) const;
+    // are); for 教育, taught by school year `grade` (1-6). `names`: 人名用
+    // kanji are allowed too.
+    [[nodiscard]] bool Allows(std::wstring_view text, KanjiRange range, int grade = 6, bool names = false) const;
     // Every kanji in `text` is 常用 or 人名用.
     [[nodiscard]] bool Common(std::wstring_view text) const { return Allows(text, KanjiRange::JoyoAndJinmei); }
 

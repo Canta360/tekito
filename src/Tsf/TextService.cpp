@@ -567,12 +567,10 @@ HRESULT TextService::ActivateEx(ITfThreadMgr* threadManager, TfClientId clientId
         Trace(L"ActivateEx UserData repository open skipped");
     }
 
-    const auto startupMode = userSettings_.restoreLastInputMode
-                                 ? userSettings_.lastInputMode
-                                 : userSettings_.defaultInputMode;
-    const auto japaneseStartupMode = userSettings_.restoreLastInputMode
-                                         ? userSettings_.lastJapaneseProfileMode
-                                         : InputMode::Japanese;
+    // The English profile has only Auto and Direct.
+    auto startupMode = userdata::StartMode(userSettings_, userSettings_.lastInputMode);
+    if (startupMode != InputMode::Direct) startupMode = InputMode::Convert;
+    const auto japaneseStartupMode = userdata::StartMode(userSettings_, userSettings_.lastJapaneseProfileMode);
     runtimeMode_ = std::make_unique<userdata::RuntimeModeState>(
         startupMode, userdata::kRuntimeStateName, japaneseStartupMode);
     UpdateActiveProfile();

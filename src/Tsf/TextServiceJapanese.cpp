@@ -87,11 +87,9 @@ InputMode TextService::ToggledMode() const noexcept {
         return mode_ == InputMode::Convert ? InputMode::Direct : InputMode::Convert;
     }
     // The modes chosen to go round (UserSettings::switchModes) that are on,
-    // in the order Japanese, Mix, Auto, Direct.
-    constexpr std::pair<InputMode, int> kOrder[] = {
-        {InputMode::Japanese, 1}, {InputMode::Mixed, 2}, {InputMode::Convert, 4}, {InputMode::Direct, 8}};
+    // in the order chosen (UserSettings::switchOrder).
     std::vector<InputMode> round;
-    for (const auto& [mode, bit] : kOrder) {
+    for (const auto& [mode, bit] : userdata::SwitchOrderModes(userSettings_.switchOrder)) {
         if ((userSettings_.switchModes & bit) != 0 && AvailableMode(mode) == mode) round.push_back(mode);
     }
     // Fewer than two: a typing mode and Auto.
