@@ -941,9 +941,9 @@ void Paint(Wizard& wizard) {
                  wizard.body.Get(), D2D1::RectF(kMargin, 170.0f, kMargin + bodyWidth, 214.0f), p.ink2);
         if (wizard.webViewReady) {
             DrawText(wizard,
-                     Tr(L"Downloads the Japanese dictionary and language data (about 56 MB) from TEKITO's release "
+                     Tr(L"Downloads the Japanese dictionary and language data (about 80 MB) from TEKITO's release "
                         L"on GitHub while installing.",
-                        L"インストール中に、日本語の辞書と言語データ（約 56 MB）を GitHub の TEKITO のリリースから"
+                        L"インストール中に、日本語の辞書と言語データ（約 80 MB）を GitHub の TEKITO のリリースから"
                         L"ダウンロードします。"),
                      wizard.caption.Get(),
                      D2D1::RectF(kMargin + 30.0f, JapaneseRow(wizard) + 28.0f, kWidth - kMargin, JapaneseRow(wizard) + 64.0f),
