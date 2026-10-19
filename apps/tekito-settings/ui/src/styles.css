@@ -257,13 +257,15 @@ kbd {
 .key-list .keycaps { flex: none; }
 .list-empty { padding: 4px 18px 14px 52px; color: var(--ink-2); font-size: 13px; }
 .list-search { padding: 0 18px 10px 52px; }
-.list-search input, .field input, .field select, .inline-form input {
+.list-search input, .field input, .field select, .inline-form input:not([type="checkbox"]) {
   width: 100%; padding: 5px 10px; border-radius: 5px; border: 1px solid var(--line); border-bottom-color: var(--track);
   background: var(--raised); outline: none;
 }
-.list-search input:focus, .field input:focus, .inline-form input:focus { border-bottom: 2px solid var(--accent); }
+.list-search input:focus, .field input:focus, .inline-form input:not([type="checkbox"]):focus { border-bottom: 2px solid var(--accent); }
 .inline-form { display: flex; gap: 8px; align-items: center; padding: 0 18px 12px 52px; }
-.inline-form label { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; font-size: 13px; }
+.inline-form label { flex: none; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; font-size: 13px; }
+.inline-form input:not([type="checkbox"]) { flex: 1; min-width: 0; width: auto; }
+.inline-form .btn { flex: none; white-space: nowrap; }
 .progress { width: 160px; height: 3px; border-radius: 2px; background: var(--line-strong); overflow: hidden; position: relative; }
 .progress::after {
   content: ""; position: absolute; top: 0; bottom: 0; width: 40%; background: var(--accent); border-radius: 2px;

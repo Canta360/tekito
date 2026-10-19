@@ -770,7 +770,7 @@ function JapanesePage({ settings, setSetting, runAction, setConfirm, showKeys, r
           )}>
           <span style={{ display: "grid", gap: 4 }}>
             <Slider label={j.kanji.title} value={stop} stops={kanjiStops.map((value, index) => [value, j.kanji.stops[index]])} onChange={setKanji} />
-            <small className="muted">{j.kanji.examples[stop <= 6 ? 0 : stop === 7 ? 1 : 2]}</small>
+            <small className="muted">{j.kanji.examples[stop - 1]}</small>
           </span>
         </Row>
       </Card>
