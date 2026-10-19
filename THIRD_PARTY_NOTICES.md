@@ -41,6 +41,14 @@ Platforms, Inc. and affiliates), licensed under the MIT License:
 Vite and its React plugin are used only to build the page and are not
 shipped.
 
+## Material Symbols
+
+The icons in Settings are Material Symbols (Rounded, weight 300; Copyright
+Google LLC), from the `@material-symbols/svg-300` package, licensed under the
+Apache License 2.0. The full license text is
+`third_party/material-symbols/LICENSE` (shipped in the package at the same
+path, and in Settings → About → Third-party notices).
+
 ## M PLUS 1
 
 M PLUS 1 (Copyright 2021 The M+ FONTS Project Authors,
@@ -62,7 +70,8 @@ the Mozc OSS dictionary, symbol, emoji, emoticon and single-kanji tables (IPAdic
 (NICT), plus data written for TEKITO. The model that checks whole Japanese
 sentences was trained on the zenz-v2.5 dataset (llm-jp-corpus-v3 part, Open
 Data Commons Attribution License 1.0) and holds no text from it. Japan Post's postal code data is not
-included: users add it themselves in Settings. Each
+included: Settings downloads it from Japan Post, or reads a file the user
+downloaded, only when the user turns it on. Each
 pack's `NOTICE` and `manifest.json` give its source, version and license, and
 carry the attribution that license asks for; they are the authoritative
 notices for the data. [docs/data-packs.md](docs/data-packs.md) lists them

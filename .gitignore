@@ -17,6 +17,8 @@ CMakeUserPresets.json
 *.ilk
 apps/tekito-settings/ui/node_modules/
 apps/tekito-settings/ui/dist/
+# Copied from the repository by copy-notices.mjs at build time.
+apps/tekito-settings/ui/public/notices/
 .edge-preview-*/
 .edge-review-*/
 eval/generated/

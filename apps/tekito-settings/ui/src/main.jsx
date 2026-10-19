@@ -1152,6 +1152,19 @@ function AboutPage({ settings, setSetting, runAction, version, runtime, packs, j
     const response = await hostRequest("license.get");
     setLicense(response.ok ? response.text : a.licenseMissing);
   };
+  // The third-party notices and full license texts carried in the page
+  // (copy-notices.mjs); `plain` for a text file.
+  const [notice, setNotice] = useState(null);
+  const openNotice = async (file, title, plain = false) => {
+    let text = a.licenseMissing;
+    try {
+      const response = await fetch(`./notices/${file}`);
+      if (response.ok) text = await response.text();
+    } catch {
+      // Shown as missing.
+    }
+    setNotice({ title, text, plain });
+  };
   // Problems only: a pack of an installed language that cannot be used, or
   // the input method not registered.
   const installedGroups = new Set(packs.filter((pack) => pack.valid).map((pack) => pack.group || "english"));
@@ -1225,7 +1238,7 @@ function AboutPage({ settings, setSetting, runAction, version, runtime, packs, j
         <LinkRow icon="content_copy" title={a.diagnostics} onClick={() => runAction("diagnostics.copy", {}, a.diagnosticsCopied)} />
         <LinkRow icon="folder" title={a.logs} onClick={() => runAction("logs.open", {})} />
         <LinkRow icon="gavel" title={a.license} onClick={openLicense} />
-        <LinkRow icon="description" title={a.notices} onClick={() => runAction("notices.open", {})} />
+        <LinkRow icon="description" title={a.notices} onClick={() => openNotice("THIRD_PARTY_NOTICES.md", a.notices)} />
       </Card>
 
       <Heading>{a.publisher}</Heading>
@@ -1240,6 +1253,18 @@ function AboutPage({ settings, setSetting, runAction, version, runtime, packs, j
         <LicenseText text={license || ""} />
         <div className="dialog-actions"><Button variant="primary" onClick={() => setLicense(null)}>{t.close}</Button></div>
       </Dialog>
+      <Dialog open={notice !== null} title={notice?.title} wide onClose={() => setNotice(null)}>
+        {notice && (notice.plain ? <pre className="license-text plain" tabIndex={0} lang="en">{notice.text}</pre> : <LicenseText text={notice.text} />)}
+        {notice && !notice.plain && (
+          <div className="notice-links">
+            <Button onClick={() => openNotice("material-symbols-LICENSE.txt", "Material Symbols — Apache License 2.0", true)}>Material Symbols</Button>
+            <Button onClick={() => openNotice("OFL.txt", "M PLUS 1 — SIL Open Font License 1.1", true)}>M PLUS 1</Button>
+            <Button onClick={() => openNotice("webview2-LICENSE.txt", "Microsoft WebView2", true)}>WebView2</Button>
+            <Button onClick={() => runAction("notices.open", {})}>{a.dataNotices}</Button>
+          </div>
+        )}
+        <div className="dialog-actions"><Button variant="primary" onClick={() => setNotice(null)}>{t.close}</Button></div>
+      </Dialog>
     </>
   );
 }
@@ -1247,16 +1272,28 @@ function AboutPage({ settings, setSetting, runAction, version, runtime, packs, j
 // Renders the license Markdown's few constructs: headings, bullets, paragraphs.
 function LicenseText({ text }) {
   const blocks = [];
+  // A line that only continues the one before (wrapped text) joins it.
+  let open = false;
   text.replace(/\r/g, "").split("\n").forEach((raw, index) => {
-    const line = raw.trim();
+    // Markdown quotes and code marks read as plain text.
+    const line = raw.trim().replace(/^>\s?/, "").replace(/`/g, "");
     const last = blocks[blocks.length - 1];
-    if (line.startsWith("- ")) {
+    if (!line || index === 0) {  // line 0 is the title, shown as the dialog heading
+      open = false;
+    } else if (line.startsWith("- ")) {
       if (last?.kind === "list") last.items.push(line.slice(2));
       else blocks.push({ kind: "list", items: [line.slice(2)] });
+      open = true;
     } else if (line.startsWith("## ")) {
       blocks.push({ kind: "heading", text: line.slice(3) });
-    } else if (line && index > 0) {  // line 0 is the title, shown as the dialog heading
+      open = false;
+    } else if (open && last?.kind === "list") {
+      last.items[last.items.length - 1] += ` ${line}`;
+    } else if (open && last?.kind === "paragraph") {
+      last.text += ` ${line}`;
+    } else {
       blocks.push({ kind: "paragraph", text: line });
+      open = true;
     }
   });
   return (

@@ -79,6 +79,7 @@ $documents = [ordered]@{
     "assets\fonts\OFL.txt" = Join-Path $repoRoot "assets\fonts\OFL.txt"
     "third_party\webview2\LICENSE.txt" = Join-Path $repoRoot "third_party\webview2\LICENSE.txt"
     "third_party\webview2\NOTICE.txt" = Join-Path $repoRoot "third_party\webview2\NOTICE.txt"
+    "third_party\material-symbols\LICENSE" = Join-Path $repoRoot "third_party\material-symbols\LICENSE"
 }
 $scripts = [ordered]@{
     "install.ps1" = Join-Path $PSScriptRoot "install.ps1"

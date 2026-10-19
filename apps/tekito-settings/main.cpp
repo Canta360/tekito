@@ -1257,7 +1257,11 @@ private:
             else if (key == L"modeBadgeOnFocus") settings_.modeBadgeOnFocus = value;
             else if (key == L"modePerApp") settings_.modePerApp = value;
             else if (key == L"advancedSettings") settings_.advancedSettings = value;
-            else if (key == L"keepRecentConversions") settings_.keepRecentConversions = value;
+            else if (key == L"keepRecentConversions") {
+                settings_.keepRecentConversions = value;
+                // Off: the kept conversions go too (0: all of them).
+                if (!value && repository_) (void)repository_->ForgetRecentConversion(0);
+            }
             else if (key == L"dateConversion") settings_.dateConversion = value;
             else if (key == L"numberConversion") settings_.numberConversion = value;
             else if (key == L"symbolConversion") settings_.symbolConversion = value;

@@ -305,6 +305,8 @@ kbd {
 .license-text h3 { font-size: 14px; margin: 14px 0 4px; }
 .license-text p, .license-text ul { margin: 0 0 8px; }
 .license-text ul { padding-left: 18px; list-style: disc; }
+.license-text.plain { margin: 0 24px 16px; padding: 0; white-space: pre-wrap; font: 12px/1.5 Consolas, "Cascadia Mono", monospace; }
+.notice-links { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 24px 18px; }
 .toast {
   position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); padding: 10px 16px; border-radius: 8px;
   background: var(--raised); border: 1px solid var(--line); box-shadow: var(--shadow); font-size: 13px;
