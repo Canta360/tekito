@@ -300,14 +300,16 @@ kbd {
 .sample:hover { background: var(--card-hover); }
 .sample.is-playing { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
 /* The clips' page is white, or #202020 in dark. */
-.sample-stage { position: relative; display: block; aspect-ratio: 3 / 2; background: #ffffff; border-bottom: 1px solid var(--line); }
+.sample-stage { position: relative; display: block; width: 100%; aspect-ratio: 3 / 2; overflow: hidden; background: #ffffff; border-bottom: 1px solid var(--line); }
 @media (prefers-color-scheme: dark) { .sample-stage { background: #202020; } }
-.sample-stage video { width: 100%; height: 100%; object-fit: contain; object-position: center top; display: block; }
+/* The typed text sits at the top left of the clip: shown larger there. */
+.sample-stage img { width: 160%; height: auto; max-width: none; display: block; }
 .sample-play {
   position: absolute; right: 10px; bottom: 10px; width: 32px; height: 32px; border-radius: 50%; color: #fff;
   background: rgba(0, 0, 0, 0.45); display: flex; align-items: center; justify-content: center;
 }
-.sample-name { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; font-size: 14px; }
+.sample-name { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 10px 12px 12px; font-size: 14px; }
+.sample-name .keycaps:empty { display: none; }
 
 /* Dialogs and notices. */
 .dialog {

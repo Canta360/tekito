@@ -4,7 +4,8 @@
 <script src="mp4.js"></script>
 <script>
 // Turns a recording's frames (frames.txt: "frameNNNNN.bmp <ms>") into an
-// H.264 MP4 at 30 fps and posts it back to encode.py.
+// H.264 MP4 at 30 fps and its last frame into a JPEG thumbnail, and posts
+// them back to encode.py.
 "use strict";
 const FPS = 30;
 
@@ -60,6 +61,8 @@ async function encode() {
   if (failure) throw failure;
   const mp4 = Mp4.write({ chunks, description, width, height, fps: FPS });
   await post("/save", mp4);
+  // The last frame as the clip's thumbnail.
+  await post("/poster", await canvas.convertToBlob({ type: "image/jpeg", quality: 0.9 }));
   await post("/log", `${index} frames, ${(elapsed / 1000).toFixed(1)} s, ${(mp4.size / 1e3).toFixed(0)} KB`);
 }
 

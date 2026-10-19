@@ -35,6 +35,7 @@ const initialSettings = {
   mixPredictionEnabled: true,
   mixFirstPageSymbol: true,
   mixCorrection: true,
+  mixSettledMarker: true,
   japaneseEnabled: true,
   modeIndicatorEnabled: true,
   modeUnderlineColors: true,
@@ -342,7 +343,7 @@ function searchIndex(t, pages, japaneseInstalled) {
     ["japanese", j.symbols.title, true], ["japanese", j.spacing.title, true], ["japanese", j.sentenceCheck.title, true],
     ["japanese", j.firstPageSymbol.title, true], ["japanese", j.typedForms.title, true],
     ["mixed", m.live.title], ["mixed", m.prediction.title], ["mixed", m.singleVowel.title], ["mixed", m.correction.title],
-    ["mixed", m.firstPageSymbol.title, true],
+    ["mixed", m.firstPageSymbol.title, true], ["mixed", m.marker.title, true],
     ["auto", a.correction.title], ["auto", a.spelling.title], ["auto", a.completion.title], ["auto", a.next.title], ["auto", a.casual.title],
     ["auto", a.doubled.title, true], ["auto", a.recheck.title, true], ["auto", a.phonetic.title, true], ["auto", a.period.title, true],
     ["auto", a.doubleSpace.title, true], ["auto", a.smart.title, true],
@@ -701,9 +702,8 @@ function SamplesPage({ japaneseInstalled, back }) {
         {sampleSets[mode].map(([id, keys]) => (
           <button key={id} type="button" className="sample" onClick={() => setShown([id, keys])}>
             <span className="sample-stage">
-              {/* At rest a card shows how its clip ends. */}
-              <video src={clip(id)} muted playsInline preload="auto"
-                onLoadedMetadata={(event) => { event.currentTarget.currentTime = Math.max(0, event.currentTarget.duration - 0.2); }} />
+              {/* The clip's last frame; the clip plays once opened. */}
+              <img src={clip(id).replace(".mp4", ".jpg")} alt="" />
               <span className="sample-play" aria-hidden="true"><Symbol name="play_arrow" size={22} /></span>
             </span>
             <span className="sample-name"><span>{t.samples.names[id]}</span><Keycaps keys={keys} /></span>
@@ -983,6 +983,9 @@ function MixedPage({ settings, setSetting }) {
         <Card label={m.firstPageSymbol.title}>
           <Row icon="mood" title={m.firstPageSymbol.title} description={m.firstPageSymbol.description}>
             <Toggle label={m.firstPageSymbol.title} checked={settings.mixFirstPageSymbol} onChange={(value) => setSetting("mixFirstPageSymbol", value)} />
+          </Row>
+          <Row icon="ink_highlighter" title={m.marker.title} description={m.marker.description}>
+            <Toggle label={m.marker.title} checked={settings.mixSettledMarker} onChange={(value) => setSetting("mixSettledMarker", value)} />
           </Row>
         </Card>
         <Card label={m.shared.title}>

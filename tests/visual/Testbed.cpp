@@ -252,8 +252,8 @@ std::vector<Cell> Layout(const Testbed& bed, HDC dc, int top, int width, std::si
         for (const wchar_t ch : bed.en.composition) chars.push_back({ch, Style::Input});
     } else {
         for (const auto& segment : bed.composer.Segments()) {
-            const Style style = segment.settled     ? Style::Settled
-                                : !segment.converted ? Style::Input
+            const Style style = segment.settled && bed.settings.mixSettledMarker ? Style::Settled
+                                : !segment.converted && !segment.settled ? Style::Input
                                 : segment.focused    ? Style::Focused
                                                      : Style::Converted;
             for (const wchar_t ch : segment.text) chars.push_back({ch, style});
@@ -1295,6 +1295,7 @@ int RunScript(Testbed& bed, const std::filesystem::path& script, const std::file
                 {L"spacing", &tekito::userdata::UserSettings::japaneseEnglishSpacing},
                 {L"mixlive", &tekito::userdata::UserSettings::mixLiveConversion},
                 {L"mixcorrection", &tekito::userdata::UserSettings::mixCorrection},
+                {L"marker", &tekito::userdata::UserSettings::mixSettledMarker},
                 {L"vowelkana", &tekito::userdata::UserSettings::mixSingleVowelKana},
                 {L"correction", &tekito::userdata::UserSettings::correctionEnabled},
                 {L"completion", &tekito::userdata::UserSettings::completionEnabled},

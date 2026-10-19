@@ -169,6 +169,9 @@ struct UserSettings {
     // Mix: Space puts a slip in an English word right (teh: the), as Auto
     // does.
     bool mixCorrection{true};
+    // Mix: the sentence held until Enter has a marker in Mix's orange; off,
+    // it is underlined as converted text.
+    bool mixSettledMarker{true};
     // A half-width space between Japanese and an English word when text is
     // committed (今日は GitHub に push した).
     bool japaneseEnglishSpacing{false};

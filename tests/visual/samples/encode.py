@@ -6,9 +6,10 @@
 Each script (tests/visual/samples/*.txt, all of them by default) is typed
 into tekito_testbed --record, once with the light and once with the dark
 candidate list, and the frames become <name>-light.mp4 and <name>-dark.mp4
-in the out folder, encoded by headless Chrome (encode.html). A small page
-window and the candidate list appear at the top left of the screen while
-recording; they never take the focus. Only the standard library is used.
+in the out folder, each with a .jpg of its last frame as the thumbnail,
+encoded by headless Chrome (encode.html). A small page window and the
+candidate list appear at the top left of the screen while recording; they
+never take the focus. Only the standard library is used.
 """
 
 from __future__ import annotations
@@ -42,6 +43,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         body = self.rfile.read(int(self.headers.get("Content-Length", 0)))
         if self.path == "/save":
             self.target.write_bytes(body)
+        elif self.path == "/poster":
+            self.target.with_suffix(".jpg").write_bytes(body)
         elif self.path == "/log":
             print(f"  {self.target.name}: {body.decode('utf-8', 'replace')}")
         elif self.path == "/done":

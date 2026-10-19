@@ -988,6 +988,8 @@ private:
         json += L",\"switchOrder\":" + std::to_wstring(settings_.switchOrder);
         json += L",\"japaneseKanjiNames\":";
         json += settings_.japaneseKanjiNames ? L"true" : L"false";
+        json += L",\"mixSettledMarker\":";
+        json += settings_.mixSettledMarker ? L"true" : L"false";
         json += L",\"mixCorrection\":";
         json += settings_.mixCorrection ? L"true" : L"false";
         json += L",\"correctionEnabled\":";
@@ -1221,6 +1223,7 @@ private:
             }
             else if (key == L"japaneseKanjiNames") settings_.japaneseKanjiNames = value;
             else if (key == L"mixCorrection") settings_.mixCorrection = value;
+            else if (key == L"mixSettledMarker") settings_.mixSettledMarker = value;
             else if (key == L"correctionEnabled") settings_.correctionEnabled = value;
             else if (key == L"commonMisspellingsEnabled") settings_.commonMisspellingsEnabled = value;
             else if (key == L"contextSuggestionsEnabled") settings_.contextSuggestionsEnabled = value;

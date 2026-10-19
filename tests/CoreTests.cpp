@@ -2219,6 +2219,7 @@ void TestSqliteUserSettingsRepository() {
     source.japaneseKanjiNames = true;
     source.japaneseNumberStyle = 4;
     source.mixCorrection = false;
+    source.mixSettledMarker = false;
     source.learningEnabled = false;
     source.correctionEnabled = false;
     source.commonMisspellingsEnabled = false;
@@ -2275,7 +2276,7 @@ void TestSqliteUserSettingsRepository() {
                 loaded.switchOrder == 3142,
             "settings repository restores all input mode settings");
     Require(loaded.japaneseKanjiRange == 3 && loaded.japaneseKanjiGrade == 4 && loaded.japaneseKanjiNames &&
-                loaded.japaneseNumberStyle == 4 && !loaded.mixCorrection,
+                loaded.japaneseNumberStyle == 4 && !loaded.mixCorrection && !loaded.mixSettledMarker,
             "settings repository restores kanji, numbers and Mix correction");
     {
         const auto modes = tekito::userdata::SwitchOrderModes(3142);

@@ -159,6 +159,7 @@ const en = {
     singleVowel: { title: "First candidate for one vowel", description: "e.g. converting i: kana い, letter I", kana: "Kana", letter: "Letter" },
     correction: { title: "Fix typos in English words", description: "Fixes them with Space (e.g. teh → the)." },
     firstPageSymbol: { title: "Symbols and emoji on the first page", description: "e.g. はーと → ♡" },
+    marker: { title: "Marker on the sentence before Enter", description: "Marks the sentence not yet entered in orange." },
     shared: { title: "Other settings", description: "Kanji, numbers, notation and the romaji table follow Japanese mode; spelling and the period on Enter follow Auto." },
   },
 
@@ -459,6 +460,7 @@ const ja = {
     singleVowel: { title: "母音1文字の第1候補", description: "例：i を変換したとき、ひらがなは「い」、英字は「I」", kana: "ひらがな", letter: "英字" },
     correction: { title: "英単語の入力ミスを修正", description: "Space で修正します（例：teh → the）" },
     firstPageSymbol: { title: "記号・絵文字を1ページ目に表示", description: "例：はーと → ♡" },
+    marker: { title: "確定前の文にマーカー", description: "Enter で確定するまでの文を、オレンジのマーカーで表示します" },
     shared: { title: "そのほかの設定", description: "漢字・数字・表記・ローマ字表は日本語モード、つづりと Enter のピリオドは Auto の設定が適用されます" },
   },
 
