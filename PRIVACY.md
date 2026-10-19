@@ -77,9 +77,11 @@ yourself (`install.ps1 -JapaneseDataPath`) makes no request at all.
 ## Postal codes
 
 Turning on **Postal codes to addresses** in Settings asks first, then
-downloads Japan Post's postal code file (utf_ken_all.zip) from
-www.post.japanpost.jp. The request sends nothing about you beyond what any
-download does, such as your IP address. **Use a file already downloaded**
+downloads Japan Post's postal code file (utf_ken_all.zip): the copy on
+TEKITO's releases on GitHub (github.com), updated monthly, or Japan Post's
+own (www.post.japanpost.jp) when that copy cannot be had. The request sends
+nothing about you beyond what any download does, such as your IP address,
+and GitHub's or Japan Post's privacy terms apply to it. **Use a file already downloaded**
 reads a file you choose on your computer and makes no request.
 
 ---
@@ -93,7 +95,7 @@ TEKITO の処理はすべて PC の中で行われます。入力した内容、
 - 再変換（文字を選んで変換キー）は選んだ文字をこの PC の中で読むだけで、ほかの IME の単語の読み込みは選んだファイルをこの PC の中で取り込むだけです。どちらも何も送りません。
 - スタートメニューの検索、設定アプリ、ストアアプリでも使えるように、インストーラーはこれらのサンドボックスのアプリに、プログラムのフォルダ（`%LOCALAPPDATA%\Programs\TEKITO`）と言語データ（`%LOCALAPPDATA%\TEKITO\data`）の読み取りだけを許可します。`user.db` は対象外なので、辞書や学習内容は読めません。そこでは TEKITO は既定の設定で動きます。
 - インストール時に日本語を選ぶと、日本語データを GitHub の TEKITO のリリースからダウンロードし、チェックサムを確かめます。ネットワークを使うのはこのときだけです。自分でダウンロードした ZIP から入れる場合（`install.ps1 -JapaneseDataPath`）は通信しません。
-- 設定の「郵便番号から住所に変換」をオンにすると、確認のうえで日本郵便のサイト（www.post.japanpost.jp）から郵便番号データ（utf_ken_all.zip）をダウンロードします。送られるのは IP アドレスなど通常のダウンロードと同じ情報だけです。「ダウンロード済みのファイルを使う」を選んだ場合は、選んだファイルをこの PC の中で取り込むだけで、通信しません。
+- 設定の「郵便番号から住所に変換」をオンにすると、確認のうえで日本郵便の郵便番号データ（utf_ken_all.zip）をダウンロードします。取得先は GitHub の TEKITO のリリースにある毎月更新の写し（github.com）で、取得できないときは日本郵便のサイト（www.post.japanpost.jp）です。送られるのは IP アドレスなど通常のダウンロードと同じ情報だけです。「ダウンロード済みのファイルを使う」を選んだ場合は、選んだファイルをこの PC の中で取り込むだけで、通信しません。
 - 診断ログ（`%TEMP%\TekitoTsf.log`、トレース用ビルドか `TEKITO_TSF_TRACE=1` のときだけ作られます）と設定画面の「診断情報をコピー」には、イベント・時間・エラーコードだけが含まれ、入力した文字は含まれません。
 - 学習は設定画面の「辞書と学習 → 選択した候補の学習」でオン/オフでき、「すべて削除」で消せます。「一般 → 詳細 → TEKITO を使わないアプリ」に追加したアプリでは完全にオフになります。
 - アンインストールしても辞書・学習・設定は残ります。消す場合はインストーラーのパッケージにある `uninstall.ps1 -RemoveUserData` を実行してください。

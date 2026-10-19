@@ -1,0 +1,28 @@
+# Keeps a copy of Japan Post's postal code data (utf_ken_all.zip) on the
+# "postal-codes" release, where TEKITO Settings downloads it from. Japan Post
+# updates the data monthly and allows it to be redistributed.
+name: Postal codes
+
+on:
+  schedule:
+    - cron: "0 3 2 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download from Japan Post
+        run: |
+          curl -fsSL -o utf_ken_all.zip https://www.post.japanpost.jp/service/search/zipcode/download/utf/zip/utf_ken_all.zip
+          unzip -l utf_ken_all.zip | grep -q utf_ken_all.csv
+      - name: Publish on the postal-codes release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release view postal-codes >/dev/null 2>&1 || gh release create postal-codes --title "Postal codes" --notes "Japan Post's postal code data (utf_ken_all.zip), updated monthly, for TEKITO Settings."
+          gh release upload postal-codes utf_ken_all.zip --clobber

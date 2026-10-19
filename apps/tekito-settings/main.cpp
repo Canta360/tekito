@@ -96,10 +96,14 @@ constexpr DataPackInfo kJapaneseDataPacks[] = {
 };
 constexpr std::size_t kJapaneseRequiredPacks = 2;
 // Where Japan Post offers its postal code data (UTF-8), which Settings adds.
-constexpr wchar_t kPostalCodePage[] = L"https://www.post.japanpost.jp/zipcode/dl/utf-zip.html";
+constexpr wchar_t kPostalCodePage[] = L"https://www.post.japanpost.jp/service/search/zipcode/download/utf-zip.html";
 // Japan Post's whole-country file in UTF-8, fetched only after the user
-// agrees to it in Settings.
-constexpr wchar_t kPostalCodeZip[] = L"https://www.post.japanpost.jp/zipcode/dl/utf/zip/utf_ken_all.zip";
+// agrees to it in Settings: the copy on TEKITO's releases (kept current by
+// .github/workflows/postal-codes.yml), else Japan Post's own.
+constexpr const wchar_t* kPostalCodeZips[] = {
+    L"https://github.com/Canta360/tekito/releases/download/postal-codes/utf_ken_all.zip",
+    L"https://www.post.japanpost.jp/service/search/zipcode/download/utf/zip/utf_ken_all.zip",
+};
 constexpr DataPackInfo kDataPacks[] = {
     {L"standard-english", L"Standard English"},
     {L"wikipedia-common-misspellings", L"Common Misspellings"},
@@ -1422,7 +1426,10 @@ private:
             auto* download = new PostalDownload{
                 requestId, std::filesystem::path(folder) / (L"tekito-utf_ken_all-" + std::to_wstring(GetCurrentProcessId()) + L".zip")};
             std::thread([hwnd = hwnd_, download] {
-                download->ok = SUCCEEDED(URLDownloadToFileW(nullptr, kPostalCodeZip, download->file.c_str(), 0, nullptr));
+                for (const auto* url : kPostalCodeZips) {
+                    download->ok = SUCCEEDED(URLDownloadToFileW(nullptr, url, download->file.c_str(), 0, nullptr));
+                    if (download->ok) break;
+                }
                 if (!PostMessageW(hwnd, kPostalDownloaded, 0, reinterpret_cast<LPARAM>(download))) delete download;
             }).detach();
         } else if (type == L"postalCodes.remove") {
