@@ -24,5 +24,5 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
-          gh release view postal-codes >/dev/null 2>&1 || gh release create postal-codes --title "Postal codes" --notes "Japan Post's postal code data (utf_ken_all.zip), updated monthly, for TEKITO Settings."
+          gh release view postal-codes >/dev/null 2>&1 || gh release create postal-codes --prerelease --latest=false --title "Postal codes" --notes "Japan Post's postal code data (utf_ken_all.zip), updated monthly, for TEKITO Settings."
           gh release upload postal-codes utf_ken_all.zip --clobber

@@ -218,8 +218,8 @@ See [the privacy notice](PRIVACY.md).
 
 ## Install
 
-Download `TEKITO-0.5.0-full-installer.exe` from
-[Releases](https://github.com/Canta360/tekito/releases/latest) and run it.
+Download `TEKITO-0.6.0-full-installer.exe` from
+[Releases](https://github.com/Canta360/tekito/releases) and run it.
 
 - **Add Japanese input** (on when Windows shows Japanese) downloads the
   Japanese dictionary and language data, about 56 MB, from the same release,
