@@ -963,9 +963,14 @@ void JapaneseComposer::KeepKanjiInRange(PhraseState& phrase) const {
     if (!kanjiSets_ || kanjiRange_ == KanjiRange::All || phrase.candidates.empty()) return;
     auto& candidates = phrase.candidates;
     const std::wstring chosen = phrase.selected < candidates.size() ? candidates[phrase.selected].text : std::wstring{};
+    const bool firstOut = !kanjiSets_->Allows(candidates.front().text, kanjiRange_, kanjiGrade_, kanjiNames_);
     std::erase_if(candidates, [&](const PhraseCandidate& c) { return !kanjiSets_->Allows(c.text, kanjiRange_, kanjiGrade_, kanjiNames_); });
-    if (candidates.empty() && phrase.begin + phrase.length <= conversionReading_.size()) {
-        candidates = KanaCandidates(conversionReading_.substr(phrase.begin, phrase.length));
+    // A word with kanji outside the range is written in kana first, not as
+    // another word that happens to fit (差して is さして, not さし手).
+    if ((firstOut || candidates.empty()) && phrase.begin + phrase.length <= conversionReading_.size()) {
+        PhraseCandidate hiragana{conversionReading_.substr(phrase.begin, phrase.length), 0, PhraseCandidate::Kind::Hiragana, false};
+        std::erase_if(candidates, [&](const PhraseCandidate& c) { return c.text == hiragana.text; });
+        candidates.insert(candidates.begin(), std::move(hiragana));
     }
     const auto kept = std::find_if(candidates.begin(), candidates.end(),
                                    [&](const PhraseCandidate& c) { return c.text == chosen; });
@@ -2000,6 +2005,9 @@ void JapaneseComposer::AddSlipCandidatesFor(PhraseState& phrase) const {
         for (auto& [candidate, kana] : SlipReadings(allKeys, {typedAll, conversionReading_}, typedCost)) {
             if (wholeInput.size() >= kWholeSlipCandidates || examined++ >= kWholeSlipExamined) break;
             if (SamePhrasing(conversionReading_, starts, kana)) continue;
+            // Not with the start of the input taken away: what was typed first
+            // was meant (igaitai is not が痛い).
+            if (kana.size() < typedAll.size() && typedAll.ends_with(kana)) continue;
             candidate.reading = kana;
             candidate.slip = true;
             wholeInput.push_back(std::move(candidate));

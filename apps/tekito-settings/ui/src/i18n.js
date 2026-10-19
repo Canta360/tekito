@@ -91,7 +91,8 @@ const en = {
       title: "Kanji",
       description: "Limits conversions to school-year or jōyō kanji.",
       stops: ["Year 1", "2", "3", "4", "5", "6", "Jōyō", "All"],
-      examples: ["ばらの花がさく", "ばらの花が咲く", "薔薇の花が咲く"],
+      // One per stop of the slider, as TEKITO converts amenohinikasawomotteeigawomiteyuuhanwotabeta.
+      examples: ["雨の日にかさをもってえいがを見てゆうはんをたべた", "雨の日にかさをもってえいがを見てゆうはんを食べた", "雨の日にかさを持ってえいがを見てゆうはんを食べた", "雨の日にかさを持ってえいがを見て夕飯を食べた", "雨の日にかさを持ってえいがを見て夕飯を食べた", "雨の日にかさを持って映画を見て夕飯を食べた", "雨の日に傘を持って映画を見て夕飯を食べた", "雨の日に傘を持って映画を見て夕飯を食べた"],
       names: "Include name kanji",
       namesExample: "e.g. 櫻, 凜",
     },
@@ -392,7 +393,8 @@ const ja = {
       title: "変換に使う漢字",
       description: "学年別の教育漢字や常用漢字に限定できます",
       stops: ["1年", "2年", "3年", "4年", "5年", "6年", "常用", "すべて"],
-      examples: ["ばらの花がさく", "ばらの花が咲く", "薔薇の花が咲く"],
+      // One per stop of the slider, as TEKITO converts amenohinikasawomotteeigawomiteyuuhanwotabeta.
+      examples: ["雨の日にかさをもってえいがを見てゆうはんをたべた", "雨の日にかさをもってえいがを見てゆうはんを食べた", "雨の日にかさを持ってえいがを見てゆうはんを食べた", "雨の日にかさを持ってえいがを見て夕飯を食べた", "雨の日にかさを持ってえいがを見て夕飯を食べた", "雨の日にかさを持って映画を見て夕飯を食べた", "雨の日に傘を持って映画を見て夕飯を食べた", "雨の日に傘を持って映画を見て夕飯を食べた"],
       names: "人名用漢字を含める",
       namesExample: "例：櫻、凜",
     },
