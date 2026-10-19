@@ -1295,6 +1295,7 @@ int RunScript(Testbed& bed, const std::filesystem::path& script, const std::file
                 {L"spacing", &tekito::userdata::UserSettings::japaneseEnglishSpacing},
                 {L"mixlive", &tekito::userdata::UserSettings::mixLiveConversion},
                 {L"mixcorrection", &tekito::userdata::UserSettings::mixCorrection},
+                {L"mixprediction", &tekito::userdata::UserSettings::mixPredictionEnabled},
                 {L"marker", &tekito::userdata::UserSettings::mixSettledMarker},
                 {L"vowelkana", &tekito::userdata::UserSettings::mixSingleVowelKana},
                 {L"correction", &tekito::userdata::UserSettings::correctionEnabled},
