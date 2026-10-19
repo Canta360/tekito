@@ -1637,6 +1637,13 @@ std::vector<PhraseCandidate> JapaneseComposer::EnglishCandidates(const std::wstr
             }
         }
     }
+    // Symbols by its name, after its katakana (heart: the outlined and
+    // filled hearts).
+    if (special_ && specialOptions_.symbols) {
+        std::wstring lower = Keys(false);
+        for (auto& c : lower) c = static_cast<wchar_t>(std::towlower(c));
+        for (auto& symbol : special_->SymbolsNamed(lower)) add(std::move(symbol), PhraseCandidate::Kind::Special);
+    }
     if (converter_ && LeftoverLetters(reading) == 0) {
         std::wstring japanese;
         for (const auto& phrase : ConvertReading(reading, 0, context_, contextWords_)) {
