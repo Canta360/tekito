@@ -140,6 +140,16 @@ export function Details({ id, title, children }) {
   );
 }
 
+// The TEKITO lettering (the user's artwork), dark on light and light on dark.
+export function Wordmark({ className = "" }) {
+  return (
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcSet="./assets/tekito-wordmark-light.svg" />
+      <img className={`wordmark ${className}`} src="./assets/tekito-wordmark-dark.svg" alt="TEKITO" />
+    </picture>
+  );
+}
+
 export function Heading({ children }) {
   return <h2 className="section-heading">{children}</h2>;
 }
@@ -213,8 +223,10 @@ export function Slider({ value, stops, onChange, label }) {
       <input type="range" min={0} max={stops.length - 1} step={1} value={index} aria-label={label}
         aria-valuetext={stops[index][1]} style={{ "--fill": `${(index / (stops.length - 1)) * 100}%` }}
         onChange={(event) => onChange(stops[Number(event.target.value)][0])} />
-      <span className="slider-stops" style={{ gridTemplateColumns: `repeat(${stops.length}, minmax(0, 1fr))` }}>
-        {stops.map(([stopValue, name], i) => <span key={stopValue} className={i === index ? "is-current" : ""}>{name}</span>)}
+      <span className="slider-stops">
+        {stops.map(([stopValue, name], i) => (
+          <span key={stopValue} className={i === index ? "is-current" : ""} style={{ "--at": i / (stops.length - 1) }}>{name}</span>
+        ))}
       </span>
     </span>
   );

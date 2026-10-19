@@ -5,7 +5,7 @@ import { hostRequest, onHostStateChanged } from "./host.js";
 import { messages, resolveLanguage, TextContext, useText } from "./i18n.js";
 import {
   Button, Card, Check, ChoiceRow, Details, Dialog, Heading, Keycaps, LinkRow, ModeIcon, Row, Segmented, Select,
-  Slider, Symbol, Toggle,
+  Slider, Symbol, Toggle, Wordmark,
 } from "./ui.jsx";
 import "./styles.css";
 
@@ -250,7 +250,7 @@ function App() {
     <TextContext.Provider value={t}>
       <div className="app">
         <aside className="sidebar">
-          <div className="brand"><img src="./assets/tekito.ico" alt="" />TEKITO {t.settings}</div>
+          <div className="brand"><img src="./assets/tekito.ico" alt="" /><Wordmark />{t.settings}</div>
           <SettingsSearch pages={shownPages} open={open} japaneseInstalled={japaneseInstalled} />
           <nav aria-label={t.settings} style={{ display: "contents" }}>
             {shownPages.filter((id) => id !== "about").map((id) => (
@@ -699,7 +699,7 @@ function JapanesePage({ settings, setSetting, runAction, setConfirm, showKeys, r
           <Toggle label={j.prediction.title} checked={settings.japanesePredictionEnabled} onChange={(value) => setSetting("japanesePredictionEnabled", value)} />
         </Row>
         <NumbersRow settings={settings} setSetting={setSetting} options={numberOptions} onChange={setNumbers} />
-        <Row icon="match_case" title={j.kanji.title} description={j.kanji.description}
+        <Row icon={<span className="row-glyph" aria-hidden="true">漢</span>} title={j.kanji.title} description={j.kanji.description}
           sub={stop < 8 && (
             <Check label={j.kanji.names} example={j.kanji.namesExample} checked={settings.japaneseKanjiNames}
               onChange={(value) => setSetting("japaneseKanjiNames", value)} />
@@ -1178,7 +1178,7 @@ function AboutPage({ settings, setSetting, runAction, version, runtime, packs, j
       <Card label="TEKITO">
         <div className="about-head">
           <img src="./assets/tekito.ico" alt="" />
-          <span>TEKITO<small>{a.version(version)}</small></span>
+          <span><Wordmark /><small>{a.version(version)}</small></span>
         </div>
       </Card>
       {problems.length > 0 && (
