@@ -901,7 +901,7 @@ void TestMixedTyping(const RomajiTable& table, const MiniPack& pack) {
     struct WordScores final : tekito::IFrequencyProvider {
         double Score(std::wstring_view word) const noexcept override {
             for (const auto& [listed, score] : {std::pair<std::wstring_view, double>{L"github", 2.7},
-                                                {L"push", 4.2}, {L"to", 6.7}, {L"take", 5.1}, {L"is", 6.3}}) {
+                                                {L"push", 4.2}, {L"to", 6.7}, {L"take", 5.1}, {L"is", 6.3}, {L"i", 7.5}}) {
                 if (word == listed) return score;
             }
             return 0.0;
@@ -1016,6 +1016,31 @@ void TestMixedTyping(const RomajiTable& table, const MiniPack& pack) {
         composer.Clear();
         Require(!live.empty() && live.front() >= 0x4E00 && english == englishOff && off == L"きかい",
                 "Mix live conversion shows Japanese converted, English as typed, and is off by default");
+    }
+
+    {
+        // A vowel typed alone stays kana when the sentence is read again,
+        // unless an English word is beside it.
+        const auto typed = [&](std::initializer_list<std::wstring_view> chunks) {
+            composer.ForgetContext();
+            composer.SetSentenceStart(true);
+            for (const auto chunk : chunks) {
+                Type(composer, chunk);
+                composer.Convert();
+            }
+            Type(composer, L"kikai");
+            const auto shown = composer.Segments();
+            (void)composer.Commit();
+            composer.ForgetContext();
+            return shown.empty() ? std::wstring() : shown.front().text;
+        };
+        const auto kana = typed({L"i", L"ga"});
+        const auto letter = typed({L"i", L"push"});
+        composer.SetSingleVowelKana(false);
+        const auto letterOff = typed({L"i", L"push"});
+        composer.SetSingleVowelKana(true);
+        Require(kana.starts_with(L"い"), "i before Japanese stays い");
+        Require(!letter.empty() && letter == letterOff, "i before an English word is read as the sentence reads it");
     }
 
     using tekito::japanese::JapaneseComposer;

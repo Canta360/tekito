@@ -2664,9 +2664,19 @@ void JapaneseComposer::JudgeWholeSentence(std::optional<ChunkJudge::Judgement>& 
     }
     keys.emplace_back(currentKeys);
     const auto whole = chunkJudge_->JudgeSentence(keys, englishCorrection_ ? englishSpelling_ : nullptr);
+    // A vowel typed alone stays kana (SetSingleVowelKana) unless an English
+    // word other than such a vowel is beside it: i ga itai is い, i think so
+    // is I, a i u e o stays kana.
+    const auto vowel = [](std::wstring_view typed) {
+        return typed.size() == 1 && std::wstring_view(L"aiueo").find(typed[0]) != std::wstring_view::npos;
+    };
+    const auto englishWord = [&](std::size_t k) { return k < whole.size() && whole[k].english && !vowel(keys[k]); };
     for (std::size_t k = 0; k < at.size(); ++k) {
         auto& chunk = settled_[at[k]];
-        if (!chunk.locked) chunk.isEnglish = whole[k].english;
+        if (chunk.locked) continue;
+        bool english = whole[k].english;
+        if (english && singleVowelKana_ && vowel(chunk.keys)) english = (k > 0 && englishWord(k - 1)) || englishWord(k + 1);
+        chunk.isEnglish = english;
     }
     if (current && !TypedWithCapitals(currentKeys) && whole.back().english != current->english &&
         !(SingleVowelKana(currentKeys) && whole.back().english)) {

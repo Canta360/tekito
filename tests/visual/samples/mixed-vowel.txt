@@ -3,9 +3,10 @@ page 640 400
 mode mixed
 hold 600
 speed 140
-type i
-key space 1400
-key enter 700
+type i 
+type ga 
+type itai
+key enter 900
 key enter 500
 type i 
 type think 
