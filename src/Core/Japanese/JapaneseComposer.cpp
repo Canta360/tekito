@@ -1119,6 +1119,26 @@ void JapaneseComposer::BuildPhrasesFor(bool convert) {
             candidates.insert(candidates.begin() + (leftover || candidates.empty() ? 0 : 1), std::move(whole));
         }
     }
+    // Japanese mode: an English word typed with letters romaji keeps for
+    // small kana or cannot read (lol, love: not お or ぉで, with the letters taken for slips).
+    if (convert && !chunkJudge_ && splitter_ && !HasAscii() && !phrases_.empty()) {
+        std::wstring keys = Keys(false);
+        const bool letters = keys.size() >= 3 &&
+                             std::all_of(keys.begin(), keys.end(), [](wchar_t c) { return c >= L'a' && c <= L'z'; });
+        const bool leftover = std::any_of(units_.begin(), units_.end(), [](const Unit& unit) {
+            return !unit.ascii && LeftoverLetters(ToFullWidthAscii(unit.kana)) > 0;
+        });
+        if (letters && (leftover || ChunkJudge::ForeignLetters(keys, false))) {
+            const auto judged = splitter_->Judge(keys, 0);
+            auto& candidates = phrases_.front().candidates;
+            if (judged.english && judged.word && !judged.written.empty()) {
+                std::erase_if(candidates, [&](const PhraseCandidate& c) { return c.text == judged.written; });
+                PhraseCandidate english{judged.written, 0, PhraseCandidate::Kind::English, false};
+                english.reading = Reading();
+                candidates.insert(candidates.begin(), std::move(english));
+            }
+        }
+    }
     if (chunk && !chunk->english && !phrases_.empty()) {
         bool foreign = false;
         if (auto split = RunTogetherEnglish(&foreign)) {
@@ -2593,7 +2613,18 @@ std::optional<std::wstring> JapaneseComposer::TypedLetters() const {
     const bool leftover = std::any_of(units_.begin(), units_.end(), [](const Unit& unit) {
         return !unit.ascii && LeftoverLetters(ToFullWidthAscii(unit.kana)) > 0;
     });
-    if (!englishSoFar && !leftover) return std::nullopt;
+    // Letters romaji keeps for small kana in what reads as English (lol,
+    // not ぉl).
+    const auto foreignWord = [&] {
+        std::wstring keys = Keys(true);
+        for (auto& c : keys) c = static_cast<wchar_t>(std::towlower(c));
+        if (keys.empty() || !ChunkJudge::ForeignLetters(keys, false) ||
+            !std::all_of(keys.begin(), keys.end(), [](wchar_t c) { return c >= L'a' && c <= L'z'; })) {
+            return false;
+        }
+        return chunkJudge_->MayStartEnglishWord(keys) || JudgeChunk(keys).english;
+    };
+    if (!englishSoFar && !leftover && !foreignWord()) return std::nullopt;
     const std::wstring keys = Keys(true);
     if (typedCaseKept_ && typedCase_.size() == keys.size()) return typedCase_;
     return keys;
