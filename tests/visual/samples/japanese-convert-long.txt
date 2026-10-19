@@ -1,0 +1,10 @@
+# 日本語: 長い文をまとめて変換 (Space, Enter)
+page 760 300
+mode japanese
+live off
+hold 600
+speed 90
+type raishuunokaigidetsukaushiryouwokinyoubimadenitsukutteokimasu
+hold 600
+key space 2200
+key enter 2000
