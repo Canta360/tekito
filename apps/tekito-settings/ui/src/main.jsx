@@ -415,7 +415,7 @@ function KeyList({ page, japaneseKeyboard, settings, japanese }) {
     rows.push([k.next, ["Space"]], [k.previous, ["Shift", "Space"]], [k.browse, ["Tab", "↑", "↓"]], [k.undo, ["Backspace"]], [k.keep, ["Esc"]]);
   }
   return (
-    <ul className="list" style={{ padding: "0 24px 16px" }}>
+    <ul className="list key-list">
       {rows.map(([label, caps]) => <li key={label}><span className="text">{label}</span><Keycaps keys={caps} /></li>)}
     </ul>
   );
@@ -1247,7 +1247,7 @@ function AboutPage({ settings, setSetting, runAction, version, runtime, packs, j
         <LinkRow icon="language" title="capitata.dev" external onClick={() => runAction("website.open", {})} />
         <LinkRow icon="code" title="GitHub" description="github.com/Canta360/tekito" external onClick={() => runAction("feedback.open", { kind: "github" })} />
       </Card>
-      <div className="footnote"><span>{a.privacy}</span><span>© 2026 Capitata</span></div>
+      <div className="footnote"><span>© 2026 Capitata</span></div>
 
       <Dialog open={license !== null} title={a.licenseTitle} wide onClose={() => setLicense(null)}>
         {a.licenseNote && <p className="dialog-message muted">{a.licenseNote}</p>}

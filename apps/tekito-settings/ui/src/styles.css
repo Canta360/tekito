@@ -252,6 +252,9 @@ kbd {
 .list .text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .list .tag { color: var(--ink-2); font-size: 12px; }
 .list .actions { display: inline-flex; align-items: center; gap: 4px; }
+.key-list { padding: 0 24px 16px; }
+.key-list .text { white-space: normal; overflow: visible; }
+.key-list .keycaps { flex: none; }
 .list-empty { padding: 4px 18px 14px 52px; color: var(--ink-2); font-size: 13px; }
 .list-search { padding: 0 18px 10px 52px; }
 .list-search input, .field input, .field select, .inline-form input {
