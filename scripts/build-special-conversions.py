@@ -10,6 +10,7 @@ Rows that share a section, language and key keep their order.
            year) {H} {HH} {I} (12-hour) {N} {NN} (minute) {P} (AM/PM)
   name     month and weekday names, AM/PM, the kanji for numbers
   era      Japanese eras and the day each began
+  symbolname  symbols by their English names (heart: ♡ ♥), written here
   symbol   symbols by reading (Japanese, from Mozc's symbol table) or by
            their ASCII spelling (English, "->" -> "→"); emoji by their
            Japanese readings (Mozc's emoji table) come after the symbols,
@@ -119,6 +120,29 @@ ENGLISH_SYMBOLS = [
     ("1/2", "½"), ("1/3", "⅓"), ("2/3", "⅔"), ("1/4", "¼"), ("3/4", "¾"),
 ]
 
+
+# Symbols by their English names, offered after an English word's emoji
+# (heart: ♡ ♥), the most used first. Words typed often for themselves
+# (because, times, mail) name none.
+ENGLISH_SYMBOL_NAMES = {
+    "arrow": "→ ← ↑ ↓ ↔ ⇒ ⇔", "heart": "♡ ♥", "star": "☆ ★", "checkmark": "✓ ✔",
+    "tick": "✓ ✔", "cross": "✗ ✘ ×", "circle": "○ ● ◎", "square": "□ ■", "triangle": "△ ▲ ▽ ▼",
+    "diamond": "◇ ◆ ♢ ♦", "bullet": "• ・", "music": "♪ ♫ ♬",
+    "degree": "°", "degrees": "°", "celsius": "℃ °C", "fahrenheit": "℉ °F",
+    "yen": "¥ ￥", "euro": "€", "pound": "£", "cent": "¢", "won": "₩", "rupee": "₹", "bitcoin": "₿",
+    "copyright": "©", "trademark": "™", "registered": "®", "paragraph": "¶",
+    "dagger": "† ‡", "infinity": "∞", "pi": "π", "alpha": "α", "beta": "β", "gamma": "γ",
+    "delta": "Δ δ", "theta": "θ", "lambda": "λ", "mu": "μ", "sigma": "Σ σ", "omega": "Ω ω",
+    "ohm": "Ω", "micro": "µ", "plusminus": "±", "divide": "÷", "sqrt": "√",
+    "integral": "∫", "approx": "≈", "neq": "≠", "leq": "≤", "geq": "≥",
+    "perpendicular": "⊥",
+    "ellipsis": "…", "dash": "– —", "emdash": "—", "endash": "–", "reference": "※", "postal": "〒",
+    "sun": "☀ ☼", "umbrella": "☂", "snowman": "☃", "telephone": "☎ ☏",
+    "envelope": "✉", "spade": "♠ ♤", "smile": "☺ ☻", "smiley": "☺ ☻",
+    "warning": "⚠", "half": "½", "squared": "²", "cubed": "³",
+    "permille": "‰", "numero": "№", "female": "♀", "male": "♂",
+    "flower": "✿ ❀", "sparkle": "✧ ✦",
+}
 
 # Rows whose first reading names a group of rare characters (radicals,
 # hentaigana, nasal kana, Ainu kana): they come up only by that name, not
@@ -310,6 +334,8 @@ def main() -> None:
         rows += [("name", language, name, value) for name, values in names.items() for value in values]
     rows += [("era", "ja", name, start) for name, start in ERAS]
     rows += [("symbol", "en", key, symbol) for key, symbol in ENGLISH_SYMBOLS]
+    rows += [("symbolname", "en", name, symbol)
+             for name, symbols in ENGLISH_SYMBOL_NAMES.items() for symbol in symbols.split(" ")]
     symbols = mozc_symbols(args.mozc_symbols)
     rows += [("symbol", "ja", reading, symbol) for reading, symbol in symbols]
     known = set(symbols)

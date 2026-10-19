@@ -7,9 +7,9 @@
   "type": "special-conversions",
   "format": "rules-tsv-v1",
   "file": "rules.tsv",
-  "entry_count": 19554,
+  "entry_count": 19667,
   "sha256": {
-    "file": "BDA7A130244A062EE1C5557A695F0BBC96094016363AF2A7DDB2D67C4744852A"
+    "file": "F5A1A25F5C423235F2CA935AA1E5AECA58F8D9F33964909D456000539F5F027D"
   },
   "license": "TEKITO-OWNED + BSD-3-Clause (Mozc) + Unicode-3.0 (emoji)",
   "source": "scripts/build-special-conversions.py; Japanese symbols, emoji, emoticons and single kanji from https://github.com/google/mozc/tree/b9c3fcbd6d76b19649ef572324fa9da2559bc18e/src/data",

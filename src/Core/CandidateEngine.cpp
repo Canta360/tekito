@@ -175,6 +175,9 @@ ConversionResult CandidateEngine::Convert(const ConversionRequest& request) cons
         }
     }
     if (request.options.special.dates) AddDates(rawText, candidates);
+    if (request.options.special.symbols) AddSymbols(rawText, candidates);
+    // Numbered as listed, with what was added.
+    for (std::size_t i = 0; i < candidates.size(); ++i) candidates[i].id = static_cast<std::uint32_t>(i + 1);
     return {std::move(candidates)};
 }
 
@@ -198,6 +201,28 @@ void CandidateEngine::AddDates(std::wstring_view rawText, std::vector<Candidate>
     for (auto& date : dates) {
         Candidate candidate;
         candidate.text = std::move(date);
+        candidate.isProtected = true;
+        candidate.policyFlags = CandidatePolicySuggestOnly;
+        at = candidates.insert(at, std::move(candidate)) + 1;
+    }
+}
+
+void CandidateEngine::AddSymbols(std::wstring_view rawText, std::vector<Candidate>& candidates) {
+    std::wstring word(rawText);
+    for (auto& c : word) c = static_cast<wchar_t>(std::towlower(c));
+    auto symbols = SpecialConversions::Installed().SymbolsNamed(word);
+    if (symbols.empty() || candidates.empty()) return;
+    // After the word as typed and its emoji: a symbol is only ever offered.
+    auto at = std::find_if(candidates.begin(), candidates.end(),
+                           [](const Candidate& candidate) { return candidate.isOriginal; });
+    at = at == candidates.end() ? candidates.begin() + 1 : at + 1;
+    while (at != candidates.end() && at->label == SemanticLabel::Emoji) ++at;
+    for (auto& symbol : symbols) {
+        const bool seen = std::any_of(candidates.begin(), candidates.end(),
+                                      [&](const Candidate& candidate) { return candidate.text == symbol; });
+        if (seen) continue;
+        Candidate candidate;
+        candidate.text = std::move(symbol);
         candidate.isProtected = true;
         candidate.policyFlags = CandidatePolicySuggestOnly;
         at = candidates.insert(at, std::move(candidate)) + 1;

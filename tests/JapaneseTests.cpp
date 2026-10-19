@@ -1516,6 +1516,9 @@ void TestSpecialConversions(const RomajiTable& table, const MiniPack& pack) {
     Require(Contains(special.Dates(Language::English, L"now", morning), L"6:05 AM"), "now, in the morning");
     RequireText(special.Dates(Language::English, L"tomorrow", morning)[0], L"September 30, 2026", "tomorrow");
     Require(special.Dates(Language::English, L"table", morning).empty(), "other words have no date");
+    const auto heart = special.SymbolsNamed(L"heart");
+    Require(heart.size() == 2 && heart[0] == L"\x2661" && heart[1] == L"\x2665", "heart names its symbols, the outline first");
+    Require(special.SymbolsNamed(L"table").empty(), "other words name no symbol");
 
     const auto kyou = special.Dates(Language::Japanese, L"きょう", morning);
     RequireText(kyou[0], L"2026/09/29", "きょう, with slashes");

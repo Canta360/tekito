@@ -349,6 +349,11 @@ std::vector<std::wstring> SpecialConversions::Symbols(Language language, std::ws
     return symbols ? *symbols : std::vector<std::wstring>{};
 }
 
+std::vector<std::wstring> SpecialConversions::SymbolsNamed(std::wstring_view name) const {
+    const auto* symbols = Find(L"symbolname", Language::English, name);
+    return symbols ? *symbols : std::vector<std::wstring>{};
+}
+
 std::vector<std::wstring> SpecialConversions::Emoticons(std::wstring_view reading) const {
     const auto* faces = Find(L"emoticon", Language::Japanese, reading);
     return faces ? *faces : std::vector<std::wstring>{};

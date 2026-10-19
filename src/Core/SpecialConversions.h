@@ -54,6 +54,9 @@ public:
     // The symbols for a reading or an ASCII spelling, in the pack's order.
     // Japanese keys are matched in full-width, as they are typed there.
     [[nodiscard]] std::vector<std::wstring> Symbols(Language language, std::wstring_view key) const;
+    // The symbols an English name stands for ("heart" -> ♡ ♥), the most used
+    // first; `name` in lower case.
+    [[nodiscard]] std::vector<std::wstring> SymbolsNamed(std::wstring_view name) const;
     // Japanese emoticons (kaomoji) for a reading ("にこにこ" -> (^^)); "かおもじ"
     // has them all.
     [[nodiscard]] std::vector<std::wstring> Emoticons(std::wstring_view reading) const;
