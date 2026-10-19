@@ -1821,6 +1821,18 @@ void TestImeDictionaryImport() {
     std::vector<tekito::japanese::UserWord> words{{L"てきと", L"TEKITO", UserWordKind::Noun, UserWordAction::First}};
     Require(tekito::userdata::MergeImeWords(words, ms->words) == 3 && words.size() == 4,
             "words already there are not added twice");
+
+    // Written as Microsoft IME's list, read back the same.
+    const std::vector<tekito::japanese::UserWord> mine{
+        {L"てきとう", L"TEKITO", UserWordKind::ProperNoun, UserWordAction::First},
+        {L"かんた", L"寛太", UserWordKind::GivenName, UserWordAction::First},
+        {L"べんきょう", L"勉強", UserWordKind::SuruNoun, UserWordAction::First},
+        {L"きしゃ", L"汽車", UserWordKind::Noun, UserWordAction::Suppress}};
+    const auto written = tekito::userdata::FormatImeDictionary(mine);
+    const auto back = tekito::userdata::ParseImeDictionary(written);
+    Require(written.size() > 2 && static_cast<unsigned char>(written[0]) == 0xFF && static_cast<unsigned char>(written[1]) == 0xFE,
+            "the word list is UTF-16 with a byte order mark");
+    Require(back && back->words == mine, "a written word list reads back the same");
 }
 
 void TestPostalCodeImport() {

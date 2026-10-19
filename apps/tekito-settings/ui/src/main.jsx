@@ -344,13 +344,13 @@ function searchIndex(t, pages, japaneseInstalled) {
     ["auto", a.correction.title], ["auto", a.spelling.title], ["auto", a.completion.title], ["auto", a.next.title], ["auto", a.casual.title],
     ["auto", a.doubled.title, true], ["auto", a.recheck.title, true], ["auto", a.phonetic.title, true], ["auto", a.period.title, true],
     ["auto", a.doubleSpace.title, true], ["auto", a.smart.title, true],
-    ["dictionary", d.japaneseWords.title], ["dictionary", d.englishWords.title], ["dictionary", d.otherIme.title],
+    ["dictionary", d.japaneseWords.title], ["dictionary", d.englishWords.title], ["dictionary", d.files.title],
     ["dictionary", d.learn.title], ["dictionary", d.learned.title], ["dictionary", d.private.title],
     ["about", t.about.report.title], ["about", t.about.bug.title], ["about", t.about.feature.title], ["about", t.about.releases.title],
     ["about", t.about.diagnostics], ["about", t.about.license],
   ];
   return entries.filter(([page, title]) => pages.includes(page) &&
-    (japaneseInstalled || (title !== d.japaneseWords.title && title !== d.otherIme.title && title !== t.about.report.title)));
+    (japaneseInstalled || (title !== d.japaneseWords.title && title !== t.about.report.title)));
 }
 
 function SettingsSearch({ pages, open, japaneseInstalled }) {
@@ -1090,15 +1090,12 @@ function DictionaryPage({ settings, setSetting, runAction, setConfirm, japanese,
               {filtered.length === 0 && <p className="list-empty">{dictionary.length === 0 ? t.words.empty : t.words.noMatch}</p>}
             </>
           )}>
-          <Button onClick={() => runAction("dictionary.import", {}, t.words.imported)}>{d.importFile}</Button>
-          <Button onClick={() => runAction("dictionary.export", {}, t.words.exported)}>{d.exportFile}</Button>
           <Button variant="primary" onClick={() => setModal({ mode: "new", entry: {} })}>{t.add}</Button>
         </Row>
-        {japanese && (
-          <Row icon="upload_file" title={d.otherIme.title} description={d.otherIme.description}>
-            <Button onClick={() => runAction("japaneseWords.browse", {}, (response) => response.text)}>{d.otherIme.import}</Button>
-          </Row>
-        )}
+        <Row icon="upload_file" title={d.files.title} description={japanese ? d.files.description : d.files.descriptionEnglish}>
+          <Button onClick={() => runAction("japaneseWords.browse", {}, (response) => response.text)}>{d.files.import}</Button>
+          <Button onClick={() => runAction("dictionary.save", {}, (response) => (response.saved ? d.files.exported : ""))}>{d.files.export}</Button>
+        </Row>
       </Card>
 
       <Heading>{d.learning}</Heading>

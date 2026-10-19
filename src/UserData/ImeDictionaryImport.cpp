@@ -139,6 +139,48 @@ std::optional<ImportedImeWords> ReadImeDictionary(const std::filesystem::path& f
     return ParseImeDictionary(bytes);
 }
 
+namespace {
+
+// Microsoft IME's name for each kind (Google Japanese Input and ATOK read
+// them too).
+std::wstring_view PartOfSpeech(const UserWord& word) {
+    if (word.action == UserWordAction::Suppress) return L"\u6291\u5236\u5358\u8A9E";
+    switch (word.kind) {
+    case UserWordKind::ProperNoun: return L"\u56FA\u6709\u540D\u8A5E";
+    case UserWordKind::Person: return L"\u4EBA\u540D";
+    case UserWordKind::Surname: return L"\u59D3";
+    case UserWordKind::GivenName: return L"\u540D";
+    case UserWordKind::Place: return L"\u5730\u540D\u305D\u306E\u4ED6";
+    case UserWordKind::Organization: return L"\u7D44\u7E54";
+    case UserWordKind::SuruNoun: return L"\u3055\u5909\u540D\u8A5E";
+    case UserWordKind::Symbol: return L"\u9854\u6587\u5B57";
+    case UserWordKind::Interjection: return L"\u611F\u52D5\u8A5E";
+    default: return L"\u540D\u8A5E";
+    }
+}
+
+}  // namespace
+
+std::string FormatImeDictionary(const std::vector<UserWord>& words) {
+    std::wstring text = L"\uFEFF!Microsoft IME Dictionary Tool\r\n!Version:\r\n!Format:WORDLIST\r\n"
+                        L"!User Dictionary Name: TEKITO\r\n\r\n";
+    for (const auto& word : words) {
+        text += word.reading + L'\t' + word.surface + L'\t' + std::wstring(PartOfSpeech(word)) + L"\r\n";
+    }
+    std::string bytes(text.size() * 2, '\0');
+    for (std::size_t i = 0; i < text.size(); ++i) {
+        bytes[i * 2] = static_cast<char>(text[i] & 0xFF);
+        bytes[i * 2 + 1] = static_cast<char>((text[i] >> 8) & 0xFF);
+    }
+    return bytes;
+}
+
+bool WriteImeDictionary(const std::vector<UserWord>& words, const std::filesystem::path& file) {
+    const auto bytes = FormatImeDictionary(words);
+    std::ofstream stream(file, std::ios::binary | std::ios::trunc);
+    return stream && stream.write(bytes.data(), static_cast<std::streamsize>(bytes.size())) && stream.flush();
+}
+
 std::size_t MergeImeWords(std::vector<UserWord>& words, const std::vector<UserWord>& imported) {
     std::set<std::pair<std::wstring, std::wstring>> known;
     for (const auto& word : words) known.emplace(word.reading, word.surface);

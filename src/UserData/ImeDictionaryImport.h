@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <filesystem>
 #include <optional>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -25,6 +26,12 @@ struct ImportedImeWords {
 // Shift_JIS); nothing if no line is a word.
 [[nodiscard]] std::optional<ImportedImeWords> ParseImeDictionary(std::string_view bytes);
 [[nodiscard]] std::optional<ImportedImeWords> ReadImeDictionary(const std::filesystem::path& file);
+
+// `words` as Microsoft IME's word list (UTF-16 with a byte order mark and
+// its header), which Microsoft IME, Google Japanese Input and ATOK import.
+// Words never offered are written as Google's suppressed words.
+[[nodiscard]] std::string FormatImeDictionary(const std::vector<japanese::UserWord>& words);
+[[nodiscard]] bool WriteImeDictionary(const std::vector<japanese::UserWord>& words, const std::filesystem::path& file);
 
 // `imported` added to `words`, skipping words already there; how many were added.
 std::size_t MergeImeWords(std::vector<japanese::UserWord>& words, const std::vector<japanese::UserWord>& imported);

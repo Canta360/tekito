@@ -1448,10 +1448,34 @@ private:
             std::wstring error;
             const bool saved = SaveJapaneseWordFromMessage(message, error);
             Reply(requestId, saved, error);
+        } else if (type == L"dictionary.save") {
+            // The Japanese words as Microsoft IME's word list (for Microsoft
+            // IME, Google Japanese Input or ATOK), or the English words as
+            // TEKITO's own file; the save dialog's file type picks which.
+            const auto [path, imeList] = ChooseDictionaryExportFile();
+            if (path.empty()) {
+                Reply(requestId, true);  // the dialog was closed
+                return;
+            }
+            const bool written = imeList ? tekito::userdata::WriteImeDictionary(japaneseWords_, path)
+                                         : tekito::userdata::ExportUserDictionary(dictionary_, path);
+            Reply(requestId, written, written ? L"" : Text(L"The dictionary could not be exported.", L"辞書を書き出せませんでした。"),
+                  written ? L",\"saved\":true" : L"");
         } else if (type == L"japaneseWords.import" || type == L"japaneseWords.browse") {
             const auto source = type == L"japaneseWords.browse" ? ChooseImeDictionaryFile() : droppedFile_;
             if (source.empty()) {
                 Reply(requestId, type == L"japaneseWords.browse");  // the dialog was closed
+                return;
+            }
+            // TEKITO's own file holds English words, and takes their place.
+            if (tekito::UserDictionary english; tekito::userdata::ImportUserDictionary(source, english)) {
+                if (!repository_->Save(english)) {
+                    Reply(requestId, false, Text(L"The dictionary could not be imported.", L"辞書を読み込めませんでした。"));
+                    return;
+                }
+                dictionary_ = std::move(english);
+                runtime_->NotifyDictionaryChanged();
+                Reply(requestId, true, {}, L",\"text\":\"" + JsonEscape(Text(L"English words imported.", L"英語の単語を読み込みました。")) + L"\"");
                 return;
             }
             const auto imported = tekito::userdata::ReadImeDictionary(source);
@@ -1809,10 +1833,30 @@ private:
         dialog.lpstrFile = buffer;
         dialog.nMaxFile = MAX_PATH;
         dialog.lpstrFilter = L"Text (*.txt)\0*.txt;*.tsv;*.csv\0All files\0*.*\0";
-        dialog.lpstrTitle = Text(L"Choose a user dictionary exported from another input method",
-                                 L"ほかの IME から書き出したユーザー辞書を選ぶ");
+        dialog.lpstrTitle = Text(L"Choose a dictionary to import", L"読み込む辞書を選択");
         dialog.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_NOCHANGEDIR;
         return GetOpenFileNameW(&dialog) ? std::filesystem::path(buffer) : std::filesystem::path{};
+    }
+
+    // Where to export, and whether as Microsoft IME's word list (the Japanese
+    // words; offered while Japanese is installed) or TEKITO's own file (the
+    // English words).
+    std::pair<std::filesystem::path, bool> ChooseDictionaryExportFile() {
+        wchar_t buffer[MAX_PATH] = L"TEKITO";
+        OPENFILENAMEW dialog{sizeof(dialog)};
+        dialog.hwndOwner = hwnd_;
+        dialog.lpstrFile = buffer;
+        dialog.nMaxFile = MAX_PATH;
+        const bool japanese = japaneseAvailable_;
+        dialog.lpstrFilter = japanese
+            ? Text(L"Japanese words, Microsoft IME format, for other IMEs (*.txt)\0*.txt\0English words, TEKITO format (*.tsv)\0*.tsv\0",
+                   L"日本語の単語 - Microsoft IME 形式、ほかの IME 用 (*.txt)\0*.txt\0英語の単語 - TEKITO 形式 (*.tsv)\0*.tsv\0")
+            : Text(L"English words, TEKITO format (*.tsv)\0*.tsv\0", L"英語の単語 - TEKITO 形式 (*.tsv)\0*.tsv\0");
+        dialog.lpstrDefExt = japanese ? L"txt" : L"tsv";
+        dialog.lpstrTitle = Text(L"Export the dictionary", L"辞書を書き出す");
+        dialog.Flags = OFN_PATHMUSTEXIST | OFN_OVERWRITEPROMPT | OFN_NOCHANGEDIR;
+        if (!GetSaveFileNameW(&dialog)) return {};
+        return {std::filesystem::path(buffer), japanese && dialog.nFilterIndex == 1};
     }
 
     std::filesystem::path ChooseRomajiFile() {
