@@ -1,3 +1,5 @@
+import licenseText from "../../../../installer/TEKITO_LICENSE.md?raw";
+
 // Development-only stand-in for the native host, so `vite` can render the
 // page in a normal browser. Loaded only when import.meta.env.DEV is true and
 // no WebView2 host is present; production builds drop it entirely.
@@ -235,7 +237,7 @@ export function installMockHost() {
         return;
       }
       if (type === "license.get") {
-        const data = JSON.stringify({ requestId, ok: true, error: "", state, text: "# TEKITO License Agreement\n\nVersion 0.1 (preview)\n\n## In short\n\n- You may install TEKITO on the computers you use.\n- What you type is yours.\n\n## 1. What you may do\n\nWe give you a personal license to use TEKITO." });
+        const data = JSON.stringify({ requestId, ok: true, error: "", state, text: licenseText });
         window.setTimeout(() => listeners.forEach((listener) => listener({ data })), 60);
         return;
       }

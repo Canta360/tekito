@@ -216,6 +216,7 @@ const en = {
     publisher: "Publisher",
     privacy: "What you type never leaves this PC.",
     licenseTitle: "TEKITO License Agreement",
+    licenseNote: "",
     licenseMissing: "The license text could not be loaded.",
   },
 
@@ -498,6 +499,7 @@ const ja = {
     publisher: "開発元",
     privacy: "入力した内容はこの PC の外に送信されません。",
     licenseTitle: "TEKITO 使用許諾契約",
+    licenseNote: "使用許諾契約は英語で書かれています。",
     licenseMissing: "ライセンスの本文を読み込めませんでした。",
   },
 

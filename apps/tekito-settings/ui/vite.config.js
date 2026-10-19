@@ -1,3 +1,4 @@
 import { defineConfig } from "vite";
 
-export default defineConfig({ base: "./" });
+// The dev server may read the repository (the license text for the mock host).
+export default defineConfig({ base: "./", server: { fs: { allow: ["../../.."] } } });

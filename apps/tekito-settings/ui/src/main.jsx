@@ -895,7 +895,7 @@ function RomajiTable({ romaji, runAction, setConfirm, back }) {
 // ---------------------------------------------------------------------------
 // まぜ打ち
 
-function MixedPage({ settings, setSetting, open }) {
+function MixedPage({ settings, setSetting }) {
   const t = useText();
   const m = t.mixed;
   return (
@@ -922,7 +922,7 @@ function MixedPage({ settings, setSetting, open }) {
           </Row>
         </Card>
         <Card label={m.shared.title}>
-          <LinkRow icon="tune" title={m.shared.title} description={m.shared.description} onClick={() => open(settings.japaneseEnabled ? "japanese" : "auto")} />
+          <Row icon="tune" title={m.shared.title} description={m.shared.description} />
         </Card>
       </Details>
     </>
@@ -1250,6 +1250,7 @@ function AboutPage({ settings, setSetting, runAction, version, runtime, packs, j
       <div className="footnote"><span>{a.privacy}</span><span>© 2026 Capitata</span></div>
 
       <Dialog open={license !== null} title={a.licenseTitle} wide onClose={() => setLicense(null)}>
+        {a.licenseNote && <p className="dialog-message muted">{a.licenseNote}</p>}
         <LicenseText text={license || ""} />
         <div className="dialog-actions"><Button variant="primary" onClick={() => setLicense(null)}>{t.close}</Button></div>
       </Dialog>
