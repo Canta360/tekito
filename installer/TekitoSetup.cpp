@@ -1402,7 +1402,8 @@ LRESULT CALLBACK WizardProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
 #ifdef TEKITO_SETUP_PREVIEW
 // Preview build (tekito_setup_preview): opens one screen without elevation,
 // saves a screenshot of the window and exits.
-//   tekito_setup_preview.exe <screen> <out.bmp> [nowebview] [unchecked] [nojapanese] [nodownload]
+//   tekito_setup_preview.exe <screen> <out.bmp> [nowebview] [unchecked] [nojapanese] [nodownload] [stay]
+// stay: keeps the screen open to try, with no screenshot.
 // screen: welcome | license | options | installing | done | failed
 struct PreviewRequest {
     Screen screen{Screen::Welcome};
@@ -1412,6 +1413,7 @@ struct PreviewRequest {
     bool noJapanese{false};
     // The failed screen after a Japanese download failure.
     bool noDownload{false};
+    bool stay{false};
 };
 PreviewRequest g_preview;
 
@@ -1504,6 +1506,7 @@ bool ShowWizard(const std::filesystem::path& self) {
     UpdateWindow(window);
 #ifdef TEKITO_SETUP_PREVIEW
     SetForegroundWindow(window);
+    if (g_preview.stay) wizard.screen = g_preview.screen;
     const auto started = GetTickCount64();
     MSG pending{};
     while (GetTickCount64() - started < 1500) {
@@ -1518,9 +1521,11 @@ bool ShowWizard(const std::filesystem::path& self) {
     InvalidateRect(window, nullptr, FALSE);
     UpdateWindow(window);
     Sleep(200);
-    SavePreview(window, g_preview.output);
-    wizard.screen = Screen::Done;  // allow closing
-    DestroyWindow(window);
+    if (!g_preview.stay) {
+        SavePreview(window, g_preview.output);
+        wizard.screen = Screen::Done;  // allow closing
+        DestroyWindow(window);
+    }
 #endif
 
     MSG message{};
@@ -1554,6 +1559,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
             if (std::wstring_view(argv[i]) == L"unchecked") g_preview.agreed = false;
             if (std::wstring_view(argv[i]) == L"nojapanese") g_preview.noJapanese = true;
             if (std::wstring_view(argv[i]) == L"nodownload") g_preview.noDownload = true;
+            if (std::wstring_view(argv[i]) == L"stay") g_preview.stay = true;
         }
     }
     LocalFree(argv);
