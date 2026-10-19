@@ -11,6 +11,7 @@ repository and of the installer come under different terms.
 | M PLUS 1 typeface | SIL Open Font License 1.1 | `assets/fonts/OFL.txt` |
 | Microsoft WebView2 SDK | Microsoft's BSD-style license | `third_party/webview2/LICENSE.txt` |
 | SQLite | Public domain | `third_party/sqlite/README.md` |
+| Material Symbols icons in Settings | Apache License 2.0 | `third_party/material-symbols/LICENSE` |
 
 ## The source code
 

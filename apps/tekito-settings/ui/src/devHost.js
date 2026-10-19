@@ -19,7 +19,10 @@ function initialState() {
   return {
     postalCodes: { installed: false },
     settings: {
-      restoreLastInputMode: true,
+      startMode: 0,
+      switchOrder: 1234,
+      japaneseKanjiNames: false,
+      mixCorrection: true,
       correctionEnabled: true,
       commonMisspellingsEnabled: true,
       contextSuggestionsEnabled: true,
@@ -61,7 +64,7 @@ function initialState() {
       japaneseSpaceWidth: 0,
       japanesePunctuation: 0,
       japaneseDigitWidth: 0,
-      japaneseNumberStyle: 0,
+      japaneseNumberStyle: 1,
       japaneseRoughNumbersKanji: true,
       japaneseKanjiRange: 0,
       japaneseKanjiGrade: 6,
@@ -210,6 +213,13 @@ export function installMockHost() {
         state.dictionary = state.dictionary.map((entry) => entry.id === message.id ? { ...entry, raw: message.raw, candidate: message.candidate, policy: message.policy } : entry);
       } else if (type === "dictionary.delete") {
         state.dictionary = state.dictionary.filter((entry) => entry.id !== message.id);
+      }
+      if (type === "postalCodes.download") {
+        window.setTimeout(() => {
+          state.postalCodes = { installed: true, version: "2026.09", count: 124182 };
+          reply(requestId);
+        }, 1800);
+        return;
       }
       if (type === "postalCodes.import" || type === "postalCodes.browse") {
         state.postalCodes = { installed: true, version: "2026.09", count: 124182 };

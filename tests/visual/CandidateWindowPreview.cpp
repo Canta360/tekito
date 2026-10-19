@@ -5,6 +5,7 @@
 // see them.
 //
 //   tekito_candidate_window_preview.exe <out.bmp> [stripes|doc|paper|dusk] [short|long] [glide] [click]
+//                                       [meaning|kanji|kanji-list]
 //                                       [badge-auto|badge-direct|badge-japanese]
 //
 // `stripes` puts saturated color bands behind the glass to show the blur;
@@ -14,6 +15,8 @@
 // candidates than fit on a page, which brings up the page indicator.
 // `glide` moves the selection two rows down and captures mid-animation.
 // `click` clicks row 4 and reports the index the host callback received.
+// `meaning` shows the meaning pane; `kanji` shows Japanese candidates with
+// it, `kanji-list` without it.
 // `badge-*` shows the mode badge instead of candidates, then checks that it
 // fades out by itself (exit code 4 if it stays).
 //
@@ -272,6 +275,7 @@ int wmain(int argc, wchar_t** argv) {
         if (wcscmp(argv[i], L"badge-japanese") == 0) badge = 3;
         if (wcscmp(argv[i], L"meaning") == 0) meaning = true;
         if (wcscmp(argv[i], L"kanji") == 0) kanji = meaning = true;
+        if (wcscmp(argv[i], L"kanji-list") == 0) kanji = true;
         if (wcscmp(argv[i], L"doc") == 0) g_documentBackdrop = true;
         if (wcscmp(argv[i], L"dusk") == 0) g_duskBackdrop = true;
         if (wcscmp(argv[i], L"paper") == 0) g_paperBackdrop = true;
