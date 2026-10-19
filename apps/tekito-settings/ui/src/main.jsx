@@ -101,7 +101,7 @@ function actionOf(policy) {
 
 function pageFromHash() {
   const id = window.location.hash.slice(1);
-  return pageAliases[id] || (pageIds.includes(id) ? id : "general");
+  return pageAliases[id] || (pageIds.includes(id) || id === "samples" ? id : "general");
 }
 
 // A file dropped anywhere but a drop area is ignored (WebView2 would

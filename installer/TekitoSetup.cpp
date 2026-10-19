@@ -10,6 +10,8 @@
 #include <dwmapi.h>
 #include <dwrite_3.h>
 #include <shellapi.h>
+#include <exdisp.h>
+#include <shldisp.h>
 #include <shlobj.h>
 #include <shlwapi.h>
 #include <wincodec.h>
@@ -97,7 +99,7 @@ enum class Screen { Welcome, License, Options, Installing, Done, Failed };
 
 enum class Action {
     Install, Cancel, Options, ReadLicense, Agree, GetRuntime, CheckRuntime,
-    Back, AcceptLicense, Browse, Shortcut, Finish, Retry, Close, Japanese, KeepEnglish,
+    Back, AcceptLicense, Browse, Shortcut, Finish, Retry, Close, Japanese, KeepEnglish, Samples,
     WithoutJapanese,
 };
 
@@ -593,9 +595,14 @@ std::vector<Control> Controls(const Wizard& wizard) {
         break;
     case Screen::Installing:
         break;
-    case Screen::Done:
+    case Screen::Done: {
+        // Settings' typing samples, opened on request only.
+        const std::wstring samples = Tr(L"See typing samples", L"入力の見本を見る");
+        const float width = 16.0f + TextWidth(wizard, wizard.body.Get(), samples);
+        controls.push_back({Action::Samples, Kind::Link, D2D1::RectF((kWidth - width) / 2.0f, 304.0f, (kWidth + width) / 2.0f, 328.0f), samples});
         controls.push_back({Action::Finish, Kind::Primary, FooterButton(0), Tr(L"Finish", L"完了")});
         break;
+    }
     case Screen::Failed: {
         // Without the Japanese data, English can still be installed.
         const int code = wizard.installExitCode.load();
@@ -1119,6 +1126,43 @@ void Go(Wizard& wizard, Screen screen) {
     InvalidateRect(wizard.window, nullptr, FALSE);
 }
 
+// Starts `file` with `arguments` as the signed-in user rather than with this
+// setup's administrator rights: through the desktop's shell (Explorer).
+bool ShellExecuteAsUser(const std::wstring& file, const std::wstring& arguments) {
+    Com<IShellWindows> windows;
+    if (FAILED(CoCreateInstance(CLSID_ShellWindows, nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(windows.Put())))) return false;
+    VARIANT empty{};
+    long desktop = 0;
+    Com<IDispatch> found;
+    if (windows->FindWindowSW(&empty, &empty, SWC_DESKTOP, &desktop, SWFO_NEEDDISPATCH, found.Put()) != S_OK || !found) {
+        return false;
+    }
+    Com<IServiceProvider> provider;
+    Com<IShellBrowser> browser;
+    Com<IShellView> view;
+    Com<IDispatch> background;
+    Com<IShellFolderViewDual> folderView;
+    Com<IDispatch> application;
+    Com<IShellDispatch2> shell;
+    if (FAILED(found->QueryInterface(IID_PPV_ARGS(provider.Put()))) ||
+        FAILED(provider->QueryService(SID_STopLevelBrowser, IID_PPV_ARGS(browser.Put()))) ||
+        FAILED(browser->QueryActiveShellView(view.Put())) ||
+        FAILED(view->GetItemObject(SVGIO_BACKGROUND, IID_PPV_ARGS(background.Put()))) ||
+        FAILED(background->QueryInterface(IID_PPV_ARGS(folderView.Put()))) ||
+        FAILED(folderView->get_Application(application.Put())) ||
+        FAILED(application->QueryInterface(IID_PPV_ARGS(shell.Put())))) {
+        return false;
+    }
+    BSTR path = SysAllocString(file.c_str());
+    VARIANT args{};
+    args.vt = VT_BSTR;
+    args.bstrVal = SysAllocString(arguments.c_str());
+    const HRESULT result = shell->ShellExecute(path, args, empty, empty, empty);
+    VariantClear(&args);
+    SysFreeString(path);
+    return SUCCEEDED(result);
+}
+
 void Activate(Wizard& wizard, Action action) {
     switch (action) {
     case Action::Install:
@@ -1146,6 +1190,13 @@ void Activate(Wizard& wizard, Action action) {
     case Action::Shortcut: wizard.startMenuShortcut = !wizard.startMenuShortcut; break;
     case Action::Japanese: wizard.japanese = !wizard.japanese; break;
     case Action::KeepEnglish: wizard.keepEnglish = !wizard.keepEnglish; break;
+    case Action::Samples: {
+        const auto app = wizard.installRoot / L"TEKITO.exe";
+        if (!ShellExecuteAsUser(app.wstring(), L"--page samples")) {
+            ShellExecuteW(nullptr, L"open", L"explorer.exe", (L"\"" + app.wstring() + L"\"").c_str(), nullptr, SW_SHOWNORMAL);
+        }
+        break;
+    }
     case Action::Finish:
         wizard.completed = true;
         DestroyWindow(wizard.window);

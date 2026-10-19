@@ -602,7 +602,7 @@ private:
                                 controller_->put_Bounds(bounds);
                                 controller_->put_IsVisible(TRUE);
                                 const HRESULT navigationResult =
-                                    webview_->Navigate(L"https://tekito.settings/index.html");
+                                    webview_->Navigate((L"https://tekito.settings/index.html" + StartPageHash()).c_str());
                                 if (FAILED(navigationResult)) {
                                     FailWebView(Text(L"The local settings page could not be opened.", L"設定画面を開けませんでした。"));
                                 }
@@ -977,6 +977,23 @@ private:
         japaneseWords_ = std::move(words);
         runtime_->NotifyDictionaryChanged();
         return true;
+    }
+
+    // "--page <name>" on the command line opens that page (the setup's
+    // "See typing samples": --page samples).
+    static std::wstring StartPageHash() {
+        static constexpr std::wstring_view kPages[] = {L"general", L"japanese", L"mixed", L"auto", L"dictionary", L"about", L"samples"};
+        int count = 0;
+        LPWSTR* arguments = CommandLineToArgvW(GetCommandLineW(), &count);
+        std::wstring hash;
+        for (int i = 1; arguments && i + 1 < count; ++i) {
+            if (std::wstring_view(arguments[i]) != L"--page") continue;
+            for (const auto page : kPages) {
+                if (page == arguments[i + 1]) hash = L"#" + std::wstring(page);
+            }
+        }
+        if (arguments) LocalFree(arguments);
+        return hash;
     }
 
     std::wstring SettingsStateJson() {
