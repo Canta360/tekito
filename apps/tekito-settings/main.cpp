@@ -30,6 +30,7 @@
 #include <commdlg.h>
 #include <dwmapi.h>
 #include <shellapi.h>
+#include <urlmon.h>
 #include <wrl.h>
 #include "WebView2.h"
 
@@ -43,6 +44,7 @@
 #include <memory>
 #include <string>
 #include <string_view>
+#include <thread>
 
 #pragma comment(lib, "comdlg32.lib")
 #pragma comment(lib, "dwmapi.lib")
@@ -63,6 +65,14 @@ constexpr int kRetryWebView = 200;
 // is only sent a new state when one of them moved.
 constexpr UINT_PTR kStateWatchTimer = 1;
 constexpr UINT kStateWatchIntervalMs = 500;
+// A postal code download finished (lParam: PostalDownload*).
+constexpr UINT kPostalDownloaded = WM_APP + 1;
+
+struct PostalDownload {
+    std::wstring requestId;
+    std::filesystem::path file;
+    bool ok{false};
+};
 
 // The distributor's site, opened by the About page. Fixed here rather than
 // taken from the page, so the page cannot ask the host to open arbitrary URLs.
@@ -87,6 +97,9 @@ constexpr DataPackInfo kJapaneseDataPacks[] = {
 constexpr std::size_t kJapaneseRequiredPacks = 2;
 // Where Japan Post offers its postal code data (UTF-8), which Settings adds.
 constexpr wchar_t kPostalCodePage[] = L"https://www.post.japanpost.jp/zipcode/dl/utf-zip.html";
+// Japan Post's whole-country file in UTF-8, fetched only after the user
+// agrees to it in Settings.
+constexpr wchar_t kPostalCodeZip[] = L"https://www.post.japanpost.jp/zipcode/dl/utf/zip/utf_ken_all.zip";
 constexpr DataPackInfo kDataPacks[] = {
     {L"standard-english", L"Standard English"},
     {L"wikipedia-common-misspellings", L"Common Misspellings"},
@@ -1374,6 +1387,20 @@ private:
             const auto imported = tekito::userdata::ImportPostalCodes(source, PostalCodeDirectory(), error);
             if (imported) runtime_->NotifyDictionaryChanged();
             Reply(requestId, imported.has_value(), imported ? L"" : PostalCodeErrorText(error));
+        } else if (type == L"postalCodes.download") {
+            if (postalDownloading_) {
+                Reply(requestId, false);
+                return;
+            }
+            postalDownloading_ = true;
+            wchar_t folder[MAX_PATH]{};
+            GetTempPathW(MAX_PATH, folder);
+            auto* download = new PostalDownload{
+                requestId, std::filesystem::path(folder) / (L"tekito-utf_ken_all-" + std::to_wstring(GetCurrentProcessId()) + L".zip")};
+            std::thread([hwnd = hwnd_, download] {
+                download->ok = SUCCEEDED(URLDownloadToFileW(nullptr, kPostalCodeZip, download->file.c_str(), 0, nullptr));
+                if (!PostMessageW(hwnd, kPostalDownloaded, 0, reinterpret_cast<LPARAM>(download))) delete download;
+            }).detach();
         } else if (type == L"postalCodes.remove") {
             const bool removed = tekito::userdata::RemovePostalCodes(PostalCodeDirectory());
             if (removed) runtime_->NotifyDictionaryChanged();
@@ -1483,6 +1510,24 @@ private:
                    L"&settings=" + QueryEncoded(ReportSettings());
             ShellExecuteW(nullptr, L"open", url.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
             Reply(requestId, true);
+        } else if (type == L"feedback.open") {
+            // A bug report (with the version and settings) or a request,
+            // to write and send in the browser; the project and its
+            // releases. Nothing is sent from here.
+            const auto kind = message.String(L"kind");
+            const std::string_view version = TEKITO_VERSION_STRING;
+            std::wstring url = L"https://github.com/Canta360/tekito";
+            if (kind == L"bug") {
+                url += L"/issues/new?template=bug-report.yml&version=" +
+                       QueryEncoded(std::wstring(version.begin(), version.end())) +
+                       L"&settings=" + QueryEncoded(ReportSettings());
+            } else if (kind == L"feature") {
+                url += L"/issues/new?template=feature-request.yml";
+            } else if (kind == L"releases") {
+                url += L"/releases";
+            }
+            const auto result = reinterpret_cast<INT_PTR>(ShellExecuteW(nullptr, L"open", url.c_str(), nullptr, nullptr, SW_SHOWNORMAL));
+            Reply(requestId, result > 32, result > 32 ? L"" : Text(L"The page could not be opened.", L"ページを開けませんでした。"));
         } else if (type == L"learning.list") {
             Reply(requestId, true, {}, L",\"items\":" + LearnedJson());
         } else if (type == L"learning.forget") {
@@ -1634,6 +1679,10 @@ private:
             SetTimer(hwnd, kStateWatchTimer, kStateWatchIntervalMs, nullptr);
             return 0;
         }
+        if (message == kPostalDownloaded) {
+            self->FinishPostalDownload(std::unique_ptr<PostalDownload>(reinterpret_cast<PostalDownload*>(lParam)));
+            return 0;
+        }
         if (message == WM_TIMER && wParam == kStateWatchTimer) {
             self->CheckForExternalChanges();
             return 0;
@@ -1686,6 +1735,23 @@ private:
 
     static std::filesystem::path PostalCodeDirectory() {
         return tekito::ExternalLexiconProvider::PackDirectory(L"japanese-zipcode");
+    }
+
+    // The downloaded file is imported, then deleted.
+    void FinishPostalDownload(std::unique_ptr<PostalDownload> download) {
+        postalDownloading_ = false;
+        if (!download->ok) {
+            Reply(download->requestId, false,
+                  Text(L"The postal codes could not be downloaded. Check the connection and try again.",
+                       L"郵便番号をダウンロードできませんでした。接続を確認して、もう一度お試しください。"));
+            return;
+        }
+        tekito::userdata::PostalCodeImportError error{};
+        const auto imported = tekito::userdata::ImportPostalCodes(download->file, PostalCodeDirectory(), error);
+        std::error_code ignored;
+        std::filesystem::remove(download->file, ignored);
+        if (imported) runtime_->NotifyDictionaryChanged();
+        Reply(download->requestId, imported.has_value(), imported ? L"" : PostalCodeErrorText(error));
     }
 
     std::wstring PostalCodesJson() const {
@@ -1904,6 +1970,7 @@ private:
     EventRegistrationToken webMessageToken_{};
     // A file dropped on the page comes with its message (postal codes).
     std::filesystem::path droppedFile_;
+    bool postalDownloading_{false};
     EventRegistrationToken navigationToken_{};
     std::wstring dataPackSummary_{L"Unavailable"};
     std::wstring japaneseDataSummary_{L"0 / 0"};

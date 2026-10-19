@@ -1,0 +1,45 @@
+name: Bug / 不具合
+description: TEKITO did something wrong, other than a wrong conversion. / 誤変換以外の、動作の問題。
+title: "Bug: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Issues are public. Remove anything private before you submit.
+        Issue は公開されます。送る前に、知られたくない内容は消してください。
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened / 起きたこと
+      placeholder: After switching to Mix, the first key typed in Notepad was lost.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps / 手順
+      description: What you did, in order. / 操作を順番に。
+  - type: input
+    id: app
+    attributes:
+      label: App / アプリ
+      placeholder: Notepad, Chrome, Word
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Mode / モード
+      options:
+        - Japanese
+        - Mix
+        - Auto
+        - Direct
+  - type: input
+    id: version
+    attributes:
+      label: TEKITO version / バージョン
+  - type: textarea
+    id: settings
+    attributes:
+      label: Settings / 設定
+      description: Filled in by TEKITO. / TEKITO が書き込みます。

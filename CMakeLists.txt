@@ -149,7 +149,7 @@ target_compile_options(TEKITO PRIVATE /utf-8)
 target_compile_definitions(TEKITO PRIVATE TEKITO_VERSION_STRING="${PROJECT_VERSION}")
 target_link_libraries(TEKITO PRIVATE
     tekito_userdata tekito_dictionary
-    user32 gdi32 comctl32 comdlg32 shell32 advapi32
+    user32 gdi32 comctl32 comdlg32 shell32 advapi32 urlmon
     "${CMAKE_CURRENT_SOURCE_DIR}/third_party/webview2/lib/x64/WebView2LoaderStatic.lib"
 )
 # The page itself is built by `npm run build` in apps/tekito-settings/ui.
