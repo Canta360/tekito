@@ -239,7 +239,8 @@ function App() {
   };
 
   const shownPages = pageIds.filter((id) => (id !== "japanese" || japanese) && (id !== "mixed" || mixed));
-  const current = shownPages.includes(page) ? page : "general";
+  // 入力の見本 opens from 一般 and is not in the list.
+  const current = page === "samples" || shownPages.includes(page) ? page : "general";
   const open = (id) => {
     setPage(id);
     document.querySelector(".content")?.scrollTo(0, 0);
@@ -279,6 +280,7 @@ function App() {
                 {current === "auto" && <AutoPage {...pageProps} />}
                 {current === "dictionary" && <DictionaryPage {...pageProps} japanese={japaneseInstalled} learning={learning}
                   dictionary={dictionary} japaneseWords={japaneseWords} setModal={setModal} />}
+                {current === "samples" && <SamplesPage japaneseInstalled={japaneseInstalled} back={() => open("general")} />}
                 {current === "about" && <AboutPage {...pageProps} version={version} runtime={runtime} packs={packs} japanese={japaneseInstalled} />}
               </>
             )}
@@ -429,7 +431,7 @@ function KeysCard({ page, showKeys }) {
 // ---------------------------------------------------------------------------
 // 一般: the modes, switching, the candidate list, and what applies to all.
 
-function GeneralPage({ settings, setSetting, runAction, showKeys, mode, changeMode, japaneseInstalled, japaneseKeyboard }) {
+function GeneralPage({ settings, setSetting, runAction, showKeys, open, mode, changeMode, japaneseInstalled, japaneseKeyboard }) {
   const t = useText();
   const g = t.general;
   const japanese = japaneseInstalled && settings.japaneseEnabled !== false;
@@ -509,6 +511,10 @@ function GeneralPage({ settings, setSetting, runAction, showKeys, mode, changeMo
             <Toggle label={g.meaningsLanguage.title} checked={settings.meaningsInUiLanguage} onChange={(value) => setSetting("meaningsInUiLanguage", value)} />
           </Row>
         )}
+      </Card>
+
+      <Card label={t.pages.samples}>
+        <LinkRow icon="play_circle" title={t.pages.samples} description={t.samples.description} onClick={() => open("samples")} />
       </Card>
 
       <Details id="general" title={t.details}>
@@ -657,6 +663,64 @@ function ExcludedApps({ settings, runAction }) {
 
 // ---------------------------------------------------------------------------
 // 日本語
+
+// 入力の見本: short clips of what each mode does (public/samples, recorded
+// by tests/visual/samples/encode.py), one playing at a time.
+const sampleSets = {
+  japanese: [
+    ["japanese-convert", ["Space", "Enter"]], ["japanese-convert-long", ["Space"]], ["japanese-live", []],
+    ["japanese-phrases", ["Space", "↑"]], ["japanese-prediction", ["Tab"]], ["japanese-english", ["Shift"]],
+    ["japanese-forms", ["F6", "F7", "F8", "F10"]], ["japanese-special", ["Space"]], ["japanese-undo", ["Ctrl", "Backspace"]],
+    ["japanese-slips", ["Space"]],
+  ],
+  mixed: [["mixed-basic", ["Space"]], ["mixed-long", ["Space"]], ["mixed-live", []], ["mixed-vowel", ["Space"]], ["mixed-correction", ["Space"]]],
+  auto: [
+    ["auto-correct", ["Space"]], ["auto-undo", ["Backspace", "Esc"]], ["auto-completion", ["Tab"]], ["auto-next", ["Tab"]],
+    ["auto-casual", []], ["auto-period", ["Enter"]],
+  ],
+};
+
+function SamplesPage({ japaneseInstalled, back }) {
+  const t = useText();
+  const modes = japaneseInstalled ? ["japanese", "mixed", "auto"] : ["auto"];
+  const [mode, setMode] = useState(modes[0]);
+  const [shown, setShown] = useState(null);
+  const theme = window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  const clip = (id) => `./samples/${id}-${theme}.mp4`;
+  return (
+    <>
+      <Button icon="chevron_left" variant="quiet" className="back" onClick={back}>{t.pages.general}</Button>
+      <div className="sample-tabs" role="tablist" aria-label={t.pages.samples}>
+        {modes.map((id) => (
+          <button key={id} type="button" role="tab" aria-selected={mode === id} className="sample-tab" onClick={() => setMode(id)}>
+            <ModeIcon id={id} size={18} />{t.modeNames[id]}
+          </button>
+        ))}
+      </div>
+      <div className="samples" role="tabpanel">
+        {sampleSets[mode].map(([id, keys]) => (
+          <button key={id} type="button" className="sample" onClick={() => setShown([id, keys])}>
+            <span className="sample-stage">
+              {/* At rest a card shows how its clip ends. */}
+              <video src={clip(id)} muted playsInline preload="auto"
+                onLoadedMetadata={(event) => { event.currentTarget.currentTime = Math.max(0, event.currentTarget.duration - 0.2); }} />
+              <span className="sample-play" aria-hidden="true"><Symbol name="play_arrow" size={22} /></span>
+            </span>
+            <span className="sample-name"><span>{t.samples.names[id]}</span><Keycaps keys={keys} /></span>
+          </button>
+        ))}
+      </div>
+      <Dialog open={Boolean(shown)} title={shown ? t.samples.names[shown[0]] : ""} wide onClose={() => setShown(null)}>
+        {shown && (
+          <div className="sample-player">
+            <video key={shown[0]} src={clip(shown[0])} muted loop playsInline autoPlay />
+          </div>
+        )}
+        <div className="dialog-actions"><Button variant="primary" onClick={() => setShown(null)}>{t.close}</Button></div>
+      </Dialog>
+    </>
+  );
+}
 
 // The kanji slider's stops and the settings each stands for.
 const kanjiStops = [1, 2, 3, 4, 5, 6, 7, 8];

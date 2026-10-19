@@ -1,0 +1,14 @@
+# まぜ打ち: 長い文
+page 760 300
+mode mixed
+hold 600
+speed 100
+type asitano 
+type sprint 
+type review 
+type de 
+type deploy 
+type no 
+type joukenwo 
+type kakuninsimasu
+key enter 2200

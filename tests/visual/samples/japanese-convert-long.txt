@@ -4,7 +4,7 @@ mode japanese
 live off
 hold 600
 speed 90
-type raishuunokaigidetsukaushiryouwokinyoubimadenitsukutteokimasu
+type raishuunokaigidetsukaushiryouwokinnyoubimadenitsukutteokimasu
 hold 600
 key space 2200
 key enter 2000

@@ -1,0 +1,11 @@
+# 日本語: 予測候補 (Tab)
+page 640 440
+mode japanese
+live off
+hold 600
+speed 160
+type ariga
+hold 1400
+key tab 1200
+key down 1300
+key enter 1800

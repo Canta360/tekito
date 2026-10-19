@@ -1,0 +1,10 @@
+# 日本語: 入力ミスの修正
+page 760 300
+mode japanese
+live off
+hold 600
+speed 100
+type raishuunokinyoubinisiryouwookurimasu
+hold 600
+key space 2000
+key enter 2000

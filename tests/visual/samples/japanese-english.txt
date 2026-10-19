@@ -1,0 +1,14 @@
+# 日本語: 英単語を混ぜる (Shift)
+page 640 360
+mode japanese
+live off
+hold 600
+speed 120
+type asitano
+key space 900
+key enter 700
+type Zoom
+key space 900
+type dehanasimasu
+key space 1300
+key enter 1800

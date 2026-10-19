@@ -1,0 +1,13 @@
+# 日本語: ひらがな・カタカナ・半角 (F6 F7 F8 F10)
+page 600 300
+mode japanese
+live off
+hold 600
+speed 120
+type tekitou
+hold 500
+key f7 1200
+key f8 1200
+key f10 1200
+key f6 1200
+key enter 1600

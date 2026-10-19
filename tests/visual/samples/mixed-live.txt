@@ -1,0 +1,16 @@
+# まぜ打ち: ライブ変換
+page 760 300
+mode mixed
+set mixlive on
+hold 600
+speed 110
+type asitano 
+type sprint 
+type review 
+type de 
+type deploy 
+type no 
+type joukenwo 
+type kakuninsimasu
+hold 900
+key enter 2200

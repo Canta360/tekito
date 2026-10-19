@@ -1,0 +1,12 @@
+# Auto: 口語表現
+page 640 440
+mode english
+hold 600
+speed 120
+type im 
+type gonna 
+type be 
+type late 
+type lol
+hold 1200
+key space 1800

@@ -285,6 +285,30 @@ kbd {
 .footnote { display: grid; gap: 2px; color: var(--ink-2); font-size: 12px; padding: 6px 4px 0; }
 .problem { color: var(--danger); }
 
+/* 入力の見本 */
+.sample-tabs { display: flex; gap: 8px; margin-bottom: 6px; }
+.sample-tab {
+  display: inline-flex; align-items: center; gap: 8px; padding: 7px 14px; border-radius: 6px; font-size: 14px;
+  border: 1px solid var(--line); background: var(--card);
+}
+.sample-tab[aria-selected="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.samples { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 1000px) { .samples { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.sample {
+  display: grid; min-width: 0; padding: 0; text-align: left; border-radius: 8px; border: 1px solid var(--line); background: var(--card); overflow: hidden;
+}
+.sample:hover { background: var(--card-hover); }
+.sample.is-playing { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+/* The clips' page is white, or #202020 in dark. */
+.sample-stage { position: relative; display: block; aspect-ratio: 3 / 2; background: #ffffff; border-bottom: 1px solid var(--line); }
+@media (prefers-color-scheme: dark) { .sample-stage { background: #202020; } }
+.sample-stage video { width: 100%; height: 100%; object-fit: contain; object-position: center top; display: block; }
+.sample-play {
+  position: absolute; right: 10px; bottom: 10px; width: 32px; height: 32px; border-radius: 50%; color: #fff;
+  background: rgba(0, 0, 0, 0.45); display: flex; align-items: center; justify-content: center;
+}
+.sample-name { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; font-size: 14px; }
+
 /* Dialogs and notices. */
 .dialog {
   width: min(440px, calc(100vw - 32px)); padding: 0; border: 1px solid var(--line); border-radius: 8px;
@@ -324,3 +348,5 @@ kbd {
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }
+.sample-player { padding: 0 24px 18px; }
+.sample-player video { width: 100%; display: block; border-radius: 6px; border: 1px solid var(--line); }

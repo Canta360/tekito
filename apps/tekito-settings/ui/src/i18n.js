@@ -8,7 +8,20 @@ const count = (value) => value.toLocaleString("en-US");
 const en = {
   lang: "en",
   settings: "Settings",
-  pages: { general: "General", japanese: "Japanese", mixed: "Mix", auto: "Auto", dictionary: "Dictionary & learning", about: "About" },
+  pages: { general: "General", japanese: "Japanese", mixed: "Mix", auto: "Auto", dictionary: "Dictionary & learning", about: "About", samples: "Typing samples" },
+  samples: {
+    description: "Short clips of what each mode does",
+    names: {
+      "japanese-convert": "Convert and enter", "japanese-convert-long": "A long sentence at once", "japanese-live": "Live conversion",
+      "japanese-phrases": "Choose per phrase", "japanese-prediction": "Predictions", "japanese-english": "English words in Japanese",
+      "japanese-forms": "Hiragana, katakana, half-width", "japanese-special": "Dates, sums and symbols",
+      "japanese-undo": "Undo an entry", "japanese-slips": "Typo correction",
+      "mixed-basic": "Japanese and English mixed", "mixed-long": "A long sentence", "mixed-live": "Live conversion",
+      "mixed-vowel": "One vowel", "mixed-correction": "English typos",
+      "auto-correct": "Typo correction", "auto-undo": "Undo a correction", "auto-completion": "Word completion",
+      "auto-next": "Next words", "auto-casual": "Casual words", "auto-period": "Period on Enter",
+    },
+  },
   loading: { title: "Loading settings", body: "Connecting to TEKITO on this PC." },
   unavailable: { title: "Settings unavailable", body: "Close Settings and open it again." },
   tryAgain: "Try again",
@@ -295,7 +308,20 @@ const en = {
 const ja = {
   lang: "ja",
   settings: "設定",
-  pages: { general: "一般", japanese: "日本語", mixed: "まぜ打ち", auto: "Auto", dictionary: "辞書と学習", about: "情報" },
+  pages: { general: "一般", japanese: "日本語", mixed: "まぜ打ち", auto: "Auto", dictionary: "辞書と学習", about: "情報", samples: "入力の見本" },
+  samples: {
+    description: "各モードでできる入力を、短い動画で確認できます",
+    names: {
+      "japanese-convert": "変換と確定", "japanese-convert-long": "長い文をまとめて変換", "japanese-live": "ライブ変換",
+      "japanese-phrases": "文節ごとに候補を選ぶ", "japanese-prediction": "予測候補", "japanese-english": "英単語を混ぜる",
+      "japanese-forms": "ひらがな・カタカナ・半角", "japanese-special": "日付・計算・記号",
+      "japanese-undo": "確定の取り消し", "japanese-slips": "入力ミスの修正",
+      "mixed-basic": "日本語と英語をまぜる", "mixed-long": "長い文", "mixed-live": "ライブ変換",
+      "mixed-vowel": "母音1文字", "mixed-correction": "英単語の修正",
+      "auto-correct": "入力ミスの修正", "auto-undo": "修正の取り消し", "auto-completion": "単語の補完",
+      "auto-next": "次の単語", "auto-casual": "口語表現", "auto-period": "Enter でピリオド",
+    },
+  },
   loading: { title: "設定を読み込んでいます", body: "この PC の TEKITO に接続しています。" },
   unavailable: { title: "設定を開けません", body: "設定をいったん閉じて、開き直してください。" },
   tryAgain: "再試行",

@@ -1,0 +1,10 @@
+# まぜ打ち: Space で区切って日本語と英語をまぜる
+page 640 300
+mode mixed
+hold 600
+speed 120
+type kyouha 
+type meeting 
+type ni 
+type deru
+key enter 2000

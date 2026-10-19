@@ -1,0 +1,13 @@
+# 日本語: 文節ごとに候補を選ぶ (Space, ↑)
+page 640 440
+mode japanese
+live off
+hold 600
+speed 120
+type kurumadematteru
+hold 500
+key space 1400
+key space 1300
+key up 900
+key up 1300
+key enter 1800

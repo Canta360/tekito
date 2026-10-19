@@ -1271,8 +1271,34 @@ int RunScript(Testbed& bed, const std::filesystem::path& script, const std::file
             if (bed.english || rest == L"mixed") (void)EnsureEngine(bed);
             ja::AttachMixedTyping(bed.composer, rest == L"mixed");
             Refresh(bed);
-        } else if (command == L"live") {
-            bed.composer.SetLiveConversion(rest == L"on");
+        } else if (command == L"live" || command == L"set") {
+            // set <setting> on|off; "live on" is "set live on".
+            const auto gap = rest.find(L' ');
+            const std::wstring name = command == L"live" ? L"live" : rest.substr(0, gap);
+            const bool on = (command == L"live" ? rest : rest.substr(gap == std::wstring::npos ? rest.size() : gap + 1)) == L"on";
+            auto& s = bed.settings;
+            struct Named { std::wstring_view name; bool tekito::userdata::UserSettings::*field; };
+            static constexpr Named kSettings[] = {
+                {L"live", &tekito::userdata::UserSettings::japaneseLiveConversion},
+                {L"refine", &tekito::userdata::UserSettings::japaneseLiveRefine},
+                {L"prediction", &tekito::userdata::UserSettings::japanesePredictionEnabled},
+                {L"kana", &tekito::userdata::UserSettings::japaneseKanaInput},
+                {L"spacing", &tekito::userdata::UserSettings::japaneseEnglishSpacing},
+                {L"mixlive", &tekito::userdata::UserSettings::mixLiveConversion},
+                {L"mixcorrection", &tekito::userdata::UserSettings::mixCorrection},
+                {L"vowelkana", &tekito::userdata::UserSettings::mixSingleVowelKana},
+                {L"correction", &tekito::userdata::UserSettings::correctionEnabled},
+                {L"completion", &tekito::userdata::UserSettings::completionEnabled},
+                {L"nextwords", &tekito::userdata::UserSettings::nextWordPrediction},
+                {L"period", &tekito::userdata::UserSettings::periodOnEnter},
+                {L"doublespace", &tekito::userdata::UserSettings::doubleSpacePeriod},
+            };
+            const auto found = std::find_if(std::begin(kSettings), std::end(kSettings),
+                                            [&](const Named& named) { return named.name == name; });
+            if (found == std::end(kSettings)) return 3;
+            s.*(found->field) = on;
+            const bool mixed = bed.composer.MixedTyping();
+            tekito::userdata::ApplyJapaneseSettings(bed.composer, s, &bed.learning, mixed);
         } else if (command == L"speed") {
             speed = std::max(1, _wtoi(rest.c_str()));
         } else if (command == L"hold") {

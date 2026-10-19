@@ -1,0 +1,9 @@
+# Auto: Enter でピリオド
+page 600 300
+mode english
+set period on
+hold 600
+speed 120
+type Thanks for the review
+hold 600
+key enter 2000

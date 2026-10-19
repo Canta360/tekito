@@ -1,0 +1,10 @@
+# Auto: 次の単語
+page 600 440
+mode english
+hold 600
+speed 140
+type I want t
+hold 1500
+key tab 1000
+key tab 1200
+key space 1800

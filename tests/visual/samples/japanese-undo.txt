@@ -1,0 +1,12 @@
+# 日本語: 確定の取り消し (Ctrl + Backspace)
+page 640 440
+mode japanese
+live off
+hold 600
+speed 120
+type kisyagakisyadekisyasita
+key space 1300
+key enter 1200
+key ctrl+backspace 1500
+key space 1500
+key enter 1800

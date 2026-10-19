@@ -1,0 +1,20 @@
+# 日本語: 日付・計算・記号
+page 640 460
+mode japanese
+live off
+hold 600
+speed 140
+type kyou
+key space 900
+key space 1500
+key enter 700
+key enter 500
+type 1+2=
+key space 1200
+key enter 700
+key enter 500
+type yajirusi
+key space 900
+key space 900
+key space 1200
+key enter 1600

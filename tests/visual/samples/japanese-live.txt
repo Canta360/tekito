@@ -1,0 +1,9 @@
+# 日本語: ライブ変換
+page 760 300
+mode japanese
+set live on
+hold 600
+speed 110
+type raishuunokaigidetsukaushiryouwokinnyoubimadenitsukutteokimasu
+hold 1200
+key enter 2000

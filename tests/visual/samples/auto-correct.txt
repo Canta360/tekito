@@ -1,0 +1,13 @@
+# Auto: 入力ミスの修正
+page 640 400
+mode english
+hold 600
+speed 110
+type I recieve 
+type it 
+hold 500
+type thnaks 
+type for 
+type teh 
+type reveiw.
+hold 2000

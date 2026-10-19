@@ -1,0 +1,9 @@
+# Auto: 修正の取り消し (Backspace, Esc)
+page 600 400
+mode english
+hold 600
+speed 120
+type I saw teh
+key space 1300
+key backspace 1300
+key esc 1600
