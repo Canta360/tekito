@@ -990,11 +990,7 @@ void TestMixedTyping(const RomajiTable& table, const MiniPack& pack) {
     RequireText(composer.Commit(), L"push", "Enter takes an English chunk as Space would");
     composer.ForgetContext();
     Type(composer, L"kikai");
-    composer.Convert();
-    const auto withSpace = composer.Commit();
-    composer.ForgetContext();
-    Type(composer, L"kikai");
-    RequireText(composer.Commit(), withSpace, "and a Japanese one: converted, not left as kana");
+    RequireText(composer.Commit(), L"きかい", "Enter converts nothing: a Japanese chunk is committed as typed");
     {
         // Mix live conversion: Japanese shows converted as it is typed;
         // English stays as typed.

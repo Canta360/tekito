@@ -2012,6 +2012,55 @@ void JapaneseComposer::AddSlipCandidatesFor(PhraseState& phrase) const {
             candidate.slip = true;
             wholeInput.push_back(std::move(candidate));
         }
+        // The whole input split another way inside its first phrase, when
+        // that reads nearly as likely: いがい|たい is 以外帯, い|がいたい is
+        // 胃が痛い. Not a slip: what was typed is kept.
+        const auto& first = phrases_.front();
+        const std::wstring& reading = conversionReading_;
+        const std::int64_t shownCost = costOf(converter_->Best(reading, 0, userDictionary_));
+        std::size_t resplits = 0;
+        std::wstring shownText;
+        for (const auto& p : phrases_) shownText += PhraseText(p);
+        for (std::size_t split = 1; split < first.length && split < reading.size(); ++split) {
+            if (resplits >= kWholeSlipCandidates) break;
+            const auto left = converter_->Best(reading.substr(0, split), 0, userDictionary_);
+            if (!left) continue;
+            const auto right = converter_->Best(reading.substr(split), left->rightId, userDictionary_);
+            if (!right || left->cost + right->cost > shownCost + kSlipMargin) continue;
+            // Converted as a sentence that breaks there; the first phrase
+            // the one the sentence model reads best (い: 胃, not 位).
+            const std::size_t breaks[] = {split};
+            const auto parts = converter_->Convert(reading, {}, context_, contextWords_, userDictionary_, breaks);
+            if (parts.empty() || parts.front().length != split || parts.front().candidates.empty()) continue;
+            std::wstring rest;
+            for (std::size_t i = 1; i < parts.size(); ++i) {
+                if (!parts[i].candidates.empty()) rest += parts[i].candidates.front().text;
+            }
+            const auto& heads = parts.front().candidates;
+            std::size_t head = 0;
+            if (reranker_ && sentenceCheck_) {
+                // Offered only when it reads better than what is shown
+                // (はしをわたる split as は|しをわたる is no sentence).
+                constexpr std::size_t kHeads = 6;
+                constexpr double kResplitNats = 0.0;
+                std::vector<std::wstring> sentences{shownText};
+                for (std::size_t i = 0; i < heads.size() && i < kHeads; ++i) sentences.push_back(heads[i].text + rest);
+                const auto scores = reranker_->LogProbabilities(sentences);
+                for (std::size_t i = 2; i < scores.size(); ++i) {
+                    if (scores[i] > scores[head + 1]) head = i - 1;
+                }
+                if (scores[head + 1] < scores[0] - kResplitNats) continue;
+            }
+            if (heads[head].text + rest == shownText) continue;
+            PhraseCandidate candidate = heads[head];
+            candidate.text += rest;
+            candidate.cost = left->cost + right->cost;
+            candidate.reading = reading;
+            candidate.slip = false;
+            const bool shown = std::any_of(wholeInput.begin(), wholeInput.end(), [&](const PhraseCandidate& c) { return c.text == candidate.text; });
+            // Before the slips: these keep what was typed.
+            if (!shown) wholeInput.insert(wholeInput.begin() + static_cast<std::ptrdiff_t>(resplits++), std::move(candidate));
+        }
     }
 
     // The keys the phrase was read from (when it starts and ends between
@@ -2458,10 +2507,11 @@ std::vector<std::wstring> JapaneseComposer::PhraseKeys() const {
 
 std::wstring JapaneseComposer::Commit() {
     if (!chunkJudge_) return CommitChunk();
-    // Enter takes the chunk being typed as Space would: judged and
-    // converted (kyouhaamegafuttekita is 今日は雨が降ってきた, not kana);
-    // a prediction picked with Tab is taken as it is.
-    if (Typing() && !IsConverted() && !PredictionChosen()) Convert();
+    // Enter commits what is shown, and converts nothing: Japanese typed
+    // without Space stays kana, unless live conversion shows it converted;
+    // English is taken as Space takes it (CommitChunk); a prediction picked
+    // with Tab as it is.
+    if (Typing() && !IsConverted() && !PredictionChosen() && MixLiveText()) Convert();
     std::wstring text;
     if (settled_.empty()) {
         text = CommitChunk();
@@ -2516,10 +2566,13 @@ void JapaneseComposer::SettleChunk() {
     }
     if (chunk.japanese.empty()) chunk.japanese = ApplyTypingStyle(Reading());
     if (settled_.empty()) spaceBeforeSentence_ = spaceAfterEnglish_;
+    const bool asTyped = !IsConverted();
     auto text = CommitChunk();
     while (!text.empty() && text.back() == L' ') text.pop_back();
     chunk.isEnglish = lastChunkEnglish_;
     lastChunkEnglish_ = false;
+    // Japanese settled as typed (Enter) stays as typed.
+    if (asTyped && !chunk.isEnglish) chunk.locked = true;
     // As it was taken (a candidate picked stays).
     (chunk.isEnglish ? chunk.english : chunk.japanese) = text;
     // What was taken comes first.

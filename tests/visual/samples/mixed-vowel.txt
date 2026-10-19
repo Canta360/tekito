@@ -5,7 +5,7 @@ hold 600
 speed 140
 type i 
 type ga 
-type itai
+type itai 
 key enter 900
 key enter 500
 type i 

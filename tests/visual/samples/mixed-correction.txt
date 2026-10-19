@@ -6,5 +6,5 @@ speed 120
 type kyouha 
 type meetnig 
 type ni 
-type deru
+type deru 
 key enter 2000

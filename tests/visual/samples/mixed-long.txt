@@ -10,5 +10,5 @@ type de
 type deploy 
 type no 
 type joukenwo 
-type kakuninsimasu
+type kakuninsimasu 
 key enter 2200
