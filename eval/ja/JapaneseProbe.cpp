@@ -14,6 +14,8 @@
 #include "Core/Japanese/JapaneseComposer.h"
 #include "Core/Japanese/JapaneseData.h"
 #include "Core/Japanese/KanaText.h"
+#include "Core/Japanese/SentenceReranker.h"
+#include "Core/ExternalLexiconProvider.h"
 #include "UserData/JapaneseSettings.h"
 #include "UserData/UserSettings.h"
 
@@ -47,6 +49,23 @@ int main(int argc, char** argv) {
     if (argc < 2) {
         std::cerr << "usage: tekito_ja_probe <keys file> [rows]\n";
         return 2;
+    }
+    // "score" as the second argument: each line is a sentence, printed with
+    // what the sentence check (japanese-reranker) makes of it.
+    if (argc > 2 && std::string(argv[2]) == "score") {
+        tekito::japanese::SentenceReranker reranker;
+        if (!reranker.Open(tekito::ExternalLexiconProvider::PackDirectory(L"japanese-reranker"))) return 3;
+        std::ifstream lines(argv[1], std::ios::binary);
+        for (std::string line; std::getline(lines, line);) {
+            if (!line.empty() && line.back() == '\r') line.pop_back();
+            if (line.empty()) continue;
+            const int size = MultiByteToWideChar(CP_UTF8, 0, line.data(), static_cast<int>(line.size()), nullptr, 0);
+            std::wstring sentence(static_cast<std::size_t>(size), L'\0');
+            MultiByteToWideChar(CP_UTF8, 0, line.data(), static_cast<int>(line.size()), sentence.data(), size);
+            const std::wstring one[] = {sentence};
+            std::cout << line << '\t' << reranker.LogProbabilities(one).front() << '\n';
+        }
+        return 0;
     }
     const std::size_t rows = argc > 2 ? std::stoul(argv[2]) : 27;
     tekito::japanese::JapaneseComposer composer(tekito::japanese::ProcessRomajiTable());
