@@ -15,6 +15,8 @@
 #include "Core/Japanese/JapaneseData.h"
 #include "Core/Japanese/KanaText.h"
 #include "Core/Japanese/SentenceReranker.h"
+#include "Core/ConversionEngine.h"
+#include "Core/EnglishSpelling.h"
 #include "Core/ExternalLexiconProvider.h"
 #include "UserData/JapaneseSettings.h"
 #include "UserData/UserSettings.h"
@@ -64,6 +66,26 @@ int main(int argc, char** argv) {
             MultiByteToWideChar(CP_UTF8, 0, line.data(), static_cast<int>(line.size()), sentence.data(), size);
             const std::wstring one[] = {sentence};
             std::cout << line << '\t' << reranker.LogProbabilities(one).front() << '\n';
+        }
+        return 0;
+    }
+    // "spell" as the second argument: each line is a word and, after a tab,
+    // the English before it, printed with what Mix's English correction
+    // (English Auto's Space) makes of it.
+    if (argc > 2 && std::string(argv[2]) == "spell") {
+        tekito::PreloadDefaultEngineData();
+        const auto engine = tekito::CreateDefaultConversionEngine();
+        if (!engine) return 3;
+        const tekito::EnglishSpelling spelling(*engine);
+        std::ifstream lines(argv[1], std::ios::binary);
+        for (std::string line; std::getline(lines, line);) {
+            if (!line.empty() && line.back() == '\r') line.pop_back();
+            if (line.empty()) continue;
+            const auto tab = line.find('\t');
+            const auto result = spelling.Spell(Widen(line.substr(0, tab)), tab == std::string::npos ? L"" : Widen(line.substr(tab + 1)));
+            std::string others;
+            for (const auto& other : result.others) others += " " + Narrow(other);
+            std::cout << line << "\t" << Narrow(result.word) << (result.corrected ? "\tcorrected" : "\tkept") << "\t" << others << "\n";
         }
         return 0;
     }
