@@ -10,8 +10,7 @@
 #include <dwmapi.h>
 #include <dwrite_3.h>
 #include <shellapi.h>
-#include <exdisp.h>
-#include <shldisp.h>
+#include <mfplay.h>
 #include <shlobj.h>
 #include <shlwapi.h>
 #include <wincodec.h>
@@ -95,15 +94,16 @@ private:
     T* pointer_{nullptr};
 };
 
-enum class Screen { Welcome, License, Options, Installing, Done, Failed };
+enum class Screen { Welcome, License, Options, Installing, Done, Failed, Samples };
 
 enum class Action {
     Install, Cancel, Options, ReadLicense, Agree, GetRuntime, CheckRuntime,
     Back, AcceptLicense, Browse, Shortcut, Finish, Retry, Close, Japanese, KeepEnglish, Samples,
-    WithoutJapanese,
+    WithoutJapanese, SampleMode, SampleClip,
 };
 
-enum class Kind { Primary, Secondary, Quiet, Checkbox, Toggle, Link };
+// Tab: a mode of the typing samples; Item: a row of their list.
+enum class Kind { Primary, Secondary, Quiet, Checkbox, Toggle, Link, Tab, Item };
 
 struct Control {
     Action action;
@@ -112,6 +112,54 @@ struct Control {
     std::wstring label;
     bool enabled{true};
     bool checked{false};
+    // Which mode or clip a Tab or Item stands for.
+    int index{0};
+};
+
+// The typing samples Settings shows, installed with it as
+// settings-ui\samples\<id>-light.mp4 and -dark.mp4, in the same order.
+struct Sample {
+    const wchar_t* id;
+    const wchar_t* english;
+    const wchar_t* japanese;
+};
+constexpr Sample kJapaneseSamples[] = {
+    {L"japanese-convert", L"Convert and enter", L"変換と確定"},
+    {L"japanese-convert-long", L"A long sentence at once", L"長い文をまとめて変換"},
+    {L"japanese-live", L"Live conversion", L"ライブ変換"},
+    {L"japanese-phrases", L"Choose per phrase", L"文節ごとに候補を選ぶ"},
+    {L"japanese-prediction", L"Predictions", L"予測候補"},
+    {L"japanese-english", L"English words in Japanese", L"英単語を混ぜる"},
+    {L"japanese-forms", L"Hiragana, katakana, half-width", L"ひらがな・カタカナ・半角"},
+    {L"japanese-special", L"Dates, sums and symbols", L"日付・計算・記号"},
+    {L"japanese-undo", L"Undo an entry", L"確定の取り消し"},
+    {L"japanese-slips", L"Typo correction", L"入力ミスの修正"},
+};
+constexpr Sample kMixedSamples[] = {
+    {L"mixed-basic", L"Japanese and English mixed", L"日本語と英語をまぜる"},
+    {L"mixed-long", L"A long sentence", L"長い文"},
+    {L"mixed-live", L"Live conversion", L"ライブ変換"},
+    {L"mixed-vowel", L"One vowel", L"母音1文字"},
+    {L"mixed-correction", L"English typos", L"英単語の修正"},
+};
+constexpr Sample kAutoSamples[] = {
+    {L"auto-correct", L"Typo correction", L"入力ミスの修正"},
+    {L"auto-undo", L"Undo a correction", L"修正の取り消し"},
+    {L"auto-completion", L"Word completion", L"単語の補完"},
+    {L"auto-next", L"Next words", L"次の単語"},
+    {L"auto-casual", L"Casual words", L"口語表現"},
+    {L"auto-period", L"Period on Enter", L"Enter でピリオド"},
+};
+struct SampleSet {
+    const wchar_t* english;
+    const wchar_t* japanese;
+    const Sample* samples;
+    std::size_t count;
+};
+constexpr SampleSet kSampleSets[] = {
+    {L"Japanese", L"日本語", kJapaneseSamples, std::size(kJapaneseSamples)},
+    {L"Mix", L"まぜ打ち", kMixedSamples, std::size(kMixedSamples)},
+    {L"Auto", L"Auto", kAutoSamples, std::size(kAutoSamples)},
 };
 
 struct Palette {
@@ -174,6 +222,13 @@ struct Wizard {
     bool keyboardFocus{false};
     bool pressed{false};
     float licenseScroll{0.0f};
+
+    // Typing samples: the mode and clip shown, played in a child window.
+    int sampleMode{0};
+    int sampleClip{0};
+    HWND video{};
+    Com<IMFPMediaPlayer> player;
+    bool sampleMissing{false};
 
     // Rendering.
     UINT dpi{96};
@@ -545,6 +600,19 @@ constexpr D2D1_RECT_F kOptionsCardJapanese{kMargin, 92.0f, kWidth - kMargin, 318
 // Welcome: the Japanese choice, and the license agreement under it.
 float JapaneseRow(const Wizard& wizard) { return wizard.webViewReady ? 238.0f : 334.0f; }
 float AgreeRow(const Wizard& wizard) { return wizard.webViewReady ? 336.0f : 366.0f; }
+// Typing samples: the list on the left, the clip (600 x 440) on the right.
+constexpr float kSampleTop = 124.0f;
+constexpr float kSampleRow = 26.0f;
+constexpr D2D1_RECT_F kSampleVideo{224.0f, kSampleTop, kWidth - kMargin, kSampleTop + (kWidth - kMargin - 224.0f) * 440.0f / 600.0f};
+
+// The sample modes installed: all three with Japanese, else Auto only.
+std::vector<int> SampleModes(const Wizard& wizard) {
+    return wizard.japanese ? std::vector<int>{0, 1, 2} : std::vector<int>{2};
+}
+
+const SampleSet& ShownSampleSet(const Wizard& wizard) {
+    return kSampleSets[std::clamp(wizard.sampleMode, 0, static_cast<int>(std::size(kSampleSets)) - 1)];
+}
 
 std::vector<Control> Controls(const Wizard& wizard) {
     std::vector<Control> controls;
@@ -595,8 +663,34 @@ std::vector<Control> Controls(const Wizard& wizard) {
         break;
     case Screen::Installing:
         break;
+    case Screen::Samples: {
+        const auto modes = SampleModes(wizard);
+        if (modes.size() > 1) {
+            float x = kMargin;
+            for (const int mode : modes) {
+                const std::wstring name = Tr(kSampleSets[mode].english, kSampleSets[mode].japanese);
+                const float width = TextWidth(wizard, wizard.body.Get(), name) + 32.0f;
+                Control tab{Action::SampleMode, Kind::Tab, D2D1::RectF(x, 78.0f, x + width, 110.0f), name, true,
+                            mode == wizard.sampleMode};
+                tab.index = mode;
+                controls.push_back(tab);
+                x += width + 4.0f;
+            }
+        }
+        const auto& set = ShownSampleSet(wizard);
+        for (std::size_t i = 0; i < set.count; ++i) {
+            const float top = kSampleTop + kSampleRow * static_cast<float>(i);
+            Control item{Action::SampleClip, Kind::Item, D2D1::RectF(kMargin - 10.0f, top, kSampleVideo.left - 14.0f, top + kSampleRow),
+                         Tr(set.samples[i].english, set.samples[i].japanese), true, static_cast<int>(i) == wizard.sampleClip};
+            item.index = static_cast<int>(i);
+            controls.push_back(item);
+        }
+        controls.push_back({Action::Back, Kind::Secondary, FooterButton(1), Tr(L"Back", L"戻る")});
+        controls.push_back({Action::Finish, Kind::Primary, FooterButton(0), Tr(L"Finish", L"完了")});
+        break;
+    }
     case Screen::Done: {
-        // Settings' typing samples, opened on request only.
+        // The typing samples, shown on request only.
         const std::wstring samples = Tr(L"See typing samples", L"入力の見本を見る");
         const float width = 16.0f + TextWidth(wizard, wizard.body.Get(), samples);
         controls.push_back({Action::Samples, Kind::Link, D2D1::RectF((kWidth - width) / 2.0f, 304.0f, (kWidth + width) / 2.0f, 328.0f), samples});
@@ -871,6 +965,23 @@ void DrawControl(const Wizard& wizard, const Control& control, bool hovered, boo
         DrawText(wizard, control.label, wizard.body.Get(), D2D1::RectF(r.left + 30.0f, r.top + 2.0f, r.right, r.bottom), p.ink);
         break;
     }
+    case Kind::Tab: {
+        if (control.checked || hovered) {
+            auto fill = Brush(wizard, control.checked ? p.recess : WithAlpha(p.recess, p.recess.a * 0.6f));
+            t->FillRoundedRectangle(Round(r, (r.bottom - r.top) / 2.0f), fill.Get());
+        }
+        DrawText(wizard, control.label, wizard.button.Get(), r, control.checked || hovered ? p.ink : p.ink2);
+        break;
+    }
+    case Kind::Item: {
+        if (control.checked || hovered) {
+            auto fill = Brush(wizard, control.checked ? p.recess : WithAlpha(p.recess, p.recess.a * 0.6f));
+            t->FillRoundedRectangle(Round(r, 8.0f), fill.Get());
+        }
+        DrawText(wizard, control.label, wizard.caption.Get(), D2D1::RectF(r.left + 10.0f, r.top + 5.0f, r.right - 6.0f, r.bottom),
+                 control.checked || hovered ? p.ink : p.ink2);
+        break;
+    }
     case Kind::Toggle: {
         auto track = Brush(wizard, control.checked ? wizard.accent : p.recess);
         t->FillRoundedRectangle(Round(r, 14.0f), track.Get());
@@ -892,7 +1003,7 @@ void DrawControl(const Wizard& wizard, const Control& control, bool hovered, boo
         const auto ringRect = control.kind == Kind::Checkbox
                                   ? D2D1::RectF(r.left - 4.0f, r.top - 1.0f, r.right + 4.0f, r.bottom + 1.0f)
                                   : D2D1::RectF(r.left - 3.0f, r.top - 3.0f, r.right + 3.0f, r.bottom + 3.0f);
-        const float radius = control.kind == Kind::Checkbox || control.kind == Kind::Link ? 8.0f
+        const float radius = control.kind == Kind::Checkbox || control.kind == Kind::Link || control.kind == Kind::Item ? 8.0f
                                                                                           : (ringRect.bottom - ringRect.top) / 2.0f;
         t->DrawRoundedRectangle(Round(ringRect, radius), ring.Get(), 2.0f);
     }
@@ -1087,6 +1198,20 @@ void Paint(Wizard& wizard) {
                  wizard.bodyCentered.Get(), D2D1::RectF(90.0f, 238.0f, kWidth - 90.0f, 290.0f), p.ink2);
         break;
     }
+    case Screen::Samples: {
+        DrawText(wizard, Tr(L"Typing samples", L"入力の見本"), wizard.heading.Get(), D2D1::RectF(kMargin, 34.0f, kWidth - kMargin, 64.0f), p.ink);
+        // The clip plays in a child window over this frame.
+        const auto& v = kSampleVideo;
+        auto recess = Brush(wizard, p.recess);
+        auto edge = Brush(wizard, p.hairline);
+        t->FillRectangle(v, recess.Get());
+        t->DrawRectangle(D2D1::RectF(v.left - 0.5f, v.top - 0.5f, v.right + 0.5f, v.bottom + 0.5f), edge.Get(), 1.0f);
+        if (wizard.sampleMissing) {
+            DrawText(wizard, Tr(L"This sample isn't available.", L"この見本は表示できません。"), wizard.captionCentered.Get(),
+                     D2D1::RectF(v.left, (v.top + v.bottom) / 2.0f - 10.0f, v.right, (v.top + v.bottom) / 2.0f + 10.0f), p.ink2);
+        }
+        break;
+    }
     case Screen::Failed:
         DrawText(wizard, Tr(L"Setup couldn't finish", L"インストールを完了できませんでした"), wizard.heading.Get(), D2D1::RectF(kMargin, 40.0f, kWidth - kMargin, 72.0f), p.ink);
         DrawText(wizard, FailureMessage(wizard.installExitCode.load()), wizard.body.Get(),
@@ -1113,7 +1238,100 @@ bool OnEnabledControl(const Wizard& wizard, int index) {
     return index >= 0 && index < static_cast<int>(controls.size()) && controls[static_cast<std::size_t>(index)].enabled;
 }
 
+// Plays each clip muted, from the start again when it ends, with the clip's
+// own page color around a clip of another shape.
+class SamplePlayback final : public IMFPMediaPlayerCallback {
+public:
+    COLORREF border{RGB(255, 255, 255)};
+    STDMETHODIMP QueryInterface(REFIID id, void** object) override {
+        if (id == __uuidof(IUnknown) || id == __uuidof(IMFPMediaPlayerCallback)) {
+            *object = static_cast<IMFPMediaPlayerCallback*>(this);
+            return S_OK;
+        }
+        *object = nullptr;
+        return E_NOINTERFACE;
+    }
+    // One instance for the process: nothing to free.
+    STDMETHODIMP_(ULONG) AddRef() override { return 1; }
+    STDMETHODIMP_(ULONG) Release() override { return 1; }
+    void STDMETHODCALLTYPE OnMediaPlayerEvent(MFP_EVENT_HEADER* event) override {
+        if (!event || !event->pMediaPlayer || FAILED(event->hrEvent)) return;
+        if (event->eEventType == MFP_EVENT_TYPE_MEDIAITEM_SET) {
+            event->pMediaPlayer->SetBorderColor(border);
+            event->pMediaPlayer->SetMute(TRUE);
+            event->pMediaPlayer->Play();
+        } else if (event->eEventType == MFP_EVENT_TYPE_PLAYBACK_ENDED) {
+            PROPVARIANT start;
+            PropVariantInit(&start);
+            start.vt = VT_I8;
+            start.hVal.QuadPart = 0;
+            event->pMediaPlayer->SetPosition(MFP_POSITIONTYPE_100NS, &start);
+            event->pMediaPlayer->Play();
+        }
+    }
+};
+SamplePlayback g_samplePlayback;
+
+void StopSample(Wizard& wizard) {
+    if (wizard.player) {
+        wizard.player->Shutdown();
+        wizard.player.Reset();
+    }
+    if (wizard.video) ShowWindow(wizard.video, SW_HIDE);
+}
+
+void PlaceSampleVideo(const Wizard& wizard) {
+    if (!wizard.video) return;
+    const auto px = [&](float dips) { return MulDiv(static_cast<int>(dips + 0.5f), static_cast<int>(wizard.dpi), 96); };
+    SetWindowPos(wizard.video, nullptr, px(kSampleVideo.left), px(kSampleVideo.top), px(kSampleVideo.right) - px(kSampleVideo.left),
+                 px(kSampleVideo.bottom) - px(kSampleVideo.top), SWP_NOZORDER | SWP_NOACTIVATE);
+    if (wizard.player) wizard.player->UpdateVideo();
+}
+
+// Plays the clip chosen, in the theme the setup is shown in, from TEKITO
+// just installed.
+void ShowSample(Wizard& wizard) {
+    StopSample(wizard);
+    const auto& set = ShownSampleSet(wizard);
+    wizard.sampleClip = std::clamp(wizard.sampleClip, 0, static_cast<int>(set.count) - 1);
+    const auto clip = wizard.installRoot / L"settings-ui" / L"samples" /
+                      (std::wstring(set.samples[wizard.sampleClip].id) + (wizard.dark ? L"-dark.mp4" : L"-light.mp4"));
+    std::error_code error;
+    wizard.sampleMissing = !wizard.video || !std::filesystem::is_regular_file(clip, error);
+    if (wizard.sampleMissing) return;
+    PlaceSampleVideo(wizard);
+    ShowWindow(wizard.video, SW_SHOWNOACTIVATE);
+    g_samplePlayback.border = wizard.dark ? RGB(32, 32, 32) : RGB(255, 255, 255);
+    if (FAILED(MFPCreateMediaPlayer(clip.c_str(), FALSE, 0, &g_samplePlayback, wizard.video, wizard.player.Put()))) {
+        wizard.player.Reset();
+        ShowWindow(wizard.video, SW_HIDE);
+        wizard.sampleMissing = true;
+    }
+}
+
+LRESULT CALLBACK SampleVideoProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam) {
+    if (message == WM_PAINT) {
+        const auto* wizard = reinterpret_cast<const Wizard*>(GetWindowLongPtrW(window, GWLP_USERDATA));
+        PAINTSTRUCT paint{};
+        const HDC dc = BeginPaint(window, &paint);
+        if (wizard && wizard->player) {
+            wizard->player->UpdateVideo();
+        } else {
+            FillRect(dc, &paint.rcPaint, static_cast<HBRUSH>(GetStockObject(BLACK_BRUSH)));
+        }
+        EndPaint(window, &paint);
+        return 0;
+    }
+    if (message == WM_ERASEBKGND) return 1;
+    return DefWindowProcW(window, message, wParam, lParam);
+}
+
 void Go(Wizard& wizard, Screen screen) {
+    if (wizard.screen == Screen::Samples && screen != Screen::Samples) StopSample(wizard);
+    if (screen == Screen::Samples) {
+        const auto modes = SampleModes(wizard);
+        if (std::find(modes.begin(), modes.end(), wizard.sampleMode) == modes.end()) wizard.sampleMode = modes.front();
+    }
     wizard.screen = screen;
     wizard.hover = -1;
     wizard.focus = 0;
@@ -1123,47 +1341,11 @@ void Go(Wizard& wizard, Screen screen) {
     for (std::size_t i = 0; i < controls.size(); ++i) {
         if (controls[i].kind == Kind::Primary) wizard.focus = static_cast<int>(i);
     }
+    if (screen == Screen::Samples) ShowSample(wizard);
     InvalidateRect(wizard.window, nullptr, FALSE);
 }
 
-// Starts `file` with `arguments` as the signed-in user rather than with this
-// setup's administrator rights: through the desktop's shell (Explorer).
-bool ShellExecuteAsUser(const std::wstring& file, const std::wstring& arguments) {
-    Com<IShellWindows> windows;
-    if (FAILED(CoCreateInstance(CLSID_ShellWindows, nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(windows.Put())))) return false;
-    VARIANT empty{};
-    long desktop = 0;
-    Com<IDispatch> found;
-    if (windows->FindWindowSW(&empty, &empty, SWC_DESKTOP, &desktop, SWFO_NEEDDISPATCH, found.Put()) != S_OK || !found) {
-        return false;
-    }
-    Com<IServiceProvider> provider;
-    Com<IShellBrowser> browser;
-    Com<IShellView> view;
-    Com<IDispatch> background;
-    Com<IShellFolderViewDual> folderView;
-    Com<IDispatch> application;
-    Com<IShellDispatch2> shell;
-    if (FAILED(found->QueryInterface(IID_PPV_ARGS(provider.Put()))) ||
-        FAILED(provider->QueryService(SID_STopLevelBrowser, IID_PPV_ARGS(browser.Put()))) ||
-        FAILED(browser->QueryActiveShellView(view.Put())) ||
-        FAILED(view->GetItemObject(SVGIO_BACKGROUND, IID_PPV_ARGS(background.Put()))) ||
-        FAILED(background->QueryInterface(IID_PPV_ARGS(folderView.Put()))) ||
-        FAILED(folderView->get_Application(application.Put())) ||
-        FAILED(application->QueryInterface(IID_PPV_ARGS(shell.Put())))) {
-        return false;
-    }
-    BSTR path = SysAllocString(file.c_str());
-    VARIANT args{};
-    args.vt = VT_BSTR;
-    args.bstrVal = SysAllocString(arguments.c_str());
-    const HRESULT result = shell->ShellExecute(path, args, empty, empty, empty);
-    VariantClear(&args);
-    SysFreeString(path);
-    return SUCCEEDED(result);
-}
-
-void Activate(Wizard& wizard, Action action) {
+void Activate(Wizard& wizard, Action action, int index = 0) {
     switch (action) {
     case Action::Install:
         if (wizard.agreed && wizard.webViewReady) StartInstall(wizard);
@@ -1177,7 +1359,7 @@ void Activate(Wizard& wizard, Action action) {
     case Action::Agree: wizard.agreed = !wizard.agreed; break;
     case Action::GetRuntime: OpenWebView2DownloadPage(); break;
     case Action::CheckRuntime: wizard.webViewReady = HasWebView2Runtime(); break;
-    case Action::Back: Go(wizard, Screen::Welcome); return;
+    case Action::Back: Go(wizard, wizard.screen == Screen::Samples ? Screen::Done : Screen::Welcome); return;
     case Action::AcceptLicense:
         wizard.agreed = true;
         Go(wizard, Screen::Welcome);
@@ -1190,13 +1372,20 @@ void Activate(Wizard& wizard, Action action) {
     case Action::Shortcut: wizard.startMenuShortcut = !wizard.startMenuShortcut; break;
     case Action::Japanese: wizard.japanese = !wizard.japanese; break;
     case Action::KeepEnglish: wizard.keepEnglish = !wizard.keepEnglish; break;
-    case Action::Samples: {
-        const auto app = wizard.installRoot / L"TEKITO.exe";
-        if (!ShellExecuteAsUser(app.wstring(), L"--page samples")) {
-            ShellExecuteW(nullptr, L"open", L"explorer.exe", (L"\"" + app.wstring() + L"\"").c_str(), nullptr, SW_SHOWNORMAL);
-        }
+    case Action::Samples:
+        wizard.sampleMode = SampleModes(wizard).front();
+        wizard.sampleClip = 0;
+        Go(wizard, Screen::Samples);
+        return;
+    case Action::SampleMode:
+        wizard.sampleMode = index;
+        wizard.sampleClip = 0;
+        ShowSample(wizard);
         break;
-    }
+    case Action::SampleClip:
+        wizard.sampleClip = index;
+        ShowSample(wizard);
+        break;
     case Action::Finish:
         wizard.completed = true;
         DestroyWindow(wizard.window);
@@ -1276,6 +1465,7 @@ LRESULT CALLBACK WizardProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
         const auto* suggested = reinterpret_cast<const RECT*>(lParam);
         SetWindowPos(window, nullptr, suggested->left, suggested->top, suggested->right - suggested->left,
                      suggested->bottom - suggested->top, SWP_NOZORDER | SWP_NOACTIVATE);
+        PlaceSampleVideo(*wizard);
         return 0;
     }
     case WM_SETTINGCHANGE:
@@ -1326,7 +1516,7 @@ LRESULT CALLBACK WizardProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
         const auto controls = Controls(*wizard);
         if (hit >= 0 && controls[hit].enabled) {
             wizard->focus = hit;
-            Activate(*wizard, controls[hit].action);
+            Activate(*wizard, controls[hit].action, controls[hit].index);
         }
         return 0;
     }
@@ -1354,11 +1544,18 @@ LRESULT CALLBACK WizardProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
         }
         if ((wParam == VK_RETURN || wParam == VK_SPACE) && !controls.empty()) {
             const int index = std::clamp(wizard->focus, 0, static_cast<int>(controls.size()) - 1);
-            if (controls[index].enabled) Activate(*wizard, controls[index].action);
+            if (controls[index].enabled) Activate(*wizard, controls[index].action, controls[index].index);
+            return 0;
+        }
+        if (wizard->screen == Screen::Samples && (wParam == VK_UP || wParam == VK_DOWN)) {
+            const int count = static_cast<int>(ShownSampleSet(*wizard).count);
+            const int next = std::clamp(wizard->sampleClip + (wParam == VK_UP ? -1 : 1), 0, count - 1);
+            if (next != wizard->sampleClip) Activate(*wizard, Action::SampleClip, next);
             return 0;
         }
         if (wParam == VK_ESCAPE) {
             if (wizard->screen == Screen::License || wizard->screen == Screen::Options) Go(*wizard, Screen::Welcome);
+            else if (wizard->screen == Screen::Samples) Go(*wizard, Screen::Done);
             else if (wizard->screen != Screen::Installing) DestroyWindow(window);
             return 0;
         }
@@ -1391,6 +1588,7 @@ LRESULT CALLBACK WizardProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
         DestroyWindow(window);
         return 0;
     case WM_DESTROY:
+        StopSample(*wizard);
         PostQuitMessage(0);
         return 0;
     default:
@@ -1404,7 +1602,7 @@ LRESULT CALLBACK WizardProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
 // saves a screenshot of the window and exits.
 //   tekito_setup_preview.exe <screen> <out.bmp> [nowebview] [unchecked] [nojapanese] [nodownload] [stay]
 // stay: keeps the screen open to try, with no screenshot.
-// screen: welcome | license | options | installing | done | failed
+// screen: welcome | license | options | installing | done | failed | samples
 struct PreviewRequest {
     Screen screen{Screen::Welcome};
     std::wstring output;
@@ -1478,6 +1676,16 @@ bool ShowWizard(const std::filesystem::path& self) {
                                         &wizard);
     if (!window) return false;
     wizard.dpi = GetDpiForWindow(window);
+    // The typing samples play in this child window.
+    WNDCLASSEXW videoClass{};
+    videoClass.cbSize = sizeof(videoClass);
+    videoClass.lpfnWndProc = SampleVideoProc;
+    videoClass.hInstance = windowClass.hInstance;
+    videoClass.lpszClassName = L"TekitoSetupSample";
+    RegisterClassExW(&videoClass);
+    wizard.video = CreateWindowExW(0, videoClass.lpszClassName, L"", WS_CHILD | WS_CLIPSIBLINGS, 0, 0, 1, 1, window, nullptr,
+                                   windowClass.hInstance, nullptr);
+    if (wizard.video) SetWindowLongPtrW(wizard.video, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(&wizard));
     ApplyTheme(wizard);
     SizeWindow(wizard);
     RECT rect{};
@@ -1552,6 +1760,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
                          : screen == L"installing" ? Screen::Installing
                          : screen == L"done" ? Screen::Done
                          : screen == L"failed" ? Screen::Failed
+                         : screen == L"samples" ? Screen::Samples
                                                : Screen::Welcome;
         g_preview.output = argv[2];
         for (int i = 3; i < argc; ++i) {

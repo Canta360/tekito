@@ -163,7 +163,7 @@ add_custom_command(TARGET TEKITO POST_BUILD
 # Setup program. The package-release script appends the package to it.
 
 set(TEKITO_SETUP_LIBS
-    user32 ole32 oleaut32 shell32 shlwapi advapi32 gdi32 d2d1 dwrite dwmapi windowscodecs
+    user32 ole32 oleaut32 shell32 shlwapi advapi32 gdi32 d2d1 dwrite dwmapi windowscodecs mfplay
     "${CMAKE_CURRENT_SOURCE_DIR}/third_party/webview2/lib/x64/WebView2LoaderStatic.lib"
 )
 
