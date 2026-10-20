@@ -25,7 +25,7 @@ download that setup fetches when Japanese is chosen.
 | `special-conversions` | Dates and times for words like "today" and "きょう", symbols by ASCII spelling ("->" → →) or Japanese reading ("やじるし" → →), emoji by Japanese reading ("ねこ" → 🐱), Japanese emoticons ("にこにこ" → (^^)), single kanji by reading, and the kanji for numbers | Written for TEKITO (`scripts/build-special-conversions.py`); Japanese symbols, emoji, emoticons and single kanji from Mozc (`src/data/symbol`, `src/data/emoji`, `src/data/emoticon`, `src/data/single_kanji`) | TEKITO (see `LICENSE.md`), BSD-3-Clause, Unicode License V3 (emoji) |
 | `qwerty-typo-catalog` | Synthetic typos of common words, for evaluation only | Generated for TEKITO | TEKITO (see `LICENSE.md`) |
 | `japanese-romaji` | How typed keys become kana in Japanese input | Written for TEKITO (`scripts/ja/build-japanese-romaji.py`) | TEKITO (see `LICENSE.md`) |
-| `japanese-core` | Words, readings and how they join, for kana-kanji conversion | Mozc OSS dictionary (IPAdic, Okinawa dictionary) plus TEKITO slang entries | IPAdic license, BSD-3-Clause, TEKITO source license |
+| `japanese-core` | Words, readings and how they join, for kana-kanji conversion | Mozc OSS dictionary (IPAdic, Okinawa dictionary) plus TEKITO slang entries and Japanese Wikipedia article titles | IPAdic license, BSD-3-Clause, TEKITO source license, CC BY-SA 4.0 |
 | `japanese-lm` | Which words go together, for conversion to prefer them (neighbor pairs, and content words of one sentence) | Leipzig Corpora Collection, Japanese news crawl 2019 and Wikipedia 2021 | CC BY 4.0 |
 | `japanese-reranker` | A small language model of word pieces that checks the likeliest converted sentences as a whole and picks the one that reads best | Trained for TEKITO (`scripts/ja/train-japanese-wordlm.py`, `scripts/ja/build-japanese-reranker-pack.py`) on the zenz-v2.5 dataset's llm-jp-corpus-v3 part; holds weights and word pieces only, no sentences | TEKITO (see `LICENSE.md`); dataset ODC-BY 1.0 |
 | `japanese-slips` | What reads as Japanese kana (kana n-grams and a small kana LSTM), to find slips in typed keys before conversion | Computed for TEKITO (`scripts/ja/build-japanese-slips-pack.py`) from the zenz-v2.5 dataset's readings; holds statistics and weights only, no sentences | TEKITO (see `LICENSE.md`); dataset ODC-BY 1.0 |
@@ -66,7 +66,7 @@ the pronunciation, frequency and standard-english packs:
 python scripts\en\build-expression-packs.py
 ```
 
-`japanese-core` (about 34 MB) is also built locally. It is two binary files
+`japanese-core` (about 51 MB) is also built locally. It is two binary files
 that TEKITO maps into memory instead of the usual text and index:
 
 ```powershell
@@ -75,7 +75,10 @@ that TEKITO maps into memory instead of the usual text and index:
 
 It downloads the Mozc dictionary at a pinned commit into `.cache\tekito-data`
 and runs `build-japanese-packs.py`, which adds the curated terms from
-`scripts\ja\japanese-slang-seeds.tsv`. Without it, Japanese input types kana
+`scripts\ja\japanese-slang-seeds.tsv`, and the words of Japanese Wikipedia
+article titles when `.cache\tekito-data\jawiki\words.tsv` is there
+(`scripts\ja\build-japanese-wikipedia-words.py`, from the article and
+langlinks dumps and KANJIDIC2). Without it, Japanese input types kana
 but cannot convert to kanji. The pack also carries `pos.tsv`, the part of
 speech each kind of word a user adds in Settings takes, and the one digits
 typed in Japanese take so counters join them (3こ -> 3個); a pack built before

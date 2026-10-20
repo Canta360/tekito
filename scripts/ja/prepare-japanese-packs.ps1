@@ -33,7 +33,11 @@ foreach ($file in $files) {
     Invoke-WebRequest -Uri $url -OutFile $target -UseBasicParsing
 }
 
-python (Join-Path $PSScriptRoot "build-japanese-packs.py") --mozc $mozc --commit $Commit --out $Output
+# The words of Wikipedia article titles, when they have been listed
+# (scripts\ja\build-japanese-wikipedia-words.py).
+$wikipedia = Join-Path $repoRoot ".cache\tekito-data\jawiki\words.tsv"
+$extra = if (Test-Path $wikipedia) { @("--wikipedia-words", $wikipedia) } else { @() }
+python (Join-Path $PSScriptRoot "build-japanese-packs.py") --mozc $mozc --commit $Commit --out $Output @extra
 if ($LASTEXITCODE -ne 0) { throw "build-japanese-packs.py failed with exit code $LASTEXITCODE" }
 Write-Host "Built $Output"
 

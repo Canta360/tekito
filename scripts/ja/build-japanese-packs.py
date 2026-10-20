@@ -47,6 +47,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import re
 import struct
 from pathlib import Path
@@ -139,6 +140,52 @@ def read_slang_entries(pos_names: list[str], base_entries):
         if key in wanted:
             existing.add(key)
     return [entry for entry in additions if (entry[0], entry[4]) not in existing]
+
+
+# Words of Wikipedia titles (build-japanese-wikipedia-words.py) cost more than
+# most of Mozc's, so its words keep their readings; less when many other
+# Wikipedias have the article; more when Mozc reads the same, and more again
+# when a particle and Mozc's words read the same (はしけん: は試験, not 箸拳).
+WIKIPEDIA_POS = {"person": "名詞,固有名詞,人名,一般,*,*,*", "noun": "名詞,一般,*,*,*,*,*",
+                 "proper-noun": "名詞,固有名詞,一般,*,*,*,*"}
+WIKIPEDIA_COST = 7600
+WIKIPEDIA_KNOWN_COST = 200
+WIKIPEDIA_KNOWN_MOST = 800
+WIKIPEDIA_HOMOPHONE_COST = 1000
+WIKIPEDIA_PARTICLE_COST = 3000
+PARTICLES = ("は", "が", "を", "に", "で", "と", "も", "の", "へ", "や", "か")
+
+
+def read_wikipedia_entries(path: Path, pos_names: list[str], base_entries):
+    existing = {(entry[0], entry[4]) for entry in base_entries}
+    readings = {entry[0] for entry in base_entries}
+
+    def words(reading: str, parts: int) -> bool:
+        if reading in readings:
+            return True
+        return parts > 1 and any(reading[:k] in readings and words(reading[k:], parts - 1)
+                                 for k in range(1, len(reading)))
+
+    def particle_and_words(reading: str) -> bool:
+        return ((reading[0] in PARTICLES and words(reading[1:], 2)) or
+                (reading[-1] in PARTICLES and words(reading[:-1], 2)))
+
+    additions = []
+    for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        fields = line.split("\t")
+        if len(fields) != 4 or fields[2] not in WIKIPEDIA_POS:
+            raise ValueError(f"{path.name}:{number}: expected reading, surface, kind and editions")
+        reading, surface, kind, editions = fields
+        if (reading, surface) in existing:
+            continue
+        cost = WIKIPEDIA_COST - min(WIKIPEDIA_KNOWN_MOST, int(WIKIPEDIA_KNOWN_COST * math.log2(1 + int(editions))))
+        if reading in readings:
+            cost += WIKIPEDIA_HOMOPHONE_COST
+        elif particle_and_words(reading):
+            cost += WIKIPEDIA_PARTICLE_COST
+        pos = pos_names.index(WIKIPEDIA_POS[kind])
+        additions.append((reading, pos, pos, cost, surface, False))
+    return additions
 
 
 def read_pos_names(mozc: Path) -> list[str]:
@@ -326,7 +373,7 @@ def write_user_pos(ids: list[int], number_id: int, out: Path) -> None:
     out.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
 
 
-def write_notice(mozc: Path, out: Path, commit: str) -> None:
+def write_notice(mozc: Path, out: Path, commit: str, wikipedia: bool) -> None:
     readme = (mozc / "dictionary_oss" / "README.txt").read_text(encoding="utf-8")
     license_text = (mozc / "LICENSE").read_text(encoding="utf-8")
     out.write_text(
@@ -336,7 +383,13 @@ def write_notice(mozc: Path, out: Path, commit: str) -> None:
         "== Mozc dictionary_oss (IPAdic, Okinawa dictionary) ==\n\n" + readme.strip() + "\n\n"
         "== TEKITO Japanese slang additions ==\n\n"
         "The curated entries and original short definitions come from "
-        "scripts/ja/japanese-slang-seeds.tsv and are covered by the TEKITO source license.\n",
+        "scripts/ja/japanese-slang-seeds.tsv and are covered by the TEKITO source license.\n"
+        + ("\n== Japanese Wikipedia ==\n\n"
+           "Words of article titles and their readings come from Japanese Wikipedia "
+           "(https://ja.wikipedia.org/), by Wikipedia contributors, under CC BY-SA 4.0 "
+           "(https://creativecommons.org/licenses/by-sa/4.0/). The kanji readings that check them "
+           "come from KANJIDIC2 (Electronic Dictionary Research and Development Group, CC BY-SA 4.0). "
+           "dictionary.bin is shared under CC BY-SA 4.0.\n" if wikipedia else ""),
         encoding="utf-8", newline="\n")
 
 
@@ -348,11 +401,15 @@ def main() -> None:
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--sentences", type=Path,
                         help="build a small pack for tests: keep only words found in these readings")
+    parser.add_argument("--wikipedia-words", type=Path,
+                        help="words of Wikipedia titles (build-japanese-wikipedia-words.py) to add")
     args = parser.parse_args()
 
     entries = read_entries(args.mozc)
     pos_names = read_pos_names(args.mozc)
     entries.extend(read_slang_entries(pos_names, entries))
+    if args.wikipedia_words:
+        entries.extend(read_wikipedia_entries(args.wikipedia_words, pos_names, entries))
     size, costs = read_matrix(args.mozc)
     if size != len(pos_names):
         raise ValueError("id.def and the connection matrix disagree on the id count")
@@ -375,12 +432,12 @@ def main() -> None:
     dictionary = build_dictionary(entries, unknown_id, args.out / "dictionary.bin")
     matrix = build_matrix(size, costs, boundary, args.out / "connection.bin")
     write_user_pos(user_ids, number_id, args.out / "pos.tsv")
-    write_notice(args.mozc, args.out / "NOTICE", args.commit)
+    write_notice(args.mozc, args.out / "NOTICE", args.commit, bool(args.wikipedia_words))
     manifest = {
         "pack_id": "japanese-core",
         "display_name": "Japanese Conversion Dictionary",
         "schema_version": 1,
-        "version": f"mozc-{args.commit[:12]}-slang-2026.09",
+        "version": f"mozc-{args.commit[:12]}-slang-2026.09" + ("-jawiki-2026.10" if args.wikipedia_words else ""),
         "language": "ja-JP",
         "type": "japanese-dictionary",
         "format": "ja-dict-v1+ja-matrix-v1",
@@ -391,9 +448,11 @@ def main() -> None:
         "sha256": {"file": sha256(args.out / "dictionary.bin"),
                    "index": sha256(args.out / "connection.bin"),
                    "pos": sha256(args.out / "pos.tsv")},
-        "license": "IPAdic + BSD-3-Clause (Mozc), TEKITO-OWNED",
+        "license": "IPAdic + BSD-3-Clause (Mozc), TEKITO-OWNED"
+                   + (", CC-BY-SA-4.0 (Japanese Wikipedia, KANJIDIC2)" if args.wikipedia_words else ""),
         "source": f"https://github.com/google/mozc/tree/{args.commit}/src/data",
-        "supplemental_source": "scripts/ja/japanese-slang-seeds.tsv",
+        "supplemental_source": "scripts/ja/japanese-slang-seeds.tsv"
+                               + (", https://dumps.wikimedia.org/jawiki/" if args.wikipedia_words else ""),
         "notice_file": "NOTICE",
     }
     (args.out / "manifest.json").write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n",
