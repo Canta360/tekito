@@ -1596,7 +1596,9 @@ void JapaneseComposer::CheckSentence() {
                                       std::iswalnum(c) != 0 || (c >= 0xFF10 && c <= 0xFF5A) || c == 0x3001 || c == 0x3002 ||
                                       c == 0xFF01 || c == 0xFF1F;
                            })) ||
-                           std::any_of(reading.begin(), reading.end(), IsDigit);
+                           std::any_of(reading.begin(), reading.end(), IsDigit) ||
+                           // A dash between digits stays ー (090ー1234ー5678, not ―).
+                           (betweenDigits && reading == L"ー");
         // A number read in kana stays in the number style (3時: not 三時);
         // another word may still read better (ご縁, not 5円).
         const auto& shown = phrase.candidates[phrase.selected < phrase.candidates.size() ? phrase.selected : 0];
