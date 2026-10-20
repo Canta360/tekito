@@ -1061,8 +1061,10 @@ void JapaneseComposer::BuildPhrasesFor(bool convert) {
                 }
             }
             if (chunk->english) {
+                // Marks as the sentence now reads (judged again just above).
+                const auto after = MarksAfterEnglish(std::wstring_view(keys).substr(word));
                 phrases_.push_back({0, reading.size(),
-                                    EnglishCandidates(EnglishAsWritten(chunk->written) + marks, reading)});
+                                    EnglishCandidates(EnglishAsWritten(chunk->written) + after, reading)});
                 return;
             }
         }
@@ -2572,8 +2574,10 @@ void JapaneseComposer::SettleChunk() {
     while (word > 0 && std::wstring_view(L".,!?").find(keys[word - 1]) != std::wstring_view::npos) --word;
     chunk.keys = keys.substr(0, word);
     chunk.marksOnly = word == 0;
-    chunk.locked = PredictionChosen() || TypedWithCapitals(chunk.keys).has_value() ||
+    chunk.picked = PredictionChosen() ||
                    std::any_of(phrases_.begin(), phrases_.end(), [](const PhraseState& p) { return p.selected != 0; });
+    chunk.locked = chunk.picked || TypedWithCapitals(chunk.keys).has_value();
+    chunk.sentenceStart = sentenceStart_;
     // Both ways, for when the sentence judges the chunk again.
     const std::wstring marks = MarksAfterEnglish(std::wstring_view(keys).substr(word));
     if (word > 0) {
@@ -2599,7 +2603,7 @@ void JapaneseComposer::SettleChunk() {
     chunk.isEnglish = lastChunkEnglish_;
     lastChunkEnglish_ = false;
     // Japanese settled as typed (Enter) stays as typed.
-    if (asTyped && !chunk.isEnglish) chunk.locked = true;
+    if (asTyped && !chunk.isEnglish) chunk.locked = chunk.picked = true;
     // As it was taken (a candidate picked stays).
     (chunk.isEnglish ? chunk.english : chunk.japanese) = text;
     // What was taken comes first.
@@ -2770,12 +2774,55 @@ void JapaneseComposer::JudgeWholeSentence(std::optional<ChunkJudge::Judgement>& 
         return typed.size() == 1 && std::wstring_view(L"aiueo").find(typed[0]) != std::wstring_view::npos;
     };
     const auto englishWord = [&](std::size_t k) { return k < whole.size() && whole[k].english && !vowel(keys[k]); };
+    // An English sentence (every chunk English): the chunks taken as
+    // Japanese are written as English, and its punctuation stays as typed
+    // (to, home, morning.; not と, 褒め, morning。).
+    const bool englishSentence =
+        std::all_of(whole.begin(), whole.end(), [](const ChunkJudge::Judgement& j) { return j.english; });
+    const auto typedMarks = [](const std::wstring& typed) {
+        std::size_t end = typed.size();
+        while (end > 0 && std::wstring_view(L".,!?").find(typed[end - 1]) != std::wstring_view::npos) --end;
+        return typed.substr(end);
+    };
+    const auto withoutMarks = [](std::wstring text) {
+        while (!text.empty() && std::wstring_view(L".,!?。、！？．，").find(text.back()) != std::wstring_view::npos) text.pop_back();
+        return text;
+    };
     for (std::size_t k = 0; k < at.size(); ++k) {
         auto& chunk = settled_[at[k]];
-        if (chunk.locked) continue;
+        if (chunk.locked) {
+            if (englishSentence && chunk.isEnglish) {
+                // Typed with a capital (Monda, GtiHub), not picked: a slip
+                // is put right in its capitals.
+                std::wstring lower = whole[k].written;
+                for (auto& c : lower) c = static_cast<wchar_t>(std::towlower(c));
+                std::wstring text = withoutMarks(chunk.english);
+                if (!chunk.picked && lower != chunk.keys && !whole[k].written.empty()) {
+                    text = whole[k].written;
+                    if (chunk.typed.size() > 0 && std::iswupper(chunk.typed[0]) && text[0] >= L'a' && text[0] <= L'z') {
+                        text[0] = static_cast<wchar_t>(text[0] - L'a' + L'A');
+                    }
+                }
+                chunk.english = text + typedMarks(chunk.typed);
+            }
+            continue;
+        }
         bool english = whole[k].english;
         if (english && singleVowelKana_ && vowel(chunk.keys)) english = (k > 0 && englishWord(k - 1)) || englishWord(k + 1);
+        if (englishSentence && english) {
+            // As English Auto writes it in the sentence (slips put right).
+            std::wstring written = withoutMarks(whole[k].written);
+            if (chunk.sentenceStart && !written.empty() && written.front() >= L'a' && written.front() <= L'z') {
+                written.front() = static_cast<wchar_t>(written.front() - L'a' + L'A');
+            }
+            chunk.english = written + typedMarks(chunk.typed);
+        }
         chunk.isEnglish = english;
+    }
+    if (englishSentence) {
+        for (auto& chunk : settled_) {
+            if (chunk.marksOnly) chunk.english = typedMarks(chunk.typed);
+        }
     }
     if (current && !TypedWithCapitals(currentKeys) && whole.back().english != current->english &&
         !(SingleVowelKana(currentKeys) && whole.back().english)) {

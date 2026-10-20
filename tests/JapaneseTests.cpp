@@ -901,7 +901,8 @@ void TestMixedTyping(const RomajiTable& table, const MiniPack& pack) {
     struct WordScores final : tekito::IFrequencyProvider {
         double Score(std::wstring_view word) const noexcept override {
             for (const auto& [listed, score] : {std::pair<std::wstring_view, double>{L"github", 2.7},
-                                                {L"push", 4.2}, {L"to", 6.7}, {L"take", 5.1}, {L"is", 6.3}, {L"i", 7.5}}) {
+                                                {L"push", 4.2}, {L"to", 6.7}, {L"take", 5.1}, {L"is", 6.3}, {L"i", 7.5},
+                                                {L"don't", 4.6}, {L"home", 4.5}}) {
                 if (word == listed) return score;
             }
             return 0.0;
@@ -926,6 +927,14 @@ void TestMixedTyping(const RomajiTable& table, const MiniPack& pack) {
     const auto particle = judge.Judge(L"dr", 1);
     Require(!particle.english && particle.meant == L"de", "two keys after English one slip from a particle are it");
     Require(judge.Judge(L"ggithub", 0).english, "a first letter typed twice is a slip of the English word");
+    Require(judge.Judge(L"don't", 0).english, "a contraction is English");
+    {
+        const auto english = judge.JudgeSentence({L"i", L"push", L"to", L"home"});
+        Require(std::all_of(english.begin(), english.end(), [](const auto& j) { return j.english; }),
+                "an English sentence is English throughout (to, home: not と, 褒め)");
+        const auto mixed = judge.JudgeSentence({L"kikai", L"to", L"push", L"home"});
+        Require(!mixed.front().english, "a chunk that is only Japanese keeps the sentence as judged");
+    }
     const auto pieces = judge.Split(L"pushsimasita");
     Require(pieces && pieces->size() == 2 && (*pieces)[0].english && (*pieces)[0].text == L"push" && !(*pieces)[1].english,
             "English run into Japanese without a space is split off");

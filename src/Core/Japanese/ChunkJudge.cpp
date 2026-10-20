@@ -72,7 +72,20 @@ ChunkJudge::Judgement ChunkJudge::Judge(std::wstring_view keys, std::size_t engl
     const bool letters = !keys.empty() && std::all_of(keys.begin(), keys.end(), [](wchar_t c) {
         return c >= L'a' && c <= L'z';
     });
-    if (!letters) return judgement;
+    if (!letters) {
+        // A contraction or possessive (don't, we're, tomorrow's): English
+        // when it is a word, or the word before the apostrophe is.
+        const auto apostrophe = keys.find(L'\'');
+        const bool word = apostrophe != std::wstring_view::npos && apostrophe > 0 && apostrophe + 1 < keys.size() &&
+                          std::all_of(keys.begin(), keys.end(), [](wchar_t c) { return (c >= L'a' && c <= L'z') || c == L'\''; });
+        if (word && (english_.Score(keys) >= thresholds_.listedWord ||
+                     english_.Score(keys.substr(0, apostrophe)) >= thresholds_.knownWord)) {
+            judgement.english = true;
+            judgement.word = true;
+            if (keys.starts_with(L"i'")) judgement.written[0] = L'I';
+        }
+        return judgement;
+    }
     // A first letter typed twice (bbug): no Japanese starts with っ, so the
     // English word, when the rest is one.
     if (keys.size() >= 4 && keys[0] == keys[1] && std::wstring_view(L"aiueon").find(keys[0]) == std::wstring_view::npos) {
@@ -425,6 +438,104 @@ std::vector<ChunkJudge::Judgement> ChunkJudge::JudgeSentence(const std::vector<s
             judged[i] = std::move(again);
         }
         if (!changed) break;
+    }
+    // An English sentence: three chunks or more, half of them English or
+    // more, and every other one an English word too (going to be, staying
+    // home) or one with a slip English Auto puts right (befroe): all of it
+    // English. One chunk that is only Japanese (kyouha, suru) keeps the
+    // chunks as judged.
+    constexpr std::size_t kSentenceChunks = 3;
+    const auto english = static_cast<std::size_t>(
+        std::count_if(judged.begin(), judged.end(), [](const Judgement& j) { return j.english; }));
+    if (chunks.size() >= kSentenceChunks && english * 2 >= chunks.size()) {
+        std::wstring text;
+        for (const auto& j : judged) {
+            if (j.english) text += j.written + L" ";
+        }
+        auto all = judged;
+        const auto isLetters = [](std::wstring_view keys) {
+            return !keys.empty() && std::all_of(keys.begin(), keys.end(), [](wchar_t c) { return c >= L'a' && c <= L'z'; });
+        };
+        for (std::size_t i = 0; i < chunks.size(); ++i) {
+            if (all[i].english) continue;
+            const std::wstring_view keys = chunks[i];
+            if (!isLetters(keys)) {
+                // Numbers and words with a hyphen or colon (6, 4th,
+                // double-check, haul:) as typed.
+                const bool typed = !keys.empty() && std::any_of(keys.begin(), keys.end(), [](wchar_t c) {
+                    return (c >= L'a' && c <= L'z') || (c >= L'0' && c <= L'9');
+                }) && std::all_of(keys.begin(), keys.end(), [](wchar_t c) {
+                    return (c >= L'a' && c <= L'z') || (c >= L'0' && c <= L'9') || std::wstring_view(L"'-:;/").find(c) != std::wstring_view::npos;
+                });
+                if (!typed) return judged;
+                all[i].english = true;
+                all[i].written = std::wstring(keys);
+                continue;
+            }
+            auto again = Judge(keys, kSentenceChunks, false, spelling, text);
+            std::wstring kana;
+            bool readable = true;
+            for (const auto& token : JapaneseComposer::ParseRomaji(table_, keys)) {
+                readable = readable && !token.leftover;
+                kana += token.kana;
+            }
+            // Mostly English (five chunks or more, four in five English):
+            // a slip that reads as a Japanese word is English too (si: is,
+            // yo: you).
+            constexpr std::size_t kLongSentence = 5;
+            const bool mostlyEnglish = chunks.size() >= kLongSentence && english * 5 >= chunks.size() * 4;
+            const bool japaneseWord = !mostlyEnglish && readable && converter_.IsWord(kana);
+            // An English word: a common one even when it is Japanese too
+            // (to, home, he); a rarer one only when it is not (nan da: 何だ).
+            const double score = english_.Score(keys);
+            if (!again.english && (score >= thresholds_.commonWord || (!japaneseWord && score >= thresholds_.knownWord))) {
+                again.english = true;
+                again.word = true;
+                again.written = WrittenAs(keys);
+            }
+            if (!again.english && spelling) {
+                // A slip that reads as romaji (apprecaite), but not as a
+                // Japanese word (mita: 見た, not Meta).
+                if (japaneseWord) return judged;
+                if (const auto spelled = spelling->Spell(keys, text); spelled.corrected) {
+                    again.english = true;
+                    again.word = true;
+                    again.written = WrittenAs(spelled.word);
+                }
+            }
+            if (!again.english) return judged;
+            all[i] = std::move(again);
+        }
+        // Written as English Auto writes it: slips put right with the
+        // English before (meetin: meeting) and looked at again with the word
+        // after (enough tim to: time); names only with capitals inside
+        // (GitHub), not words a name list also has (cup, apple).
+        if (spelling) {
+            // All capitals (API) only for no English word (it: not IT).
+            const auto asEnglish = [&](const std::wstring& word) {
+                const auto named = WrittenAs(word);
+                const bool inside = named.size() > 1 && std::any_of(named.begin() + 1, named.end(),
+                                                                    [](wchar_t c) { return std::iswupper(c) != 0; });
+                const bool allCapitals = std::none_of(named.begin(), named.end(), [](wchar_t c) { return std::iswlower(c) != 0; });
+                std::wstring lower = word;
+                for (auto& c : lower) c = static_cast<wchar_t>(std::towlower(c));
+                const bool acronym = allCapitals && english_.Score(lower) < thresholds_.knownWord;
+                return inside && (!allCapitals || acronym) ? named : word;
+            };
+            std::wstring before;
+            for (std::size_t i = 0; i < chunks.size(); ++i) {
+                if (isLetters(chunks[i])) {
+                    const auto spelled = spelling->Spell(chunks[i], before);
+                    std::wstring word = spelled.word;
+                    if (!spelled.corrected && i + 1 < chunks.size()) {
+                        if (const auto meant = spelling->Recheck(chunks[i], before, chunks[i + 1])) word = *meant;
+                    }
+                    all[i].written = asEnglish(word);
+                }
+                before += all[i].written + L" ";
+            }
+        }
+        return all;
     }
     return judged;
 }

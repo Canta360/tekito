@@ -568,6 +568,8 @@ private:
         bool isEnglish{false};
         bool marksOnly{false};  // punctuation of its own (a "." after English)
         bool locked{false};     // picked from the list or typed with capitals
+        bool picked{false};     // picked from the list, or Japanese taken as typed
+        bool sentenceStart{false};  // it began a sentence (English capitalized)
     };
     std::vector<SettledChunk> settled_;
     // English was committed just before the sentence, with its space after.

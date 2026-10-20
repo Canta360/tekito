@@ -49,4 +49,9 @@ EnglishSpelling::Result EnglishSpelling::Spell(std::wstring_view typed, std::wst
     return result;
 }
 
+std::optional<std::wstring> EnglishSpelling::Recheck(std::wstring_view word, std::wstring_view before,
+                                                     std::wstring_view after) const {
+    return engine_.Recheck(word, before, after);
+}
+
 }  // namespace tekito

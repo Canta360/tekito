@@ -2,6 +2,7 @@
 
 #include "Core/SpellingVariants.h"
 
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -27,6 +28,10 @@ public:
     // `typed`: lower-case letters. `before`: the English typed just before
     // it in the sentence, as context.
     [[nodiscard]] Result Spell(std::wstring_view typed, std::wstring_view before) const;
+    // A word looked at again with the word after it known, as English Auto
+    // does (enough tim to: time): the word meant, or nothing when it fits.
+    [[nodiscard]] std::optional<std::wstring> Recheck(std::wstring_view word, std::wstring_view before,
+                                                      std::wstring_view after) const;
     // American or British, as English Auto spells (UserSettings::englishSpelling).
     void SetVariety(EnglishVariety variety) noexcept { variety_ = variety; }
 
