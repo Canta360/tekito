@@ -114,12 +114,14 @@ std::wstring LearningReading(std::wstring_view reading, std::size_t begin, std::
 }
 
 // A number in digits for a word read in kana (いち: 1, the dictionary's
-// likeliest) comes after the first two words.
+// likeliest) comes after the first two words; not a number read whole
+// (さんびゃく: 300).
 constexpr std::size_t kDigitsPosition = 2;
 void PutDigitsAfterWords(std::vector<PhraseCandidate>& candidates) {
     std::vector<PhraseCandidate> digits;
     for (std::size_t i = 0; i < std::min(candidates.size(), kDigitsPosition); ++i) {
-        if (candidates[i].kind == PhraseCandidate::Kind::Dictionary && IsDigits(candidates[i].text)) {
+        if (candidates[i].kind == PhraseCandidate::Kind::Dictionary && IsDigits(candidates[i].text) &&
+            !candidates[i].kanaNumber) {
             digits.push_back(std::move(candidates[i]));
             candidates.erase(candidates.begin() + static_cast<std::ptrdiff_t>(i--));
         }
@@ -1167,8 +1169,90 @@ void JapaneseComposer::BuildPhrasesFor(bool convert) {
         candidates.insert(candidates.begin() + 1, std::move(english));
     }
     if (convert && reranker_ && sentenceCheck_ && !chunkJudge_ && !reconverted_) CheckSentence();
+    if (convert) StyleKanaNumbers();
     if (convert) ApplyNumberStyle();
     if (convert) AddTypedForms();
+}
+
+namespace {
+
+// A number in kanji numerals as it is read (2005: 二千五, 10: 十, 120000:
+// 十二万).
+std::wstring KanjiNumber(std::uint64_t value) {
+    if (value == 0) return L"〇";
+    constexpr std::wstring_view kDigits = L"〇一二三四五六七八九";
+    constexpr std::pair<std::uint64_t, wchar_t> kBig[] = {{1000000000000ULL, L'兆'}, {100000000ULL, L'億'}, {10000ULL, L'万'}};
+    const auto small = [&](std::uint64_t n) {
+        std::wstring text;
+        constexpr std::pair<std::uint64_t, wchar_t> kUnits[] = {{1000, L'千'}, {100, L'百'}, {10, L'十'}};
+        for (const auto& [unit, mark] : kUnits) {
+            const auto digit = n / unit;
+            n %= unit;
+            if (digit == 0) continue;
+            if (digit > 1) text += kDigits[digit];
+            text += mark;
+        }
+        if (n > 0) text += kDigits[n];
+        return text;
+    };
+    std::wstring text;
+    for (const auto& [unit, mark] : kBig) {
+        const auto part = value / unit;
+        value %= unit;
+        if (part > 0) text += small(part) + mark;
+    }
+    return text + small(value);
+}
+
+}  // namespace
+
+// Numbers read in kana (written in digits by the converter) in the number
+// style, and the other way of writing them next (2005年, 二千五年).
+void JapaneseComposer::StyleKanaNumbers() {
+    const auto restyle = [&](const std::wstring& text, NumberStyle style) {
+        std::wstring out;
+        for (std::size_t i = 0; i < text.size();) {
+            if (text[i] < L'0' || text[i] > L'9') {
+                out += text[i++];
+                continue;
+            }
+            std::size_t end = i;
+            while (end < text.size() && text[end] >= L'0' && text[end] <= L'9') ++end;
+            const std::wstring digits = text.substr(i, end - i);
+            switch (style) {
+            case NumberStyle::Kanji: out += KanjiNumber(std::stoull(digits)); break;
+            case NumberStyle::FullWidth:
+                for (const wchar_t c : digits) out += static_cast<wchar_t>(c + 0xFEE0);
+                break;
+            case NumberStyle::Official: out += SpecialConversions::Official(digits); break;
+            default: out += digits; break;
+            }
+            i = end;
+        }
+        return out;
+    };
+    for (auto& phrase : phrases_) {
+        auto& candidates = phrase.candidates;
+        const auto first = std::find_if(candidates.begin(), candidates.end(), [](const PhraseCandidate& c) { return c.kanaNumber; });
+        if (first == candidates.end()) continue;
+        // The other way of the first: kanji after digits, digits after kanji.
+        PhraseCandidate other = *first;
+        other.text = restyle(first->text, numberStyle_ == NumberStyle::Kanji ? NumberStyle::HalfWidth : NumberStyle::Kanji);
+        for (auto& candidate : candidates) {
+            if (candidate.kanaNumber) candidate.text = restyle(candidate.text, numberStyle_);
+        }
+        // Written alike now (三百 in kanji and the dictionary's): once.
+        for (std::size_t i = 1; i < candidates.size(); ++i) {
+            const auto same = std::find_if(candidates.begin(), candidates.begin() + static_cast<std::ptrdiff_t>(i),
+                                           [&](const PhraseCandidate& c) { return c.text == candidates[i].text; });
+            if (same != candidates.begin() + static_cast<std::ptrdiff_t>(i)) candidates.erase(candidates.begin() + static_cast<std::ptrdiff_t>(i--));
+        }
+        const auto has = std::any_of(candidates.begin(), candidates.end(), [&](const PhraseCandidate& c) { return c.text == other.text; });
+        if (!has) {
+            const auto at = std::find_if(candidates.begin(), candidates.end(), [](const PhraseCandidate& c) { return c.kanaNumber; });
+            candidates.insert(at + 1, std::move(other));
+        }
+    }
 }
 
 void JapaneseComposer::ApplyNumberStyle() {

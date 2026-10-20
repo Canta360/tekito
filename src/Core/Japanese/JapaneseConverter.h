@@ -33,6 +33,8 @@ struct PhraseCandidate {
     // The part of speech (right id) of its last word, for what is typed
     // next; 0 when not known.
     std::uint16_t rightId{0};
+    // Has a number read in kana in it, written in digits (にせんご: 2005).
+    bool kanaNumber{false};
 };
 
 // A word that starts with what has been typed, for prediction.

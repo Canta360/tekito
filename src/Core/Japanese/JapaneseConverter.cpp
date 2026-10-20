@@ -44,8 +44,10 @@ struct Node {
     std::int64_t cost{0};
     bool known{false};
     DictionaryWord word;
-    // A word the user added, and how it is written.
+    // A word the user added, and how it is written; or a number read in
+    // kana (numeral) with its digits.
     bool user{false};
+    bool numeral{false};
     std::wstring text;
     // For the language model, when it has the word: ln(count), the pair
     // hash the word starts, and its text to end a pair.
@@ -64,9 +66,80 @@ bool IsDigit(wchar_t c) {
     return (c >= L'0' && c <= L'9') || (c >= L'\xFF10' && c <= L'\xFF19');
 }
 
+// What a number read in kana costs over digits typed: words the
+// dictionary has for it stay first (二重, 十八番), counters take it (20円).
+constexpr std::int64_t kKanaNumberCost = 1000;
+
 // A decimal point or thousands comma, as typed in Japanese.
 bool IsNumberMark(wchar_t c) {
     return c == L'.' || c == L',' || c == L'\xFF0E' || c == L'\xFF0C';
+}
+
+// Numbers read in kana (にせんご: 2005, さんびゃく: 300, にじゅうよ: 24):
+// each length of `reading` from its start that reads as one number of two
+// parts or more, and the number. One part alone (いち, じゅう, ひゃく) is
+// left to the dictionary (一番, 十分, 百均).
+std::vector<std::pair<std::size_t, std::uint64_t>> KanaNumbers(std::wstring_view reading) {
+    struct Token {
+        std::wstring_view kana;
+        std::uint64_t value;
+        int rank;  // 0 a digit, 1 十, 2 百, 3 千, 4 万, 8 億
+    };
+    // Digits as read before a unit too (いっ, ろっ, はっ: いっせん, ろっぴゃく).
+    static constexpr Token kTokens[] = {
+        {L"いち", 1, 0}, {L"いっ", 1, 0}, {L"に", 2, 0}, {L"さん", 3, 0}, {L"よん", 4, 0}, {L"よ", 4, 0},
+        {L"ご", 5, 0}, {L"ろく", 6, 0}, {L"ろっ", 6, 0}, {L"なな", 7, 0}, {L"しち", 7, 0}, {L"はち", 8, 0},
+        {L"はっ", 8, 0}, {L"きゅう", 9, 0}, {L"じゅう", 10, 1}, {L"ひゃく", 100, 2}, {L"びゃく", 100, 2},
+        {L"ぴゃく", 100, 2}, {L"せん", 1000, 3}, {L"ぜん", 1000, 3}, {L"まん", 10000, 4}, {L"おく", 100000000, 8},
+    };
+    std::vector<std::pair<std::size_t, std::uint64_t>> found;
+    // `group`: the part below 万 so far; `rank`: the smallest unit in it;
+    // `digit`: a digit read and not yet multiplied (0 none); `sokuon`: it
+    // was read with っ and needs a unit after it; `big`: the last 万 or 億.
+    const auto step = [&](auto&& self, std::size_t at, std::uint64_t total, std::uint64_t group, int rank,
+                          std::uint64_t digit, bool sokuon, int big, int parts) -> void {
+        if (parts >= 2 && !sokuon && (group > 0 || digit > 0 || total > 0)) {
+            found.emplace_back(at, total + group + digit);
+        }
+        constexpr int kMostParts = 12;
+        if (parts >= kMostParts) return;
+        for (const auto& token : kTokens) {
+            if (!reading.substr(at).starts_with(token.kana)) continue;
+            const std::size_t next = at + token.kana.size();
+            if (token.rank == 0) {
+                // A digit: not after another digit; only units after a
+                // ones digit (にじゅうご, not にじゅうごに).
+                if (digit > 0 || rank == 0) continue;
+                const bool withSokuon = token.kana.back() == L'っ';
+                // よ only last, before a counter (よじかん).
+                self(self, next, total, group, rank, token.value, withSokuon, big, parts + 1);
+                continue;
+            }
+            if (token.rank < 4) {
+                if (token.rank >= rank) continue;  // units only get smaller
+                const std::uint64_t times = digit > 0 ? digit : 1;
+                if (digit == 1 && !sokuon) continue;  // いちじゅう, いちひゃく are not read so
+                // The unit as read after the digit: ひゃく, さんびゃく,
+                // ろっぴゃく; せん, さんぜん, いっせん (not ごぜん: 午前).
+                const wchar_t first = token.kana.front();
+                bool read = true;
+                if (first == L'ひ') read = !sokuon && digit != 3 && digit != 6 && digit != 8;
+                if (first == L'び') read = !sokuon && digit == 3;
+                if (first == L'ぴ') read = sokuon;
+                if (first == L'せ') read = sokuon ? digit != 6 : digit != 3;
+                if (first == L'ぜ') read = !sokuon && digit == 3;
+                if (first == L'じ') read = !sokuon;
+                if (!read) continue;
+                self(self, next, total, group + times * token.value, token.rank, 0, false, big, parts + 1);
+                continue;
+            }
+            // 万, 億: a part before it, and each only once, larger first.
+            if (sokuon || (group == 0 && digit == 0) || token.rank >= big) continue;
+            self(self, next, total + (group + digit) * token.value, 0, 4, 0, false, token.rank, parts + 1);
+        }
+    };
+    step(step, 0, 0, 0, 4, 0, false, 9, 0);
+    return found;
 }
 
 Lattice BuildLattice(const JapaneseDictionary& dictionary, const ReadingCodes& codes,
@@ -90,6 +163,17 @@ Lattice BuildLattice(const JapaneseDictionary& dictionary, const ReadingCodes& c
         lattice.nodes.push_back(std::move(node));
     };
     const std::uint16_t unknown = dictionary.UnknownId();
+    // Numbers read in kana, by where they start; none starts inside a
+    // longer one (にせんご is not に and せんご).
+    std::vector<std::vector<std::pair<std::size_t, std::uint64_t>>> numerals(n);
+    if (number) {
+        std::size_t covered = 0;
+        for (std::size_t i = 0; i < n; ++i) {
+            if (i < covered) continue;
+            numerals[i] = KanaNumbers(reading.substr(i));
+            for (const auto& [length, value] : numerals[i]) covered = std::max(covered, i + length);
+        }
+    }
     for (std::size_t i = 0; i < n; ++i) {
         dictionary.CommonPrefixSearch(ReadingCodesView(codes).substr(i),
                                       [&](std::size_t length, std::uint32_t record) {
@@ -153,6 +237,23 @@ Lattice BuildLattice(const JapaneseDictionary& dictionary, const ReadingCodes& c
             digits.right = number->right;
             digits.cost = number->cost;
             add(std::move(digits));
+        }
+        // A number read in kana, written in digits as a number word
+        // (にせんごねん: 2005年); the number style is the composer's.
+        if (number) {
+            for (const auto& [length, value] : numerals[i]) {
+                if (crosses(i, i + length)) continue;
+                Node numeral;
+                numeral.begin = static_cast<std::uint32_t>(i);
+                numeral.end = static_cast<std::uint32_t>(i + length);
+                numeral.left = number->left;
+                numeral.right = number->right;
+                numeral.cost = number->cost + kKanaNumberCost;
+                numeral.user = true;
+                numeral.numeral = true;
+                numeral.text = std::to_wstring(value);
+                add(std::move(numeral));
+            }
         }
         Node single;
         single.begin = static_cast<std::uint32_t>(i);
@@ -272,7 +373,6 @@ std::vector<Phrase> JapaneseConverter::Convert(std::wstring_view reading,
     // The most likely words for the whole reading.
     const std::vector<int> path = SearchPath(lattice, n, context, matrix_, model_, weights_).path;
     if (path.empty()) return {};
-
     // Phrases: fixed ones as given, then wherever the rules put a boundary.
     std::vector<std::pair<std::size_t, std::size_t>> spans;  // path index ranges
     std::size_t start = 0;
@@ -378,6 +478,7 @@ std::vector<Phrase> JapaneseConverter::Convert(std::wstring_view reading,
             std::wstring text;
             std::wstring head;
             bool spelling = false;
+            bool kanaNumber = false;
             std::vector<int> parts;
             for (int k = ending.node, r = ending.rank; k >= 0;) {
                 parts.push_back(k);
@@ -393,10 +494,12 @@ std::vector<Phrase> JapaneseConverter::Convert(std::wstring_view reading,
                 }
                 text += part;
                 spelling = spelling || (nodes[*it].known && nodes[*it].word.spellingCorrection);
+                kanaNumber = kanaNumber || nodes[*it].numeral;
             }
             if (!has(text)) {
                 PhraseCandidate candidate{std::move(text), ending.cost, PhraseCandidate::Kind::Dictionary, spelling};
                 candidate.rightId = nodes[ending.node].right;
+                candidate.kanaNumber = kanaNumber;
                 phrase.candidates.push_back(std::move(candidate));
                 heads.push_back(std::move(head));
             }
