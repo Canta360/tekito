@@ -160,14 +160,19 @@ foreach ($entry in @($binaries.GetEnumerator()) + @($documents.GetEnumerator()) 
     New-Item -ItemType Directory -Path (Split-Path $target -Parent) -Force | Out-Null
     Copy-Item -LiteralPath $entry.Value $target -Force
 }
-# Only the files the built page references, not stale builds left in dist.
+# The bundle the built page references (not stale builds left in dist), and
+# every static file the page loads by name: icons, the font, the candidate
+# looks, the notices and the typing samples.
 $settingsSource = Join-Path $releaseRoot "settings-ui"
 $settingsIndex = Get-Content -LiteralPath (Join-Path $settingsSource "index.html") -Raw
+$settingsStatic = @(Get-ChildItem -LiteralPath $settingsSource -Recurse -File |
+    ForEach-Object { Get-RelativeUnixPath $settingsSource $_.FullName } |
+    Where-Object { $_ -ne "index.html" -and $_ -notmatch '^assets/[^/]+-[A-Za-z0-9_-]{8}\.(js|css)$' })
+foreach ($required in "notices/THIRD_PARTY_NOTICES.md", "samples/japanese-convert-light.mp4", "assets/candidates/glass-light.png") {
+    if ($settingsStatic -notcontains $required) { throw "Settings page file is missing: $required" }
+}
 $settingsFiles = @("index.html") + @([regex]::Matches($settingsIndex, "assets/[^`"']+") | ForEach-Object { $_.Value }) +
-    @("assets/auto.ico", "assets/direct.ico", "assets/direct-dark.ico", "assets/japanese.ico",
-      "assets/japanese-dark.ico", "assets/mixed.ico", "assets/tekito.ico", "assets/tekito-wordmark-dark.svg",
-      "assets/tekito-wordmark-light.svg",
-      "assets/fonts/MPLUS1-wght.ttf")
+    $settingsStatic
 foreach ($file in $settingsFiles | Select-Object -Unique) {
     $source = Resolve-ChildPath $settingsSource $file
     if (-not (Test-Path -LiteralPath $source -PathType Leaf)) { throw "Settings page file is missing: $file" }
