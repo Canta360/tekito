@@ -7,7 +7,7 @@
 //
 // "live" turns live conversion on (the text after a pause is printed too);
 // "mix" types in Mix, "mixlive" with its live conversion; "steps" prints
-// what is shown after each key.
+// what is shown after each key; "nocheck" turns the sentence check off.
 //
 // The composer is set up as the text service sets it up: the installed
 // Japanese data and the default settings.
@@ -100,6 +100,7 @@ int main(int argc, char** argv) {
         if (std::string(argv[i]) == "steps") steps = true;
         if (std::string(argv[i]) == "live") settings.japaneseLiveConversion = true;
         if (std::string(argv[i]) == "mix") mix = true;
+        if (std::string(argv[i]) == "nocheck") settings.japaneseSentenceCheck = false;
         if (std::string(argv[i]).starts_with("num=")) settings.japaneseNumberStyle = std::stoi(argv[i] + 4);
         if (std::string(argv[i]).starts_with("kanji=")) settings.japaneseKanjiRange = std::stoi(argv[i] + 6);
         if (std::string(argv[i]).starts_with("grade=")) settings.japaneseKanjiGrade = std::stoi(argv[i] + 6);
