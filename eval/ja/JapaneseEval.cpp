@@ -63,6 +63,15 @@
 
 namespace {
 
+// Digits and numbers read in kana as one number word, as the text service
+// sets it up (JapaneseData: japanese-core/pos.tsv, "number").
+void SetNumberWord(tekito::japanese::JapaneseConverter& converter, const std::filesystem::path& pack) {
+    const auto parts = tekito::japanese::UserPartsOfSpeech::Load(pack / "pos.tsv");
+    if (const auto number = parts.Number()) {
+        converter.SetNumberWord(tekito::japanese::JapaneseConverter::NumberWord{number->left, number->right, number->cost});
+    }
+}
+
 using tekito::japanese::ConnectionMatrix;
 using tekito::japanese::JapaneseConverter;
 using tekito::japanese::JapaneseDictionary;
@@ -738,6 +747,7 @@ int main(int argc, char** argv) {
         }
         JapaneseConverter converter(dictionary, matrix);
         if (model.IsOpen()) converter.SetLanguageModel(&model, weights);
+        SetNumberWord(converter, pack);
         chunks.pack = pack;
         chunks.rerankerPack = rerankerPack;
         chunks.slipsPack = slipsPack;
@@ -785,6 +795,7 @@ int main(int argc, char** argv) {
         }
         JapaneseConverter converter(dictionary, matrix);
         if (model.IsOpen()) converter.SetLanguageModel(&model, weights);
+        SetNumberWord(converter, pack);
         if (!study.study.empty()) {
             study.pack = pack;
             study.showExamples = showMisses;
@@ -822,6 +833,7 @@ int main(int argc, char** argv) {
     }
     JapaneseConverter converter(dictionary, matrix);
         if (model.IsOpen()) converter.SetLanguageModel(&model, weights);
+        SetNumberWord(converter, pack);
     const auto rows = LoadCorpus(corpus);
     if (rows.empty()) {
         std::cerr << "no rows in " << corpus.string() << "\n";
