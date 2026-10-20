@@ -618,6 +618,8 @@ private:
     [[nodiscard]] ChunkJudge::Judgement JudgeChunk(std::wstring_view keys) const;
     // Phrases that are only digits: the form SetNumberStyle asks for first.
     void ApplyNumberStyle();
+    // A run of 。 typed as ... is one phrase, … first.
+    void JoinEllipsis();
     // Numbers read in kana in the number style, the other way next.
     void StyleKanaNumbers();
     [[nodiscard]] bool SingleVowelKana(std::wstring_view keys) const noexcept;

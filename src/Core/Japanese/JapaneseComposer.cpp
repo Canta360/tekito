@@ -1168,6 +1168,7 @@ void JapaneseComposer::BuildPhrasesFor(bool convert) {
         english.reading = conversionReading_;
         candidates.insert(candidates.begin() + 1, std::move(english));
     }
+    if (convert) JoinEllipsis();
     if (convert && reranker_ && sentenceCheck_ && !chunkJudge_ && !reconverted_) CheckSentence();
     if (convert) StyleKanaNumbers();
     if (convert) ApplyNumberStyle();
@@ -1509,6 +1510,33 @@ bool JapaneseComposer::FixSlips() {
     return true;
 }
 
+// "..." typed (。。。) is an ellipsis: one phrase written … first (‥ for
+// two), with the marks as typed next.
+void JapaneseComposer::JoinEllipsis() {
+    for (std::size_t i = 0; i < phrases_.size(); ++i) {
+        std::size_t end = i;
+        std::size_t length = 0;
+        while (end < phrases_.size() && phrases_[end].begin + phrases_[end].length <= conversionReading_.size()) {
+            const auto reading = std::wstring_view(conversionReading_).substr(phrases_[end].begin, phrases_[end].length);
+            if (reading.empty() || std::any_of(reading.begin(), reading.end(), [](wchar_t c) { return c != 0x3002; })) break;
+            length += phrases_[end].length;
+            ++end;
+        }
+        if (length < 2 || length > 3) continue;
+        PhraseState joined;
+        joined.begin = phrases_[i].begin;
+        joined.length = length;
+        const std::wstring typed(length, static_cast<wchar_t>(0x3002));
+        const std::wstring ellipsis(1, static_cast<wchar_t>(length == 3 ? 0x2026 : 0x2025));
+        joined.candidates.push_back({ellipsis, 0, PhraseCandidate::Kind::Special, false});
+        joined.candidates.push_back({typed, 0, PhraseCandidate::Kind::Hiragana, false});
+        joined.candidates.push_back({std::wstring(length, L'.'), 0, PhraseCandidate::Kind::Hiragana, false});
+        phrases_.erase(phrases_.begin() + static_cast<std::ptrdiff_t>(i), phrases_.begin() + static_cast<std::ptrdiff_t>(end));
+        phrases_.insert(phrases_.begin() + static_cast<std::ptrdiff_t>(i), std::move(joined));
+        if (focus_ >= phrases_.size()) focus_ = phrases_.size() - 1;
+    }
+}
+
 void JapaneseComposer::CheckSentence() {
     if (phrases_.empty() || (!phrases_.front().candidates.empty() && !phrases_.front().candidates.front().reading.empty())) {
         return;  // the whole input read another way (English run in) stays first
@@ -1520,6 +1548,21 @@ void JapaneseComposer::CheckSentence() {
     std::vector<std::vector<std::size_t>> lists;
     for (const auto& phrase : phrases_) {
         if (phrase.candidates.empty()) return;
+        // Marks typed as marks stay as typed (リック・ルービン: not /).
+        const auto reading = std::wstring_view(conversionReading_).substr(
+            std::min(phrase.begin, conversionReading_.size()), phrase.length);
+        // Between digits (1/2) the check still reads them.
+        const std::size_t end = phrase.begin + phrase.length;
+        const bool betweenDigits = phrase.begin > 0 && end < conversionReading_.size() &&
+                                   IsDigit(conversionReading_[phrase.begin - 1]) && IsDigit(conversionReading_[end]);
+        // Digits typed stay in the number style (10/21: not 十).
+        // The sentence's own punctuation (、。！？) is read as before.
+        const bool marks = (!reading.empty() && !betweenDigits && std::none_of(reading.begin(), reading.end(), [](wchar_t c) {
+                               return (c >= 0x3041 && c <= 0x3096) || (c >= 0x30A1 && c <= 0x30FA) || c == 0x30FC ||
+                                      std::iswalnum(c) != 0 || (c >= 0xFF10 && c <= 0xFF5A) || c == 0x3001 || c == 0x3002 ||
+                                      c == 0xFF01 || c == 0xFF1F;
+                           })) ||
+                           std::any_of(reading.begin(), reading.end(), IsDigit);
         std::vector<std::size_t> list;
         for (std::size_t c = 0; c < phrase.candidates.size() && list.size() < kListed; ++c) {
             const auto& candidate = phrase.candidates[c];
@@ -1529,7 +1572,7 @@ void JapaneseComposer::CheckSentence() {
             });
             if (!seen) list.push_back(c);
             // What learning put first stays.
-            if (phrase.learned) break;
+            if (phrase.learned || marks) break;
         }
         if (list.empty() || list.front() != phrase.selected) return;
         lists.push_back(std::move(list));
