@@ -60,14 +60,13 @@ to pick one.
   </tr>
   <tr>
     <td align="center"><img src="docs/images/mode-mixed.png" width="48" alt=""></td>
-    <td><b>Mix</b><br>Types Japanese and English without switching, a Space after each part. Turn it on in Settings > Japanese.</td>
+    <td><b>Mix</b><br>Types Japanese and English without switching, a Space after each part.</td>
   </tr>
 </table>
 
 The switch key is Hankaku/Zenkaku on a Japanese keyboard and Alt+` on a US
-one (or Ctrl+Space, Ctrl+Shift+Space, or none). With Japanese, it goes
-between Japanese and Auto, Japanese and Direct, or round all three, as you
-choose in Settings. On
+one (or Ctrl+Space, Ctrl+Shift+Space, or none). It goes round the modes
+turned on under **Settings → General**, in the order set there. On
 a Japanese keyboard, Henkan switches to Japanese, Muhenkan to English, and
 Hiragana to Japanese in hiragana (katakana with Shift). After a switch, the
 new mode shows by the caret for a moment.
@@ -103,12 +102,11 @@ writing it comes right after it in the list.
 
 The list also offers words that often come next (“to” for “I want t”), and
 Space takes out a word typed twice, like “the the”; Backspace brings it back.
-With Settings’ Advanced switch you can turn these off, or turn on a period
-for Space pressed twice and curly quotes and dashes (“ ” ’ and — for " ' and
---).
+**Settings → Auto** turns these off, and turns on **Period with two
+spaces** and **Curly quotes and dashes**.
 
 A few things come up as choices too: “today” and “now” offer the date and
-time, “(c)” and “->” offer © and →, and “1+2=” offers 3. What you typed
+time, “heart”, “(c)” and “->” offer ♡, © and →, and “1+2=” offers 3. What you typed
 stays first, so nothing changes unless you pick one.
 
 ![The TEKITO candidate list, glass and simple, in light and dark, with the meaning of the highlighted word beside it](docs/images/candidate-list.png)
@@ -158,22 +156,29 @@ for the phrase in focus.
   Wikipedia.
 - **It learns your way of writing.** The conversion you pick for a reading
   comes first the next time.
-- **Your own words.** Add a reading and how you write it in Settings, and
-  choose whether it comes first, is only offered, or never comes up.
+- **Your own words.** Add a reading and how you write it under
+  **Settings → Dictionary & learning → Japanese words**.
 - **Numbers, dates and symbols.** Digits read as numbers, so 3こ is 3個 and
   100えん 100円, and converting a number offers the other width and kanji
-  (千二百三十四). きょう and いま offer the date and time, やじるし and ほし
+  (千二百三十四). **Numbers** and **Kanji** in **Settings → Japanese** set
+  how numbers are written and which kanji are used (by school year, 常用,
+  人名用). きょう and いま offer the date and time, やじるし and ほし
   symbols, にこにこ emoticons, and 1+2= its answer. Single kanji come after
   a reading's words.
-- **Postal codes.** Add Japan Post's postal code data under
-  **Settings → Dictionary & learning**, and 1000001 converts to its address.
-- **Live conversion.** Turn it on in **Settings → Japanese** to see the
-  text converted as you type; Space then picks another candidate for the
+- **Postal codes.** Turn on **Settings → Japanese → Postal codes to
+  addresses** to download Japan Post's data; 1000001 then converts to its
+  address.
+- **Live conversion.** Turn on **Settings → Japanese → Live conversion**
+  to see the text converted as you type; Space then picks another candidate for the
   last phrase.
 - **Emoji.** Readings offer emoji after the symbols: ねこ gives 🐱.
-- **Words from your old IME.** Words exported as text from Microsoft IME,
-  Google Japanese Input or ATOK can be imported under
-  **Settings → Dictionary & learning**.
+- **Words shared with other IMEs.** Words exported as text from Microsoft
+  IME, Google Japanese Input or ATOK can be imported under
+  **Settings → Dictionary & learning → Import and export**, and your
+  Japanese words exported in a form other IMEs import.
+- **Kana input and the romaji table.** **Kana input** types the kana printed
+  on a JIS keyboard. The **Romaji table** can be edited or read from another
+  IME.
 - **Everywhere you type.** TEKITO works in the Start menu's search,
   Settings and Store apps too, and a katakana field (furigana) types
   katakana.
@@ -184,22 +189,23 @@ is not affiliated with them.
 
 ### Mix mode
 
-Turn on Mix mode in Settings > Japanese, and it joins the modes after
-Japanese. There you type Japanese and English without switching, a Space
+Turn on Mix in **Settings → General**, and it joins the modes you switch
+between. There you type Japanese and English without switching, a Space
 after each part: `kyouha github ni push suru` becomes 今日はGitHubにpushする.
 Each part is taken as Japanese or English on its own: keys that are no romaji
 (github, push) and well-known names (API) stay English, written the way they
 are (GitHub); Japanese is converted as usual. A part that reads both ways,
 like “take”, follows the sentence: Japanese in Japanese, English after
-English. Space again gives the other one.
+English. Space again gives the other one. Enter enters what is shown and
+converts nothing.
 
 ## Settings
 
 ![TEKITO Settings](docs/images/settings.png)
 
-Settings shows what most people change; **Show advanced settings** at the
-end of General adds the rest, such as the widths of what you type in
-Japanese and a page to turn each special conversion on or off.
+Each page shows what most people change, and **More settings** at its end
+holds the rest. **Settings → General → Typing samples** shows short clips of
+what each mode does.
 
 Settings, the setup program and TEKITO's own messages are available in
 English and Japanese; they follow the Windows display language unless you
@@ -210,10 +216,9 @@ pick one under **Settings → General → Language**.
 Everything TEKITO does happens on your computer. It does not send your
 typing anywhere, it has no account and no telemetry, and it does not use the
 network while you type. What it learns from your choices stays in
-`%LOCALAPPDATA%\TEKITO` and can be cleared from Settings. The only download
-is the Japanese data, fetched by the setup program when you choose Japanese.
-Postal codes come from a file you download from Japan Post yourself and add
-in Settings.
+`%LOCALAPPDATA%\TEKITO` and can be cleared from Settings. It downloads only
+the Japanese data, when you choose Japanese in the setup program, and
+postal codes, when you turn them on in Settings.
 See [the privacy notice](PRIVACY.md).
 
 ## Install

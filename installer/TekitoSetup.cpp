@@ -291,7 +291,7 @@ std::filesystem::path BrowseForDirectory(HWND owner) {
     BROWSEINFOW browse{};
     browse.hwndOwner = owner;
     browse.ulFlags = BIF_RETURNONLYFSDIRS | BIF_NEWDIALOGSTYLE;
-    browse.lpszTitle = Tr(L"Choose where to install TEKITO", L"TEKITO のインストール先を選んでください");
+    browse.lpszTitle = Tr(L"Choose where to install TEKITO", L"TEKITO のインストール先を選択してください");
     const auto selected = SHBrowseForFolderW(&browse);
     if (!selected) return {};
     wchar_t path[MAX_PATH]{};
@@ -475,12 +475,12 @@ std::wstring FailureMessage(int code) {
     case 3: return Tr(L"Setup couldn't create a temporary folder. Make sure the drive has free space, then try again.", L"一時フォルダーを作成できませんでした。ドライブの空き容量を確認して、もう一度お試しください。");
     case 4: return Tr(L"Setup couldn't unpack its files. Make sure the drive has free space, then try again.", L"ファイルを展開できませんでした。ドライブの空き容量を確認して、もう一度お試しください。");
     case 5: return Tr(L"Setup couldn't start Windows PowerShell, which it needs to install TEKITO.", L"インストールに必要な Windows PowerShell を起動できませんでした。");
-    case 20: return Tr(L"Setup couldn't download the Japanese data. Check the internet connection and try again, or install without Japanese.", L"日本語のデータをダウンロードできませんでした。インターネットの接続を確かめてもう一度お試しいただくか、日本語なしでインストールしてください。");
-    case 21: return Tr(L"The downloaded Japanese data was not the file this installer expects. Try again, or download the latest TEKITO.", L"ダウンロードした日本語のデータが、このインストーラーの想定と違いました。もう一度お試しいただくか、最新の TEKITO をダウンロードしてください。");
+    case 20: return Tr(L"Setup couldn't download the Japanese data. Check the internet connection and try again, or install without Japanese.", L"日本語のデータをダウンロードできませんでした。インターネット接続を確認してもう一度お試しいただくか、日本語なしでインストールしてください。");
+    case 21: return Tr(L"The downloaded Japanese data was not the file this installer expects. Try again, or download the latest TEKITO.", L"ダウンロードした日本語データが、このインストーラーの想定と一致しません。もう一度お試しいただくか、最新の TEKITO をダウンロードしてください。");
     default:
         if (UseJapanese()) {
             return L"インストールがエラー " + std::to_wstring(code) +
-                   L" で止まりました。新しいインストールだった場合、何も残っていません。もう一度お試しください。"
+                   L" で停止しました。新規インストールの場合、変更は残っていません。もう一度お試しください。"
                    L"繰り返し起きる場合は、%TEMP%\\TEKITO-install.log に詳しい記録があります。";
         }
         return L"The install step stopped with error " + std::to_wstring(code) +
@@ -588,7 +588,7 @@ std::vector<Control> Controls(const Wizard& wizard) {
             controls.push_back({Action::KeepEnglish, Kind::Toggle,
                                 D2D1::RectF(kOptionsCard.right - 66.0f, kOptionsCard.top + 166.0f,
                                             kOptionsCard.right - 18.0f, kOptionsCard.top + 194.0f),
-                                Tr(L"Keep TEKITO for English keyboards", L"英語のキーボードにも TEKITO を残す"), true,
+                                Tr(L"Keep TEKITO for English keyboards", L"英語のキーボード一覧にも追加する"), true,
                                 wizard.keepEnglish});
         }
         controls.push_back({Action::Back, Kind::Primary, FooterButton(0), Tr(L"Done", L"完了")});
@@ -931,13 +931,13 @@ void Paint(Wizard& wizard) {
     case Screen::Welcome:
         DrawLogo(wizard, kMargin, 42.0f, 60.0f);
         DrawWordmark(wizard, kMargin + 78.0f, 58.0f);
-        DrawText(wizard, Tr(L"English and Japanese input for Windows", L"英語と日本語を打つための入力方式"), wizard.title.Get(),
+        DrawText(wizard, Tr(L"English and Japanese input for Windows", L"英語と日本語を入力するための IME"), wizard.title.Get(),
                  D2D1::RectF(kMargin, 128.0f, kWidth - kMargin, 164.0f), p.ink);
         DrawText(wizard,
                  Tr(L"TEKITO fixes English typos as you type, and turns romaji into Japanese. Everything runs on "
                     L"this PC, and nothing you type is ever sent anywhere.",
-                    L"TEKITO は英語の打ち間違いを直し、ローマ字を日本語にします。処理はすべてこの PC の中で行われ、"
-                    L"入力した内容がどこかに送られることはありません。"),
+                    L"TEKITO は英語の入力ミスを修正し、ローマ字を日本語に変換します。処理はすべてこの PC の中で行い、"
+                    L"入力内容を外部に送信することはありません。"),
                  wizard.body.Get(), D2D1::RectF(kMargin, 170.0f, kMargin + bodyWidth, 214.0f), p.ink2);
         if (wizard.webViewReady) {
             DrawText(wizard,
@@ -951,7 +951,7 @@ void Paint(Wizard& wizard) {
         }
         if (!wizard.webViewReady) {
             DrawCard(wizard, kWebViewCard);
-            DrawText(wizard, Tr(L"One more thing is needed first", L"先にもうひとつ必要なものがあります"), wizard.body.Get(),
+            DrawText(wizard, Tr(L"One more thing is needed first", L"インストールの前に必要なものがあります"), wizard.body.Get(),
                      D2D1::RectF(kWebViewCard.left + 18.0f, kWebViewCard.top + 14.0f, kWebViewCard.right - 18.0f,
                                  kWebViewCard.top + 34.0f),
                      p.problem);
@@ -1011,11 +1011,11 @@ void Paint(Wizard& wizard) {
         if (wizard.japanese) {
             t->DrawLine(D2D1::Point2F(left, kOptionsCard.top + 150.0f),
                         D2D1::Point2F(kOptionsCard.right - 18.0f, kOptionsCard.top + 150.0f), divider.Get(), 1.0f);
-            DrawText(wizard, Tr(L"Keep TEKITO for English keyboards", L"英語のキーボードにも TEKITO を残す"), wizard.body.Get(),
+            DrawText(wizard, Tr(L"Keep TEKITO for English keyboards", L"英語のキーボード一覧にも追加する"), wizard.body.Get(),
                      D2D1::RectF(left, kOptionsCard.top + 160.0f, kOptionsCard.right - 90.0f, kOptionsCard.top + 180.0f), p.ink);
             DrawText(wizard,
                      Tr(L"TEKITO for Japanese types English too, so this is rarely needed.",
-                        L"日本語の TEKITO でも英語を打てるので、ふつうは不要です。"),
+                        L"日本語の TEKITO でも英語を入力できるため、通常は不要です。"),
                      wizard.caption.Get(),
                      D2D1::RectF(left, kOptionsCard.top + 182.0f, kOptionsCard.right - 90.0f, kOptionsCard.top + 212.0f), p.ink2);
         }
@@ -1082,7 +1082,7 @@ void Paint(Wizard& wizard) {
         DrawText(wizard,
                  Tr(L"Restart the apps you want to type in, then choose TEKITO from the input menu on the "
                     L"taskbar or press Win+Space.",
-                    L"使いたいアプリを再起動してから、タスクバーの入力メニューで TEKITO を選ぶか、"
+                    L"使用するアプリを再起動し、タスクバーの入力メニューで TEKITO を選択するか、"
                     L"Win+Space を押してください。"),
                  wizard.bodyCentered.Get(), D2D1::RectF(90.0f, 238.0f, kWidth - 90.0f, 290.0f), p.ink2);
         break;
