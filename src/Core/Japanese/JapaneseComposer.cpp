@@ -378,6 +378,7 @@ std::vector<Phrase> JapaneseComposer::ConvertReading(const std::wstring& reading
             if (covered != piece.size()) phrases = {{0, piece.size(), KanaCandidates(piece)}};
             for (auto& phrase : phrases) {
                 phrase.begin += begin;
+                StyleKanaNumbers(phrase.candidates);
                 out.push_back(std::move(phrase));
             }
         }
@@ -1091,6 +1092,7 @@ void JapaneseComposer::BuildPhrasesFor(bool convert) {
             slipUndone = true;
             conversionReading_ = ApplyTypingStyle(std::move(conversion->reading));
             readingKeys_ = std::move(conversion->keyAt);
+            for (auto& phrase : conversion->phrases) StyleKanaNumbers(phrase.candidates);
             AddPhrases(std::move(conversion->phrases), conversionReading_);
         } else {
             AddPhrases(ConvertReading(reading, 0, context_, contextWords_), reading);
@@ -1170,7 +1172,6 @@ void JapaneseComposer::BuildPhrasesFor(bool convert) {
     }
     if (convert) JoinEllipsis();
     if (convert && reranker_ && sentenceCheck_ && !chunkJudge_ && !reconverted_) CheckSentence();
-    if (convert) StyleKanaNumbers();
     if (convert) ApplyNumberStyle();
     if (convert) AddTypedForms();
 }
@@ -1207,40 +1208,56 @@ std::wstring KanjiNumber(std::uint64_t value) {
 
 }  // namespace
 
+// A number read in kana, written in digits by the converter, in `style`.
+std::wstring JapaneseComposer::KanaNumberText(const std::wstring& text, NumberStyle style) {
+    std::wstring out;
+    for (std::size_t i = 0; i < text.size();) {
+        if (text[i] < L'0' || text[i] > L'9') {
+            out += text[i++];
+            continue;
+        }
+        std::size_t end = i;
+        while (end < text.size() && text[end] >= L'0' && text[end] <= L'9') ++end;
+        const std::wstring digits = text.substr(i, end - i);
+        // Too long to be a number said (a phone or card number): as it is.
+        constexpr std::size_t kLongestNumber = 16;
+        if (digits.size() > kLongestNumber) {
+            out += digits;
+            i = end;
+            continue;
+        }
+        switch (style) {
+        case NumberStyle::Kanji: out += KanjiNumber(std::stoull(digits)); break;
+        case NumberStyle::FullWidth:
+            for (const wchar_t c : digits) out += static_cast<wchar_t>(c + 0xFEE0);
+            break;
+        case NumberStyle::Official: out += SpecialConversions::Official(digits); break;
+        case NumberStyle::Mixed:
+            if (digits.size() == 1) {
+                out += static_cast<wchar_t>(digits[0] + 0xFEE0);
+            } else {
+                out += digits;
+            }
+            break;
+        default: out += digits; break;
+        }
+        i = end;
+    }
+    return out;
+}
+
 // Numbers read in kana (written in digits by the converter) in the number
 // style, and the other way of writing them next (2005年, 二千五年).
-void JapaneseComposer::StyleKanaNumbers() {
-    const auto restyle = [&](const std::wstring& text, NumberStyle style) {
-        std::wstring out;
-        for (std::size_t i = 0; i < text.size();) {
-            if (text[i] < L'0' || text[i] > L'9') {
-                out += text[i++];
-                continue;
-            }
-            std::size_t end = i;
-            while (end < text.size() && text[end] >= L'0' && text[end] <= L'9') ++end;
-            const std::wstring digits = text.substr(i, end - i);
-            switch (style) {
-            case NumberStyle::Kanji: out += KanjiNumber(std::stoull(digits)); break;
-            case NumberStyle::FullWidth:
-                for (const wchar_t c : digits) out += static_cast<wchar_t>(c + 0xFEE0);
-                break;
-            case NumberStyle::Official: out += SpecialConversions::Official(digits); break;
-            default: out += digits; break;
-            }
-            i = end;
-        }
-        return out;
-    };
-    for (auto& phrase : phrases_) {
-        auto& candidates = phrase.candidates;
+void JapaneseComposer::StyleKanaNumbers(std::vector<PhraseCandidate>& candidates) const {
+    {
         const auto first = std::find_if(candidates.begin(), candidates.end(), [](const PhraseCandidate& c) { return c.kanaNumber; });
-        if (first == candidates.end()) continue;
+        if (first == candidates.end()) return;
         // The other way of the first: kanji after digits, digits after kanji.
+        // The other way only with other forms on (数字の変換: ほかの表記).
         PhraseCandidate other = *first;
-        other.text = restyle(first->text, numberStyle_ == NumberStyle::Kanji ? NumberStyle::HalfWidth : NumberStyle::Kanji);
+        other.text = KanaNumberText(first->text, numberStyle_ == NumberStyle::Kanji ? NumberStyle::HalfWidth : NumberStyle::Kanji);
         for (auto& candidate : candidates) {
-            if (candidate.kanaNumber) candidate.text = restyle(candidate.text, numberStyle_);
+            if (candidate.kanaNumber) candidate.text = KanaNumberText(candidate.text, numberStyle_);
         }
         // Written alike now (三百 in kanji and the dictionary's): once.
         for (std::size_t i = 1; i < candidates.size(); ++i) {
@@ -1249,7 +1266,7 @@ void JapaneseComposer::StyleKanaNumbers() {
             if (same != candidates.begin() + static_cast<std::ptrdiff_t>(i)) candidates.erase(candidates.begin() + static_cast<std::ptrdiff_t>(i--));
         }
         const auto has = std::any_of(candidates.begin(), candidates.end(), [&](const PhraseCandidate& c) { return c.text == other.text; });
-        if (!has) {
+        if (!has && specialOptions_.numbers) {
             const auto at = std::find_if(candidates.begin(), candidates.end(), [](const PhraseCandidate& c) { return c.kanaNumber; });
             candidates.insert(at + 1, std::move(other));
         }
@@ -1438,6 +1455,7 @@ bool JapaneseComposer::FixSlips() {
             out.reading = ApplyTypingStyle(std::move(conversion->reading));
             out.keyAt = std::move(conversion->keyAt);
             converted = std::move(conversion->phrases);
+            for (auto& phrase : converted) StyleKanaNumbers(phrase.candidates);
         } else {
             std::wstring kana;
             std::vector<std::pair<std::size_t, std::size_t>> units;  // kana offset, key offset
@@ -1563,10 +1581,37 @@ void JapaneseComposer::CheckSentence() {
                                       c == 0xFF01 || c == 0xFF1F;
                            })) ||
                            std::any_of(reading.begin(), reading.end(), IsDigit);
+        // A number read in kana stays in the number style (3時: not 三時);
+        // another word may still read better (ご縁, not 5円).
+        const auto& shown = phrase.candidates[phrase.selected < phrase.candidates.size() ? phrase.selected : 0];
+        const auto shape = [](const std::wstring& text) {
+            std::wstring out;
+            for (const wchar_t c : text) {
+                const bool numeral = IsDigit(c) || std::wstring_view(L"〇一二三四五六七八九十百千万億").find(c) != std::wstring_view::npos;
+                if (!numeral) out += c;
+                else if (out.empty() || out.back() != L'#') out += L'#';
+            }
+            return out;
+        };
+        const std::wstring numberShape = shown.kanaNumber ? shape(shown.text) : std::wstring{};
         std::vector<std::size_t> list;
         for (std::size_t c = 0; c < phrase.candidates.size() && list.size() < kListed; ++c) {
             const auto& candidate = phrase.candidates[c];
             if (!candidate.reading.empty()) continue;
+            if (!numberShape.empty() && c != phrase.selected) {
+                // The number another way: in kanji (三時), or left as read
+                // (く月, に月: the kana the reading starts with, then the rest).
+                std::size_t kana = 0;
+                while (kana < candidate.text.size() && kana < reading.size() && candidate.text[kana] == reading[kana]) ++kana;
+                const bool asRead = kana > 0 && L"#" + shape(candidate.text.substr(kana)) == numberShape;
+                // Or the counter kept with something else for the number
+                // (苦月, 区月 for 9月); a word of its own (惨事, ご縁) stays.
+                const std::wstring counter = numberShape.substr(numberShape.find(L'#') + 1);
+                constexpr std::size_t kNumberRead = 3;
+                const bool counterKept = numberShape.starts_with(L'#') && !counter.empty() && candidate.text.ends_with(counter) &&
+                                         candidate.text.size() <= counter.size() + kNumberRead;
+                if (shape(candidate.text) == numberShape || asRead || counterKept) continue;
+            }
             const bool seen = std::any_of(list.begin(), list.end(), [&](std::size_t other) {
                 return phrase.candidates[other].text == candidate.text;
             });
@@ -1605,7 +1650,16 @@ std::vector<std::size_t> JapaneseComposer::ReadBest(const std::vector<std::vecto
         }
         return sentences.size() < reranker_->Top();
     });
-    const std::size_t chosen = reranker_->Choose(sentences);
+    // Numbers are read by the sentence model in kanji, as its text mostly
+    // writes them (2時間 read as 二時間, not beaten by 似時間).
+    auto read = sentences;
+    for (auto& text : read) {
+        for (auto& ch : text) {
+            if (ch >= 0xFF10 && ch <= 0xFF19) ch = static_cast<wchar_t>(ch - 0xFEE0);
+        }
+        text = KanaNumberText(text, NumberStyle::Kanji);
+    }
+    const std::size_t chosen = reranker_->Choose(read);
     return chosen == 0 ? keep : picked[chosen];
 }
 

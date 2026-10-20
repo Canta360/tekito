@@ -621,7 +621,8 @@ private:
     // A run of 。 typed as ... is one phrase, … first.
     void JoinEllipsis();
     // Numbers read in kana in the number style, the other way next.
-    void StyleKanaNumbers();
+    void StyleKanaNumbers(std::vector<PhraseCandidate>& candidates) const;
+    [[nodiscard]] static std::wstring KanaNumberText(const std::wstring& text, NumberStyle style);
     [[nodiscard]] bool SingleVowelKana(std::wstring_view keys) const noexcept;
     std::uint16_t englishContext_{0};
     // Mixed typing: English chunks committed in a row, just before, and
