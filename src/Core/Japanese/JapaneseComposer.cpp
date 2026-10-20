@@ -1310,7 +1310,23 @@ void JapaneseComposer::ApplyNumberStyle() {
         std::wstring full = half;
         for (auto& c : full) c = static_cast<wchar_t>(c + 0xFEE0);
         std::wstring wanted;
-        const NumberStyle style = rough ? NumberStyle::Kanji : numberStyle_;
+        NumberStyle style = rough ? NumberStyle::Kanji : numberStyle_;
+        // Digits from 0 (006, 0120) or joined to others by a dash (090-1234)
+        // are a code, not a number: kept as typed, none dropped.
+        // The dash may be a phrase of its own (090|ー|1234).
+        constexpr std::wstring_view kDashes = L"-ー－―‐";
+        const auto digit = [](wchar_t c) { return (c >= L'0' && c <= L'9') || (c >= L'\xFF10' && c <= L'\xFF19'); };
+        const auto dash = [&](wchar_t c) { return kDashes.find(c) != std::wstring_view::npos; };
+        std::wstring dashedBefore = before;
+        if (before.size() == 1 && dash(before[0]) && index >= 2) dashedBefore = PhraseText(phrases_[index - 2]) + before;
+        std::wstring dashedAfter = after;
+        if (after.size() == 1 && dash(after[0]) && index + 2 < phrases_.size()) dashedAfter = after + PhraseText(phrases_[index + 2]);
+        const bool dashed = (dashedBefore.size() >= 2 && dash(dashedBefore.back()) && digit(dashedBefore[dashedBefore.size() - 2])) ||
+                            (dashedAfter.size() >= 2 && dash(dashedAfter.front()) && digit(dashedAfter[1]));
+        if (((half.size() > 1 && half.front() == L'0') || dashed) &&
+            (style == NumberStyle::Kanji || style == NumberStyle::Official)) {
+            style = NumberStyle::AsTyped;
+        }
         switch (style) {
         case NumberStyle::AsTyped:
             wanted = halfWidthDigits_ && !(singleDigitFull_ && half.size() == 1) ? half : full;

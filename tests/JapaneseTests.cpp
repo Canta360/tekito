@@ -255,6 +255,8 @@ void TestConversionForms(const RomajiTable& table) {
         RequireText(converted(L"15", Style::FullWidth), L"１５", "full-width");
         RequireText(converted(L"3", Style::Mixed), L"３", "mixed: one digit full-width");
         RequireText(converted(L"15", Style::Mixed), L"15", "and more half-width");
+        RequireText(converted(L"006", Style::Official), L"006", "digits from 0 are a code: none dropped");
+        RequireText(converted(L"0120", Style::Kanji), L"0120", "nor written in kanji");
         number.SetHalfWidthDigits(false);
         RequireText(converted(L"15", Style::HalfWidth), L"15", "half-width, even typed full-width");
         // Typed with one digit full-width: as it shows before conversion.
