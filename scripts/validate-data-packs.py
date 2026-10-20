@@ -250,6 +250,30 @@ def validate_language_model(pack: Path, manifest: dict) -> list[str]:
     return errors
 
 
+def validate_japanese_words(pack: Path, manifest: dict) -> list[str]:
+    """Words added to japanese-core's (japanese-wikipedia,
+    scripts/ja/build-japanese-packs.py --wikipedia-out): one ja-dict file."""
+    pack_id = pack.name
+    errors = [f"{pack_id}: manifest missing {field}"
+              for field in ("pack_id", "version", "language", "type", "license", "file", "notice_file",
+                            "entry_count", "sha256")
+              if field not in manifest]
+    if errors:
+        return errors
+    if manifest["pack_id"] != pack_id:
+        errors.append(f"{pack_id}: manifest pack_id mismatch")
+    data_path = relative_to_pack(pack, manifest["file"])
+    if not data_path.is_file() or not relative_to_pack(pack, manifest["notice_file"]).is_file():
+        return errors + [f"{pack_id}: missing files"]
+    if data_path.read_bytes()[:4] != b"TKJD":
+        errors.append(f"{pack_id}: {data_path.name} is not a ja-dict file")
+    if digest(data_path) != manifest["sha256"].get("file"):
+        errors.append(f"{pack_id}: data checksum mismatch")
+    if not isinstance(manifest["entry_count"], int) or manifest["entry_count"] <= 0:
+        errors.append(f"{pack_id}: entry_count must be a positive integer")
+    return errors
+
+
 def validate_pack(pack: Path, manifest: dict) -> list[str]:
     if manifest.get("format") == "sorted-tsv-v1":
         return validate_sorted_tsv(pack, manifest)
@@ -257,6 +281,8 @@ def validate_pack(pack: Path, manifest: dict) -> list[str]:
         return validate_rules(pack, manifest)
     if str(manifest.get("format", "")).startswith("ja-lm-"):
         return validate_language_model(pack, manifest)
+    if manifest.get("format") == "ja-dict-v1":
+        return validate_japanese_words(pack, manifest)
     errors: list[str] = []
     pack_id = pack.name
     for field in ("pack_id", "version", "language", "type", "license", "file",

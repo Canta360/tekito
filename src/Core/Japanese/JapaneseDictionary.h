@@ -2,13 +2,18 @@
 
 #include "Core/Japanese/MappedFile.h"
 
+#include <algorithm>
+#include <array>
 #include <cstdint>
 #include <cstring>
 #include <filesystem>
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <type_traits>
+#include <utility>
+#include <vector>
 
 namespace tekito::japanese {
 
@@ -25,6 +30,8 @@ struct DictionaryWord {
     // Mozc marks some entries as spelling corrections: offer them, never
     // choose them on their own.
     bool spellingCorrection{false};
+    // One of the added words (JapaneseDictionary::AddWords).
+    bool added{false};
     std::uint32_t surfaceOffset{0};
 };
 
@@ -34,8 +41,15 @@ struct DictionaryWord {
 class JapaneseDictionary final {
 public:
     bool Open(const std::filesystem::path& file) noexcept;
+    // More words, in a file of the same format and reading codes
+    // (japanese-wikipedia): looked up with these as one dictionary. Its keys
+    // that this one lacks are the records from this one's key count on.
+    bool AddWords(const std::filesystem::path& file);
     [[nodiscard]] bool IsOpen() const noexcept { return keyCount_ != 0; }
-    [[nodiscard]] std::uint32_t KeyCount() const noexcept { return keyCount_; }
+    [[nodiscard]] bool HasAddedWords() const noexcept { return added_ != nullptr; }
+    [[nodiscard]] std::uint32_t KeyCount() const noexcept {
+        return keyCount_ + (added_ ? added_->keyCount_ : 0);
+    }
     // The part of speech of a character no word covers.
     [[nodiscard]] std::uint16_t UnknownId() const noexcept { return unknownId_; }
 
@@ -47,15 +61,19 @@ public:
     template <typename Found>
     void CommonPrefixSearch(ReadingCodesView codes, Found&& found) const;
     [[nodiscard]] std::optional<std::uint32_t> Find(ReadingCodesView codes) const;
-    // The records whose key starts with `codes`, in key order, as a range
-    // [first, end); empty if there are none.
-    [[nodiscard]] std::pair<std::uint32_t, std::uint32_t> PrefixRange(ReadingCodesView codes) const;
+    // The records whose key starts with `codes`, in key order, as ranges
+    // [first, end): this file's, then the added words' (empty if none).
+    [[nodiscard]] std::array<std::pair<std::uint32_t, std::uint32_t>, 2> PrefixRanges(ReadingCodesView codes) const;
     // A record's key as text.
     [[nodiscard]] std::wstring KeyText(std::uint32_t record) const;
-    // The words of a record, cheapest first; word(const DictionaryWord&)
-    // returns nothing, or false to stop.
+    // The words of a record, cheapest first, the added words of its key
+    // among them; word(const DictionaryWord&) returns nothing, or false to
+    // stop.
     template <typename Visit>
     void ForEachWord(std::uint32_t record, Visit&& word) const;
+    // Only the words the record holds, for going through every record once.
+    template <typename Visit>
+    void ForEachStoredWord(std::uint32_t record, Visit&& word) const;
     [[nodiscard]] std::wstring Surface(const DictionaryWord& word, std::wstring_view reading) const;
     // A pooled surface read in place (0 and 0 for the others): its length,
     // and its character at `i`.
@@ -63,6 +81,13 @@ public:
     [[nodiscard]] wchar_t PoolSurfaceChar(const DictionaryWord& word, std::size_t i) const noexcept;
 
 private:
+    [[nodiscard]] std::pair<std::uint32_t, std::uint32_t> PrefixRange(ReadingCodesView codes) const;
+    template <typename Found>
+    void SearchKeys(ReadingCodesView codes, Found&& found) const;
+    [[nodiscard]] std::optional<std::uint32_t> FindKey(ReadingCodesView codes) const;
+    // The words of one of this file's records; false if word() stopped.
+    template <typename Visit>
+    bool VisitWords(std::uint32_t record, bool added, Visit&& word) const;
     [[nodiscard]] std::uint32_t RecordOffset(std::uint32_t record) const noexcept;
     // The key of a record, or an empty view if the record is out of bounds.
     [[nodiscard]] ReadingCodesView Key(std::uint32_t record) const noexcept;
@@ -85,10 +110,34 @@ private:
     std::uint32_t recordsSize_{0};
     const std::uint8_t* surfaces_{nullptr};
     std::uint32_t surfaceUnits_{0};
+    std::unique_ptr<JapaneseDictionary> added_;
 };
 
 template <typename Found>
 void JapaneseDictionary::CommonPrefixSearch(ReadingCodesView codes, Found&& found) const {
+    if (!added_) {
+        SearchKeys(codes, found);
+        return;
+    }
+    // The added words' keys, shortest first (a key is at most 255 codes);
+    // one this file has too is its record's.
+    std::array<std::pair<std::uint8_t, std::uint32_t>, 255> others;
+    std::size_t count = 0;
+    added_->SearchKeys(codes, [&](std::size_t length, std::uint32_t record) {
+        if (count < others.size()) others[count++] = {static_cast<std::uint8_t>(length), keyCount_ + record};
+    });
+    std::size_t next = 0;
+    SearchKeys(codes, [&](std::size_t length, std::uint32_t record) {
+        for (; next < count && others[next].first <= length; ++next) {
+            if (others[next].first < length) found(static_cast<std::size_t>(others[next].first), others[next].second);
+        }
+        found(length, record);
+    });
+    for (; next < count; ++next) found(static_cast<std::size_t>(others[next].first), others[next].second);
+}
+
+template <typename Found>
+void JapaneseDictionary::SearchKeys(ReadingCodesView codes, Found&& found) const {
     std::uint32_t lo = 0;
     std::uint32_t hi = keyCount_;
     // Keys in [lo, hi) share the first `depth` codes; narrow them to those
@@ -117,18 +166,50 @@ void JapaneseDictionary::CommonPrefixSearch(ReadingCodesView codes, Found&& foun
 }
 
 template <typename Visit>
+void JapaneseDictionary::ForEachStoredWord(std::uint32_t record, Visit&& word) const {
+    if (record < keyCount_) {
+        (void)VisitWords(record, false, word);
+    } else if (added_) {
+        (void)added_->VisitWords(record - keyCount_, true, word);
+    }
+}
+
+template <typename Visit>
 void JapaneseDictionary::ForEachWord(std::uint32_t record, Visit&& word) const {
-    if (record >= keyCount_) return;
+    const auto other = added_ && record < keyCount_ ? added_->FindKey(Key(record)) : std::nullopt;
+    if (!other) {
+        ForEachStoredWord(record, word);
+        return;
+    }
+    // Both have the key: their words in one order, cheapest first.
+    std::vector<DictionaryWord> words;
+    const auto keep = [&](const DictionaryWord& entry) { words.push_back(entry); };
+    (void)VisitWords(record, false, keep);
+    (void)added_->VisitWords(*other, true, keep);
+    std::stable_sort(words.begin(), words.end(),
+                     [](const DictionaryWord& a, const DictionaryWord& b) { return a.cost < b.cost; });
+    for (const auto& entry : words) {
+        if constexpr (std::is_same_v<decltype(word(entry)), bool>) {
+            if (!word(entry)) return;
+        } else {
+            word(entry);
+        }
+    }
+}
+
+template <typename Visit>
+bool JapaneseDictionary::VisitWords(std::uint32_t record, bool added, Visit&& word) const {
+    if (record >= keyCount_) return false;
     std::uint32_t at = RecordOffset(record);
     const std::uint32_t end = RecordOffset(record + 1);
-    if (at >= end || end > recordsSize_) return;
+    if (at >= end || end > recordsSize_) return false;
     const std::uint32_t keyLength = records_[at];
     at += 1 + keyLength;
-    if (at + 2 > end) return;
+    if (at + 2 > end) return false;
     const std::uint16_t count = Read<std::uint16_t>(records_ + at);
     at += 2;
     for (std::uint16_t i = 0; i < count; ++i) {
-        if (at + 5 > end) return;
+        if (at + 5 > end) return false;
         const std::uint8_t flags = records_[at++];
         DictionaryWord entry;
         entry.surface = static_cast<DictionaryWord::Surface>(flags & 3);
@@ -137,30 +218,33 @@ void JapaneseDictionary::ForEachWord(std::uint32_t record, Visit&& word) const {
         at += 2;
         entry.right = entry.left;
         if ((flags & 8) == 0) {
-            if (at + 2 > end) return;
+            if (at + 2 > end) return false;
             entry.right = Read<std::uint16_t>(records_ + at);
             at += 2;
         }
-        if (at + 2 > end) return;
+        if (at + 2 > end) return false;
         entry.cost = Read<std::uint16_t>(records_ + at);
         at += 2;
         if (entry.surface == DictionaryWord::Surface::Pool) {
-            if (at + 3 > end) return;
+            if (at + 3 > end) return false;
             entry.surfaceOffset = static_cast<std::uint32_t>(records_[at]) |
                                   (static_cast<std::uint32_t>(records_[at + 1]) << 8) |
                                   (static_cast<std::uint32_t>(records_[at + 2]) << 16);
             at += 3;
         } else if (entry.surface != DictionaryWord::Surface::Reading &&
                    entry.surface != DictionaryWord::Surface::Katakana) {
-            return;
+            return false;
         }
+        entry.added = added;
         if constexpr (std::is_same_v<decltype(word(static_cast<const DictionaryWord&>(entry))), bool>) {
-            if (!word(static_cast<const DictionaryWord&>(entry))) return;
+            if (!word(static_cast<const DictionaryWord&>(entry))) return false;
         } else {
             word(static_cast<const DictionaryWord&>(entry));
         }
     }
+    return true;
 }
+
 
 // How words join (ja-matrix-v1): the cost of one word following another,
 // and whether a new phrase (bunsetsu) starts between them.

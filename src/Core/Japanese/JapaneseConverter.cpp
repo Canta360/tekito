@@ -840,9 +840,9 @@ std::vector<Prediction> JapaneseConverter::Predict(std::wstring_view reading, st
         }
     }
     const ReadingCodes codes = dictionary_.Encode(reading);
-    auto [first, end] = dictionary_.PrefixRange(codes);
+    auto ranges = dictionary_.PrefixRanges(codes);
     // Too many to look through: the dictionary's words are left out.
-    if (end - first > kMaxKeys) end = first;
+    if (ranges[0].second - ranges[0].first + ranges[1].second - ranges[1].first > kMaxKeys) ranges = {};
 
     struct Found {
         std::int64_t cost;
@@ -850,15 +850,16 @@ std::vector<Prediction> JapaneseConverter::Predict(std::wstring_view reading, st
         DictionaryWord word;
     };
     std::vector<Found> found;
-    found.reserve(end - first);
-    for (std::uint32_t record = first; record < end; ++record) {
-        dictionary_.ForEachWord(record, [&](const DictionaryWord& word) {
-            // The cheapest word of each longer reading, never a spelling
-            // correction.
-            if (word.spellingCorrection) return true;
-            found.push_back({word.cost, record, word});
-            return false;
-        });
+    for (const auto& [first, end] : ranges) {
+        for (std::uint32_t record = first; record < end; ++record) {
+            dictionary_.ForEachStoredWord(record, [&](const DictionaryWord& word) {
+                // The cheapest word of each longer reading, never a spelling
+                // correction.
+                if (word.spellingCorrection) return true;
+                found.push_back({word.cost, record, word});
+                return false;
+            });
+        }
     }
     const auto cheaper = [](const Found& a, const Found& b) { return a.cost < b.cost; };
     // Only the first few are needed; some may be dropped below.
@@ -913,7 +914,7 @@ std::optional<ReadingGuess> JapaneseConverter::ReadingOf(std::wstring_view text)
     if (written) {
         for (std::uint32_t record = 0; record < dictionary_.KeyCount(); ++record) {
             std::wstring reading;
-            dictionary_.ForEachWord(record, [&](const DictionaryWord& word) {
+            dictionary_.ForEachStoredWord(record, [&](const DictionaryWord& word) {
                 if (word.spellingCorrection) return true;
                 const std::size_t length = dictionary_.PoolSurfaceLength(word);
                 if (length == 0 || length > n) return true;

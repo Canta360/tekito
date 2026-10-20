@@ -399,6 +399,59 @@ bool HasCandidate(const tekito::japanese::Phrase& phrase, std::wstring_view text
     return false;
 }
 
+// Words added from a pack of their own (japanese-wikipedia), looked up with
+// the dictionary's as one.
+void TestAddedWords(const MiniPack& pack) {
+    using tekito::japanese::DictionaryWord;
+    const std::filesystem::path data(TEKITO_TEST_DATA_DIR);
+    tekito::japanese::JapaneseDictionary dictionary;
+    Require(dictionary.Open(data / L"japanese-mini" / L"dictionary.bin"), "the test dictionary opens again");
+    Require(!dictionary.AddWords(data / L"japanese-mini" / L"connection.bin") && !dictionary.HasAddedWords(),
+            "a file that is not a dictionary adds nothing");
+    Require(dictionary.AddWords(data / L"japanese-mini-wikipedia" / L"dictionary.bin"), "the added words open");
+
+    // A reading only the added words have.
+    const auto added = dictionary.Find(dictionary.Encode(L"てんきなかの"));
+    Require(added.has_value() && *added >= pack.dictionary.KeyCount(), "a reading of the added words is found after the dictionary's");
+    std::wstring surfaces;
+    dictionary.ForEachWord(*added, [&](const DictionaryWord& word) { surfaces += dictionary.Surface(word, L"てんきなかの"); });
+    RequireText(surfaces, L"天気中野", "its word is written as added");
+    RequireText(dictionary.KeyText(*added), L"てんきなかの", "and its key reads so");
+
+    // A reading both have: one record, the words cheapest first.
+    const auto shared = dictionary.Find(dictionary.Encode(L"きかい"));
+    Require(shared.has_value() && *shared < pack.dictionary.KeyCount(), "a reading both have is the dictionary's record");
+    bool machine = false, addedWord = false, sorted = true;
+    int previousCost = -1;
+    dictionary.ForEachWord(*shared, [&](const DictionaryWord& word) {
+        const auto text = dictionary.Surface(word, L"きかい");
+        machine = machine || text == L"機械";
+        addedWord = addedWord || (text == L"奇械" && word.added);
+        sorted = sorted && static_cast<int>(word.cost) >= previousCost;
+        previousCost = word.cost;
+    });
+    Require(machine && addedWord && sorted, "it has the dictionary's words and the added one, cheapest first");
+    std::size_t stored = 0;
+    dictionary.ForEachStoredWord(*shared, [&](const DictionaryWord& word) { stored += word.added ? 100 : 1; });
+    Require(stored > 0 && stored < 100, "the record holds only the dictionary's own words");
+
+    // Prefixes from both, shortest first, a shared key once.
+    std::vector<std::size_t> lengths;
+    dictionary.CommonPrefixSearch(dictionary.Encode(L"てんきなかのです"),
+                                  [&](std::size_t length, std::uint32_t) { lengths.push_back(length); });
+    Require(std::is_sorted(lengths.begin(), lengths.end()) &&
+                std::adjacent_find(lengths.begin(), lengths.end()) == lengths.end() &&
+                std::find(lengths.begin(), lengths.end(), 6) != lengths.end(),
+            "prefixes come shortest first, each once, the added word among them");
+    const auto ranges = dictionary.PrefixRanges(dictionary.Encode(L"てんき"));
+    Require(ranges[1].second > ranges[1].first, "the added words have keys from てんき on");
+
+    tekito::japanese::JapaneseConverter converter(dictionary, pack.matrix);
+    const auto predictions = converter.Predict(L"てんきな", 10);
+    Require(std::any_of(predictions.begin(), predictions.end(), [](const auto& p) { return p.text == L"天気中野"; }),
+            "an added word is predicted");
+}
+
 void TestDictionary(const MiniPack& pack) {
     const auto& dictionary = pack.dictionary;
     const auto record = dictionary.Find(dictionary.Encode(L"きかい"));
@@ -1946,6 +1999,7 @@ int main(int argc, char** argv) {
     TestInputFormAndPunctuation(*table);
     const auto pack = LoadMiniPack();
     TestDictionary(*pack);
+    TestAddedWords(*pack);
     TestDamagedPacks();
     TestConversion(*pack);
     TestComposerConversion(*table, *pack);

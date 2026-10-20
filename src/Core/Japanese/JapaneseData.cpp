@@ -47,6 +47,8 @@ const JapaneseData* ProcessJapaneseData() {
         if (!loaded->dictionary.Open(core / L"dictionary.bin") || !loaded->matrix.Open(core / L"connection.bin")) {
             return std::unique_ptr<JapaneseData>{};
         }
+        // Words of Wikipedia article titles, a pack of their own (CC BY-SA).
+        (void)loaded->dictionary.AddWords(ExternalLexiconProvider::PackDirectory(L"japanese-wikipedia") / L"dictionary.bin");
         loaded->converter = std::make_unique<JapaneseConverter>(loaded->dictionary, loaded->matrix);
         if (loaded->model.Open(ExternalLexiconProvider::PackDirectory(L"japanese-lm"))) {
             loaded->converter->SetLanguageModel(&loaded->model);

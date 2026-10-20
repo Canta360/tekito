@@ -40,6 +40,14 @@ Usage:
   python scripts/ja/build-japanese-packs.py --mozc <Mozc src/data> --commit <sha> --out data/ja/japanese-core
   python scripts/ja/build-japanese-packs.py --mozc ... --commit ... --out tests/data/ja/japanese-mini \\
       --sentences tests/data/ja/japanese-mini-sentences.txt
+
+With --wikipedia-words <words.tsv> --wikipedia-out <dir> it also builds
+japanese-wikipedia: the words of Wikipedia article titles
+(build-japanese-wikipedia-words.py) that japanese-core lacks, one
+dictionary.bin with japanese-core's reading codes, which TEKITO adds to
+japanese-core's words (JapaneseDictionary::AddWords). It is a pack of its own
+for its license (CC BY-SA 4.0). tests/data/ja/japanese-mini-wikipedia comes
+from tests/data/ja/japanese-mini-wikipedia.tsv so.
 """
 
 from __future__ import annotations
@@ -243,8 +251,14 @@ def boundary_rows(mozc: Path, pos_names: list[str]) -> list[int]:
     return boundary
 
 
-def build_dictionary(entries, unknown_id: int, out: Path) -> dict:
-    chars = sorted({c for reading, *_ in entries for c in reading})
+def reading_chars(entries) -> list[str]:
+    return sorted({c for reading, *_ in entries for c in reading})
+
+
+def build_dictionary(entries, unknown_id: int, out: Path, chars: list[str] | None = None) -> dict:
+    """chars: the reading characters, in code order; another dictionary's
+    for words added to it (japanese-wikipedia uses japanese-core's)."""
+    chars = chars or reading_chars(entries)
     if len(chars) > 255:
         raise ValueError(f"{len(chars)} reading characters; ja-dict-v1 codes hold 255")
     if any(ord(c) > 0xFFFF for c in chars):
@@ -373,7 +387,7 @@ def write_user_pos(ids: list[int], number_id: int, out: Path) -> None:
     out.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
 
 
-def write_notice(mozc: Path, out: Path, commit: str, wikipedia: bool) -> None:
+def write_notice(mozc: Path, out: Path, commit: str) -> None:
     readme = (mozc / "dictionary_oss" / "README.txt").read_text(encoding="utf-8")
     license_text = (mozc / "LICENSE").read_text(encoding="utf-8")
     out.write_text(
@@ -383,13 +397,7 @@ def write_notice(mozc: Path, out: Path, commit: str, wikipedia: bool) -> None:
         "== Mozc dictionary_oss (IPAdic, Okinawa dictionary) ==\n\n" + readme.strip() + "\n\n"
         "== TEKITO Japanese slang additions ==\n\n"
         "The curated entries and original short definitions come from "
-        "scripts/ja/japanese-slang-seeds.tsv and are covered by the TEKITO source license.\n"
-        + ("\n== Japanese Wikipedia ==\n\n"
-           "Words of article titles and their readings come from Japanese Wikipedia "
-           "(https://ja.wikipedia.org/), by Wikipedia contributors, under CC BY-SA 4.0 "
-           "(https://creativecommons.org/licenses/by-sa/4.0/). The kanji readings that check them "
-           "come from KANJIDIC2 (Electronic Dictionary Research and Development Group, CC BY-SA 4.0). "
-           "dictionary.bin is shared under CC BY-SA 4.0.\n" if wikipedia else ""),
+        "scripts/ja/japanese-slang-seeds.tsv and are covered by the TEKITO source license.\n",
         encoding="utf-8", newline="\n")
 
 
@@ -402,14 +410,16 @@ def main() -> None:
     parser.add_argument("--sentences", type=Path,
                         help="build a small pack for tests: keep only words found in these readings")
     parser.add_argument("--wikipedia-words", type=Path,
-                        help="words of Wikipedia titles (build-japanese-wikipedia-words.py) to add")
+                        help="words of Wikipedia titles (build-japanese-wikipedia-words.py) for the "
+                             "japanese-wikipedia pack")
+    parser.add_argument("--wikipedia-out", type=Path, help="where to build the japanese-wikipedia pack")
     args = parser.parse_args()
 
     entries = read_entries(args.mozc)
     pos_names = read_pos_names(args.mozc)
     entries.extend(read_slang_entries(pos_names, entries))
-    if args.wikipedia_words:
-        entries.extend(read_wikipedia_entries(args.wikipedia_words, pos_names, entries))
+    if bool(args.wikipedia_words) != bool(args.wikipedia_out):
+        parser.error("--wikipedia-words and --wikipedia-out go together")
     size, costs = read_matrix(args.mozc)
     if size != len(pos_names):
         raise ValueError("id.def and the connection matrix disagree on the id count")
@@ -432,12 +442,12 @@ def main() -> None:
     dictionary = build_dictionary(entries, unknown_id, args.out / "dictionary.bin")
     matrix = build_matrix(size, costs, boundary, args.out / "connection.bin")
     write_user_pos(user_ids, number_id, args.out / "pos.tsv")
-    write_notice(args.mozc, args.out / "NOTICE", args.commit, bool(args.wikipedia_words))
+    write_notice(args.mozc, args.out / "NOTICE", args.commit)
     manifest = {
         "pack_id": "japanese-core",
         "display_name": "Japanese Conversion Dictionary",
         "schema_version": 1,
-        "version": f"mozc-{args.commit[:12]}-slang-2026.09" + ("-jawiki-2026.10" if args.wikipedia_words else ""),
+        "version": f"mozc-{args.commit[:12]}-slang-2026.09",
         "language": "ja-JP",
         "type": "japanese-dictionary",
         "format": "ja-dict-v1+ja-matrix-v1",
@@ -448,16 +458,54 @@ def main() -> None:
         "sha256": {"file": sha256(args.out / "dictionary.bin"),
                    "index": sha256(args.out / "connection.bin"),
                    "pos": sha256(args.out / "pos.tsv")},
-        "license": "IPAdic + BSD-3-Clause (Mozc), TEKITO-OWNED"
-                   + (", CC-BY-SA-4.0 (Japanese Wikipedia, KANJIDIC2)" if args.wikipedia_words else ""),
+        "license": "IPAdic + BSD-3-Clause (Mozc), TEKITO-OWNED",
         "source": f"https://github.com/google/mozc/tree/{args.commit}/src/data",
-        "supplemental_source": "scripts/ja/japanese-slang-seeds.tsv"
-                               + (", https://dumps.wikimedia.org/jawiki/" if args.wikipedia_words else ""),
+        "supplemental_source": "scripts/ja/japanese-slang-seeds.tsv",
         "notice_file": "NOTICE",
     }
     (args.out / "manifest.json").write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n",
                                            encoding="utf-8", newline="\n")
-    print(json.dumps({"dictionary": dictionary, "matrix": matrix}, indent=2))
+    report = {"dictionary": dictionary, "matrix": matrix}
+    if args.wikipedia_words:
+        report["wikipedia"] = build_wikipedia_pack(args.wikipedia_words, args.wikipedia_out, pos_names,
+                                                   entries, unknown_id)
+    print(json.dumps(report, indent=2))
+
+
+def build_wikipedia_pack(words: Path, out: Path, pos_names: list[str], core_entries, unknown_id: int) -> dict:
+    """japanese-wikipedia: words TEKITO adds to japanese-core's, a pack of
+    their own for their license, with the same reading codes."""
+    chars = reading_chars(core_entries)
+    known = set(chars)
+    entries = [entry for entry in read_wikipedia_entries(words, pos_names, core_entries)
+               if set(entry[0]) <= known]
+    out.mkdir(parents=True, exist_ok=True)
+    dictionary = build_dictionary(entries, unknown_id, out / "dictionary.bin", chars)
+    (out / "NOTICE").write_text(
+        "japanese-wikipedia holds words of Japanese Wikipedia article titles and their readings, "
+        "from Japanese Wikipedia (https://ja.wikipedia.org/), by Wikipedia contributors, under "
+        "CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/). The kanji readings that "
+        "check them come from KANJIDIC2 (Electronic Dictionary Research and Development Group, "
+        "https://www.edrdg.org/, CC BY-SA 4.0). This pack is shared under CC BY-SA 4.0.\n",
+        encoding="utf-8", newline="\n")
+    manifest = {
+        "pack_id": "japanese-wikipedia",
+        "display_name": "Japanese Wikipedia Words",
+        "schema_version": 1,
+        "version": "jawiki-2026.10",
+        "language": "ja-JP",
+        "type": "japanese-dictionary",
+        "format": "ja-dict-v1",
+        "file": "dictionary.bin",
+        "entry_count": dictionary["words"],
+        "sha256": {"file": sha256(out / "dictionary.bin")},
+        "license": "CC-BY-SA-4.0",
+        "source": "https://dumps.wikimedia.org/jawiki/ (pages-articles, langlinks), KANJIDIC2",
+        "notice_file": "NOTICE",
+    }
+    (out / "manifest.json").write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n",
+                                       encoding="utf-8", newline="\n")
+    return dictionary
 
 
 if __name__ == "__main__":

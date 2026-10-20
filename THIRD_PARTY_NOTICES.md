@@ -66,8 +66,8 @@ texts.
 The data packs in `data/` (and in the installer, or the Japanese data it
 downloads) come from SCOWL, Wikipedia, the Leipzig Corpora Collection,
 WordNet, GeoNames, Wiktionary, the CMU Pronouncing Dictionary, Unicode CLDR,
-the Mozc OSS dictionary, symbol, emoji, emoticon and single-kanji tables (IPAdic, BSD 3-Clause) and the Japanese WordNet
-(NICT), plus data written for TEKITO. The model that checks whole Japanese
+the Mozc OSS dictionary, symbol, emoji, emoticon and single-kanji tables (IPAdic, BSD 3-Clause), KANJIDIC2
+(EDRDG) and the Japanese WordNet (NICT), plus data written for TEKITO. The model that checks whole Japanese
 sentences was trained on the zenz-v2.5 dataset (llm-jp-corpus-v3 part, Open
 Data Commons Attribution License 1.0) and holds no text from it. Japan Post's postal code data is not
 included: Settings downloads it (from the postal-codes release, a monthly copy
