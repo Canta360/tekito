@@ -69,7 +69,7 @@ page; it never downloads anything on its own.
 
 When you choose Japanese in the setup program, it downloads the Japanese
 data from TEKITO's release on GitHub (github.com) and checks it against the
-checksum it carries. That request is the only network use; it sends nothing
+checksum it carries. That request is the setup program's only network use; it sends nothing
 about you beyond what any download does, such as your IP address, and
 GitHub's privacy terms apply to it. Installing from a ZIP you downloaded
 yourself (`install.ps1 -JapaneseDataPath`) makes no request at all.
@@ -94,7 +94,7 @@ TEKITO の処理はすべて PC の中で行われます。入力した内容、
 - 誤変換を報告できるよう、直近30件の日本語の変換（読みと変換結果のみ。押したキーは保存せず、プライベートウィンドウでの変換も保存しません）を `user.db` に保存します。設定の「情報 → 誤変換の報告」でオフにでき、オフにすると削除されます。「報告」はブラウザで GitHub の Issue フォームを開き、読みと変換結果を入力した状態にするだけで、送信するまで何も送られません。「不具合の報告」も同じように、バージョンと設定を入力した状態でフォームを開きます。
 - 再変換（文字を選んで変換キー）は選んだ文字をこの PC の中で読むだけで、ほかの IME の単語の読み込みは選んだファイルをこの PC の中で取り込むだけです。どちらも何も送りません。
 - スタートメニューの検索、設定アプリ、ストアアプリでも使えるように、インストーラーはこれらのサンドボックスのアプリに、プログラムのフォルダ（`%LOCALAPPDATA%\Programs\TEKITO`）と言語データ（`%LOCALAPPDATA%\TEKITO\data`）の読み取りだけを許可します。`user.db` は対象外なので、辞書や学習内容は読めません。そこでは TEKITO は既定の設定で動きます。
-- インストール時に日本語を選ぶと、日本語データを GitHub の TEKITO のリリースからダウンロードし、チェックサムを確かめます。ネットワークを使うのはこのときだけです。自分でダウンロードした ZIP から入れる場合（`install.ps1 -JapaneseDataPath`）は通信しません。
+- インストール時に日本語を選択すると、日本語データを GitHub の TEKITO のリリースからダウンロードし、チェックサムを照合します。インストーラーがネットワークを使用するのはこのときのみです。自分でダウンロードした ZIP からインストールする場合（`install.ps1 -JapaneseDataPath`）は通信しません。
 - 設定の「郵便番号から住所に変換」をオンにすると、確認のうえで日本郵便の郵便番号データ（utf_ken_all.zip）をダウンロードします。取得先は GitHub の TEKITO のリリースにある毎月更新の写し（github.com）で、取得できないときは日本郵便のサイト（www.post.japanpost.jp）です。送られるのは IP アドレスなど通常のダウンロードと同じ情報だけです。「ダウンロード済みのファイルを使う」を選んだ場合は、選んだファイルをこの PC の中で取り込むだけで、通信しません。
 - 診断ログ（`%TEMP%\TekitoTsf.log`、トレース用ビルドか `TEKITO_TSF_TRACE=1` のときだけ作られます）と設定画面の「診断情報をコピー」には、イベント・時間・エラーコードだけが含まれ、入力した文字は含まれません。
 - 学習は設定画面の「辞書と学習 → 選択した候補の学習」でオン/オフでき、「すべて削除」で消せます。「一般 → 詳細 → TEKITO を使わないアプリ」に追加したアプリでは完全にオフになります。
