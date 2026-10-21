@@ -877,8 +877,55 @@ std::vector<Prediction> JapaneseConverter::Predict(std::wstring_view reading, st
         const bool seen = std::any_of(predictions.begin(), predictions.end(),
                                       [&](const Prediction& p) { return p.text == text; });
         if (seen) continue;
-        if (predictions.size() >= limit) break;
+        // Twice as many, for the other endings to go after (below).
+        if (predictions.size() >= limit * 2) break;
         predictions.push_back({std::move(key), std::move(text), item.cost});
+    }
+    // Other endings of a word already there (借りたかっ, 借りたく after
+    // 借りたい) come after the other words.
+    {
+        const auto stem = [](const std::wstring& text) {
+            std::size_t end = text.size();
+            while (end > 0 && ((text[end - 1] >= L'\x3041' && text[end - 1] <= L'\x3096') || text[end - 1] == L'ー')) --end;
+            return end == 0 ? text : text.substr(0, end);
+        };
+        // Of each word, the ending a sentence can stop on (面白い, not
+        // 面白かっ) stays where the word's first ending was.
+        constexpr std::wstring_view kFinal = L"うくすつぬふむゆるぐずぶぷい";
+        const auto final = [&](const std::wstring& text) {
+            return !text.empty() && kFinal.find(text.back()) != std::wstring_view::npos;
+        };
+        std::vector<std::wstring> stems(predictions.size());
+        for (std::size_t i = 0; i < predictions.size(); ++i) stems[i] = stem(predictions[i].text);
+        std::vector<bool> front(predictions.size(), false);
+        for (std::size_t i = 0; i < predictions.size(); ++i) {
+            if (stems[i] == predictions[i].text) {
+                front[i] = true;
+                continue;
+            }
+            const auto seen = [&](std::size_t j) { return stems[j] == stems[i]; };
+            bool earlier = false;
+            for (std::size_t j = 0; j < i && !earlier; ++j) earlier = seen(j);
+            if (earlier) continue;
+            // The word's first: it or a later ending of it that can stop.
+            std::size_t pick = i;
+            for (std::size_t j = i; j < predictions.size(); ++j) {
+                if (seen(j) && final(predictions[j].text)) {
+                    pick = j;
+                    break;
+                }
+            }
+            if (pick != i) {
+                std::swap(predictions[i], predictions[pick]);
+                std::swap(stems[i], stems[pick]);
+            }
+            front[i] = true;
+        }
+        std::vector<Prediction> first, later;
+        for (std::size_t i = 0; i < predictions.size(); ++i) (front[i] ? first : later).push_back(std::move(predictions[i]));
+        first.insert(first.end(), std::make_move_iterator(later.begin()), std::make_move_iterator(later.end()));
+        predictions = std::move(first);
+        if (predictions.size() > limit) predictions.resize(limit);
     }
     // The words only to offer come second.
     if (user) {
