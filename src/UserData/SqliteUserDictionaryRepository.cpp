@@ -369,6 +369,8 @@ bool SqliteUserDictionaryRepository::LoadSettings(UserSettings& settings) const 
             loaded.japaneseLiveConversion = value != 0;
         } else if (std::strcmp(key, "japanese_sentence_check") == 0) {
             loaded.japaneseSentenceCheck = value != 0;
+        } else if (std::strcmp(key, "japanese_slip_auto_apply") == 0) {
+            loaded.japaneseSlipAutoApply = value != 0;
         } else if (std::strcmp(key, "japanese_first_page_symbol") == 0) {
             loaded.japaneseFirstPageSymbol = value != 0;
         } else if (std::strcmp(key, "japanese_typed_forms") == 0) {
@@ -514,6 +516,7 @@ bool SqliteUserDictionaryRepository::SaveSettings(const UserSettings& settings) 
     saveValue("japanese_prediction_enabled", settings.japanesePredictionEnabled ? 1 : 0);
     saveValue("japanese_live_conversion", settings.japaneseLiveConversion ? 1 : 0);
     saveValue("japanese_sentence_check", settings.japaneseSentenceCheck ? 1 : 0);
+    saveValue("japanese_slip_auto_apply", settings.japaneseSlipAutoApply ? 1 : 0);
     saveValue("japanese_first_page_symbol", settings.japaneseFirstPageSymbol ? 1 : 0);
     saveValue("japanese_typed_forms", settings.japaneseTypedForms ? 1 : 0);
     saveValue("japanese_live_refine", settings.japaneseLiveRefine ? 1 : 0);

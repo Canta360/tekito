@@ -78,6 +78,7 @@ function initialState() {
       japanesePredictionEnabled: true,
       japaneseLiveConversion: false,
       japaneseSentenceCheck: true,
+      japaneseSlipAutoApply: false,
       japaneseFirstPageSymbol: true,
       japaneseTypedForms: true,
       japaneseLiveRefine: true,
