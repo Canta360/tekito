@@ -137,6 +137,10 @@ const en = {
     symbols: { title: "Symbol width", description: "e.g. half-width !?, full-width ！？" },
     spacing: { title: "Space around English words", description: "Puts a half-width space between Japanese and English (e.g. 今日は GitHub に push した)." },
     candidates: "Candidates",
+    slipAutoApply: {
+      title: "Fix typing slips with Space",
+      description: "Changes the reading before converting (e.g. arigayou → ありがとう). Off: keeps what you typed first; the fix stays in the list.",
+    },
     sentenceCheck: { title: "Choose by the whole sentence", description: "Puts first the conversion that reads most naturally as a sentence." },
     firstPageSymbol: { title: "Symbols and emoji on the first page", description: "e.g. はーと → ♡" },
     typedForms: { title: "Typed forms at the end of the list", description: "Hiragana, katakana, half-width kana and letters at the end." },
@@ -440,6 +444,10 @@ const ja = {
     symbols: { title: "記号の幅", description: "例：半角 !?、全角 ！？" },
     spacing: { title: "英単語の前後にスペース", description: "日本語と英単語の間に半角スペースを挿入します（例：今日は GitHub に push した）" },
     candidates: "候補",
+    slipAutoApply: {
+      title: "Space で入力ミスを直す",
+      description: "変換の前に読みを直します（例：arigayou → ありがとう）。オフでも候補には出ます。第1候補は入力どおりです。",
+    },
     sentenceCheck: { title: "文全体で変換を選ぶ", description: "文として自然な変換を第1候補にします" },
     firstPageSymbol: { title: "記号・絵文字を1ページ目に表示", description: "例：はーと → ♡" },
     typedForms: { title: "入力した形を候補の末尾に表示", description: "ひらがな・カタカナ・半角カナ・英字を候補の末尾に表示します" },

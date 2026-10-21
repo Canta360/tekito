@@ -119,6 +119,12 @@ public:
     void SetSentenceReranker(const SentenceReranker* reranker) noexcept { reranker_ = reranker; }
     // The user's switch for it (on by default).
     void SetSentenceCheck(bool on) noexcept { sentenceCheck_ = on; }
+    // Space (and live refine) may undo typing slips in the keys and convert
+    // the reading as meant. Off: convert as typed; slip candidates stay in
+    // the list. On by default so tests and the eval harness match the old
+    // path; UserSettings::japaneseSlipAutoApply defaults off for users.
+    void SetSlipAutoApply(bool on) noexcept { slipAutoApply_ = on; }
+    [[nodiscard]] bool SlipAutoApply() const noexcept { return slipAutoApply_; }
     // The first emoji for a reading shown on the first page of its list
     // (off: with the other symbols, last).
     void SetEmojiOnFirstPage(bool on) noexcept { emojiOnFirstPage_ = on; }
@@ -643,6 +649,7 @@ private:
     JapaneseLearningStore* learning_{nullptr};
     const SentenceReranker* reranker_{nullptr};
     bool sentenceCheck_{true};
+    bool slipAutoApply_{true};
     bool emojiOnFirstPage_{true};
     bool typedForms_{true};
     bool singleVowelKana_{true};

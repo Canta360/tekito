@@ -65,6 +65,7 @@ const initialSettings = {
   japanesePredictionEnabled: true,
   japaneseLiveConversion: false,
   japaneseSentenceCheck: true,
+  japaneseSlipAutoApply: false,
   japaneseFirstPageSymbol: true,
   japaneseTypedForms: true,
   japaneseLiveRefine: true,
@@ -341,8 +342,8 @@ function searchIndex(t, pages, japaneseInstalled) {
     ["japanese", j.live.title], ["japanese", j.prediction.title], ["japanese", j.numbers.title], ["japanese", j.kanji.title],
     ["japanese", j.romaji.title], ["japanese", j.postal.title], ["japanese", j.kanaInput.title, true], ["japanese", j.capsLock.title, true],
     ["japanese", j.punctuation.title, true], ["japanese", j.space.title, true], ["japanese", j.letters.title, true],
-    ["japanese", j.symbols.title, true], ["japanese", j.spacing.title, true], ["japanese", j.sentenceCheck.title, true],
-    ["japanese", j.firstPageSymbol.title, true], ["japanese", j.typedForms.title, true],
+    ["japanese", j.symbols.title, true], ["japanese", j.spacing.title, true], ["japanese", j.slipAutoApply.title, true],
+    ["japanese", j.sentenceCheck.title, true], ["japanese", j.firstPageSymbol.title, true], ["japanese", j.typedForms.title, true],
     ["mixed", m.live.title], ["mixed", m.prediction.title], ["mixed", m.singleVowel.title], ["mixed", m.correction.title],
     ["mixed", m.firstPageSymbol.title, true], ["mixed", m.marker.title, true],
     ["auto", a.correction.title], ["auto", a.spelling.title], ["auto", a.completion.title], ["auto", a.next.title], ["auto", a.casual.title],
@@ -815,6 +816,9 @@ function JapanesePage({ settings, setSetting, runAction, setConfirm, showKeys, r
           </Row>
         </Card>
         <Card label={j.candidates}>
+          <Row icon="spellcheck" title={j.slipAutoApply.title} description={j.slipAutoApply.description}>
+            <Toggle label={j.slipAutoApply.title} checked={settings.japaneseSlipAutoApply} onChange={(value) => setSetting("japaneseSlipAutoApply", value)} />
+          </Row>
           <Row icon="notes" title={j.sentenceCheck.title} description={j.sentenceCheck.description}>
             <Toggle label={j.sentenceCheck.title} checked={settings.japaneseSentenceCheck} onChange={(value) => setSetting("japaneseSentenceCheck", value)} />
           </Row>

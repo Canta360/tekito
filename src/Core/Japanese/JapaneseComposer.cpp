@@ -1089,9 +1089,9 @@ void JapaneseComposer::BuildPhrasesFor(bool convert) {
     const bool endsInLetters = !units_.empty() && !units_.back().ascii &&
                                LeftoverLetters(ToFullWidthAscii(units_.back().kana)) > 0;
     if (convert && converter_) {
-        // A slip in the keys: converted from the keys as meant. Esc still
-        // goes back to what was typed.
-        if (auto conversion = keyConverter_ && !HasAscii() && !KanaTyped() && !endsInLetters
+        // A slip in the keys: converted from the keys as meant when the
+        // user allows auto-apply. Esc still goes back to what was typed.
+        if (auto conversion = slipAutoApply_ && keyConverter_ && !HasAscii() && !KanaTyped() && !endsInLetters
                                   ? keyConverter_->Convert(Keys(false), context_, contextWords_, userDictionary_)
                                             : std::nullopt) {
             slipUndone = true;
@@ -1102,8 +1102,8 @@ void JapaneseComposer::BuildPhrasesFor(bool convert) {
         } else {
             AddPhrases(ConvertReading(reading, 0, context_, contextWords_), reading);
         }
-        if (slips_ && table_ && !chunkJudge_ && !HasAscii() && !KanaTyped() && !reconverted_ && !endsInLetters &&
-            !phrases_.empty() && FixSlips()) {
+        if (slipAutoApply_ && slips_ && table_ && !chunkJudge_ && !HasAscii() && !KanaTyped() && !reconverted_ &&
+            !endsInLetters && !phrases_.empty() && FixSlips()) {
             slipUndone = true;
         }
     }
@@ -1395,8 +1395,9 @@ void JapaneseComposer::ApplyNumberStyle() {
 
 void JapaneseComposer::AddTypedForms() {
     if (!typedForms_ || (chunkJudge_ && ChoseEnglish())) return;
-    // The keys are known for each part of the reading only when it is the
-    // reading typed (not one with a slip undone).
+    // The keys are known for each part of the reading when it is the reading
+    // typed, or when readingKeys_ maps the phrase back to the typed keys
+    // after a slip was undone.
     const bool typedReading = conversionReading_ == Reading();
     // Small kana (っ, ぃ), when every kana has one.
     const auto small = [](std::wstring text) {
@@ -1416,25 +1417,36 @@ void JapaneseComposer::AddTypedForms() {
     for (auto& phrase : phrases_) {
         if (phrase.candidates.empty() || !phrase.candidates.front().reading.empty()) continue;
         const std::wstring reading = conversionReading_.substr(phrase.begin, phrase.length);
-        // Letters alone (q) already offer the other width next.
-        if (std::none_of(reading.begin(), reading.end(), [](wchar_t c) { return c >= 0x3041 && c <= 0x30FA; })) continue;
+        // Physical keys for this phrase (via readingKeys_ after a slip).
+        std::wstring keys = KeysFor(phrase.begin, phrase.length);
+        // Forms show what was typed: after a slip, kana of the keys as typed
+        // rather than the corrected reading.
+        std::wstring formReading = reading;
+        if (!typedReading && table_ && !keys.empty()) {
+            std::wstring kana;
+            for (const auto& token : ParseRomaji(*table_, keys)) kana += ToFullWidthAscii(token.kana);
+            if (!kana.empty()) formReading = ApplyTypingStyle(std::move(kana));
+        }
+        // Letters alone (q) already offer the other width next; do not move
+        // those width pairs into the typed-forms tail.
+        if (std::none_of(formReading.begin(), formReading.end(),
+                         [](wchar_t c) { return c >= 0x3041 && c <= 0x30FA; })) {
+            continue;
+        }
         // In the order Up reaches them from the first candidate (the list
         // goes round to its end): hiragana, katakana, half-width katakana,
         // the keys in both widths and cases, small kana.
         std::vector<std::pair<std::wstring, PhraseCandidate::Kind>> forms{
-            {ToHiragana(reading), PhraseCandidate::Kind::Hiragana},
-            {ToKatakana(reading), PhraseCandidate::Kind::Katakana},
-            {ToHalfWidthKatakana(reading), PhraseCandidate::Kind::Katakana}};
-        if (typedReading) {
-            const std::wstring keys = KeysFor(phrase.begin, phrase.length);
-            if (!keys.empty()) {
-                forms.emplace_back(ToFullWidthAscii(keys), PhraseCandidate::Kind::English);
-                forms.emplace_back(ToFullWidthAscii(upper(keys)), PhraseCandidate::Kind::English);
-                forms.emplace_back(keys, PhraseCandidate::Kind::English);
-                forms.emplace_back(upper(keys), PhraseCandidate::Kind::English);
-            }
+            {ToHiragana(formReading), PhraseCandidate::Kind::Hiragana},
+            {ToKatakana(formReading), PhraseCandidate::Kind::Katakana},
+            {ToHalfWidthKatakana(formReading), PhraseCandidate::Kind::Katakana}};
+        if (!keys.empty()) {
+            forms.emplace_back(ToFullWidthAscii(keys), PhraseCandidate::Kind::English);
+            forms.emplace_back(ToFullWidthAscii(upper(keys)), PhraseCandidate::Kind::English);
+            forms.emplace_back(keys, PhraseCandidate::Kind::English);
+            forms.emplace_back(upper(keys), PhraseCandidate::Kind::English);
         }
-        forms.emplace_back(small(ToHiragana(reading)), PhraseCandidate::Kind::Hiragana);
+        forms.emplace_back(small(ToHiragana(formReading)), PhraseCandidate::Kind::Hiragana);
         auto& candidates = phrase.candidates;
         // One or two kana (i, ki, ai): kanji outside 常用 and 人名用, the
         // long tail of kanji read so, after the common ones.
@@ -2567,12 +2579,26 @@ std::wstring JapaneseComposer::Keys(bool includePending) const {
 }
 
 std::wstring JapaneseComposer::KeysFor(std::size_t begin, std::size_t length) const {
+    // After conversion (including a slip undone), phrase offsets index
+    // conversionReading_ and readingKeys_ maps them back to the typed keys.
+    const std::size_t end = begin + length;
+    if (!readingKeys_.empty() && end < readingKeys_.size()) {
+        const std::size_t firstKey = readingKeys_[begin];
+        const std::size_t endKey = readingKeys_[end];
+        if (firstKey != std::wstring::npos && endKey != std::wstring::npos && endKey >= firstKey) {
+            const std::wstring typed = Keys(false);
+            if (endKey <= typed.size()) return typed.substr(firstKey, endKey - firstKey);
+        }
+        // Inside a corrected edit there is no clean key span; do not fall
+        // back to walking units_ by corrected-reading offsets (wrong keys).
+        if (conversionReading_ != Reading()) return {};
+    }
     std::wstring keys;
     std::size_t at = 0;
     for (const auto& unit : units_) {
-        const std::size_t end = at + unit.kana.size();
-        if (end > begin && at < begin + length) keys += unit.keys;
-        at = end;
+        const std::size_t unitEnd = at + unit.kana.size();
+        if (unitEnd > begin && at < begin + length) keys += unit.keys;
+        at = unitEnd;
     }
     return keys;
 }

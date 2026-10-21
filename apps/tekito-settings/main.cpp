@@ -884,6 +884,7 @@ private:
         text += L"Live conversion: " + std::wstring(onOff(s.japaneseLiveConversion)) + L"\n";
         text += L"Refine on pause: " + std::wstring(onOff(s.japaneseLiveRefine)) + L"\n";
         text += L"Sentence check: " + std::wstring(onOff(s.japaneseSentenceCheck)) + L"\n";
+        text += L"Slip auto-apply: " + std::wstring(onOff(s.japaneseSlipAutoApply)) + L"\n";
         text += L"Predictions: " + std::wstring(onOff(s.japanesePredictionEnabled)) + L"\n";
         text += L"Mix: " + std::wstring(onOff(s.mixedTypingEnabled)) + L"\n";
         text += L"Mix live conversion: " + std::wstring(onOff(s.mixLiveConversion)) + L"\n";
@@ -1101,6 +1102,8 @@ private:
         json += settings_.japaneseLiveConversion ? L"true" : L"false";
         json += L",\"japaneseSentenceCheck\":";
         json += settings_.japaneseSentenceCheck ? L"true" : L"false";
+        json += L",\"japaneseSlipAutoApply\":";
+        json += settings_.japaneseSlipAutoApply ? L"true" : L"false";
         json += L",\"japaneseFirstPageSymbol\":";
         json += settings_.japaneseFirstPageSymbol ? L"true" : L"false";
         json += L",\"japaneseTypedForms\":";
@@ -1329,6 +1332,7 @@ private:
             else if (key == L"japanesePredictionEnabled") settings_.japanesePredictionEnabled = value;
             else if (key == L"japaneseLiveConversion") settings_.japaneseLiveConversion = value;
             else if (key == L"japaneseSentenceCheck") settings_.japaneseSentenceCheck = value;
+            else if (key == L"japaneseSlipAutoApply") settings_.japaneseSlipAutoApply = value;
             else if (key == L"japaneseFirstPageSymbol") settings_.japaneseFirstPageSymbol = value;
             else if (key == L"japaneseTypedForms") settings_.japaneseTypedForms = value;
             else if (key == L"japaneseLiveRefine") settings_.japaneseLiveRefine = value;
