@@ -67,6 +67,9 @@ public:
         std::int64_t keepTypedBy{0};
         // A consonant left out (nomiai: nomitai), as well as a vowel or n.
         bool consonantsDropped{true};
+        // A vowel typed for another, neighbor or not (miro: miru), as well
+        // as a neighboring key.
+        bool vowelsReplaced{true};
     };
 
     KeyConverter(const JapaneseDictionary& dictionary, const ConnectionMatrix& matrix,

@@ -75,12 +75,15 @@ struct Slip {
 
 // The runs one slip away from `typed`, with the slip at `at` (at the end:
 // a key left out last).
-void SlipsAt(std::wstring_view typed, std::size_t at, bool consonants, std::vector<Slip>& slips) {
+void SlipsAt(std::wstring_view typed, std::size_t at, bool consonants, bool vowels, std::vector<Slip>& slips) {
     const wchar_t key = at < typed.size() ? typed[at] : L'\0';
     const bool letter = key >= L'a' && key <= L'z';
+    constexpr std::wstring_view kVowels = L"aiueo";
+    const bool vowel = vowels && kVowels.find(key) != std::wstring_view::npos;
     if (letter) {
         for (wchar_t other = L'a'; other <= L'z'; ++other) {
-            if (!AreQwertyNeighbors(key, other)) continue;
+            const bool vowelFor = vowel && other != key && kVowels.find(other) != std::wstring_view::npos;
+            if (!AreQwertyNeighbors(key, other) && !vowelFor) continue;
             std::wstring keys(typed);
             keys[at] = other;
             slips.push_back({Slip::Kind::Replaced, at, std::move(keys)});
@@ -269,7 +272,7 @@ std::optional<KeyConversion> KeyConverter::Convert(std::wstring_view keys, std::
             const std::size_t fromKey = bounds[from];
             const std::size_t toKey = std::min(n, g + kTypoWindow);
             slips.clear();
-            SlipsAt(keys.substr(fromKey, toKey - fromKey), g - fromKey, costs_.consonantsDropped, slips);
+            SlipsAt(keys.substr(fromKey, toKey - fromKey), g - fromKey, costs_.consonantsDropped, costs_.vowelsReplaced, slips);
             for (const auto& slip : slips) {
                 // The keys as meant from `fromKey` (and from the slip's own
                 // unit, when that starts a word), then earlier units in front.

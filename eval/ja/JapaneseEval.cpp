@@ -697,6 +697,7 @@ int main(int argc, char** argv) {
         else if (arg == "--typo-swapped" && i + 1 < argc) costs.swappedPercent = std::stoll(argv[++i]);
         else if (arg == "--typo-lattice") costs.contextDecides = false;
         else if (arg == "--typo-vowels-only") costs.consonantsDropped = false;
+        else if (arg == "--typo-no-vowel-swaps") costs.vowelsReplaced = false;
         else if (arg == "--typo-keep" && i + 1 < argc) costs.keepTypedBy = std::stoll(argv[++i]);
         else if (arg == "--dump-phrases" && i + 1 < argc) dumpPhrases = argv[++i];
         else if (arg == "--write-sentences" && i + 1 < argc) writeSentences = argv[++i];
