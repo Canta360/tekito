@@ -42,6 +42,7 @@
 #include <fstream>
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -2055,9 +2056,40 @@ private:
     Generations seenGenerations_{};
 };
 
+// "--export-dictionaries <folder>" (the uninstaller's): the user's words
+// saved into the folder, with no window: the Japanese words as Microsoft
+// IME's word list, the English words as TEKITO's own file, each only when
+// there are some. 0 when every list was written, 2 when one was not.
+std::optional<int> ExportDictionariesFromCommandLine() {
+    int count = 0;
+    LPWSTR* arguments = CommandLineToArgvW(GetCommandLineW(), &count);
+    std::filesystem::path folder;
+    for (int i = 1; arguments && i + 1 < count; ++i) {
+        if (std::wstring_view(arguments[i]) == L"--export-dictionaries") folder = arguments[i + 1];
+    }
+    if (arguments) LocalFree(arguments);
+    if (folder.empty()) return std::nullopt;
+    const auto repository = tekito::userdata::CreateDefaultUserDataRepository();
+    if (!repository || !repository->Open()) return 2;
+    tekito::UserDictionary english;
+    std::vector<tekito::japanese::UserWord> japanese;
+    if (!repository->Load(english) || !repository->LoadJapaneseUserWords(japanese)) return 2;
+    std::error_code error;
+    std::filesystem::create_directories(folder, error);
+    bool written = true;
+    if (!japanese.empty()) {
+        written = tekito::userdata::WriteImeDictionary(japanese, folder / L"TEKITO Japanese words.txt") && written;
+    }
+    if (!english.Entries().empty()) {
+        written = tekito::userdata::ExportUserDictionary(english, folder / L"TEKITO English words.tsv") && written;
+    }
+    return written ? 0 : 2;
+}
+
 }  // namespace
 
 int RunTekitoSettings(HINSTANCE instance) {
+    if (const auto exported = ExportDictionariesFromCommandLine()) return *exported;
     const HRESULT comResult = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
     const bool comInitialized = SUCCEEDED(comResult);
     HANDLE singleInstance = CreateMutexW(nullptr, TRUE, L"Local\\TEKITO.Settings.Singleton");

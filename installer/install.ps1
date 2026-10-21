@@ -35,6 +35,7 @@ $tip = "0409:{6F67E5C8-A873-4B69-8EC3-26DF00F642F1}{8D99240A-5C9C-4ED8-8DE4-85F2
 $japaneseTip = "0411:{6F67E5C8-A873-4B69-8EC3-26DF00F642F1}{2876747C-FA52-4CCC-B308-F406190F8CDE}"
 $regsvr32 = Join-Path $env:WINDIR "System32\regsvr32.exe"
 $startMenu = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\TEKITO"
+$uninstallKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\TEKITO"
 
 function Invoke-Regsvr32([string[]]$Arguments) {
     $process = Start-Process $regsvr32 -ArgumentList $Arguments -WindowStyle Hidden -Wait -PassThru
@@ -184,6 +185,10 @@ try {
     Copy-Item -LiteralPath (Join-Path $SourceRoot "TEKITO.exe") $stagingRoot
     Copy-Item -LiteralPath (Join-Path $SourceRoot "Tekito.Tsf.dll") $stagingRoot
     Copy-Item -LiteralPath (Join-Path $SourceRoot "settings-ui") $stagingRoot -Recurse
+    # What Installed apps runs to uninstall.
+    Copy-Item -LiteralPath (Join-Path $SourceRoot "uninstall.ps1") $stagingRoot
+    $uninstaller = Join-Path $SourceRoot "TekitoUninstall.exe"
+    if (Test-Path -LiteralPath $uninstaller) { Copy-Item -LiteralPath $uninstaller $stagingRoot }
 
     # Data Packs first: if one cannot be replaced, the installed program is
     # left as it was.
@@ -260,6 +265,34 @@ try {
         start_menu_shortcut = $StartMenuShortcut
         japanese = $Japanese
     } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $installRoot "install-manifest.json") -Encoding UTF8
+
+    # An uninstall's cleanup left for the next sign-in would delete this.
+    Remove-ItemProperty -LiteralPath "HKCU:\Software\Microsoft\Windows\CurrentVersion\RunOnce" -Name "TEKITO cleanup" -ErrorAction SilentlyContinue
+
+    # Installed apps lists TEKITO, and uninstalls it with TekitoUninstall.exe.
+    # Not being listed there does not stop the install.
+    $installedUninstaller = Join-Path $installRoot "TekitoUninstall.exe"
+    if (Test-Path -LiteralPath $installedUninstaller) { try {
+        $bytes = 0
+        foreach ($root in @($installRoot, (Join-Path $env:LOCALAPPDATA "TEKITO\data"))) {
+            $files = @(Get-ChildItem -LiteralPath $root -File -Recurse -ErrorAction SilentlyContinue)
+            if ($files.Count -gt 0) { $bytes += ($files | Measure-Object Length -Sum).Sum }
+        }
+        New-Item -Path $uninstallKey -Force | Out-Null
+        $values = [ordered]@{
+            DisplayName = "TEKITO"
+            DisplayVersion = if ($packageManifest) { [string]$packageManifest.version } else { "" }
+            Publisher = "Capitata"
+            DisplayIcon = "$installedApp,0"
+            InstallLocation = $installRoot
+            UninstallString = ('"{0}" /uninstall' -f $installedUninstaller)
+        }
+        foreach ($name in $values.Keys) { Set-ItemProperty -LiteralPath $uninstallKey -Name $name -Value $values[$name] }
+        foreach ($name in @("NoModify", "NoRepair")) {
+            New-ItemProperty -LiteralPath $uninstallKey -Name $name -Value 1 -PropertyType DWord -Force | Out-Null
+        }
+        New-ItemProperty -LiteralPath $uninstallKey -Name EstimatedSize -Value ([int]($bytes / 1KB)) -PropertyType DWord -Force | Out-Null
+    } catch { Write-Warning "TEKITO could not be listed in Installed apps: $($_.Exception.Message)" } }
 
     Write-Host "TEKITO is installed in $installRoot."
     Write-Host "Sign out and back in, or restart your apps, then pick TEKITO with Win+Space."

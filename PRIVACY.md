@@ -54,9 +54,8 @@ reach, and there TEKITO types with the default settings.
   every key through in the apps you list. It also stays off in terminals,
   apps running as administrator, and password, PIN, email, URL and number
   fields.
-- Uninstalling keeps your dictionary, learning and settings. Run
-  `uninstall.ps1 -RemoveUserData` from the installer package to remove them
-  too.
+- Uninstalling from Installed apps removes TEKITO with its data, dictionary,
+  learning and settings. It can export your dictionary to Documents first.
 
 ## Other software
 
@@ -98,5 +97,5 @@ TEKITO の処理はすべて PC の中で行われます。入力した内容、
 - 設定の「郵便番号から住所に変換」をオンにすると、確認のうえで日本郵便の郵便番号データ（utf_ken_all.zip）をダウンロードします。取得先は GitHub の TEKITO のリリースにある毎月更新の写し（github.com）で、取得できないときは日本郵便のサイト（www.post.japanpost.jp）です。送られるのは IP アドレスなど通常のダウンロードと同じ情報だけです。「ダウンロード済みのファイルを使う」を選んだ場合は、選んだファイルをこの PC の中で取り込むだけで、通信しません。
 - 診断ログ（`%TEMP%\TekitoTsf.log`、トレース用ビルドか `TEKITO_TSF_TRACE=1` のときだけ作られます）と設定画面の「診断情報をコピー」には、イベント・時間・エラーコードだけが含まれ、入力した文字は含まれません。
 - 学習は設定画面の「辞書と学習 → 選択した候補の学習」でオン/オフでき、「すべて削除」で消せます。「一般 → 詳細 → TEKITO を使わないアプリ」に追加したアプリでは完全にオフになります。
-- アンインストールしても辞書・学習・設定は残ります。消す場合はインストーラーのパッケージにある `uninstall.ps1 -RemoveUserData` を実行してください。
+- 「インストールされているアプリ」からアンインストールすると、TEKITO とそのデータ・辞書・学習・設定をすべて削除します。その前に、ユーザー辞書をドキュメントに書き出せます。
 - データベースは暗号化していません。ほかの個人ファイルと同じように扱ってください。

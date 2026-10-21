@@ -65,6 +65,8 @@ function Get-Sha256([string]$Path) {
 $binaries = [ordered]@{
     "TEKITO.exe" = Join-Path $releaseRoot "TEKITO.exe"
     "Tekito.Tsf.dll" = Join-Path $releaseRoot "Tekito.Tsf.dll"
+    # The setup program without the package: it uninstalls (/uninstall).
+    "TekitoUninstall.exe" = Join-Path $releaseRoot "TekitoSetupStub.exe"
 }
 $setupStub = Join-Path $releaseRoot "TekitoSetupStub.exe"
 $documents = [ordered]@{

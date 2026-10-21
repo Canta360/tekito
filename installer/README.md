@@ -31,6 +31,12 @@ the license agreement and the Japanese choice, then unpacks the ZIP to a
 temporary folder, runs `verify-package.ps1` and `install.ps1`. To look at its
 screens without installing anything, build the `tekito_setup_preview` target.
 
+The install also copies the setup program without its package
+(`TekitoUninstall.exe`) and `uninstall.ps1` into the installation, and lists
+TEKITO in Installed apps. Uninstalling there runs `TekitoUninstall.exe
+/uninstall`: it offers to export the user's words to Documents, then removes
+everything TEKITO put on the PC.
+
 The scripts can also be run by hand from an administrator PowerShell in the
 extracted package:
 
@@ -38,7 +44,7 @@ extracted package:
 | --- | --- |
 | `verify-package.ps1` | Checks every file against the package manifest. |
 | `install.ps1` | Installs to `%LOCALAPPDATA%\Programs\TEKITO`, installs the Data Packs to `%LOCALAPPDATA%\TEKITO\data`, registers the input method and adds a Start menu shortcut. |
-| `uninstall.ps1` | Removes the program and both keyboard list entries. `-RemoveUserData` also deletes the dictionary, learning, settings and Data Packs. |
+| `uninstall.ps1` | Removes the program, both keyboard list entries, the Start menu shortcut and the Installed apps entry. `-RemoveUserData` also deletes the dictionary, learning, settings and Data Packs; `-ExportTo <folder>` first saves the user's words there. Files still in use are deleted at the next sign-in. |
 | `scripts\verify-installed.ps1` | Read-only check of an installation. |
 
 `install.ps1` options for Japanese:

@@ -1,5 +1,8 @@
 // TEKITO single-EXE setup. The installer package (a zip) is appended to this
 // executable; the wizard extracts it, verifies it and runs install.ps1.
+// Without the package (TekitoUninstall.exe, which Installed apps runs with
+// /uninstall) it uninstalls: it can export the user's words, then runs
+// uninstall.ps1 to remove everything TEKITO put on the PC.
 //
 // The UI is drawn with Direct2D/DirectWrite on the Windows 11 Mica backdrop,
 // in the same language as the candidate window and Settings: ink on glass,
@@ -94,12 +97,16 @@ private:
     T* pointer_{nullptr};
 };
 
-enum class Screen { Welcome, License, Options, Installing, Done, Failed, Samples };
+enum class Screen {
+    Welcome, License, Options, Installing, Done, Failed, Samples,
+    Uninstall, Uninstalling, Uninstalled, UninstallFailed,
+};
 
 enum class Action {
     Install, Cancel, Options, ReadLicense, Agree, GetRuntime, CheckRuntime,
     Back, AcceptLicense, Browse, Shortcut, Finish, Retry, Close, Japanese, KeepEnglish, Samples,
     WithoutJapanese, SampleMode, SampleClip,
+    Uninstall, ExportWords, UninstallWithoutExport, OpenExportFolder,
 };
 
 // Tab: a mode of the typing samples; Item: a row of their list.
@@ -229,6 +236,15 @@ struct Wizard {
     HWND video{};
     Com<IMFPMediaPlayer> player;
     bool sampleMissing{false};
+
+    // Uninstalling: the installation, uninstall.ps1 (copied next to this
+    // program, out of the folder it removes), whether the user's words are
+    // exported first and where to.
+    std::filesystem::path uninstallRoot;
+    std::filesystem::path uninstallScript;
+    bool exportWords{true};
+    std::filesystem::path exportFolder;
+    bool exported{false};
 
     // Rendering.
     UINT dpi{96};
@@ -524,6 +540,99 @@ int InstallEmbeddedPackage(const std::filesystem::path& self, const InstallChoic
     return exitCode == -1 ? 5 : exitCode;
 }
 
+// Documents\TEKITO words (date): a folder not there yet.
+std::filesystem::path ExportFolder() {
+    PWSTR documents = nullptr;
+    if (FAILED(SHGetKnownFolderPath(FOLDERID_Documents, 0, nullptr, &documents))) return {};
+    const std::filesystem::path root(documents);
+    CoTaskMemFree(documents);
+    SYSTEMTIME now{};
+    GetLocalTime(&now);
+    wchar_t date[16]{};
+    swprintf_s(date, L"%04u-%02u-%02u", now.wYear, now.wMonth, now.wDay);
+    const std::wstring name = std::wstring(Tr(L"TEKITO words", L"TEKITO の辞書")) + L" " + date;
+    std::error_code error;
+    for (int n = 1; n < 100; ++n) {
+        const auto candidate = root / (n == 1 ? name : name + L" (" + std::to_wstring(n) + L")");
+        if (!std::filesystem::exists(candidate, error)) return candidate;
+    }
+    return {};
+}
+
+// uninstall.ps1's exit code: 0 removed, 3 removed with files left for the
+// next sign-in, 30 the words could not be exported (nothing removed).
+int RunUninstall(const std::filesystem::path& script, const std::filesystem::path& installRoot,
+                 const std::filesystem::path& exportFolder) {
+    wchar_t systemDirectory[MAX_PATH]{};
+    const auto length = GetSystemDirectoryW(systemDirectory, MAX_PATH);
+    if (length == 0 || length >= MAX_PATH) return -1;
+    const auto powershell = std::filesystem::path(systemDirectory) / LR"(WindowsPowerShell\v1.0\powershell.exe)";
+    std::wstring command = L"-NoProfile -ExecutionPolicy Bypass -Command \"$ErrorActionPreference='Stop'; & " +
+                           QuotePowerShell(script.wstring()) + L" -InstallRoot " + QuotePowerShell(installRoot.wstring()) +
+                           L" -RemoveUserData";
+    if (!exportFolder.empty()) command += L" -ExportTo " + QuotePowerShell(exportFolder.wstring());
+    command += L"; exit $(if ($LASTEXITCODE) { $LASTEXITCODE } else { 0 })\"";
+    std::vector<wchar_t> commandLine(command.begin(), command.end());
+    commandLine.push_back(L'\0');
+    STARTUPINFOW startup{};
+    startup.cb = sizeof(startup);
+    startup.dwFlags = STARTF_USESHOWWINDOW;
+    startup.wShowWindow = SW_HIDE;
+    PROCESS_INFORMATION process{};
+    const auto workingDirectory = script.parent_path();
+    if (!CreateProcessW(powershell.c_str(), commandLine.data(), nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr,
+                        workingDirectory.c_str(), &startup, &process)) {
+        return -1;
+    }
+    WaitForSingleObject(process.hProcess, INFINITE);
+    DWORD exitCode = 1;
+    GetExitCodeProcess(process.hProcess, &exitCode);
+    CloseHandle(process.hThread);
+    CloseHandle(process.hProcess);
+    return static_cast<int>(exitCode);
+}
+
+std::wstring UninstallFailureMessage(int code) {
+    if (code == 30) {
+        return Tr(L"Your dictionary couldn't be exported, so nothing was removed. Try again, or uninstall without "
+                  L"exporting it.",
+                  L"ユーザー辞書を書き出せなかったため、何も削除していません。もう一度お試しいただくか、"
+                  L"書き出さずにアンインストールしてください。");
+    }
+    if (UseJapanese()) {
+        return L"アンインストールがエラー " + std::to_wstring(code) + L" で停止しました。もう一度お試しください。";
+    }
+    return L"The uninstall stopped with error " + std::to_wstring(code) + L". Try again.";
+}
+
+void StartUninstall(Wizard& wizard) {
+    wizard.hover = -1;
+    wizard.focus = 0;
+    wizard.pressed = false;
+    wizard.screen = Screen::Uninstalling;
+    wizard.installExitCode.store(1);
+    SetTimer(wizard.window, kAnimationTimer, 16, nullptr);
+#ifdef TEKITO_SETUP_PREVIEW
+    return;  // the preview never uninstalls
+#endif
+    wizard.exportFolder = wizard.exportWords ? ExportFolder() : std::filesystem::path{};
+    const HWND window = wizard.window;
+    const auto script = wizard.uninstallScript;
+    const auto root = wizard.uninstallRoot;
+    const auto folder = wizard.exportFolder;
+    try {
+        wizard.installThread = std::thread([&wizard, window, script, root, folder] {
+            const int code = RunUninstall(script, root, folder);
+            wizard.installExitCode.store(code == -1 ? 5 : code);
+            PostMessageW(window, kWizardInstallComplete, 0, 0);
+        });
+    } catch (...) {
+        KillTimer(window, kAnimationTimer);
+        wizard.installExitCode.store(5);
+        wizard.screen = Screen::UninstallFailed;
+    }
+}
+
 std::wstring FailureMessage(int code) {
     switch (code) {
     case 2: return Tr(L"This setup file is incomplete or damaged. Download TEKITO again and run the new file.", L"このセットアップファイルは不完全か、壊れています。TEKITO をダウンロードし直して、新しいファイルを実行してください。");
@@ -695,6 +804,43 @@ std::vector<Control> Controls(const Wizard& wizard) {
         const float width = 16.0f + TextWidth(wizard, wizard.body.Get(), samples);
         controls.push_back({Action::Samples, Kind::Link, D2D1::RectF((kWidth - width) / 2.0f, 304.0f, (kWidth + width) / 2.0f, 328.0f), samples});
         controls.push_back({Action::Finish, Kind::Primary, FooterButton(0), Tr(L"Finish", L"完了")});
+        break;
+    }
+    case Screen::Uninstall:
+        controls.push_back({Action::ExportWords, Kind::Toggle, D2D1::RectF(kOptionsCard.right - 66.0f, kOptionsCard.top + 24.0f,
+                                                                          kOptionsCard.right - 18.0f, kOptionsCard.top + 52.0f),
+                            Tr(L"Export your dictionary", L"ユーザー辞書を書き出す"), true, wizard.exportWords});
+        controls.push_back({Action::Cancel, Kind::Secondary,
+                            D2D1::RectF(FooterButton(0, 148.0f).left - 126.0f, kFooterTop, FooterButton(0, 148.0f).left - 10.0f,
+                                        kFooterTop + kButtonHeight),
+                            Tr(L"Cancel", L"キャンセル")});
+        controls.push_back({Action::Uninstall, Kind::Primary, FooterButton(0, 148.0f), Tr(L"Uninstall", L"アンインストール")});
+        break;
+    case Screen::Uninstalling:
+        break;
+    case Screen::Uninstalled: {
+        if (wizard.exported) {
+            const std::wstring open = Tr(L"Open the folder", L"フォルダーを開く");
+            const float width = 16.0f + TextWidth(wizard, wizard.body.Get(), open);
+            controls.push_back({Action::OpenExportFolder, Kind::Link,
+                                D2D1::RectF((kWidth - width) / 2.0f, 304.0f, (kWidth + width) / 2.0f, 328.0f), open});
+        }
+        controls.push_back({Action::Finish, Kind::Primary, FooterButton(0), Tr(L"Close", L"閉じる")});
+        break;
+    }
+    case Screen::UninstallFailed: {
+        if (wizard.installExitCode.load() == 30) {
+            controls.push_back({Action::Close, Kind::Quiet, D2D1::RectF(22.0f, kFooterTop, 130.0f, kFooterTop + kButtonHeight),
+                                Tr(L"Close", L"閉じる")});
+            const std::wstring without = Tr(L"Uninstall without exporting", L"書き出さずにアンインストール");
+            const float width = TextWidth(wizard, wizard.body.Get(), without) + 40.0f;
+            const D2D1_RECT_F retry = FooterButton(0);
+            controls.push_back({Action::UninstallWithoutExport, Kind::Secondary,
+                                D2D1::RectF(retry.left - 12.0f - width, retry.top, retry.left - 12.0f, retry.bottom), without});
+        } else {
+            controls.push_back({Action::Close, Kind::Secondary, FooterButton(1), Tr(L"Close", L"閉じる")});
+        }
+        controls.push_back({Action::Uninstall, Kind::Primary, FooterButton(0), Tr(L"Try again", L"再試行")});
         break;
     }
     case Screen::Failed: {
@@ -1132,11 +1278,32 @@ void Paint(Wizard& wizard) {
         }
         break;
     }
-    case Screen::Installing: {
-        DrawLogo(wizard, kWidth / 2.0f - 30.0f, 96.0f, 60.0f);
-        DrawText(wizard, Tr(L"Installing TEKITO", L"TEKITO をインストールしています"), wizard.headingCentered.Get(), D2D1::RectF(0.0f, 180.0f, kWidth, 212.0f), p.ink);
+    case Screen::Uninstall: {
+        DrawText(wizard, Tr(L"Uninstall TEKITO", L"TEKITO をアンインストール"), wizard.heading.Get(),
+                 D2D1::RectF(kMargin, 34.0f, kWidth - kMargin, 64.0f), p.ink);
         DrawText(wizard,
-                 wizard.japanese
+                 Tr(L"Removes TEKITO and its settings, learning and dictionary from this PC.",
+                    L"TEKITO と、その設定・学習した内容・辞書をこの PC から削除します。"),
+                 wizard.body.Get(), D2D1::RectF(kMargin, 70.0f, kWidth - kMargin, 88.0f), p.ink2);
+        const auto card = D2D1::RectF(kOptionsCard.left, kOptionsCard.top, kOptionsCard.right, kOptionsCard.top + 76.0f);
+        DrawCard(wizard, card);
+        const float left = card.left + 18.0f;
+        DrawText(wizard, Tr(L"Export your dictionary", L"ユーザー辞書を書き出す"), wizard.body.Get(),
+                 D2D1::RectF(left, card.top + 18.0f, card.right - 90.0f, card.top + 38.0f), p.ink);
+        DrawText(wizard, Tr(L"Saves your words to Documents.", L"登録した単語をドキュメントに保存します。"), wizard.caption.Get(),
+                 D2D1::RectF(left, card.top + 40.0f, card.right - 90.0f, card.top + 60.0f), p.ink2);
+        break;
+    }
+    case Screen::Installing:
+    case Screen::Uninstalling: {
+        const bool removing = wizard.screen == Screen::Uninstalling;
+        DrawLogo(wizard, kWidth / 2.0f - 30.0f, 96.0f, 60.0f);
+        DrawText(wizard, removing ? Tr(L"Uninstalling TEKITO", L"TEKITO をアンインストールしています")
+                                  : Tr(L"Installing TEKITO", L"TEKITO をインストールしています"),
+                 wizard.headingCentered.Get(), D2D1::RectF(0.0f, 180.0f, kWidth, 212.0f), p.ink);
+        DrawText(wizard,
+                 removing ? Tr(L"Please keep this window open.", L"このウィンドウは開いたままにしてください。")
+                 : wizard.japanese
                      ? Tr(L"Downloading Japanese takes a few minutes. Please keep this window open.",
                           L"日本語のダウンロードに数分かかります。このウィンドウは開いたままにしてください。")
                      : Tr(L"This takes about a minute. Please keep this window open.",
@@ -1161,7 +1328,8 @@ void Paint(Wizard& wizard) {
         t->PopAxisAlignedClip();
         break;
     }
-    case Screen::Done: {
+    case Screen::Done:
+    case Screen::Uninstalled: {
         // A check lit by the accent color, glowing up through the surface.
         const auto center = D2D1::Point2F(kWidth / 2.0f, 138.0f);
         Com<ID2D1GradientStopCollection> stops;
@@ -1189,6 +1357,20 @@ void Paint(Wizard& wizard) {
             sink->Close();
             t->DrawGeometry(path.Get(), mark.Get(), 4.0f, round.Get());
         }
+        if (wizard.screen == Screen::Uninstalled) {
+            DrawText(wizard, Tr(L"TEKITO is uninstalled", L"TEKITO をアンインストールしました"), wizard.headingCentered.Get(),
+                     D2D1::RectF(0.0f, 196.0f, kWidth, 228.0f), p.ink);
+            std::wstring text = wizard.exported
+                                    ? Tr(L"Your dictionary is saved in Documents.", L"ユーザー辞書をドキュメントに保存しました。")
+                                    : L"";
+            if (wizard.installExitCode.load() == 3) {
+                text += (text.empty() ? L"" : L"\n") +
+                        std::wstring(Tr(L"Files still in use are deleted the next time you sign in.",
+                                        L"使用中のファイルは、次回のサインイン時に削除されます。"));
+            }
+            DrawText(wizard, text, wizard.bodyCentered.Get(), D2D1::RectF(90.0f, 238.0f, kWidth - 90.0f, 290.0f), p.ink2);
+            break;
+        }
         DrawText(wizard, Tr(L"TEKITO is installed", L"TEKITO をインストールしました"), wizard.headingCentered.Get(), D2D1::RectF(0.0f, 196.0f, kWidth, 228.0f), p.ink);
         DrawText(wizard,
                  Tr(L"Restart the apps you want to type in, then choose TEKITO from the input menu on the "
@@ -1212,6 +1394,12 @@ void Paint(Wizard& wizard) {
         }
         break;
     }
+    case Screen::UninstallFailed:
+        DrawText(wizard, Tr(L"Uninstall couldn't finish", L"アンインストールを完了できませんでした"), wizard.heading.Get(),
+                 D2D1::RectF(kMargin, 40.0f, kWidth - kMargin, 72.0f), p.ink);
+        DrawText(wizard, UninstallFailureMessage(wizard.installExitCode.load()), wizard.body.Get(),
+                 D2D1::RectF(kMargin, 84.0f, kWidth - kMargin, 200.0f), p.ink2);
+        break;
     case Screen::Failed:
         DrawText(wizard, Tr(L"Setup couldn't finish", L"インストールを完了できませんでした"), wizard.heading.Get(), D2D1::RectF(kMargin, 40.0f, kWidth - kMargin, 72.0f), p.ink);
         DrawText(wizard, FailureMessage(wizard.installExitCode.load()), wizard.body.Get(),
@@ -1391,6 +1579,15 @@ void Activate(Wizard& wizard, Action action, int index = 0) {
         DestroyWindow(wizard.window);
         return;
     case Action::Retry: StartInstall(wizard); break;
+    case Action::Uninstall: StartUninstall(wizard); break;
+    case Action::ExportWords: wizard.exportWords = !wizard.exportWords; break;
+    case Action::UninstallWithoutExport:
+        wizard.exportWords = false;
+        StartUninstall(wizard);
+        break;
+    case Action::OpenExportFolder:
+        ShellExecuteW(wizard.window, L"open", wizard.exportFolder.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+        break;
     case Action::WithoutJapanese:
         wizard.japanese = false;
         StartInstall(wizard);
@@ -1556,7 +1753,7 @@ LRESULT CALLBACK WizardProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
         if (wParam == VK_ESCAPE) {
             if (wizard->screen == Screen::License || wizard->screen == Screen::Options) Go(*wizard, Screen::Welcome);
             else if (wizard->screen == Screen::Samples) Go(*wizard, Screen::Done);
-            else if (wizard->screen != Screen::Installing) DestroyWindow(window);
+            else if (wizard->screen != Screen::Installing && wizard->screen != Screen::Uninstalling) DestroyWindow(window);
             return 0;
         }
         if (wizard->screen == Screen::License) {
@@ -1581,10 +1778,21 @@ LRESULT CALLBACK WizardProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
     case kWizardInstallComplete:
         if (wizard->installThread.joinable()) wizard->installThread.join();
         KillTimer(window, kAnimationTimer);
+        if (wizard->screen == Screen::Uninstalling) {
+            const int code = wizard->installExitCode.load();
+            // A folder with nothing in it (no words to save) goes.
+            std::error_code error;
+            if (!wizard->exportFolder.empty() && std::filesystem::is_empty(wizard->exportFolder, error) && !error) {
+                std::filesystem::remove(wizard->exportFolder, error);
+            }
+            wizard->exported = !wizard->exportFolder.empty() && std::filesystem::exists(wizard->exportFolder, error);
+            Go(*wizard, code == 0 || code == 3 ? Screen::Uninstalled : Screen::UninstallFailed);
+            return 0;
+        }
         Go(*wizard, wizard->installExitCode.load() == 0 ? Screen::Done : Screen::Failed);
         return 0;
     case WM_CLOSE:
-        if (wizard->screen == Screen::Installing) return 0;  // let the install finish
+        if (wizard->screen == Screen::Installing || wizard->screen == Screen::Uninstalling) return 0;  // let it finish
         DestroyWindow(window);
         return 0;
     case WM_DESTROY:
@@ -1603,6 +1811,7 @@ LRESULT CALLBACK WizardProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
 //   tekito_setup_preview.exe <screen> <out.bmp> [nowebview] [unchecked] [nojapanese] [nodownload] [stay]
 // stay: keeps the screen open to try, with no screenshot.
 // screen: welcome | license | options | installing | done | failed | samples
+//         | uninstall | uninstalling | uninstalled | uninstallfailed
 struct PreviewRequest {
     Screen screen{Screen::Welcome};
     std::wstring output;
@@ -1645,9 +1854,13 @@ void SavePreview(HWND window, const std::wstring& path) {
 }
 #endif
 
-bool ShowWizard(const std::filesystem::path& self) {
+// `uninstallRoot`: uninstall that installation (uninstall.ps1 is next to
+// `self`) instead of installing.
+bool ShowWizard(const std::filesystem::path& self, const std::filesystem::path& uninstallRoot = {}) {
     Wizard wizard;
     wizard.self = self;
+    wizard.uninstallRoot = uninstallRoot;
+    wizard.uninstallScript = self.parent_path() / L"uninstall.ps1";
     wizard.installRoot = DefaultInstallRoot();
     wizard.webViewReady = HasWebView2Runtime();
     if (FAILED(D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, wizard.factory.Put())) ||
@@ -1671,7 +1884,10 @@ bool ShowWizard(const std::filesystem::path& self) {
     windowClass.lpszClassName = className;
     RegisterClassExW(&windowClass);
 
-    const HWND window = CreateWindowExW(0, className, Tr(L"TEKITO Setup", L"TEKITO セットアップ"), WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
+    const HWND window = CreateWindowExW(0, className,
+                                        uninstallRoot.empty() ? Tr(L"TEKITO Setup", L"TEKITO セットアップ")
+                                                              : Tr(L"Uninstall TEKITO", L"TEKITO のアンインストール"),
+                                        WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
                                         CW_USEDEFAULT, CW_USEDEFAULT, 100, 100, nullptr, nullptr, windowClass.hInstance,
                                         &wizard);
     if (!window) return false;
@@ -1697,16 +1913,22 @@ bool ShowWizard(const std::filesystem::path& self) {
     const int height = rect.bottom - rect.top;
     SetWindowPos(window, nullptr, info.rcWork.left + (info.rcWork.right - info.rcWork.left - width) / 2,
                  info.rcWork.top + (info.rcWork.bottom - info.rcWork.top - height) / 2, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
-    Go(wizard, Screen::Welcome);
+    Go(wizard, uninstallRoot.empty() ? Screen::Welcome : Screen::Uninstall);
 #ifdef TEKITO_SETUP_PREVIEW
     wizard.webViewReady = !g_preview.noWebView;
     wizard.agreed = g_preview.agreed;
     if (g_preview.noJapanese) wizard.japanese = false;
-    if (g_preview.screen == Screen::Installing) {
-        StartInstall(wizard);
+    if (g_preview.screen == Screen::Installing || g_preview.screen == Screen::Uninstalling) {
+        if (g_preview.screen == Screen::Installing) StartInstall(wizard); else StartUninstall(wizard);
         wizard.animation = 0.35f;
     } else {
         if (g_preview.screen == Screen::Failed) wizard.installExitCode.store(g_preview.noDownload ? 20 : 4);
+        // nodownload: the uninstall that could not export the words.
+        if (g_preview.screen == Screen::UninstallFailed) wizard.installExitCode.store(g_preview.noDownload ? 30 : 1);
+        if (g_preview.screen == Screen::Uninstalled) {
+            wizard.exported = true;
+            wizard.installExitCode.store(3);
+        }
         Go(wizard, g_preview.screen);
     }
 #endif
@@ -1761,6 +1983,10 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
                          : screen == L"done" ? Screen::Done
                          : screen == L"failed" ? Screen::Failed
                          : screen == L"samples" ? Screen::Samples
+                         : screen == L"uninstall" ? Screen::Uninstall
+                         : screen == L"uninstalling" ? Screen::Uninstalling
+                         : screen == L"uninstalled" ? Screen::Uninstalled
+                         : screen == L"uninstallfailed" ? Screen::UninstallFailed
                                                : Screen::Welcome;
         g_preview.output = argv[2];
         for (int i = 3; i < argc; ++i) {
@@ -1776,9 +2002,53 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     wchar_t selfPath[MAX_PATH * 4]{};
     const auto length = GetModuleFileNameW(nullptr, selfPath, static_cast<DWORD>(std::size(selfPath)));
     if (length == 0 || length >= std::size(selfPath)) return 1;
+    const std::filesystem::path self(selfPath);
+    // /uninstall [/from <installation>]: from Installed apps.
+    std::filesystem::path uninstallRoot;
+    bool uninstall = false;
+    {
+        int argc = 0;
+        LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc);
+        for (int i = 1; argv && i < argc; ++i) {
+            if (std::wstring_view(argv[i]) == L"/uninstall") uninstall = true;
+            if (std::wstring_view(argv[i]) == L"/from" && i + 1 < argc) uninstallRoot = argv[i + 1];
+        }
+        if (argv) LocalFree(argv);
+    }
+    if (uninstall && uninstallRoot.empty()) {
+        // Run from the installation, which is deleted: go on from a copy in
+        // the temporary folder, with uninstall.ps1 next to it.
+        const auto temp = MakeTempDirectory();
+        std::error_code error;
+        const auto copy = temp / self.filename();
+        if (temp.empty() || !std::filesystem::copy_file(self, copy, error) ||
+            !std::filesystem::copy_file(self.parent_path() / L"uninstall.ps1", temp / L"uninstall.ps1", error)) {
+            MessageBoxW(nullptr, Tr(L"TEKITO couldn't be uninstalled: its uninstall files are missing.",
+                                    L"アンインストールに必要なファイルが見つからないため、TEKITO をアンインストールできません。"),
+                        Tr(L"Uninstall TEKITO", L"TEKITO のアンインストール"), MB_OK | MB_ICONERROR);
+            return 1;
+        }
+        std::wstring commandLine = L"\"" + copy.wstring() + L"\" /uninstall /from \"" + self.parent_path().wstring() + L"\"";
+        STARTUPINFOW startup{};
+        startup.cb = sizeof(startup);
+        PROCESS_INFORMATION process{};
+        if (!CreateProcessW(copy.c_str(), commandLine.data(), nullptr, nullptr, FALSE, 0, nullptr, temp.c_str(), &startup,
+                            &process)) {
+            return 1;
+        }
+        CloseHandle(process.hThread);
+        CloseHandle(process.hProcess);
+        return 0;
+    }
     const HRESULT comResult = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
     const bool comInitialized = SUCCEEDED(comResult);
-    const int result = ShowWizard(std::filesystem::path(selfPath)) ? 0 : 1;
+    const int result = ShowWizard(self, uninstall ? uninstallRoot : std::filesystem::path{}) ? 0 : 1;
     if (comInitialized) CoUninitialize();
+    if (uninstall) {
+        // The copy and its folder go at the next restart.
+        for (const auto& path : {self.parent_path() / L"uninstall.ps1", self, self.parent_path()}) {
+            MoveFileExW(path.c_str(), nullptr, MOVEFILE_DELAY_UNTIL_REBOOT);
+        }
+    }
     return result;
 }

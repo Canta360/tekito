@@ -39,7 +39,7 @@ You own the text you type and anything you create with TEKITO, including your di
 
 TEKITO processes your typing on your computer to correct and suggest words and to convert romaji into Japanese. It stores your settings, your dictionary, and what it learns from your choices on your computer. It does not send your typing, your dictionary, or what it has learned over the network. Diagnostics you copy from TEKITO Settings never include what you type. You can clear learned data and remove your dictionary entries in TEKITO Settings at any time.
 
-Keep your own copy of anything you would not want to lose, such as an exported dictionary. Uninstalling TEKITO leaves your data in place unless you choose to remove it.
+Keep your own copy of anything you would not want to lose, such as an exported dictionary. Uninstalling TEKITO removes your data; it offers to export your dictionary first.
 
 ## 4. Language data and third-party parts
 
