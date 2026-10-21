@@ -1,5 +1,5 @@
 """Lists the words of Japanese Wikipedia article titles with their readings,
-for build-japanese-packs.py --wikipedia-words.
+for build-japanese-packs.py --wikimedia-words.
 
 An article's opening sentence gives its title's reading
 ("'''大政翼賛会'''（たいせいよくさんかい）は、…"). A reading is kept only

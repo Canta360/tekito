@@ -21,7 +21,7 @@
 //
 // --study measures ways of typing borrowed from SKK (JapaneseTypingStudy.h).
 //
-// --wikipedia <data/ja/japanese-wikipedia> adds the words of Wikipedia
+// --wikimedia <data/ja/japanese-wikimedia> adds the words of Wikipedia
 // article titles to the dictionary, as TEKITO does when the pack is there.
 //
 // Per source: sentences whose first conversion is acceptable, the character
@@ -666,7 +666,7 @@ int RunChunks(const ConnectionMatrix& matrix, const JapaneseDictionary& dictiona
 }  // namespace
 
 int main(int argc, char** argv) {
-    std::filesystem::path pack, wikipedia, corpus, keysCorpus, romaji, dumpPhrases, writeSentences, guessReadings, guessReadingsOut;
+    std::filesystem::path pack, wikimedia, corpus, keysCorpus, romaji, dumpPhrases, writeSentences, guessReadings, guessReadingsOut;
     bool byPhrase = false;
     bool useContext = true;
     std::filesystem::path modelPack;
@@ -684,7 +684,7 @@ int main(int argc, char** argv) {
     for (int i = 1; i < argc; ++i) {
         const std::string_view arg = argv[i];
         if (arg == "--pack" && i + 1 < argc) pack = argv[++i];
-        else if (arg == "--wikipedia" && i + 1 < argc) wikipedia = argv[++i];
+        else if (arg == "--wikimedia" && i + 1 < argc) wikimedia = argv[++i];
         else if (arg == "--corpus" && i + 1 < argc) corpus = argv[++i];
         else if (arg == "--keys-corpus" && i + 1 < argc) keysCorpus = argv[++i];
         else if (arg == "--romaji" && i + 1 < argc) romaji = argv[++i];
@@ -749,7 +749,7 @@ int main(int argc, char** argv) {
             std::cerr << "could not open the japanese-core pack at " << pack.string() << "\n";
             return 1;
         }
-        if (!wikipedia.empty()) (void)dictionary.AddWords(wikipedia / "dictionary.bin");
+        if (!wikimedia.empty()) (void)dictionary.AddWords(wikimedia / "dictionary.bin");
         JapaneseConverter converter(dictionary, matrix);
         if (model.IsOpen()) converter.SetLanguageModel(&model, weights);
         SetNumberWord(converter, pack);
@@ -772,7 +772,7 @@ int main(int argc, char** argv) {
             std::cerr << "could not open the japanese-core pack at " << pack.string() << "\n";
             return 1;
         }
-        if (!wikipedia.empty()) (void)dictionary.AddWords(wikipedia / "dictionary.bin");
+        if (!wikimedia.empty()) (void)dictionary.AddWords(wikimedia / "dictionary.bin");
         const JapaneseConverter converter(dictionary, matrix);
         std::ifstream in(guessReadings, std::ios::binary);
         std::ofstream out(guessReadingsOut, std::ios::binary);
@@ -799,7 +799,7 @@ int main(int argc, char** argv) {
             std::cerr << "could not open the japanese-core pack at " << pack.string() << "\n";
             return 1;
         }
-        if (!wikipedia.empty()) (void)dictionary.AddWords(wikipedia / "dictionary.bin");
+        if (!wikimedia.empty()) (void)dictionary.AddWords(wikimedia / "dictionary.bin");
         JapaneseConverter converter(dictionary, matrix);
         if (model.IsOpen()) converter.SetLanguageModel(&model, weights);
         SetNumberWord(converter, pack);
@@ -838,7 +838,7 @@ int main(int argc, char** argv) {
         std::cerr << "could not open the japanese-core pack at " << pack.string() << "\n";
         return 1;
     }
-    if (!wikipedia.empty()) (void)dictionary.AddWords(wikipedia / "dictionary.bin");
+    if (!wikimedia.empty()) (void)dictionary.AddWords(wikimedia / "dictionary.bin");
     JapaneseConverter converter(dictionary, matrix);
         if (model.IsOpen()) converter.SetLanguageModel(&model, weights);
         SetNumberWord(converter, pack);

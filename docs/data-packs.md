@@ -26,7 +26,7 @@ download that setup fetches when Japanese is chosen.
 | `qwerty-typo-catalog` | Synthetic typos of common words, for evaluation only | Generated for TEKITO | TEKITO (see `LICENSE.md`) |
 | `japanese-romaji` | How typed keys become kana in Japanese input | Written for TEKITO (`scripts/ja/build-japanese-romaji.py`) | TEKITO (see `LICENSE.md`) |
 | `japanese-core` | Words, readings and how they join, for kana-kanji conversion | Mozc OSS dictionary (IPAdic, Okinawa dictionary) plus TEKITO slang entries | IPAdic license, BSD-3-Clause, TEKITO source license |
-| `japanese-wikipedia` | More words for kana-kanji conversion: names of people, places, organizations and works, and terms | Japanese Wikipedia article titles and the readings their opening sentences give, checked with KANJIDIC2 | CC BY-SA 4.0 |
+| `japanese-wikimedia` | More words for kana-kanji conversion: names of people, places, organizations and works, terms, and set phrases (四字熟語, 慣用句, ことわざ) | Japanese Wikipedia article titles and the readings their opening sentences give; set phrases of the English and Japanese Wiktionary (wiktextract); readings checked with KANJIDIC2 | CC BY-SA 4.0 |
 | `japanese-lm` | Which words go together, for conversion to prefer them (neighbor pairs, and content words of one sentence) | Leipzig Corpora Collection, Japanese news crawl 2019 and Wikipedia 2021 | CC BY 4.0 |
 | `japanese-reranker` | A small language model of word pieces that checks the likeliest converted sentences as a whole and picks the one that reads best | Trained for TEKITO (`scripts/ja/train-japanese-wordlm.py`, `scripts/ja/build-japanese-reranker-pack.py`) on the zenz-v2.5 dataset's llm-jp-corpus-v3 part; holds weights and word pieces only, no sentences | TEKITO (see `LICENSE.md`); dataset ODC-BY 1.0 |
 | `japanese-slips` | What reads as Japanese kana (kana n-grams and a small kana LSTM), to find slips in typed keys before conversion | Computed for TEKITO (`scripts/ja/build-japanese-slips-pack.py`) from the zenz-v2.5 dataset's readings; holds statistics and weights only, no sentences | TEKITO (see `LICENSE.md`); dataset ODC-BY 1.0 |
@@ -76,11 +76,12 @@ that TEKITO maps into memory instead of the usual text and index:
 
 It downloads the Mozc dictionary at a pinned commit into `.cache\tekito-data`
 and runs `build-japanese-packs.py`, which adds the curated terms from
-`scripts\ja\japanese-slang-seeds.tsv`. When `.cache\tekito-data\jawiki\words.tsv` is there
-(`scripts\ja\build-japanese-wikipedia-words.py`, from the Wikipedia article and
-langlinks dumps and KANJIDIC2), it also builds `japanese-wikipedia`, the words
-of Wikipedia article titles TEKITO adds to the dictionary's; a pack of their
-own, for their license. Without japanese-core, Japanese input types kana
+`scripts\ja\japanese-slang-seeds.tsv`. When `.cache\tekito-data\jawiki\words.tsv` and
+`phrases.tsv` are there (`scripts\ja\build-japanese-wikipedia-words.py` from the
+Wikipedia article and langlinks dumps, `scripts\ja\build-japanese-wiktionary-phrases.py`
+from the Wiktionary extracts, both checked with KANJIDIC2), it also builds
+`japanese-wikimedia`, the words TEKITO adds to the dictionary's; a pack of
+their own, for their license. Without japanese-core, Japanese input types kana
 but cannot convert to kanji. The pack also carries `pos.tsv`, the part of
 speech each kind of word a user adds in Settings takes, and the one digits
 typed in Japanese take so counters join them (3こ -> 3個); a pack built before

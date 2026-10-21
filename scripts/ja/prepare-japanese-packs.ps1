@@ -33,12 +33,13 @@ foreach ($file in $files) {
     Invoke-WebRequest -Uri $url -OutFile $target -UseBasicParsing
 }
 
-# And japanese-wikipedia, the words of Wikipedia article titles, when they
-# have been listed
-# (scripts\ja\build-japanese-wikipedia-words.py).
-$wikipedia = Join-Path $repoRoot ".cache\tekito-data\jawiki\words.tsv"
-$extra = if (Test-Path $wikipedia) {
-    @("--wikipedia-words", $wikipedia, "--wikipedia-out", (Join-Path (Split-Path $Output -Parent) "japanese-wikipedia"))
+# And japanese-wikimedia, the words of Wikipedia article titles and the set
+# phrases of Wiktionary, when they have been listed
+# (scripts\ja\build-japanese-wikipedia-words.py, build-japanese-wiktionary-phrases.py).
+$listed = @("words.tsv", "phrases.tsv") | ForEach-Object { Join-Path $repoRoot ".cache\tekito-data\jawiki\$_" } |
+    Where-Object { Test-Path $_ }
+$extra = if ($listed) {
+    @("--wikimedia-words") + @($listed) + @("--wikimedia-out", (Join-Path (Split-Path $Output -Parent) "japanese-wikimedia"))
 } else { @() }
 python (Join-Path $PSScriptRoot "build-japanese-packs.py") --mozc $mozc --commit $Commit --out $Output @extra
 if ($LASTEXITCODE -ne 0) { throw "build-japanese-packs.py failed with exit code $LASTEXITCODE" }

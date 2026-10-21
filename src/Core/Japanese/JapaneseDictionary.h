@@ -32,6 +32,8 @@ struct DictionaryWord {
     bool spellingCorrection{false};
     // One of the added words (JapaneseDictionary::AddWords).
     bool added{false};
+    // A set phrase (四字熟語, 慣用句, ことわざ), as written.
+    bool setPhrase{false};
     std::uint32_t surfaceOffset{0};
 };
 
@@ -42,7 +44,7 @@ class JapaneseDictionary final {
 public:
     bool Open(const std::filesystem::path& file) noexcept;
     // More words, in a file of the same format and reading codes
-    // (japanese-wikipedia): looked up with these as one dictionary. Its keys
+    // (japanese-wikimedia): looked up with these as one dictionary. Its keys
     // that this one lacks are the records from this one's key count on.
     bool AddWords(const std::filesystem::path& file);
     [[nodiscard]] bool IsOpen() const noexcept { return keyCount_ != 0; }
@@ -214,6 +216,7 @@ bool JapaneseDictionary::VisitWords(std::uint32_t record, bool added, Visit&& wo
         DictionaryWord entry;
         entry.surface = static_cast<DictionaryWord::Surface>(flags & 3);
         entry.spellingCorrection = (flags & 4) != 0;
+        entry.setPhrase = (flags & 16) != 0;
         entry.left = Read<std::uint16_t>(records_ + at);
         at += 2;
         entry.right = entry.left;

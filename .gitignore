@@ -30,8 +30,8 @@ data/en/phrase/
 # Built by scripts/ja/build-japanese-packs.py from the Mozc dictionary
 data/ja/japanese-core/
 # Built by scripts/ja/build-japanese-packs.py from the words of Wikipedia
-# article titles (scripts/ja/build-japanese-wikipedia-words.py)
-data/ja/japanese-wikipedia/
+# article titles and Wiktionary's set phrases
+data/ja/japanese-wikimedia/
 # Built by scripts/ja/build-japanese-english-pack.py from JMdict, Japanese
 # Wikipedia and the Leipzig corpora
 data/ja/japanese-english/

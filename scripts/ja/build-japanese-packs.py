@@ -20,6 +20,8 @@ dictionary.bin (ja-dict-v1): readings -> words
     flags bit 2     Mozc lists it as a spelling correction: offer it, never
                     choose it on its own
     flags bit 3     the right id equals the left id and is not stored
+    flags bit 4     a set phrase (四字熟語, 慣用句, ことわざ; japanese-wikimedia):
+                    the sentence check leaves it as it is
   Words of a reading are sorted cheapest first.
 
 connection.bin (ja-matrix-v1): how words join
@@ -41,13 +43,14 @@ Usage:
   python scripts/ja/build-japanese-packs.py --mozc ... --commit ... --out tests/data/ja/japanese-mini \\
       --sentences tests/data/ja/japanese-mini-sentences.txt
 
-With --wikipedia-words <words.tsv> --wikipedia-out <dir> it also builds
-japanese-wikipedia: the words of Wikipedia article titles
-(build-japanese-wikipedia-words.py) that japanese-core lacks, one
+With --wikimedia-words <words.tsv>... --wikimedia-out <dir> it also builds
+japanese-wikimedia: the words of Wikipedia article titles
+(build-japanese-wikipedia-words.py) and the set phrases of Wiktionary
+(build-japanese-wiktionary-phrases.py) that japanese-core lacks, one
 dictionary.bin with japanese-core's reading codes, which TEKITO adds to
 japanese-core's words (JapaneseDictionary::AddWords). It is a pack of its own
-for its license (CC BY-SA 4.0). tests/data/ja/japanese-mini-wikipedia comes
-from tests/data/ja/japanese-mini-wikipedia.tsv so.
+for its license (CC BY-SA 4.0). tests/data/ja/japanese-mini-wikimedia comes
+from tests/data/ja/japanese-mini-wikimedia.tsv so.
 """
 
 from __future__ import annotations
@@ -75,6 +78,7 @@ ROOT = Path(__file__).resolve().parents[2]
 SURFACE_POOL, SURFACE_READING, SURFACE_KATAKANA = 0, 1, 2
 FLAG_SPELLING_CORRECTION = 1 << 2
 FLAG_SAME_IDS = 1 << 3
+FLAG_SET_PHRASE = 1 << 4
 COST_SCALE = 64
 
 # The kinds of words users add, and the Mozc part of speech of each.
@@ -154,9 +158,12 @@ def read_slang_entries(pos_names: list[str], base_entries):
 # most of Mozc's, so its words keep their readings; less when many other
 # Wikipedias have the article; more when Mozc reads the same, and more again
 # when a particle and Mozc's words read the same (はしけん: は試験, not 箸拳).
+# Wiktionary's set phrases (build-japanese-wiktionary-phrases.py), chosen by
+# hand, cost less, the ones Mozc has too (がりょうてんせい: 画竜点睛).
 WIKIPEDIA_POS = {"person": "名詞,固有名詞,人名,一般,*,*,*", "noun": "名詞,一般,*,*,*,*,*",
-                 "proper-noun": "名詞,固有名詞,一般,*,*,*,*"}
+                 "proper-noun": "名詞,固有名詞,一般,*,*,*,*", "phrase": "名詞,一般,*,*,*,*,*"}
 WIKIPEDIA_COST = 7600
+PHRASE_COST = 6000
 WIKIPEDIA_KNOWN_COST = 200
 WIKIPEDIA_KNOWN_MOST = 800
 WIKIPEDIA_HOMOPHONE_COST = 1000
@@ -164,8 +171,11 @@ WIKIPEDIA_PARTICLE_COST = 3000
 PARTICLES = ("は", "が", "を", "に", "で", "と", "も", "の", "へ", "や", "か")
 
 
-def read_wikipedia_entries(path: Path, pos_names: list[str], base_entries):
-    existing = {(entry[0], entry[4]) for entry in base_entries}
+def read_wikipedia_entries(paths: list[Path], pos_names: list[str], base_entries):
+    existing: dict[tuple[str, str], int] = {}
+    for entry in base_entries:
+        key = (entry[0], entry[4])
+        existing[key] = min(existing.get(key, entry[3]), entry[3])
     readings = {entry[0] for entry in base_entries}
 
     def words(reading: str, parts: int) -> bool:
@@ -179,20 +189,32 @@ def read_wikipedia_entries(path: Path, pos_names: list[str], base_entries):
                 (reading[-1] in PARTICLES and words(reading[:-1], 2)))
 
     additions = []
-    for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+    lines = [(path, number, line) for path in paths
+             for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1)]
+    for path, number, line in lines:
         fields = line.split("\t")
         if len(fields) != 4 or fields[2] not in WIKIPEDIA_POS:
             raise ValueError(f"{path.name}:{number}: expected reading, surface, kind and editions")
         reading, surface, kind, editions = fields
-        if (reading, surface) in existing:
+        known = existing.get((reading, surface))
+        # A set phrase Mozc has at a higher cost comes again, cheaper: it
+        # is looked up with Mozc's, and the cheaper one counts.
+        if kind == "phrase" and known is not None and known > PHRASE_COST:
+            existing[(reading, surface)] = PHRASE_COST
+            pos = pos_names.index(WIKIPEDIA_POS[kind])
+            additions.append((reading, pos, pos, PHRASE_COST, surface, False, True))
             continue
-        cost = WIKIPEDIA_COST - min(WIKIPEDIA_KNOWN_MOST, int(WIKIPEDIA_KNOWN_COST * math.log2(1 + int(editions))))
+        if known is not None:
+            continue
+        existing[(reading, surface)] = 0
+        cost = PHRASE_COST if kind == "phrase" else WIKIPEDIA_COST - min(
+            WIKIPEDIA_KNOWN_MOST, int(WIKIPEDIA_KNOWN_COST * math.log2(1 + int(editions))))
         if reading in readings:
             cost += WIKIPEDIA_HOMOPHONE_COST
         elif particle_and_words(reading):
             cost += WIKIPEDIA_PARTICLE_COST
         pos = pos_names.index(WIKIPEDIA_POS[kind])
-        additions.append((reading, pos, pos, cost, surface, False))
+        additions.append((reading, pos, pos, cost, surface, False, kind == "phrase"))
     return additions
 
 
@@ -257,7 +279,7 @@ def reading_chars(entries) -> list[str]:
 
 def build_dictionary(entries, unknown_id: int, out: Path, chars: list[str] | None = None) -> dict:
     """chars: the reading characters, in code order; another dictionary's
-    for words added to it (japanese-wikipedia uses japanese-core's)."""
+    for words added to it (japanese-wikimedia uses japanese-core's)."""
     chars = chars or reading_chars(entries)
     if len(chars) > 255:
         raise ValueError(f"{len(chars)} reading characters; ja-dict-v1 codes hold 255")
@@ -284,7 +306,8 @@ def build_dictionary(entries, unknown_id: int, out: Path, chars: list[str] | Non
         records.append(len(key))
         records.extend(key)
         records.extend(struct.pack("<H", len(words)))
-        for reading, left, right, cost, surface, spelling in words:
+        # An entry may say, last, that it is a set phrase.
+        for reading, left, right, cost, surface, spelling, *phrase in words:
             if not (0 <= cost <= 0xFFFF and 0 <= left <= 0xFFFF and 0 <= right <= 0xFFFF):
                 raise ValueError(f"value out of range for {reading}")
             if surface == reading:
@@ -302,7 +325,7 @@ def build_dictionary(entries, unknown_id: int, out: Path, chars: list[str] | Non
                     surface_units.extend(struct.unpack(f"<{len(units) // 2}H", units))
                 if offset >= 1 << 24:
                     raise ValueError("surface pool too large for ja-dict-v1")
-            flags = kind | (FLAG_SPELLING_CORRECTION if spelling else 0)
+            flags = kind | (FLAG_SPELLING_CORRECTION if spelling else 0) | (FLAG_SET_PHRASE if any(phrase) else 0)
             if left == right:
                 flags |= FLAG_SAME_IDS
             records.append(flags)
@@ -409,17 +432,17 @@ def main() -> None:
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--sentences", type=Path,
                         help="build a small pack for tests: keep only words found in these readings")
-    parser.add_argument("--wikipedia-words", type=Path,
-                        help="words of Wikipedia titles (build-japanese-wikipedia-words.py) for the "
-                             "japanese-wikipedia pack")
-    parser.add_argument("--wikipedia-out", type=Path, help="where to build the japanese-wikipedia pack")
+    parser.add_argument("--wikimedia-words", type=Path, nargs="+",
+                        help="words of Wikipedia titles (build-japanese-wikipedia-words.py) and Wiktionary's "
+                             "set phrases (build-japanese-wiktionary-phrases.py) for the japanese-wikimedia pack")
+    parser.add_argument("--wikimedia-out", type=Path, help="where to build the japanese-wikimedia pack")
     args = parser.parse_args()
 
     entries = read_entries(args.mozc)
     pos_names = read_pos_names(args.mozc)
     entries.extend(read_slang_entries(pos_names, entries))
-    if bool(args.wikipedia_words) != bool(args.wikipedia_out):
-        parser.error("--wikipedia-words and --wikipedia-out go together")
+    if bool(args.wikimedia_words) != bool(args.wikimedia_out):
+        parser.error("--wikimedia-words and --wikimedia-out go together")
     size, costs = read_matrix(args.mozc)
     if size != len(pos_names):
         raise ValueError("id.def and the connection matrix disagree on the id count")
@@ -466,14 +489,14 @@ def main() -> None:
     (args.out / "manifest.json").write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n",
                                            encoding="utf-8", newline="\n")
     report = {"dictionary": dictionary, "matrix": matrix}
-    if args.wikipedia_words:
-        report["wikipedia"] = build_wikipedia_pack(args.wikipedia_words, args.wikipedia_out, pos_names,
+    if args.wikimedia_words:
+        report["wikimedia"] = build_wikimedia_pack(args.wikimedia_words, args.wikimedia_out, pos_names,
                                                    entries, unknown_id)
     print(json.dumps(report, indent=2))
 
 
-def build_wikipedia_pack(words: Path, out: Path, pos_names: list[str], core_entries, unknown_id: int) -> dict:
-    """japanese-wikipedia: words TEKITO adds to japanese-core's, a pack of
+def build_wikimedia_pack(words: list[Path], out: Path, pos_names: list[str], core_entries, unknown_id: int) -> dict:
+    """japanese-wikimedia: words TEKITO adds to japanese-core's, a pack of
     their own for their license, with the same reading codes."""
     chars = reading_chars(core_entries)
     known = set(chars)
@@ -482,15 +505,18 @@ def build_wikipedia_pack(words: Path, out: Path, pos_names: list[str], core_entr
     out.mkdir(parents=True, exist_ok=True)
     dictionary = build_dictionary(entries, unknown_id, out / "dictionary.bin", chars)
     (out / "NOTICE").write_text(
-        "japanese-wikipedia holds words of Japanese Wikipedia article titles and their readings, "
-        "from Japanese Wikipedia (https://ja.wikipedia.org/), by Wikipedia contributors, under "
-        "CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/). The kanji readings that "
-        "check them come from KANJIDIC2 (Electronic Dictionary Research and Development Group, "
-        "https://www.edrdg.org/, CC BY-SA 4.0). This pack is shared under CC BY-SA 4.0.\n",
+        "japanese-wikimedia holds words of Japanese Wikipedia article titles and their readings, from "
+        "Japanese Wikipedia (https://ja.wikipedia.org/), by Wikipedia contributors, and Japanese set "
+        "phrases (四字熟語, 慣用句, ことわざ) and their readings, from the English and the Japanese "
+        "Wiktionary (https://en.wiktionary.org/, https://ja.wiktionary.org/), by Wiktionary "
+        "contributors, as extracted by wiktextract (https://kaikki.org/), all under CC BY-SA 4.0 "
+        "(https://creativecommons.org/licenses/by-sa/4.0/). The kanji readings that check them come "
+        "from KANJIDIC2 (Electronic Dictionary Research and Development Group, https://www.edrdg.org/, "
+        "CC BY-SA 4.0). This pack is shared under CC BY-SA 4.0.\n",
         encoding="utf-8", newline="\n")
     manifest = {
-        "pack_id": "japanese-wikipedia",
-        "display_name": "Japanese Wikipedia Words",
+        "pack_id": "japanese-wikimedia",
+        "display_name": "Japanese Words from Wikipedia and Wiktionary",
         "schema_version": 1,
         "version": "jawiki-2026.10",
         "language": "ja-JP",
@@ -500,7 +526,8 @@ def build_wikipedia_pack(words: Path, out: Path, pos_names: list[str], core_entr
         "entry_count": dictionary["words"],
         "sha256": {"file": sha256(out / "dictionary.bin")},
         "license": "CC-BY-SA-4.0",
-        "source": "https://dumps.wikimedia.org/jawiki/ (pages-articles, langlinks), KANJIDIC2",
+        "source": "https://dumps.wikimedia.org/jawiki/ (pages-articles, langlinks), "
+                  "https://kaikki.org/ (English and Japanese Wiktionary), KANJIDIC2",
         "notice_file": "NOTICE",
     }
     (out / "manifest.json").write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n",

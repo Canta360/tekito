@@ -35,7 +35,7 @@ LANGUAGE = {
     "japanese-loanwords": "ja",
     "japanese-romaji": "ja",
     "japanese-slang": "ja",
-    "japanese-wikipedia": "ja",
+    "japanese-wikimedia": "ja",
     "japanese-wiktionary": "ja",
     "japanese-wordnet": "ja",
     "japanese-zipcode": "ja",

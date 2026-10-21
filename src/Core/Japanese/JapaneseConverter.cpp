@@ -615,6 +615,7 @@ std::vector<Phrase> JapaneseConverter::Convert(std::wstring_view reading,
             std::wstring head;
             bool spelling = false;
             bool kanaNumber = false;
+            bool setPhrase = false;
             std::vector<int> parts;
             for (int k = ending.node, r = ending.rank; k >= 0;) {
                 parts.push_back(k);
@@ -631,11 +632,13 @@ std::vector<Phrase> JapaneseConverter::Convert(std::wstring_view reading,
                 text += part;
                 spelling = spelling || (nodes[*it].known && nodes[*it].word.spellingCorrection);
                 kanaNumber = kanaNumber || nodes[*it].numeral || nodes[*it].numberPrefix > 0;
+                setPhrase = setPhrase || (nodes[*it].known && nodes[*it].word.setPhrase);
             }
             if (!has(text)) {
                 PhraseCandidate candidate{std::move(text), ending.cost, PhraseCandidate::Kind::Dictionary, spelling};
                 candidate.rightId = nodes[ending.node].right;
                 candidate.kanaNumber = kanaNumber;
+                candidate.setPhrase = setPhrase;
                 phrase.candidates.push_back(std::move(candidate));
                 heads.push_back(std::move(head));
             }

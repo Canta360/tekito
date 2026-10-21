@@ -399,7 +399,7 @@ bool HasCandidate(const tekito::japanese::Phrase& phrase, std::wstring_view text
     return false;
 }
 
-// Words added from a pack of their own (japanese-wikipedia), looked up with
+// Words added from a pack of their own (japanese-wikimedia), looked up with
 // the dictionary's as one.
 void TestAddedWords(const MiniPack& pack) {
     using tekito::japanese::DictionaryWord;
@@ -408,7 +408,7 @@ void TestAddedWords(const MiniPack& pack) {
     Require(dictionary.Open(data / L"japanese-mini" / L"dictionary.bin"), "the test dictionary opens again");
     Require(!dictionary.AddWords(data / L"japanese-mini" / L"connection.bin") && !dictionary.HasAddedWords(),
             "a file that is not a dictionary adds nothing");
-    Require(dictionary.AddWords(data / L"japanese-mini-wikipedia" / L"dictionary.bin"), "the added words open");
+    Require(dictionary.AddWords(data / L"japanese-mini-wikimedia" / L"dictionary.bin"), "the added words open");
 
     // A reading only the added words have.
     const auto added = dictionary.Find(dictionary.Encode(L"てんきなかの"));

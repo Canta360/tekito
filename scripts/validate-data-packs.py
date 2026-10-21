@@ -251,8 +251,8 @@ def validate_language_model(pack: Path, manifest: dict) -> list[str]:
 
 
 def validate_japanese_words(pack: Path, manifest: dict) -> list[str]:
-    """Words added to japanese-core's (japanese-wikipedia,
-    scripts/ja/build-japanese-packs.py --wikipedia-out): one ja-dict file."""
+    """Words added to japanese-core's (japanese-wikimedia,
+    scripts/ja/build-japanese-packs.py --wikimedia-out): one ja-dict file."""
     pack_id = pack.name
     errors = [f"{pack_id}: manifest missing {field}"
               for field in ("pack_id", "version", "language", "type", "license", "file", "notice_file",

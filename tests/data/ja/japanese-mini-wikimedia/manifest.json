@@ -1,6 +1,6 @@
 {
-  "pack_id": "japanese-wikipedia",
-  "display_name": "Japanese Wikipedia Words",
+  "pack_id": "japanese-wikimedia",
+  "display_name": "Japanese Words from Wikipedia and Wiktionary",
   "schema_version": 1,
   "version": "jawiki-2026.10",
   "language": "ja-JP",
@@ -12,6 +12,6 @@
     "file": "4A7AA17A5EDD6947A5BBC4E2F71643CA005C5DE9E1A0E432C3FB1C8A04AF4D2B"
   },
   "license": "CC-BY-SA-4.0",
-  "source": "https://dumps.wikimedia.org/jawiki/ (pages-articles, langlinks), KANJIDIC2",
+  "source": "https://dumps.wikimedia.org/jawiki/ (pages-articles, langlinks), https://kaikki.org/ (English and Japanese Wiktionary), KANJIDIC2",
   "notice_file": "NOTICE"
 }

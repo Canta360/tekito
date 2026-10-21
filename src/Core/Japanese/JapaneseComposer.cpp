@@ -1634,8 +1634,9 @@ void JapaneseComposer::CheckSentence() {
                 return phrase.candidates[other].text == candidate.text;
             });
             if (!seen) list.push_back(c);
-            // What learning put first stays.
-            if (phrase.learned || marks) break;
+            // What learning put first stays, and a set phrase (画竜点睛:
+            // the check reads its rare kanji as unlikely).
+            if (phrase.learned || marks || shown.setPhrase) break;
         }
         if (list.empty() || list.front() != phrase.selected) return;
         lists.push_back(std::move(list));

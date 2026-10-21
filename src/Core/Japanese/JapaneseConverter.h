@@ -35,6 +35,8 @@ struct PhraseCandidate {
     std::uint16_t rightId{0};
     // Has a number read in kana in it, written in digits (にせんご: 2005).
     bool kanaNumber{false};
+    // Has a set phrase in it (画竜点睛), which the sentence check leaves.
+    bool setPhrase{false};
 };
 
 // A word that starts with what has been typed, for prediction.
