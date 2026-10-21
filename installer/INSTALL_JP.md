@@ -2,9 +2,9 @@
 
 ## インストーラーでインストールする
 
-`TEKITO-0.6.1-full-installer.exe` を実行します。使用許諾に同意すると、インストールが始まります。
+`TEKITO-0.6.2-full-installer.exe` を実行します。使用許諾に同意すると、インストールが始まります。
 
-- **日本語入力を追加する** を選択すると、日本語の辞書と言語データ（約 80 MB）を GitHub のリリースからダウンロードし、チェックサムを照合してからインストールします。TEKITO は日本語のキーボード一覧に追加されます。
+- **日本語入力を追加する** を選択すると、日本語の辞書と言語データ（約 88 MB）を GitHub のリリースからダウンロードし、チェックサムを照合してからインストールします。TEKITO は日本語のキーボード一覧に追加されます。
 - 日本語を選択しない場合は、英語のキーボード一覧に追加されます。日本語は、インストーラーを再度実行すると追加できます。
 - Microsoft Edge WebView2 Runtime が必要です。Windows 11 には標準で含まれています。見つからない場合は、インストーラーに案内を表示します。
 - インストール後、サインアウトしてサインインし直すか、使用するアプリを再起動します。
@@ -13,7 +13,7 @@
 
 ## ZIP から手動でインストールする
 
-`TEKITO-0.6.1-full.zip` を展開し、そのフォルダーで管理者として PowerShell を開いて、次のコマンドを実行します。
+`TEKITO-0.6.2-full.zip` を展開し、そのフォルダーで管理者として PowerShell を開いて、次のコマンドを実行します。
 
 ```powershell
 Set-ExecutionPolicy -Scope Process Bypass -Force
@@ -21,11 +21,11 @@ Set-ExecutionPolicy -Scope Process Bypass -Force
 .\install.ps1
 ```
 
-日本語も追加する場合は `-Japanese $true` を指定します。オフラインでインストールする場合は、同じリリースの `TEKITO-0.6.1-japanese-data.zip` を事前にダウンロードし、そのパスを指定します（チェックサムも照合します）。
+日本語も追加する場合は `-Japanese $true` を指定します。オフラインでインストールする場合は、同じリリースの `TEKITO-0.6.2-japanese-data.zip` を事前にダウンロードし、そのパスを指定します（チェックサムも照合します）。
 
 ```powershell
 .\install.ps1 -Japanese $true
-.\install.ps1 -JapaneseDataPath C:\Downloads\TEKITO-0.6.1-japanese-data.zip
+.\install.ps1 -JapaneseDataPath C:\Downloads\TEKITO-0.6.2-japanese-data.zip
 ```
 
 英語のキーボード一覧にも TEKITO を追加する場合は `-KeepEnglishProfile $true` を指定します。
