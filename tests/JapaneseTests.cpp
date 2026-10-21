@@ -1617,7 +1617,11 @@ void TestSpecialConversions(const RomajiTable& table, const MiniPack& pack) {
             "twelve in kanji, as one Roman numeral and circled");
     Require(Contains(special.Numbers(L"10000"), L"一万") && Contains(special.Numbers(L"120000000"), L"一億二千万"),
             "large numbers in kanji");
-    Require(special.Numbers(L"0120").size() == 2, "a number that starts with 0 only changes width");
+    {
+        const auto code = special.Numbers(L"0120");
+        Require(code.size() == 3 && Contains(code, L"０１２０") && Contains(code, L"〇一二〇"),
+                "a number that starts with 0 changes width or is written a digit at a time, none dropped");
+    }
     using tekito::SpecialConversions;
     RequireText(SpecialConversions::Official(L"123456789"), L"1億2,345万6,789", "official style: 億 and 万 with commas");
     RequireText(SpecialConversions::Official(L"120000"), L"12万", "empty groups are left out");

@@ -1237,7 +1237,10 @@ std::wstring JapaneseComposer::KanaNumberText(const std::wstring& text, NumberSt
         case NumberStyle::FullWidth:
             for (const wchar_t c : digits) out += static_cast<wchar_t>(c + 0xFEE0);
             break;
-        case NumberStyle::Official: out += SpecialConversions::Official(digits); break;
+        case NumberStyle::Official:
+            // A year is written without commas (2026年).
+            out += end < text.size() && text[end] == L'年' ? digits : SpecialConversions::Official(digits);
+            break;
         case NumberStyle::Mixed:
             if (digits.size() == 1) {
                 out += static_cast<wchar_t>(digits[0] + 0xFEE0);
@@ -1271,10 +1274,22 @@ void JapaneseComposer::StyleKanaNumbers(std::vector<PhraseCandidate>& candidates
                                            [&](const PhraseCandidate& c) { return c.text == candidates[i].text; });
             if (same != candidates.begin() + static_cast<std::ptrdiff_t>(i)) candidates.erase(candidates.begin() + static_cast<std::ptrdiff_t>(i--));
         }
-        const auto has = std::any_of(candidates.begin(), candidates.end(), [&](const PhraseCandidate& c) { return c.text == other.text; });
-        if (!has && specialOptions_.numbers) {
-            const auto at = std::find_if(candidates.begin(), candidates.end(), [](const PhraseCandidate& c) { return c.kanaNumber; });
-            candidates.insert(at + 1, std::move(other));
+        // Next to the number, the dictionary's own (三 for さん) moved up
+        // there; one above the number (五十 of 五十歩百歩) stays.
+        if (specialOptions_.numbers) {
+            const auto number = static_cast<std::size_t>(
+                std::find_if(candidates.begin(), candidates.end(), [](const PhraseCandidate& c) { return c.kanaNumber; }) -
+                candidates.begin());
+            const auto same = static_cast<std::size_t>(
+                std::find_if(candidates.begin(), candidates.end(), [&](const PhraseCandidate& c) { return c.text == other.text; }) -
+                candidates.begin());
+            if (same == candidates.size()) {
+                candidates.insert(candidates.begin() + static_cast<std::ptrdiff_t>(number + 1), std::move(other));
+            } else if (same > number + 1) {
+                std::rotate(candidates.begin() + static_cast<std::ptrdiff_t>(number + 1),
+                            candidates.begin() + static_cast<std::ptrdiff_t>(same),
+                            candidates.begin() + static_cast<std::ptrdiff_t>(same + 1));
+            }
         }
     }
 }
@@ -1305,6 +1320,13 @@ void JapaneseComposer::ApplyNumberStyle() {
             phrase.selected = 0;
             phrase.form.reset();
             continue;
+        }
+        // A year read in kana is written without commas too (にせんにじゅう
+        // ろくねん: 2026年).
+        if (numberStyle_ == NumberStyle::Official && !after.empty() && after.front() == L'年') {
+            for (auto& candidate : phrase.candidates) {
+                if (candidate.kanaNumber) std::erase(candidate.text, L',');
+            }
         }
         if (!IsDigits(reading)) continue;
         const bool rough = roughKanji_ && ((!before.empty() && kRoughBefore.find(before.back()) != std::wstring_view::npos) ||
@@ -1341,7 +1363,10 @@ void JapaneseComposer::ApplyNumberStyle() {
         case NumberStyle::FullWidth: wanted = full; break;
         case NumberStyle::Mixed: wanted = half.size() == 1 ? full : half; break;
         case NumberStyle::Kanji: break;
-        case NumberStyle::Official: wanted = SpecialConversions::Official(half); break;
+        case NumberStyle::Official:
+            // A year is written without commas (2026年).
+            wanted = !after.empty() && after.front() == L'年' ? half : SpecialConversions::Official(half);
+            break;
         }
         auto& candidates = phrase.candidates;
         auto found = candidates.end();

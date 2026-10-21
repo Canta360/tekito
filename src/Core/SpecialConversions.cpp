@@ -442,8 +442,16 @@ std::vector<std::wstring> SpecialConversions::Numbers(std::wstring_view text) co
     std::vector<std::wstring> out;
     AddUnique(out, *digits);
     AddUnique(out, japanese::ToFullWidthAscii(*digits));
-    // "0120" is a code, not a number: it only changes width.
-    if (digits->size() > 1 && digits->front() == L'0') return out;
+    // "0120" is a code, not a number: it changes width, or is written a
+    // digit at a time (〇〇七), none dropped.
+    if (digits->size() > 1 && digits->front() == L'0') {
+        if (digits->size() <= kLongestKanjiNumber) {
+            std::wstring each;
+            for (const wchar_t c : *digits) each += Name(Language::Japanese, L"kanji-digits", c - L'0');
+            if (each.size() >= digits->size()) AddUnique(out, std::move(each));
+        }
+        return out;
+    }
     if (digits->size() >= 4) AddUnique(out, WithCommas(*digits));
     if (digits->size() >= 5) AddUnique(out, Official(*digits));
     if (digits->size() <= kLongestKanjiNumber) {
