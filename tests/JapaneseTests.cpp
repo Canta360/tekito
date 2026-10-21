@@ -1139,6 +1139,15 @@ void TestRomajiCorrection(const RomajiTable& table, const MiniPack& pack) {
     Require(composer.Preedit().find(L"仕事") != std::wstring::npos, "sjigoto converts as しごと");
     composer.Clear();
 
+    // A letter left last is meant: no slip drops or changes it.
+    for (const auto* keys : {L"ok", L"arigatouk", L"kk"}) {
+        Type(composer, keys);
+        const auto typed = composer.Preedit();
+        composer.Convert();
+        Require(!typed.empty() && composer.Preedit().ends_with(typed.back()), "Space keeps a letter typed last");
+        composer.Clear();
+    }
+
     // Slips that still read as kana: a neighboring key, a key dropped, an
     // extra key, two keys swapped.
     for (const auto* keys : {L"arigayougozaimasu", L"arigtougozaimasu", L"arigatouggozaimasu",

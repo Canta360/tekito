@@ -1084,10 +1084,15 @@ void JapaneseComposer::BuildPhrasesFor(bool convert) {
     }
     // A slip in the keys was undone: English typed into it comes second.
     bool slipUndone = false;
+    // Keys that end in letters romaji left as they were (おk, っk) are meant
+    // so: no slip is undone to drop or change them.
+    const bool endsInLetters = !units_.empty() && !units_.back().ascii &&
+                               LeftoverLetters(ToFullWidthAscii(units_.back().kana)) > 0;
     if (convert && converter_) {
         // A slip in the keys: converted from the keys as meant. Esc still
         // goes back to what was typed.
-        if (auto conversion = keyConverter_ && !HasAscii() && !KanaTyped() ? keyConverter_->Convert(Keys(false), context_, contextWords_, userDictionary_)
+        if (auto conversion = keyConverter_ && !HasAscii() && !KanaTyped() && !endsInLetters
+                                  ? keyConverter_->Convert(Keys(false), context_, contextWords_, userDictionary_)
                                             : std::nullopt) {
             slipUndone = true;
             conversionReading_ = ApplyTypingStyle(std::move(conversion->reading));
@@ -1097,7 +1102,8 @@ void JapaneseComposer::BuildPhrasesFor(bool convert) {
         } else {
             AddPhrases(ConvertReading(reading, 0, context_, contextWords_), reading);
         }
-        if (slips_ && table_ && !chunkJudge_ && !HasAscii() && !KanaTyped() && !reconverted_ && !phrases_.empty() && FixSlips()) {
+        if (slips_ && table_ && !chunkJudge_ && !HasAscii() && !KanaTyped() && !reconverted_ && !endsInLetters &&
+            !phrases_.empty() && FixSlips()) {
             slipUndone = true;
         }
     }
