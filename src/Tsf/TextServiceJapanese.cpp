@@ -384,6 +384,15 @@ bool TextService::TranslateJapaneseKey(WPARAM wParam, KeyInput& input) {
         input.type = KeyInput::Type::MixedEnterPeriod;
         return true;
     }
+    // The numeric keypad types its digits and marks as they are, half-width:
+    // the application gets the key, after what is being typed is committed.
+    // With the candidate list open its digits still choose.
+    const bool keypad = (wParam >= VK_NUMPAD0 && wParam <= VK_DIVIDE) && wParam != VK_SEPARATOR;
+    if (userSettings_.japaneseNumpadDirect && keypad && !HasCommandModifier() && !japanese_.IsCandidateListOpen()) {
+        if (!japanese_.IsComposing()) return false;
+        input.type = KeyInput::Type::EndComposition;
+        return true;
+    }
     japanese::KeyOptions options = userdata::JapaneseKeyOptions(userSettings_);
     options.pageSize = japanesePage_;
     const auto command = japanese::TranslateKey(

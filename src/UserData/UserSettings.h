@@ -177,6 +177,9 @@ struct UserSettings {
     bool japaneseEnglishSpacing{false};
     // Letters typed in Japanese as if Caps Lock were off.
     bool japaneseIgnoreCapsLock{true};
+    // Digits and marks from the numeric keypad go to the app as typed, in
+    // half-width (what is being typed is committed first).
+    bool japaneseNumpadDirect{true};
     // かな入力: the keys type the kana printed on a JIS keyboard (Japanese
     // mode only, not Mix).
     bool japaneseKanaInput{false};

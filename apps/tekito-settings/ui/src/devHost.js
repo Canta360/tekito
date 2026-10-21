@@ -87,6 +87,7 @@ function initialState() {
       mixLiveConversion: false,
       noLearningInPrivate: true,
       japaneseIgnoreCapsLock: true,
+      japaneseNumpadDirect: true,
       uiLanguage: 0,
       excludedApps: ["Code.exe"],
       builtInExcludedApps: ["WindowsTerminal.exe", "OpenConsole.exe", "conhost.exe", "cmd.exe", "powershell.exe", "pwsh.exe"],

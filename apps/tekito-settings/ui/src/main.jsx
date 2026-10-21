@@ -76,6 +76,7 @@ const initialSettings = {
   mixedTypingEnabled: false,
   japaneseEnglishSpacing: false,
   japaneseIgnoreCapsLock: true,
+  japaneseNumpadDirect: true,
   dateConversion: true,
   numberConversion: true,
   symbolConversion: true,
@@ -787,6 +788,9 @@ function JapanesePage({ settings, setSetting, runAction, setConfirm, showKeys, r
           </Row>
           <Row icon="keyboard_capslock" title={j.capsLock.title}>
             <Toggle label={j.capsLock.title} checked={settings.japaneseIgnoreCapsLock} onChange={(value) => setSetting("japaneseIgnoreCapsLock", value)} />
+          </Row>
+          <Row icon="dialpad" title={j.numpad.title} description={j.numpad.description}>
+            <Toggle label={j.numpad.title} checked={settings.japaneseNumpadDirect} onChange={(value) => setSetting("japaneseNumpadDirect", value)} />
           </Row>
         </Card>
         <Card label={j.notation}>

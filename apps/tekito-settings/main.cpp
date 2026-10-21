@@ -1119,6 +1119,8 @@ private:
         json += settings_.noLearningInPrivate ? L"true" : L"false";
         json += L",\"japaneseIgnoreCapsLock\":";
         json += settings_.japaneseIgnoreCapsLock ? L"true" : L"false";
+        json += L",\"japaneseNumpadDirect\":";
+        json += settings_.japaneseNumpadDirect ? L"true" : L"false";
         json += L",\"uiLanguage\":" + std::to_wstring(settings_.uiLanguage);
         json += L",\"excludedApps\":" + NameListJson(settings_.excludedApps);
         json += L",\"builtInExcludedApps\":" +
@@ -1341,6 +1343,7 @@ private:
             else if (key == L"mixedTypingEnabled") settings_.mixedTypingEnabled = value;
             else if (key == L"japaneseEnglishSpacing") settings_.japaneseEnglishSpacing = value;
             else if (key == L"japaneseIgnoreCapsLock") settings_.japaneseIgnoreCapsLock = value;
+            else if (key == L"japaneseNumpadDirect") settings_.japaneseNumpadDirect = value;
             else if (key == L"uiLanguage") settings_.uiLanguage = std::clamp(integerValue, 0, 2);
             else if (key == L"toggleKey") {
                 settings_.toggleKey = std::clamp(integerValue, 0, 3);
