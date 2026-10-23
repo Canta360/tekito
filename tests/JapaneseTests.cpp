@@ -1221,6 +1221,32 @@ void TestRomajiCorrection(const RomajiTable& table, const MiniPack& pack) {
     Type(composer, L"kikai");
     composer.Convert();
     Require(composer.Preedit().find(L"機") != std::wstring::npos, "correct romaji is not touched");
+    composer.Clear();
+
+    // Off: Space keeps the reading as typed; the list may still offer the fix.
+    composer.SetSlipAutoApply(false);
+    Type(composer, L"arigatpu");
+    composer.Convert();
+    Require(composer.Preedit().find(L'ｔ') != std::wstring::npos,
+            "with slip auto-apply off, Space keeps the typed reading");
+    composer.Clear();
+    composer.SetSlipAutoApply(true);
+
+    // After a slip is undone, F10 and typed forms still expose the keys typed.
+    Type(composer, L"arigatpu");
+    composer.Convert();
+    Require(composer.Preedit().find(L'ｔ') == std::wstring::npos, "Space undoes the slip");
+    composer.Transliterate(KanaForm::HalfWidthAlphanumeric);
+    RequireText(composer.Preedit(), L"arigatpu", "F10 after a slip shows the keys typed");
+    composer.Clear();
+    Type(composer, L"arigatpu");
+    composer.Convert();
+    composer.NextCandidate();
+    const auto* afterSlip = composer.FocusedCandidates();
+    Require(afterSlip && std::any_of(afterSlip->begin(), afterSlip->end(),
+                                     [](const tekito::japanese::PhraseCandidate& c) { return c.text == L"arigatpu"; }),
+            "typed forms still list the keys after a slip");
+    composer.Clear();
 }
 
 void TestPrediction(const RomajiTable& table, const MiniPack& pack) {
@@ -1996,7 +2022,14 @@ void TestKanaSlips(const RomajiTable& table, const MiniPack& pack) {
     Require(!composer.RefinesOnPause() && !composer.RefineLive(), "with the pause off, nothing is converted again");
     composer.Clear();
     composer.SetLiveRefine(true);
+    // Off: a pause must not rewrite the reading via slips (same gate as Space).
+    composer.SetSlipAutoApply(false);
+    Type(composer, typed);
+    const std::wstring liveAsTyped = composer.Preedit();
+    (void)composer.RefineLive();
+    RequireText(composer.Preedit(), liveAsTyped, "with slip auto-apply off, a pause keeps the typed conversion");
     composer.Clear();
+    composer.SetSlipAutoApply(true);
     composer.SetLiveConversion(false);
 }
 

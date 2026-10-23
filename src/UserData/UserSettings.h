@@ -145,6 +145,10 @@ struct UserSettings {
     // Converting checks the likeliest sentences as a whole (the
     // japanese-reranker pack) and takes the one that reads best.
     bool japaneseSentenceCheck{true};
+    // Space may rewrite the reading when keys look like a typing slip
+    // (KeyConverter / KanaSlips), then convert. Off: convert as typed;
+    // slip readings stay in the candidate list only.
+    bool japaneseSlipAutoApply{false};
     // The symbol or emoji a reading names on the first page of its list
     // (まる: ○, わらい: 😂); off, with the other symbols at the end.
     bool japaneseFirstPageSymbol{true};
