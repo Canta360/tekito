@@ -104,8 +104,8 @@ enum class Screen {
 
 enum class Action {
     Install, Cancel, Options, ReadLicense, Agree, GetRuntime, CheckRuntime,
-    Back, AcceptLicense, Browse, Shortcut, Finish, Retry, Close, Japanese, KeepEnglish, Samples,
-    WithoutJapanese, SampleMode, SampleClip,
+    Back, AcceptLicense, Browse, Shortcut, Finish, Retry, Close, Japanese, KeepEnglish, CheckForUpdates,
+    Samples, WithoutJapanese, SampleMode, SampleClip,
     Uninstall, ExportWords, UninstallWithoutExport, OpenExportFolder,
 };
 
@@ -216,6 +216,8 @@ struct Wizard {
     // With Japanese: keep TEKITO in the English keyboard list too (the
     // Japanese one has Auto and Direct for English).
     bool keepEnglish{false};
+    // Settings may check GitHub for a newer TEKITO (off unless chosen).
+    bool checkForUpdates{false};
     bool agreed{false};
     bool webViewReady{false};
     std::thread installThread;
@@ -478,6 +480,7 @@ struct InstallChoices {
     bool startMenuShortcut{true};
     bool japanese{false};
     bool keepEnglish{false};
+    bool checkForUpdates{false};
 };
 
 int RunPowerShell(const std::filesystem::path& zipPath, const std::filesystem::path& packageRoot,
@@ -501,6 +504,7 @@ int RunPowerShell(const std::filesystem::path& zipPath, const std::filesystem::p
                          L" -StartMenuShortcut:" + flag(choices.startMenuShortcut) +
                          L" -Japanese:" + flag(choices.japanese) +
                          L" -KeepEnglishProfile:" + flag(choices.keepEnglish) +
+                         L" -CheckForUpdates:" + flag(choices.checkForUpdates) +
                          L"; exit $(if ($LASTEXITCODE) { $LASTEXITCODE } else { 0 })\"";
     std::vector<wchar_t> commandLine(command.begin(), command.end());
     commandLine.push_back(L'\0');
@@ -669,7 +673,7 @@ void StartInstall(Wizard& wizard) {
     const HWND window = wizard.window;
     const auto self = wizard.self;
     const InstallChoices choices{wizard.installRoot, wizard.startMenuShortcut, wizard.japanese,
-                                 wizard.japanese && wizard.keepEnglish};
+                                 wizard.japanese && wizard.keepEnglish, wizard.checkForUpdates};
     try {
         wizard.installThread = std::thread([&wizard, window, self, choices] {
             wizard.installExitCode.store(InstallEmbeddedPackage(self, choices));
@@ -703,9 +707,9 @@ D2D1_RECT_F FooterButton(int slotFromRight, float width = 116.0f) {
 
 constexpr D2D1_RECT_F kWebViewCard{kMargin, 226.0f, kWidth - kMargin, 326.0f};
 constexpr D2D1_RECT_F kLicenseCard{kMargin, 100.0f, kWidth - kMargin, 384.0f};
-constexpr D2D1_RECT_F kOptionsCard{kMargin, 92.0f, kWidth - kMargin, 252.0f};
-// With Japanese, the options card has a third row.
-constexpr D2D1_RECT_F kOptionsCardJapanese{kMargin, 92.0f, kWidth - kMargin, 318.0f};
+// Options card: location, shortcut, updates; with Japanese, keep-English too.
+constexpr D2D1_RECT_F kOptionsCard{kMargin, 92.0f, kWidth - kMargin, 318.0f};
+constexpr D2D1_RECT_F kOptionsCardJapanese{kMargin, 92.0f, kWidth - kMargin, 384.0f};
 // Welcome: the Japanese choice, and the license agreement under it.
 float JapaneseRow(const Wizard& wizard) { return wizard.webViewReady ? 238.0f : 334.0f; }
 float AgreeRow(const Wizard& wizard) { return wizard.webViewReady ? 336.0f : 366.0f; }
@@ -754,22 +758,28 @@ std::vector<Control> Controls(const Wizard& wizard) {
         controls.push_back({Action::Back, Kind::Secondary, FooterButton(1), Tr(L"Back", L"戻る")});
         controls.push_back({Action::AcceptLicense, Kind::Primary, FooterButton(0), Tr(L"I agree", L"同意する")});
         break;
-    case Screen::Options:
+    case Screen::Options: {
         controls.push_back({Action::Browse, Kind::Secondary, D2D1::RectF(kOptionsCard.right - 118.0f, kOptionsCard.top + 20.0f,
                                                                         kOptionsCard.right - 18.0f, kOptionsCard.top + 52.0f),
                             Tr(L"Change", L"変更")});
         controls.push_back({Action::Shortcut, Kind::Toggle, D2D1::RectF(kOptionsCard.right - 66.0f, kOptionsCard.top + 104.0f,
                                                                        kOptionsCard.right - 18.0f, kOptionsCard.top + 132.0f),
                             Tr(L"Start menu shortcut", L"スタートメニューのショートカット"), true, wizard.startMenuShortcut});
+        float updatesTop = kOptionsCard.top + 166.0f;
         if (wizard.japanese) {
             controls.push_back({Action::KeepEnglish, Kind::Toggle,
                                 D2D1::RectF(kOptionsCard.right - 66.0f, kOptionsCard.top + 166.0f,
                                             kOptionsCard.right - 18.0f, kOptionsCard.top + 194.0f),
                                 Tr(L"Keep TEKITO for English keyboards", L"英語のキーボード一覧にも追加する"), true,
                                 wizard.keepEnglish});
+            updatesTop = kOptionsCard.top + 232.0f;
         }
+        controls.push_back({Action::CheckForUpdates, Kind::Toggle,
+                            D2D1::RectF(kOptionsCard.right - 66.0f, updatesTop, kOptionsCard.right - 18.0f, updatesTop + 28.0f),
+                            Tr(L"Check for updates", L"更新を確認する"), true, wizard.checkForUpdates});
         controls.push_back({Action::Back, Kind::Primary, FooterButton(0), Tr(L"Done", L"完了")});
         break;
+    }
     case Screen::Installing:
         break;
     case Screen::Samples: {
@@ -1265,6 +1275,7 @@ void Paint(Wizard& wizard) {
                  D2D1::RectF(left, kOptionsCard.top + 98.0f, kOptionsCard.right - 90.0f, kOptionsCard.top + 118.0f), p.ink);
         DrawText(wizard, Tr(L"Adds TEKITO Settings to the Start menu.", L"TEKITO の設定をスタートメニューに追加します。"), wizard.caption.Get(),
                  D2D1::RectF(left, kOptionsCard.top + 120.0f, kOptionsCard.right - 90.0f, kOptionsCard.top + 140.0f), p.ink2);
+        const float updatesLabelTop = wizard.japanese ? kOptionsCard.top + 226.0f : kOptionsCard.top + 160.0f;
         if (wizard.japanese) {
             t->DrawLine(D2D1::Point2F(left, kOptionsCard.top + 150.0f),
                         D2D1::Point2F(kOptionsCard.right - 18.0f, kOptionsCard.top + 150.0f), divider.Get(), 1.0f);
@@ -1275,7 +1286,19 @@ void Paint(Wizard& wizard) {
                         L"日本語の TEKITO でも英語を入力できるため、通常は不要です。"),
                      wizard.caption.Get(),
                      D2D1::RectF(left, kOptionsCard.top + 182.0f, kOptionsCard.right - 90.0f, kOptionsCard.top + 212.0f), p.ink2);
+            t->DrawLine(D2D1::Point2F(left, kOptionsCard.top + 216.0f),
+                        D2D1::Point2F(kOptionsCard.right - 18.0f, kOptionsCard.top + 216.0f), divider.Get(), 1.0f);
+        } else {
+            t->DrawLine(D2D1::Point2F(left, kOptionsCard.top + 150.0f),
+                        D2D1::Point2F(kOptionsCard.right - 18.0f, kOptionsCard.top + 150.0f), divider.Get(), 1.0f);
         }
+        DrawText(wizard, Tr(L"Check for updates", L"更新を確認する"), wizard.body.Get(),
+                 D2D1::RectF(left, updatesLabelTop, kOptionsCard.right - 90.0f, updatesLabelTop + 20.0f), p.ink);
+        DrawText(wizard,
+                 Tr(L"Settings may look on GitHub for a newer TEKITO. Typing never uses the network.",
+                    L"設定が GitHub で新しい TEKITO を確認できます。入力そのものはネットを使いません。"),
+                 wizard.caption.Get(),
+                 D2D1::RectF(left, updatesLabelTop + 22.0f, kOptionsCard.right - 90.0f, updatesLabelTop + 52.0f), p.ink2);
         break;
     }
     case Screen::Uninstall: {
@@ -1560,6 +1583,7 @@ void Activate(Wizard& wizard, Action action, int index = 0) {
     case Action::Shortcut: wizard.startMenuShortcut = !wizard.startMenuShortcut; break;
     case Action::Japanese: wizard.japanese = !wizard.japanese; break;
     case Action::KeepEnglish: wizard.keepEnglish = !wizard.keepEnglish; break;
+    case Action::CheckForUpdates: wizard.checkForUpdates = !wizard.checkForUpdates; break;
     case Action::Samples:
         wizard.sampleMode = SampleModes(wizard).front();
         wizard.sampleClip = 0;
@@ -1856,12 +1880,14 @@ void SavePreview(HWND window, const std::wstring& path) {
 
 // `uninstallRoot`: uninstall that installation (uninstall.ps1 is next to
 // `self`) instead of installing.
-bool ShowWizard(const std::filesystem::path& self, const std::filesystem::path& uninstallRoot = {}) {
+bool ShowWizard(const std::filesystem::path& self, const std::filesystem::path& uninstallRoot = {},
+                bool enableUpdates = false) {
     Wizard wizard;
     wizard.self = self;
     wizard.uninstallRoot = uninstallRoot;
     wizard.uninstallScript = self.parent_path() / L"uninstall.ps1";
     wizard.installRoot = DefaultInstallRoot();
+    wizard.checkForUpdates = enableUpdates;
     wizard.webViewReady = HasWebView2Runtime();
     if (FAILED(D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, wizard.factory.Put())) ||
         FAILED(DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory),
@@ -2004,14 +2030,17 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     if (length == 0 || length >= std::size(selfPath)) return 1;
     const std::filesystem::path self(selfPath);
     // /uninstall [/from <installation>]: from Installed apps.
+    // /enable-updates: turn on optional update checks (online installer).
     std::filesystem::path uninstallRoot;
     bool uninstall = false;
+    bool enableUpdates = false;
     {
         int argc = 0;
         LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc);
         for (int i = 1; argv && i < argc; ++i) {
             if (std::wstring_view(argv[i]) == L"/uninstall") uninstall = true;
             if (std::wstring_view(argv[i]) == L"/from" && i + 1 < argc) uninstallRoot = argv[i + 1];
+            if (std::wstring_view(argv[i]) == L"/enable-updates") enableUpdates = true;
         }
         if (argv) LocalFree(argv);
     }
@@ -2042,7 +2071,8 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     }
     const HRESULT comResult = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
     const bool comInitialized = SUCCEEDED(comResult);
-    const int result = ShowWizard(self, uninstall ? uninstallRoot : std::filesystem::path{}) ? 0 : 1;
+    const int result =
+        ShowWizard(self, uninstall ? uninstallRoot : std::filesystem::path{}, enableUpdates) ? 0 : 1;
     if (comInitialized) CoUninitialize();
     if (uninstall) {
         // The copy and its folder go at the next restart.

@@ -20,6 +20,9 @@ param(
     [bool]$Japanese = $false,
     [string]$JapaneseDataPath,
     [bool]$KeepEnglishProfile = $false,
+    # When true, Settings may check GitHub for a newer TEKITO (a flag file
+    # under %LOCALAPPDATA%\TEKITO; typing never uses the network).
+    [bool]$CheckForUpdates = $false,
     [switch]$SkipDataPacks,
     [switch]$SkipRegistration,
     [switch]$SkipPrerequisiteCheck
@@ -264,7 +267,19 @@ try {
         data_root = Join-Path $env:LOCALAPPDATA "TEKITO\data"
         start_menu_shortcut = $StartMenuShortcut
         japanese = $Japanese
+        check_for_updates = $CheckForUpdates
     } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $installRoot "install-manifest.json") -Encoding UTF8
+
+    # Settings reads this once and turns on checkForUpdates (user.db is not
+    # written here so an existing dictionary is left alone).
+    $userData = Join-Path $env:LOCALAPPDATA "TEKITO"
+    $updateFlag = Join-Path $userData "enable-update-check"
+    if ($CheckForUpdates) {
+        New-Item -ItemType Directory -Path $userData -Force | Out-Null
+        Set-Content -LiteralPath $updateFlag -Value "1" -Encoding ASCII
+    } else {
+        Remove-Item -LiteralPath $updateFlag -Force -ErrorAction SilentlyContinue
+    }
 
     # An uninstall's cleanup left for the next sign-in would delete this.
     Remove-ItemProperty -LiteralPath "HKCU:\Software\Microsoft\Windows\CurrentVersion\RunOnce" -Name "TEKITO cleanup" -ErrorAction SilentlyContinue

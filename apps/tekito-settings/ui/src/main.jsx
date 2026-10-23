@@ -62,6 +62,7 @@ const initialSettings = {
   japaneseSymbolWidth: 0,
   japaneseLetterWidth: 1,
   keepRecentConversions: true,
+  checkForUpdates: false,
   japanesePredictionEnabled: true,
   japaneseLiveConversion: false,
   japaneseSentenceCheck: true,
@@ -350,8 +351,9 @@ function searchIndex(t, pages, japaneseInstalled) {
     ["auto", a.doubleSpace.title, true], ["auto", a.smart.title, true],
     ["dictionary", d.japaneseWords.title], ["dictionary", d.englishWords.title], ["dictionary", d.files.title],
     ["dictionary", d.learn.title], ["dictionary", d.learned.title], ["dictionary", d.private.title],
-    ["about", t.about.report.title], ["about", t.about.bug.title], ["about", t.about.feature.title], ["about", t.about.releases.title],
-    ["about", t.about.diagnostics], ["about", t.about.license],
+    ["about", t.about.report.title], ["about", t.about.bug.title], ["about", t.about.feature.title],
+    ["about", t.about.updates.title], ["about", t.about.updates.check.title],
+    ["about", t.about.releases.title], ["about", t.about.diagnostics], ["about", t.about.license],
   ];
   return entries.filter(([page, title]) => pages.includes(page) &&
     (japaneseInstalled || (title !== d.japaneseWords.title && title !== t.about.report.title)));
@@ -1216,10 +1218,55 @@ function AboutPage({ settings, setSetting, runAction, version, runtime, packs, j
   const t = useText();
   const a = t.about;
   const [license, setLicense] = useState(null);
+  const [updateStatus, setUpdateStatus] = useState(null);
+  const [updateBusy, setUpdateBusy] = useState(false);
   const openLicense = async () => {
     const response = await hostRequest("license.get");
     setLicense(response.ok ? response.text : a.licenseMissing);
   };
+  const checkUpdates = async () => {
+    setUpdateBusy(true);
+    setUpdateStatus(null);
+    try {
+      const response = await hostRequest("updates.check");
+      if (!response.ok) {
+        setUpdateStatus({ kind: "error", text: response.error || a.updates.failed });
+      } else if (response.updateAvailable) {
+        setUpdateStatus({
+          kind: "available",
+          text: a.updates.available(response.latestVersion),
+          url: response.installerUrl,
+          name: response.installerName,
+        });
+      } else {
+        setUpdateStatus({ kind: "ok", text: a.updates.upToDate });
+      }
+    } catch {
+      setUpdateStatus({ kind: "error", text: a.updates.failed });
+    } finally {
+      setUpdateBusy(false);
+    }
+  };
+  const installUpdate = async () => {
+    if (!updateStatus?.url || !updateStatus?.name) return;
+    setUpdateBusy(true);
+    try {
+      const response = await hostRequest("updates.install", { url: updateStatus.url, name: updateStatus.name });
+      setUpdateStatus({
+        kind: response.ok ? "ok" : "error",
+        text: response.ok ? a.updates.opened : (response.error || a.updates.failed),
+      });
+    } catch {
+      setUpdateStatus({ kind: "error", text: a.updates.failed });
+    } finally {
+      setUpdateBusy(false);
+    }
+  };
+  useEffect(() => {
+    if (settings.checkForUpdates) checkUpdates();
+    // Once when About opens with the option on.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings.checkForUpdates]);
   // The third-party notices and full license texts carried in the page
   // (copy-notices.mjs); `plain` for a text file.
   const [notice, setNotice] = useState(null);
@@ -1298,6 +1345,27 @@ function AboutPage({ settings, setSetting, runAction, version, runtime, packs, j
         )}
         <LinkRow icon="bug_report" title={a.bug.title} description={a.bug.description} external onClick={() => runAction("feedback.open", { kind: "bug" })} />
         <LinkRow icon="lightbulb" title={a.feature.title} description={a.feature.description} external onClick={() => runAction("feedback.open", { kind: "feature" })} />
+      </Card>
+
+      <Heading>{a.updates.title}</Heading>
+      <Card label={a.updates.title}>
+        <Row icon="system_update" title={a.updates.check.title} description={a.updates.check.description}
+          sub={(
+            <>
+              {updateStatus && <p className={updateStatus.kind === "error" ? "problem" : "list-empty"}>{updateStatus.text}</p>}
+              <div className="row-actions">
+                <Button onClick={checkUpdates} disabled={updateBusy}>{updateBusy ? a.updates.checking : a.updates.now}</Button>
+                {updateStatus?.kind === "available" && (
+                  <Button variant="primary" onClick={installUpdate} disabled={updateBusy}>
+                    {updateBusy ? a.updates.installing : a.updates.install}
+                  </Button>
+                )}
+              </div>
+            </>
+          )}>
+          <Toggle label={a.updates.check.title} checked={settings.checkForUpdates}
+            onChange={(value) => setSetting("checkForUpdates", value)} />
+        </Row>
       </Card>
 
       <Heading>{a.support}</Heading>

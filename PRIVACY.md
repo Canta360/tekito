@@ -1,10 +1,11 @@
 # Privacy
 
 TEKITO works entirely on your PC. It does not send what you type, your
-dictionary or what it has learned anywhere. It has no account, no telemetry
-and no update check, and nothing in the input path uses the network. The
-only downloads are the ones you ask for: the Japanese data in the setup
-program and the postal code data in Settings.
+dictionary or what it has learned anywhere. It has no account and no
+telemetry, and nothing in the input path uses the network. Downloads you
+ask for are: the Japanese data in setup, postal codes in Settings, and —
+only if you turn on **Check for updates** or use the online installer —
+looking up or fetching a newer TEKITO from GitHub.
 
 ## What TEKITO keeps, and where
 
@@ -50,6 +51,10 @@ reach, and there TEKITO types with the default settings.
   with the reading and the result filled in; nothing is sent until you submit
   it there. **Report a problem** fills in the version and settings the same
   way.
+- **Settings → About → Check for updates** (off by default) lets Settings ask
+  GitHub for a newer TEKITO and, if you choose, download its installer. The
+  online installer can turn this on during setup. Typing never uses the
+  network for updates.
 - **Settings → General → More settings → Apps where TEKITO is off** makes TEKITO pass
   every key through in the apps you list. It also stays off in terminals,
   apps running as administrator, and password, PIN, email, URL and number
@@ -64,14 +69,29 @@ and the apps you type in have their own privacy terms. If the WebView2
 Runtime is missing, the setup program offers to open Microsoft's download
 page; it never downloads anything on its own.
 
+## Installers and updates
+
+There are two setup programs:
+
+- **Full installer** (`TEKITO-<version>-full-installer.exe`): English and the
+  program are in the file. Network use is only if you add Japanese (below) or
+  turn on update checks.
+- **Online installer** (`TEKITO-online-installer.exe`): downloads the latest
+  full installer from GitHub Releases, checks its SHA-256, then runs it. You
+  can opt in to update checks there.
+
+Optional updates (Settings or that opt-in) only contact GitHub for the
+release version and installer files. They do not send what you type, your
+dictionary or learning.
+
 ## The Japanese data download
 
 When you choose Japanese in the setup program, it downloads the Japanese
 data from TEKITO's release on GitHub (github.com) and checks it against the
-checksum it carries. That request is the setup program's only network use; it sends nothing
-about you beyond what any download does, such as your IP address, and
-GitHub's privacy terms apply to it. Installing from a ZIP you downloaded
-yourself (`install.ps1 -JapaneseDataPath`) makes no request at all.
+checksum it carries. That request sends nothing about you beyond what any
+download does, such as your IP address, and GitHub's privacy terms apply to
+it. Installing from a ZIP you downloaded yourself
+(`install.ps1 -JapaneseDataPath`) makes no request at all.
 
 ## Postal codes
 
@@ -87,13 +107,14 @@ reads a file you choose on your computer and makes no request.
 
 ## プライバシー（日本語）
 
-TEKITO の処理はすべて PC の中で行われます。入力した内容、ユーザー辞書、学習した内容をどこにも送りません。アカウント、テレメトリ、更新確認はなく、入力の処理経路でネットワークを使うこともありません。ダウンロードするのは、インストール時の日本語データと、設定で指示した郵便番号データだけです。
+TEKITO の処理はすべて PC の中で行われます。入力した内容、ユーザー辞書、学習した内容をどこにも送りません。アカウントやテレメトリはなく、入力の処理経路でネットワークを使うこともありません。ダウンロードするのは、インストール時の日本語データ、設定で指示した郵便番号データ、および（任意の）更新確認・更新用インストーラーだけです。
 
 - 設定・ユーザー辞書・学習内容は `%LOCALAPPDATA%\TEKITO\user.db` に保存されます。学習しているのは「どの単語でどの候補を選んだか」と、日本語では「どの読みにどの変換を選んだか」の回数だけで、文章や入力履歴は保存しません。日本語の変換は文全体を読むために直前に確定した数語をメモリーにだけ持ちますが、続けて打っている間だけ使い、カーソルがほかへ移ると忘れます。保存はしません。Ctrl+Backspace で確定を取り消せるよう、確定したばかりの文字も次に打ち始めるまでメモリーにだけ持ちます。
 - 誤変換を報告できるよう、直近30件の日本語の変換（読みと変換結果のみ。押したキーは保存せず、プライベートウィンドウでの変換も保存しません）を `user.db` に保存します。設定の「情報 → 誤変換の報告」でオフにでき、オフにすると削除されます。「報告」はブラウザで GitHub の Issue フォームを開き、読みと変換結果を入力した状態にするだけで、送信するまで何も送られません。「不具合の報告」も同じように、バージョンと設定を入力した状態でフォームを開きます。
 - 再変換（文字を選んで変換キー）は選んだ文字をこの PC の中で読むだけで、ほかの IME の単語の読み込みは選んだファイルをこの PC の中で取り込むだけです。どちらも何も送りません。
 - スタートメニューの検索、設定アプリ、ストアアプリでも使えるように、インストーラーはこれらのサンドボックスのアプリに、プログラムのフォルダ（`%LOCALAPPDATA%\Programs\TEKITO`）と言語データ（`%LOCALAPPDATA%\TEKITO\data`）の読み取りだけを許可します。`user.db` は対象外なので、辞書や学習内容は読めません。そこでは TEKITO は既定の設定で動きます。
-- インストール時に日本語を選択すると、日本語データを GitHub の TEKITO のリリースからダウンロードし、チェックサムを照合します。インストーラーがネットワークを使用するのはこのときのみです。自分でダウンロードした ZIP からインストールする場合（`install.ps1 -JapaneseDataPath`）は通信しません。
+- インストーラーは2種類あります。フルインストーラー（英語同梱）と、起動時に GitHub から最新のフルインストーラーを取得するオンラインインストーラーです。設定の「情報 → 更新を確認する」（既定オフ。オンラインインストーラーでもオンにできます）をオンにすると、設定だけが GitHub で新しい版を確認・取得します。入力そのものはネットを使いません。
+- インストール時に日本語を選択すると、日本語データを GitHub の TEKITO のリリースからダウンロードし、チェックサムを照合します。自分でダウンロードした ZIP からインストールする場合（`install.ps1 -JapaneseDataPath`）は通信しません。
 - 設定の「郵便番号から住所に変換」をオンにすると、確認のうえで日本郵便の郵便番号データ（utf_ken_all.zip）をダウンロードします。取得先は GitHub の TEKITO のリリースにある毎月更新の写し（github.com）で、取得できないときは日本郵便のサイト（www.post.japanpost.jp）です。送られるのは IP アドレスなど通常のダウンロードと同じ情報だけです。「ダウンロード済みのファイルを使う」を選んだ場合は、選んだファイルをこの PC の中で取り込むだけで、通信しません。
 - 診断ログ（`%TEMP%\TekitoTsf.log`、トレース用ビルドか `TEKITO_TSF_TRACE=1` のときだけ作られます）と設定画面の「診断情報をコピー」には、イベント・時間・エラーコードだけが含まれ、入力した文字は含まれません。
 - 学習は設定画面の「辞書と学習 → 選択した候補の学習」でオン/オフでき、「すべて削除」で消せます。「一般 → 詳細 → TEKITO を使わないアプリ」に追加したアプリでは完全にオフになります。
