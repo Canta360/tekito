@@ -1,8 +1,9 @@
-# Builds the offline installer from a Release build:
-#   artifacts\TEKITO-<version>-full\            the package, ready to zip
-#   artifacts\TEKITO-<version>-full.zip          the package as a ZIP
-#   artifacts\TEKITO-<version>-full-installer.exe  setup program + ZIP in one file
-#   artifacts\TEKITO-<version>-japanese-data.zip  the Japanese Data Packs
+# Builds the offline and online installers from a Release build:
+#   artifacts\TEKITO-<version>-full\               the package, ready to zip
+#   artifacts\TEKITO-<version>-full.zip             the package as a ZIP
+#   artifacts\TEKITO-<version>-full-installer.exe   offline setup (English + ZIP)
+#   artifacts\TEKITO-online-installer.exe           stub: downloads the latest full installer
+#   artifacts\TEKITO-<version>-japanese-data.zip    the Japanese Data Packs
 # The Japanese data is too large to carry in the installer. Attach its ZIP to
 # the GitHub release v<version>; the installer downloads it when Japanese is
 # chosen and checks it against the SHA-256 recorded here.
@@ -69,6 +70,7 @@ $binaries = [ordered]@{
     "TekitoUninstall.exe" = Join-Path $releaseRoot "TekitoSetupStub.exe"
 }
 $setupStub = Join-Path $releaseRoot "TekitoSetupStub.exe"
+$onlineStub = Join-Path $releaseRoot "TekitoOnlineSetup.exe"
 $documents = [ordered]@{
     "README.md" = Join-Path $repoRoot "README.md"
     "README_JP.md" = Join-Path $repoRoot "README_JP.md"
@@ -91,7 +93,7 @@ $scripts = [ordered]@{
     "scripts\install-data-packs.ps1" = Join-Path $repoRoot "scripts\install-data-packs.ps1"
     "scripts\verify-installed.ps1" = Join-Path $repoRoot "scripts\verify-installed.ps1"
 }
-foreach ($source in @($binaries.Values) + @($documents.Values) + @($scripts.Values) + @($setupStub)) {
+foreach ($source in @($binaries.Values) + @($documents.Values) + @($scripts.Values) + @($setupStub) + @($onlineStub)) {
     if (-not (Test-Path -LiteralPath $source -PathType Leaf)) { throw "Missing input: $source" }
 }
 if (-not (Test-Path -LiteralPath (Join-Path $releaseRoot "settings-ui\index.html"))) {
@@ -144,7 +146,7 @@ foreach ($pack in $allPacks) {
     }
 }
 if ($ValidateOnly) {
-    Write-Host ("Inputs are complete: $($binaries.Count) binaries, the setup program, the Settings page, " +
+    Write-Host ("Inputs are complete: $($binaries.Count) binaries, the setup program, the online installer, the Settings page, " +
         "$($packs.Count) Data Packs and $($japaneseSources.Count) Japanese Data Packs.")
     exit 0
 }
@@ -216,16 +218,19 @@ $japaneseHash = Get-Sha256 $japaneseArchive
 Write-Host "Japanese data: $japaneseArchive (attach it to the v$version release)"
 
 $installerName = "TEKITO-$version-full-installer.exe"
+$onlineInstallerName = "TEKITO-online-installer.exe"
 [ordered]@{
     product = "TEKITO"
     version = $version
     created_at = [DateTime]::UtcNow.ToString("o")
     single_exe_installer = $installerName
+    online_installer = $onlineInstallerName
     runtime_network = "not-used"
     requires_webview2_runtime = $true
     data_packs = $packs.Count
     data_pack_manifests = $packManifests
-    # Downloaded by install.ps1 -Japanese; nothing else is fetched.
+    # Downloaded by install.ps1 -Japanese; nothing else is fetched by the
+    # offline installer. The online stub fetches the full installer only.
     japanese_data = [ordered]@{
         file = $japaneseName
         url = "$($JapaneseDataBaseUrl.TrimEnd('/'))/v$version/$japaneseName"
@@ -246,7 +251,8 @@ Write-Host "Archive: $ArchivePath"
 
 # The setup program finds its payload through a trailer at the end of the
 # file: magic, payload length, reserved (see TekitoSetup.cpp).
-$installerPath = Join-Path (Split-Path $ArchivePath -Parent) $installerName
+$artifactDir = Split-Path $ArchivePath -Parent
+$installerPath = Join-Path $artifactDir $installerName
 $output = [IO.File]::Create($installerPath)
 try {
     foreach ($part in @($setupStub, $ArchivePath)) {
@@ -263,3 +269,9 @@ try {
 "$(Get-Sha256 $installerPath)  $installerName" | Set-Content -LiteralPath "$installerPath.sha256" -Encoding ASCII
 & (Join-Path $OutputRoot "verify-package.ps1") -PackageRoot $OutputRoot -RequireSingleExeInstaller
 Write-Host "Installer: $installerPath"
+
+# Online stub (no package payload): always fetches the latest full installer.
+$onlinePath = Join-Path $artifactDir $onlineInstallerName
+Copy-Item -LiteralPath $onlineStub $onlinePath -Force
+"$(Get-Sha256 $onlinePath)  $onlineInstallerName" | Set-Content -LiteralPath "$onlinePath.sha256" -Encoding ASCII
+Write-Host "Online installer: $onlinePath"

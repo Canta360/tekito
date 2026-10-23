@@ -204,6 +204,10 @@ struct UserSettings {
     // Language of TEKITO's own windows: 0 = the Windows display language,
     // 1 = English, 2 = Japanese. See UiLanguage.h.
     int uiLanguage{0};
+    // Settings may ask GitHub for a newer TEKITO. Off by default; the online
+    // installer or Options can turn it on. The input method never uses the
+    // network.
+    bool checkForUpdates{false};
     // Executable names (e.g. "code.exe") where TEKITO passes every key
     // through, in addition to the built-in terminal list.
     std::vector<std::wstring> excludedApps;

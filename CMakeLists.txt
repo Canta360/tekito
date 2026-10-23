@@ -149,7 +149,7 @@ target_compile_options(TEKITO PRIVATE /utf-8)
 target_compile_definitions(TEKITO PRIVATE TEKITO_VERSION_STRING="${PROJECT_VERSION}")
 target_link_libraries(TEKITO PRIVATE
     tekito_userdata tekito_dictionary
-    user32 gdi32 comctl32 comdlg32 shell32 advapi32 urlmon
+    user32 gdi32 comctl32 comdlg32 shell32 advapi32 urlmon winhttp bcrypt
     "${CMAKE_CURRENT_SOURCE_DIR}/third_party/webview2/lib/x64/WebView2LoaderStatic.lib"
 )
 # The page itself is built by `npm run build` in apps/tekito-settings/ui.
@@ -173,6 +173,13 @@ target_compile_definitions(TekitoSetupStub PRIVATE ${TEKITO_WINDOWS_DEFINES})
 target_compile_options(TekitoSetupStub PRIVATE /utf-8)
 target_link_libraries(TekitoSetupStub PRIVATE ${TEKITO_SETUP_LIBS})
 set_target_properties(TekitoSetupStub PROPERTIES LINK_FLAGS "/MANIFEST:NO")
+
+# Online installer: downloads the latest full installer from GitHub Releases.
+add_executable(TekitoOnlineSetup WIN32 installer/TekitoOnlineSetup.cpp installer/TekitoSetup.rc)
+target_compile_definitions(TekitoOnlineSetup PRIVATE ${TEKITO_WINDOWS_DEFINES})
+target_compile_options(TekitoOnlineSetup PRIVATE /utf-8)
+target_link_libraries(TekitoOnlineSetup PRIVATE user32 shell32 shlwapi winhttp bcrypt)
+set_target_properties(TekitoOnlineSetup PROPERTIES LINK_FLAGS "/MANIFEST:NO")
 
 # ---------------------------------------------------------------------------
 # Tests and tools

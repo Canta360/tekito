@@ -326,6 +326,7 @@ kbd {
   display: flex; gap: 8px; padding: 18px 24px; background: var(--window); border-top: 1px solid var(--line);
 }
 .dialog-actions > .btn { flex: 1; justify-content: center; }
+.row-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 .dialog-link { display: block; padding: 0 24px 20px; border: 0; background: none; color: var(--accent); font-size: 13px; text-align: left; }
 .form { display: grid; gap: 14px; }
 .form > .field { padding: 0 24px; }

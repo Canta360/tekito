@@ -75,6 +75,7 @@ function initialState() {
       japaneseLetterWidth: 1,
       advancedSettings: false,
       keepRecentConversions: true,
+      checkForUpdates: false,
       japanesePredictionEnabled: true,
       japaneseLiveConversion: false,
       japaneseSentenceCheck: true,
@@ -217,6 +218,21 @@ export function installMockHost() {
         state.dictionary = state.dictionary.map((entry) => entry.id === message.id ? { ...entry, raw: message.raw, candidate: message.candidate, policy: message.policy } : entry);
       } else if (type === "dictionary.delete") {
         state.dictionary = state.dictionary.filter((entry) => entry.id !== message.id);
+      }
+      if (type === "updates.check") {
+        window.setTimeout(() => {
+          const data = JSON.stringify({
+            requestId, ok: true, error: "", state,
+            updateAvailable: false, latestVersion: state.version, currentVersion: state.version,
+            installerUrl: "", installerName: "",
+          });
+          listeners.forEach((listener) => listener({ data }));
+        }, 400);
+        return;
+      }
+      if (type === "updates.install") {
+        window.setTimeout(() => reply(requestId), 400);
+        return;
       }
       if (type === "postalCodes.download") {
         window.setTimeout(() => {

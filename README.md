@@ -217,14 +217,21 @@ Everything TEKITO does happens on your computer. It does not send your
 typing anywhere, it has no account and no telemetry, and it does not use the
 network while you type. What it learns from your choices stays in
 `%LOCALAPPDATA%\TEKITO` and can be cleared from Settings. It downloads only
-the Japanese data, when you choose Japanese in the setup program, and
-postal codes, when you turn them on in Settings.
+what you ask for: Japanese data in setup, postal codes in Settings, and
+optional updates from GitHub when that option is on.
 See [the privacy notice](PRIVACY.md).
 
 ## Install
 
-Download `TEKITO-0.6.2-full-installer.exe` from
-[Releases](https://github.com/Canta360/tekito/releases) and run it.
+From [Releases](https://github.com/Canta360/tekito/releases), pick one:
+
+- **`TEKITO-<version>-full-installer.exe`** — offline-style: English and the
+  program are in the file. Use this when you already have the build you want.
+- **`TEKITO-online-installer.exe`** — downloads the latest full installer from
+  GitHub, checks its SHA-256, then runs it. Optional: turn on update checks
+  for later.
+
+In the full installer:
 
 - **Add Japanese input** (on when Windows shows Japanese) downloads the
   Japanese dictionary and language data, about 88 MB, from the same release,
@@ -233,6 +240,8 @@ Download `TEKITO-0.6.2-full-installer.exe` from
   so it leaves the English list unless you keep it there under **Options**.
 - Without Japanese, TEKITO appears in the English keyboard list with Auto and
   Direct. Run the installer again to add Japanese later.
+- **Options → Check for updates** (off by default) lets Settings look on
+  GitHub for a newer TEKITO. Typing never uses the network.
 - It needs the Microsoft Edge WebView2 Runtime, which Windows 11 already has.
 
 After installing, restart the apps you want to type in (or sign out and back

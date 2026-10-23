@@ -27,10 +27,12 @@
 #include "assets/tekito_resource.h"
 
 #include <windows.h>
+#include <bcrypt.h>
 #include <commdlg.h>
 #include <dwmapi.h>
 #include <shellapi.h>
 #include <urlmon.h>
+#include <winhttp.h>
 #include <wrl.h>
 #include "WebView2.h"
 
@@ -46,10 +48,13 @@
 #include <string>
 #include <string_view>
 #include <thread>
+#include <vector>
 
 #pragma comment(lib, "comdlg32.lib")
 #pragma comment(lib, "dwmapi.lib")
 #pragma comment(lib, "shell32.lib")
+#pragma comment(lib, "winhttp.lib")
+#pragma comment(lib, "bcrypt.lib")
 
 namespace {
 
@@ -68,11 +73,36 @@ constexpr UINT_PTR kStateWatchTimer = 1;
 constexpr UINT kStateWatchIntervalMs = 500;
 // A postal code download finished (lParam: PostalDownload*).
 constexpr UINT kPostalDownloaded = WM_APP + 1;
+// An optional update check finished (lParam: UpdateCheck*).
+constexpr UINT kUpdateChecked = WM_APP + 2;
+// An optional update installer download finished (lParam: UpdateInstall*).
+constexpr UINT kUpdateDownloaded = WM_APP + 3;
+
+constexpr wchar_t kGitHubApiHost[] = L"api.github.com";
+constexpr wchar_t kGitHubLatestPath[] = L"/repos/Canta360/tekito/releases/latest";
+constexpr wchar_t kUpdateUserAgent[] = L"TEKITO-Settings";
 
 struct PostalDownload {
     std::wstring requestId;
     std::filesystem::path file;
     bool ok{false};
+};
+
+struct UpdateCheck {
+    std::wstring requestId;
+    bool ok{false};
+    bool updateAvailable{false};
+    std::wstring latestVersion;
+    std::wstring installerUrl;
+    std::wstring installerName;
+    std::wstring error;
+};
+
+struct UpdateInstall {
+    std::wstring requestId;
+    std::filesystem::path installer;
+    bool ok{false};
+    std::wstring error;
 };
 
 // The distributor's site, opened by the About page. Fixed here rather than
@@ -399,6 +429,269 @@ std::filesystem::path WebViewUserDataDirectory() {
     return std::filesystem::path(localAppData) / L"TEKITO" / L"settings-webview";
 }
 
+std::filesystem::path TekitoUserDataDirectory() {
+    wchar_t localAppData[MAX_PATH]{};
+    const DWORD length = GetEnvironmentVariableW(L"LOCALAPPDATA", localAppData, MAX_PATH);
+    if (length == 0 || length >= MAX_PATH) return {};
+    return std::filesystem::path(localAppData) / L"TEKITO";
+}
+
+std::wstring UiText(const wchar_t* english, const wchar_t* japanese) {
+    return PRIMARYLANGID(GetUserDefaultUILanguage()) == LANG_JAPANESE ? japanese : english;
+}
+
+// install.ps1 -CheckForUpdates writes this; Settings turns the option on once.
+bool ConsumeEnableUpdateCheckFlag(tekito::userdata::UserSettings& settings) {
+    const auto flag = TekitoUserDataDirectory() / L"enable-update-check";
+    std::error_code error;
+    if (!std::filesystem::is_regular_file(flag, error)) return false;
+    settings.checkForUpdates = true;
+    std::filesystem::remove(flag, error);
+    return true;
+}
+
+bool HttpGetHttps(const wchar_t* host, const wchar_t* path, std::vector<char>& body) {
+    body.clear();
+    HINTERNET session = WinHttpOpen(kUpdateUserAgent, WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, WINHTTP_NO_PROXY_NAME,
+                                    WINHTTP_NO_PROXY_BYPASS, 0);
+    if (!session) return false;
+    HINTERNET connect = WinHttpConnect(session, host, INTERNET_DEFAULT_HTTPS_PORT, 0);
+    if (!connect) {
+        WinHttpCloseHandle(session);
+        return false;
+    }
+    HINTERNET request = WinHttpOpenRequest(connect, L"GET", path, nullptr, WINHTTP_NO_REFERER,
+                                           WINHTTP_DEFAULT_ACCEPT_TYPES, WINHTTP_FLAG_SECURE);
+    if (!request) {
+        WinHttpCloseHandle(connect);
+        WinHttpCloseHandle(session);
+        return false;
+    }
+    WinHttpAddRequestHeaders(request, L"Accept: application/vnd.github+json\r\n", static_cast<DWORD>(-1),
+                             WINHTTP_ADDREQ_FLAG_ADD);
+    const bool ok = WinHttpSendRequest(request, WINHTTP_NO_ADDITIONAL_HEADERS, 0, WINHTTP_NO_REQUEST_DATA, 0, 0, 0) &&
+                    WinHttpReceiveResponse(request, nullptr);
+    if (ok) {
+        for (;;) {
+            DWORD available = 0;
+            if (!WinHttpQueryDataAvailable(request, &available) || available == 0) break;
+            const auto offset = body.size();
+            body.resize(offset + available);
+            DWORD read = 0;
+            if (!WinHttpReadData(request, body.data() + offset, available, &read)) {
+                body.resize(offset);
+                break;
+            }
+            body.resize(offset + read);
+        }
+    }
+    WinHttpCloseHandle(request);
+    WinHttpCloseHandle(connect);
+    WinHttpCloseHandle(session);
+    return ok && !body.empty();
+}
+
+bool DownloadHttpsUrl(const std::wstring& url, const std::filesystem::path& dest) {
+    URL_COMPONENTS parts{};
+    parts.dwStructSize = sizeof(parts);
+    parts.dwHostNameLength = static_cast<DWORD>(-1);
+    parts.dwUrlPathLength = static_cast<DWORD>(-1);
+    parts.dwExtraInfoLength = static_cast<DWORD>(-1);
+    if (!WinHttpCrackUrl(url.c_str(), 0, 0, &parts) || !parts.lpszHostName || !parts.lpszUrlPath) return false;
+    const std::wstring host(parts.lpszHostName, parts.dwHostNameLength);
+    std::wstring path(parts.lpszUrlPath, parts.dwUrlPathLength);
+    if (parts.lpszExtraInfo && parts.dwExtraInfoLength > 0) {
+        path.append(parts.lpszExtraInfo, parts.dwExtraInfoLength);
+    }
+    std::vector<char> body;
+    if (!HttpGetHttps(host.c_str(), path.c_str(), body)) return false;
+    std::ofstream output(dest, std::ios::binary);
+    return static_cast<bool>(output.write(body.data(), static_cast<std::streamsize>(body.size())));
+}
+
+std::string FileSha256Hex(const std::filesystem::path& path) {
+    std::ifstream input(path, std::ios::binary);
+    if (!input) return {};
+    BCRYPT_ALG_HANDLE algorithm{};
+    BCRYPT_HASH_HANDLE hash{};
+    DWORD objectLength = 0;
+    DWORD dataLength = 0;
+    DWORD hashLength = 0;
+    if (BCryptOpenAlgorithmProvider(&algorithm, BCRYPT_SHA256_ALGORITHM, nullptr, 0) != 0) return {};
+    if (BCryptGetProperty(algorithm, BCRYPT_OBJECT_LENGTH, reinterpret_cast<PUCHAR>(&objectLength), sizeof(objectLength),
+                          &dataLength, 0) != 0 ||
+        BCryptGetProperty(algorithm, BCRYPT_HASH_LENGTH, reinterpret_cast<PUCHAR>(&hashLength), sizeof(hashLength),
+                          &dataLength, 0) != 0) {
+        BCryptCloseAlgorithmProvider(algorithm, 0);
+        return {};
+    }
+    std::vector<UCHAR> object(objectLength);
+    std::vector<UCHAR> digest(hashLength);
+    if (BCryptCreateHash(algorithm, &hash, object.data(), objectLength, nullptr, 0, 0) != 0) {
+        BCryptCloseAlgorithmProvider(algorithm, 0);
+        return {};
+    }
+    std::vector<char> buffer(1024 * 256);
+    while (input) {
+        input.read(buffer.data(), static_cast<std::streamsize>(buffer.size()));
+        const auto got = input.gcount();
+        if (got > 0 &&
+            BCryptHashData(hash, reinterpret_cast<PUCHAR>(buffer.data()), static_cast<ULONG>(got), 0) != 0) {
+            BCryptDestroyHash(hash);
+            BCryptCloseAlgorithmProvider(algorithm, 0);
+            return {};
+        }
+    }
+    if (BCryptFinishHash(hash, digest.data(), hashLength, 0) != 0) {
+        BCryptDestroyHash(hash);
+        BCryptCloseAlgorithmProvider(algorithm, 0);
+        return {};
+    }
+    BCryptDestroyHash(hash);
+    BCryptCloseAlgorithmProvider(algorithm, 0);
+    static constexpr char kHex[] = "0123456789ABCDEF";
+    std::string hex(digest.size() * 2, '\0');
+    for (std::size_t i = 0; i < digest.size(); ++i) {
+        hex[i * 2] = kHex[digest[i] >> 4];
+        hex[i * 2 + 1] = kHex[digest[i] & 0xf];
+    }
+    return hex;
+}
+
+std::string ReadSha256Sidecar(const std::filesystem::path& path) {
+    std::ifstream input(path);
+    if (!input) return {};
+    std::string line;
+    std::getline(input, line);
+    const auto end = line.find_first_of(" \t");
+    std::string hash = end == std::string::npos ? line : line.substr(0, end);
+    for (char& c : hash) {
+        if (c >= 'a' && c <= 'f') c = static_cast<char>(c - 'a' + 'A');
+    }
+    return hash;
+}
+
+// Compares dotted versions ("1.2.3"); returns true when latest is newer.
+bool VersionIsNewer(std::string_view latest, std::string_view current) {
+    auto next = [](std::string_view& text) {
+        const auto dot = text.find('.');
+        const auto part = dot == std::string_view::npos ? text : text.substr(0, dot);
+        text = dot == std::string_view::npos ? std::string_view{} : text.substr(dot + 1);
+        int value = 0;
+        for (const char c : part) {
+            if (c < '0' || c > '9') break;
+            value = value * 10 + (c - '0');
+        }
+        return value;
+    };
+    std::string_view a = latest;
+    std::string_view b = current;
+    for (int i = 0; i < 4; ++i) {
+        const int left = next(a);
+        const int right = next(b);
+        if (left != right) return left > right;
+        if (a.empty() && b.empty()) return false;
+    }
+    return false;
+}
+
+bool ParseLatestInstaller(const std::vector<char>& json, UpdateCheck& result) {
+    const std::string body(json.begin(), json.end());
+    const auto tagKey = body.find("\"tag_name\"");
+    if (tagKey == std::string::npos) return false;
+    const auto quote1 = body.find('"', body.find(':', tagKey));
+    const auto quote2 = body.find('"', quote1 + 1);
+    if (quote1 == std::string::npos || quote2 == std::string::npos) return false;
+    std::string tag = body.substr(quote1 + 1, quote2 - quote1 - 1);
+    if (!tag.empty() && (tag[0] == 'v' || tag[0] == 'V')) tag.erase(0, 1);
+    result.latestVersion.assign(tag.begin(), tag.end());
+
+    const std::string marker = "TEKITO-";
+    const std::string suffix = "-full-installer.exe";
+    std::size_t search = 0;
+    while (true) {
+        const auto namePos = body.find(marker, search);
+        if (namePos == std::string::npos) return false;
+        const auto exePos = body.find(suffix, namePos);
+        if (exePos == std::string::npos || exePos > namePos + 64) {
+            search = namePos + marker.size();
+            continue;
+        }
+        const auto nameEnd = exePos + suffix.size();
+        if (nameEnd < body.size() && body.compare(nameEnd, 7, ".sha256") == 0) {
+            search = nameEnd;
+            continue;
+        }
+        const std::string assetName = body.substr(namePos, nameEnd - namePos);
+        const auto urlKey = body.find("\"browser_download_url\"", namePos);
+        if (urlKey == std::string::npos || urlKey > nameEnd + 400) {
+            search = nameEnd;
+            continue;
+        }
+        const auto urlQuote1 = body.find('"', body.find(':', urlKey));
+        const auto urlQuote2 = body.find('"', urlQuote1 + 1);
+        if (urlQuote1 == std::string::npos || urlQuote2 == std::string::npos) {
+            search = nameEnd;
+            continue;
+        }
+        const std::string asciiUrl = body.substr(urlQuote1 + 1, urlQuote2 - urlQuote1 - 1);
+        if (asciiUrl.find(assetName) == std::string::npos) {
+            search = nameEnd;
+            continue;
+        }
+        result.installerUrl.assign(asciiUrl.begin(), asciiUrl.end());
+        result.installerName.assign(assetName.begin(), assetName.end());
+        return true;
+    }
+}
+
+UpdateCheck RunUpdateCheck() {
+    UpdateCheck result;
+    std::vector<char> json;
+    if (!HttpGetHttps(kGitHubApiHost, kGitHubLatestPath, json) || !ParseLatestInstaller(json, result)) {
+        result.error = UiText(L"Could not check for updates. Check the internet connection and try again.",
+                              L"更新を確認できませんでした。インターネット接続を確認してもう一度お試しください。");
+        return result;
+    }
+    result.ok = true;
+    std::string latestAscii;
+    latestAscii.reserve(result.latestVersion.size());
+    for (const wchar_t c : result.latestVersion) {
+        if (c >= 0x20 && c < 0x7f) latestAscii.push_back(static_cast<char>(c));
+    }
+    result.updateAvailable = VersionIsNewer(latestAscii, TEKITO_VERSION_STRING);
+    return result;
+}
+
+UpdateInstall DownloadUpdateInstaller(const std::wstring& url, const std::wstring& name) {
+    UpdateInstall result;
+    wchar_t folder[MAX_PATH]{};
+    GetTempPathW(MAX_PATH, folder);
+    const auto temp = std::filesystem::path(folder) / (L"TEKITO-update-" + std::to_wstring(GetCurrentProcessId()));
+    std::error_code error;
+    std::filesystem::create_directories(temp, error);
+    result.installer = temp / name;
+    const auto shaPath = temp / (name + L".sha256");
+    if (!DownloadHttpsUrl(url, result.installer)) {
+        result.error = UiText(L"The update could not be downloaded.", L"更新をダウンロードできませんでした。");
+        return result;
+    }
+    if (!DownloadHttpsUrl(url + L".sha256", shaPath)) {
+        result.error = UiText(L"The update checksum could not be downloaded.",
+                              L"更新のチェックサムをダウンロードできませんでした。");
+        return result;
+    }
+    const auto expected = ReadSha256Sidecar(shaPath);
+    const auto actual = FileSha256Hex(result.installer);
+    if (expected.empty() || actual.empty() || expected != actual) {
+        result.error = UiText(L"The downloaded update did not match its checksum.",
+                              L"ダウンロードした更新のチェックサムが一致しません。");
+        return result;
+    }
+    result.ok = true;
+    return result;
+}
+
 class SettingsApp final {
 public:
     bool Initialize(HINSTANCE instance) {
@@ -408,6 +701,7 @@ public:
         (void)repository_->Load(dictionary_);
         (void)repository_->LoadJapaneseUserWords(japaneseWords_);
         (void)repository_->LoadSettings(settings_);
+        if (ConsumeEnableUpdateCheckFlag(settings_)) (void)repository_->SaveSettings(settings_);
         (void)repository_->LoadLearning(learning_);
         auto startupMode = tekito::userdata::StartMode(settings_, settings_.lastInputMode);
         if (startupMode != tekito::InputMode::Direct) startupMode = tekito::InputMode::Convert;
@@ -1089,6 +1383,8 @@ private:
         json += L",\"japaneseLetterWidth\":" + std::to_wstring(settings_.japaneseLetterWidth);
         json += L",\"advancedSettings\":";
         json += settings_.advancedSettings ? L"true" : L"false";
+        json += L",\"checkForUpdates\":";
+        json += settings_.checkForUpdates ? L"true" : L"false";
         json += L",\"keepRecentConversions\":";
         json += settings_.keepRecentConversions ? L"true" : L"false";
         json += L",\"japanesePredictionEnabled\":";
@@ -1284,6 +1580,7 @@ private:
             else if (key == L"modeBadgeOnFocus") settings_.modeBadgeOnFocus = value;
             else if (key == L"modePerApp") settings_.modePerApp = value;
             else if (key == L"advancedSettings") settings_.advancedSettings = value;
+            else if (key == L"checkForUpdates") settings_.checkForUpdates = value;
             else if (key == L"keepRecentConversions") {
                 settings_.keepRecentConversions = value;
                 // Off: the kept conversions go too (0: all of them).
@@ -1435,6 +1732,40 @@ private:
                     if (download->ok) break;
                 }
                 if (!PostMessageW(hwnd, kPostalDownloaded, 0, reinterpret_cast<LPARAM>(download))) delete download;
+            }).detach();
+        } else if (type == L"updates.check") {
+            if (updateBusy_) {
+                Reply(requestId, false);
+                return;
+            }
+            updateBusy_ = true;
+            auto* check = new UpdateCheck{};
+            check->requestId = std::wstring(requestId);
+            std::thread([hwnd = hwnd_, check] {
+                const auto id = check->requestId;
+                *check = RunUpdateCheck();
+                check->requestId = id;
+                if (!PostMessageW(hwnd, kUpdateChecked, 0, reinterpret_cast<LPARAM>(check))) delete check;
+            }).detach();
+        } else if (type == L"updates.install") {
+            if (updateBusy_) {
+                Reply(requestId, false);
+                return;
+            }
+            const auto url = message.String(L"url");
+            const auto name = message.String(L"name");
+            if (url.empty() || name.empty()) {
+                Reply(requestId, false, Text(L"Nothing to install.", L"インストールする更新がありません。"));
+                return;
+            }
+            updateBusy_ = true;
+            auto* install = new UpdateInstall{};
+            install->requestId = std::wstring(requestId);
+            std::thread([hwnd = hwnd_, install, url, name] {
+                const auto id = install->requestId;
+                *install = DownloadUpdateInstaller(url, name);
+                install->requestId = id;
+                if (!PostMessageW(hwnd, kUpdateDownloaded, 0, reinterpret_cast<LPARAM>(install))) delete install;
             }).detach();
         } else if (type == L"postalCodes.remove") {
             const bool removed = tekito::userdata::RemovePostalCodes(PostalCodeDirectory());
@@ -1742,6 +2073,14 @@ private:
             self->FinishPostalDownload(std::unique_ptr<PostalDownload>(reinterpret_cast<PostalDownload*>(lParam)));
             return 0;
         }
+        if (message == kUpdateChecked) {
+            self->FinishUpdateCheck(std::unique_ptr<UpdateCheck>(reinterpret_cast<UpdateCheck*>(lParam)));
+            return 0;
+        }
+        if (message == kUpdateDownloaded) {
+            self->FinishUpdateDownload(std::unique_ptr<UpdateInstall>(reinterpret_cast<UpdateInstall*>(lParam)));
+            return 0;
+        }
         if (message == WM_TIMER && wParam == kStateWatchTimer) {
             self->CheckForExternalChanges();
             return 0;
@@ -1811,6 +2150,38 @@ private:
         std::filesystem::remove(download->file, ignored);
         if (imported) runtime_->NotifyDictionaryChanged();
         Reply(download->requestId, imported.has_value(), imported ? L"" : PostalCodeErrorText(error));
+    }
+
+    void FinishUpdateCheck(std::unique_ptr<UpdateCheck> check) {
+        updateBusy_ = false;
+        if (!check->ok) {
+            Reply(check->requestId, false, check->error);
+            return;
+        }
+        std::wstring extra = L",\"updateAvailable\":";
+        extra += check->updateAvailable ? L"true" : L"false";
+        extra += L",\"latestVersion\":\"" + JsonEscape(check->latestVersion) + L"\"";
+        extra += L",\"currentVersion\":\"" + JsonEscape(kVersion) + L"\"";
+        extra += L",\"installerUrl\":\"" + JsonEscape(check->installerUrl) + L"\"";
+        extra += L",\"installerName\":\"" + JsonEscape(check->installerName) + L"\"";
+        Reply(check->requestId, true, L"", extra);
+    }
+
+    void FinishUpdateDownload(std::unique_ptr<UpdateInstall> install) {
+        updateBusy_ = false;
+        if (!install->ok) {
+            Reply(install->requestId, false, install->error);
+            return;
+        }
+        const auto launched = reinterpret_cast<INT_PTR>(
+            ShellExecuteW(hwnd_, L"open", install->installer.c_str(), nullptr, nullptr, SW_SHOWNORMAL));
+        if (launched <= 32) {
+            Reply(install->requestId, false,
+                  Text(L"The update downloaded, but could not be started.",
+                       L"更新はダウンロードできましたが、起動できませんでした。"));
+            return;
+        }
+        Reply(install->requestId, true);
     }
 
     std::wstring PostalCodesJson() const {
@@ -2050,6 +2421,7 @@ private:
     // A file dropped on the page comes with its message (postal codes).
     std::filesystem::path droppedFile_;
     bool postalDownloading_{false};
+    bool updateBusy_{false};
     EventRegistrationToken navigationToken_{};
     std::wstring dataPackSummary_{L"Unavailable"};
     std::wstring japaneseDataSummary_{L"0 / 0"};
