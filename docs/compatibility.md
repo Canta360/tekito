@@ -10,11 +10,13 @@ untouched and shows nothing.
 | --- | --- |
 | Notepad | Works |
 | Word, Outlook | Not tested yet |
-| Edge, Chrome, Firefox | Not tested yet |
+| Chrome | Works |
+| Edge, Firefox | Not tested yet |
 | Visual Studio Code and other Electron apps | Not tested yet |
 | Teams, Slack, Discord | Not tested yet |
 | WPF, WinForms, WinUI 3, UWP fields | Not tested yet |
-| Start menu search, Settings app | Not supported yet (needs immersive-mode support) |
+| Start menu search | Works |
+| Settings app, Store apps | Should work (the same support as Start menu search); not tested yet |
 | Windows Terminal, PowerShell, Command Prompt | Stays off |
 | Apps running as administrator | Stays off |
 | Apps listed in Settings | Stays off |
