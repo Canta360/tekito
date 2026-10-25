@@ -509,6 +509,12 @@ void TestConversion(const MiniPack& pack) {
     RequireText(Joined(converter.Convert(L"ここではきものをぬぐ"), true), L"ここでは|着物を|脱ぐ",
                 "the likelier split wins");
 
+    // A word the dictionary lacks, shaped like a borrowed one: katakana.
+    const auto borrowed = converter.Convert(L"ぐろっくです");
+    Require(!borrowed.empty() && !borrowed[0].candidates.empty() &&
+                borrowed[0].candidates.front().text.starts_with(L"グロック"),
+            "kana ending like a borrowed word (っく) convert to one katakana word");
+
     const auto kanji = converter.Convert(L"かんじにへんかんします");
     Require(kanji.size() == 2 && HasCandidate(kanji[0], L"漢字に", 3),
             "漢字に is among the first candidates of かんじに");

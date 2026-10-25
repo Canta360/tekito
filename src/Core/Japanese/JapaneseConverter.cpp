@@ -24,6 +24,11 @@ bool IsIdeograph(wchar_t c) { return (c >= 0x3400 && c <= 0x9FFF) || (c >= 0xF90
 // uses (letters, full-width digits): costly, so words win when they can.
 constexpr std::int64_t kUnknownCharacterCost = 10000;
 constexpr std::int64_t kUnknownRunCost = 8000;
+// Kana shaped like a borrowed word read as one katakana word, up to this
+// many characters: dearer the longer, so words still win a long stretch.
+constexpr std::int64_t kLoanwordCost = 4000;
+constexpr std::int64_t kLoanwordCharacterCost = 1200;
+constexpr std::size_t kLongestLoanword = 6;
 // Spelling-correction entries are offered, not chosen.
 constexpr std::int64_t kSpellingCorrectionPenalty = 5000;
 // Transliterations come after every dictionary candidate.
@@ -404,6 +409,38 @@ Lattice BuildLattice(const JapaneseDictionary& dictionary, const ReadingCodes& c
                 run.cost = kUnknownRunCost;
                 add(std::move(run));
             }
+        }
+    }
+    // Kana shaped like a word from another language, ending in っく, っと and
+    // the like (ぐろっく, ぴあっつ): one katakana word too, dearer than the
+    // dictionary's words, so a name it lacks (グロック) converts as typed, not
+    // as other words or a slip undone (ブロック).
+    const auto kana = [](wchar_t c) { return c >= L'\x3041' && c <= L'\x3096'; };
+    constexpr std::wstring_view kNoStart = L"っんーぁぃぅぇぉゃゅょゎ";
+    constexpr std::wstring_view kAfterSmallTsu = L"くとぷちつすどぐじずぶ";
+    constexpr std::wstring_view kParticles = L"のはがをにでともへや";
+    for (std::size_t i = 0; i < n; ++i) {
+        if (!kana(reading[i]) || kNoStart.find(reading[i]) != std::wstring_view::npos) continue;
+        for (std::size_t end = i + 1; end <= n && end - i <= kLongestLoanword; ++end) {
+            if (!kana(reading[end - 1]) || crosses(i, end)) break;
+            // Not over a particle (脇のハッチ: not ワキノハッチ); one may start it
+            // (トップ) or end it after っ (グロット).
+            if (end - 1 > i && kParticles.find(reading[end - 1]) != std::wstring_view::npos &&
+                reading[end - 2] != L'っ') {
+                break;
+            }
+            const std::size_t length = end - i;
+            const bool smallTsuEnd = length >= 3 && reading[end - 2] == L'っ' &&
+                                     kAfterSmallTsu.find(reading[end - 1]) != std::wstring_view::npos;
+            if (!smallTsuEnd) continue;
+            Node loanword;
+            loanword.begin = static_cast<std::uint32_t>(i);
+            loanword.end = static_cast<std::uint32_t>(end);
+            loanword.left = loanword.right = unknown;
+            loanword.cost = kLoanwordCost + kLoanwordCharacterCost * static_cast<std::int64_t>(length);
+            loanword.user = true;
+            loanword.text = ToKatakana(reading.substr(i, length));
+            add(std::move(loanword));
         }
     }
     return lattice;
