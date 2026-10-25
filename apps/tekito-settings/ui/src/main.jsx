@@ -65,7 +65,7 @@ const initialSettings = {
   japanesePredictionEnabled: true,
   japaneseLiveConversion: false,
   japaneseSentenceCheck: true,
-  japaneseSlipAutoApply: false,
+  japaneseSlipAutoApply: true,
   japaneseFirstPageSymbol: true,
   japaneseTypedForms: true,
   japaneseLiveRefine: true,

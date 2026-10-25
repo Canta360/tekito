@@ -121,8 +121,7 @@ public:
     void SetSentenceCheck(bool on) noexcept { sentenceCheck_ = on; }
     // Space (and live refine) may undo typing slips in the keys and convert
     // the reading as meant. Off: convert as typed; slip candidates stay in
-    // the list. On by default so tests and the eval harness match the old
-    // path; UserSettings::japaneseSlipAutoApply defaults off for users.
+    // the list. On by default, as UserSettings::japaneseSlipAutoApply.
     void SetSlipAutoApply(bool on) noexcept { slipAutoApply_ = on; }
     [[nodiscard]] bool SlipAutoApply() const noexcept { return slipAutoApply_; }
     // The first emoji for a reading shown on the first page of its list

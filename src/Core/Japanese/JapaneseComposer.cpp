@@ -1489,7 +1489,9 @@ void JapaneseComposer::AddTypedForms() {
             if (std::any_of(tail.begin(), tail.end(), [&](const PhraseCandidate& c) { return c.text == text; })) continue;
             const auto seen = std::find_if(candidates.begin(), candidates.end(),
                                            [&](const PhraseCandidate& c) { return c.text == text; });
-            if (seen == candidates.begin()) continue;
+            // The first stays, and so does the keys as typed after a slip
+            // undone (its second place).
+            if (seen == candidates.begin() || (seen != candidates.end() && !seen->reading.empty())) continue;
             if (seen != candidates.end()) {
                 tail.push_back(std::move(*seen));
                 candidates.erase(seen);

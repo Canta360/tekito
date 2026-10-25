@@ -139,7 +139,7 @@ const en = {
     candidates: "Candidates",
     slipAutoApply: {
       title: "Fix typing slips with Space",
-      description: "Changes the reading before converting (e.g. arigayou → ありがとう). Off: keeps what you typed first; the fix stays in the list.",
+      description: "Fixes slips before converting (arigayou → ありがとう). Off: converts as typed and lists the fix.",
     },
     sentenceCheck: { title: "Choose by the whole sentence", description: "Puts first the conversion that reads most naturally as a sentence." },
     firstPageSymbol: { title: "Symbols and emoji on the first page", description: "e.g. はーと → ♡" },
@@ -446,7 +446,7 @@ const ja = {
     candidates: "候補",
     slipAutoApply: {
       title: "Space で入力ミスを直す",
-      description: "変換の前に読みを直します（例：arigayou → ありがとう）。オフでも候補には出ます。第1候補は入力どおりです。",
+      description: "入力ミスを直してから変換します（arigayou → ありがとう）。オフにすると入力どおりに変換し、直した候補を一覧に表示します。",
     },
     sentenceCheck: { title: "文全体で変換を選ぶ", description: "文として自然な変換を第1候補にします" },
     firstPageSymbol: { title: "記号・絵文字を1ページ目に表示", description: "例：はーと → ♡" },
