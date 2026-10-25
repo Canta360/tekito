@@ -551,7 +551,8 @@ HRESULT TextService::ReplaceJapaneseComposition(ITfContext* context, TfEditCooki
     hr = range->SetText(editCookie, 0, text.c_str(), static_cast<LONG>(text.size()));
     if (FAILED(hr)) return hr;
     compositionText_ = text;
-    if (TraceEnabled()) Trace((L"Japanese composition " + text).c_str());
+    // Its length only: the log never holds what is typed.
+    if (TraceEnabled()) Trace((L"Japanese composition length=" + std::to_wstring(text.size())).c_str());
 
     LONG offset = 0;
     for (const auto& segment : segments) {

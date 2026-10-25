@@ -86,7 +86,7 @@ Assert-Absent "no network access in the input method or its data" `
 
 # Diagnostics may name events and timings, never what the user typed.
 Assert-Absent "no typed text in trace output" `
-    "Trace(Hr)?\([^\n]*(rawText_|input\.character|candidates_\[|action\.text|\.text\.c_str)" `
+    "Trace(Hr)?\([^\n]*(rawText_|input\.character|candidates_\[|action\.text|\.text\.c_str|\+\s*text\b|\+\s*reading\b|Preedit\(\))" `
     @("src\Tsf")
 
 # Vocabulary lives in Data Packs, not in if-statements.
