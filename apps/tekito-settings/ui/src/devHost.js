@@ -93,7 +93,7 @@ function initialState() {
       excludedApps: ["Code.exe"],
       builtInExcludedApps: ["WindowsTerminal.exe", "OpenConsole.exe", "conhost.exe", "cmd.exe", "powershell.exe", "pwsh.exe"],
     },
-    version: "0.6.2",
+    version: "0.6.3",
     mode: japaneseInstalled ? "japanese" : "auto",
     runtime: { tsf: "Loaded", dataPacks: "12 / 13", japaneseData: japaneseInstalled ? "6 / 6" : "0 / 6", japanese: japaneseInstalled,
       // "?keyboard=us": Windows reports a US keyboard.
