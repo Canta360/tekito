@@ -13,8 +13,9 @@
 namespace tekito::userdata {
 namespace {
 
-// How long a save waits for another application's save to finish.
-constexpr int kBusyTimeoutMs = 250;
+// How long a save waits for another application's save to finish: long
+// enough for one save, short enough not to hold up the app being closed.
+constexpr int kBusyTimeoutMs = 1000;
 
 constexpr const char* kCreateSchema =
     "CREATE TABLE IF NOT EXISTS user_dictionary ("
@@ -116,6 +117,9 @@ bool SqliteUserDictionaryRepository::Open() noexcept {
     // Every application with TEKITO open shares this file; when two save at
     // once, the second waits briefly instead of losing what it had to save.
     sqlite3_busy_timeout(database_, kBusyTimeoutMs);
+    // Write-ahead logging: reading never waits for a save, and saves wait
+    // only for each other (the mode stays with the file).
+    sqlite3_exec(database_, "PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;", nullptr, nullptr, nullptr);
     if (!EnsureSchema()) {
         Close();
         return false;

@@ -10,7 +10,7 @@ program and the postal code data in Settings.
 
 | Location | What is in it |
 | --- | --- |
-| `%LOCALAPPDATA%\TEKITO\user.db` | Your settings, your dictionary, what TEKITO has learned from your choices, and your last 30 Japanese conversions while that is on |
+| `%LOCALAPPDATA%\TEKITO\user.db` (and `user.db-wal`, `user.db-shm` beside it) | Your settings, your dictionary, what TEKITO has learned from your choices, and your last 30 Japanese conversions while that is on |
 | `%LOCALAPPDATA%\TEKITO\data` | The language data packs |
 | `%LOCALAPPDATA%\TEKITO\settings-webview` | The Settings window's browser cache |
 | `%TEMP%\TekitoTsf.log` | A diagnostic log, written only by trace builds or when `TEKITO_TSF_TRACE=1` is set |
@@ -89,7 +89,7 @@ reads a file you choose on your computer and makes no request.
 
 TEKITO の処理はすべて PC の中で行われます。入力した内容、ユーザー辞書、学習した内容をどこにも送りません。アカウント、テレメトリ、更新確認はなく、入力の処理経路でネットワークを使うこともありません。ダウンロードするのは、インストール時の日本語データと、設定で指示した郵便番号データだけです。
 
-- 設定・ユーザー辞書・学習内容は `%LOCALAPPDATA%\TEKITO\user.db` に保存されます。学習しているのは「どの単語でどの候補を選んだか」と、日本語では「どの読みにどの変換を選んだか」の回数だけで、文章や入力履歴は保存しません。日本語の変換は文全体を読むために直前に確定した数語をメモリーにだけ持ちますが、続けて打っている間だけ使い、カーソルがほかへ移ると忘れます。保存はしません。Ctrl+Backspace で確定を取り消せるよう、確定したばかりの文字も次に打ち始めるまでメモリーにだけ持ちます。
+- 設定・ユーザー辞書・学習内容は `%LOCALAPPDATA%\TEKITO\user.db`（と、その横の `user.db-wal`、`user.db-shm`）に保存されます。学習しているのは「どの単語でどの候補を選んだか」と、日本語では「どの読みにどの変換を選んだか」の回数だけで、文章や入力履歴は保存しません。日本語の変換は文全体を読むために直前に確定した数語をメモリーにだけ持ちますが、続けて打っている間だけ使い、カーソルがほかへ移ると忘れます。保存はしません。Ctrl+Backspace で確定を取り消せるよう、確定したばかりの文字も次に打ち始めるまでメモリーにだけ持ちます。
 - 誤変換を報告できるよう、直近30件の日本語の変換（読みと変換結果のみ。押したキーは保存せず、プライベートウィンドウでの変換も保存しません）を `user.db` に保存します。設定の「情報 → 誤変換の報告」でオフにでき、オフにすると削除されます。「報告」はブラウザで GitHub の Issue フォームを開き、読みと変換結果を入力した状態にするだけで、送信するまで何も送られません。「不具合の報告」も同じように、バージョンと設定を入力した状態でフォームを開きます。
 - 再変換（文字を選んで変換キー）は選んだ文字をこの PC の中で読むだけで、ほかの IME の単語の読み込みは選んだファイルをこの PC の中で取り込むだけです。どちらも何も送りません。
 - スタートメニューの検索、設定アプリ、ストアアプリでも使えるように、インストーラーはこれらのサンドボックスのアプリに、プログラムのフォルダ（`%LOCALAPPDATA%\Programs\TEKITO`）と言語データ（`%LOCALAPPDATA%\TEKITO\data`）の読み取りだけを許可します。`user.db` は対象外なので、辞書や学習内容は読めません。そこでは TEKITO は既定の設定で動きます。
