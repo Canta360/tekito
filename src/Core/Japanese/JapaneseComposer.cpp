@@ -1106,6 +1106,32 @@ void JapaneseComposer::BuildPhrasesFor(bool convert) {
             !phrases_.empty() && FixSlips()) {
             slipUndone = true;
         }
+        // A slip undone: the keys as typed stay a choice, after what was
+        // meant (konpyu-ra-: コンピューラー after コンピューター), for a short input
+        // that reads as kana.
+        constexpr std::size_t kTypedChoiceLength = 16;
+        if (slipUndone && !phrases_.empty() && reading.size() <= kTypedChoiceLength &&
+            LeftoverLetters(ToFullWidthAscii(reading)) == 0) {
+            std::wstring typed;
+            for (const auto& phrase : ConvertReading(reading, 0, context_, contextWords_)) {
+                if (phrase.candidates.empty()) {
+                    typed.clear();
+                    break;
+                }
+                typed += phrase.candidates.front().text;
+            }
+            std::wstring shown;
+            for (const auto& phrase : phrases_) shown += PhraseText(phrase);
+            auto& candidates = phrases_.front().candidates;
+            if (!typed.empty() && typed != shown &&
+                std::none_of(candidates.begin(), candidates.end(), [&](const PhraseCandidate& c) { return c.text == typed; })) {
+                PhraseCandidate asTyped{typed, candidates.empty() ? 0 : candidates.front().cost,
+                                        PhraseCandidate::Kind::Dictionary, false};
+                asTyped.reading = std::wstring(reading);
+                candidates.insert(candidates.begin() + std::min<std::ptrdiff_t>(1, static_cast<std::ptrdiff_t>(candidates.size())),
+                                  std::move(asTyped));
+            }
+        }
     }
     if (phrases_.empty()) {
         phrases_.push_back({0, reading.size(),

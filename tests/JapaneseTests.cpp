@@ -1163,6 +1163,15 @@ void TestRomajiCorrection(const RomajiTable& table, const MiniPack& pack) {
         RequireText(composer.Preedit(), L"ありがとうございます", "Space converts what was meant");
         composer.Clear();
     }
+    // The keys as typed stay a choice, second.
+    Type(composer, L"arigayougozaimasu");
+    composer.Convert();
+    {
+        const auto* list = composer.FocusedCandidates();
+        Require(list && list->size() > 1 && (*list)[1].reading == L"ありがようございます",
+                "after a slip undone, the keys as typed are the second choice");
+    }
+    composer.Clear();
     Type(composer, L"shigotogaowatta");
     composer.Convert();
     const std::wstring meant = composer.Preedit();
