@@ -16,6 +16,7 @@ set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 option(TEKITO_BUILD_TESTS "Build the unit tests" ON)
 option(TEKITO_BUILD_BENCHMARKS "Build the engine latency benchmark" OFF)
 option(TEKITO_BUILD_EVAL "Build the offline accuracy evaluation" OFF)
+option(TEKITO_BUILD_AI "Build TekitoAI.exe, which runs the optional AI models (llama.cpp)" ON)
 
 set(TEKITO_WARNINGS /W4 /permissive- /EHsc /utf-8)
 set(TEKITO_WINDOWS_DEFINES UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
@@ -25,6 +26,7 @@ set(TEKITO_WINDOWS_DEFINES UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
 
 add_library(tekito_core STATIC
     src/Core/AutoApplyPolicy.cpp
+    src/Core/Japanese/AiJudge.cpp
     src/Core/BuiltinLexicon.cpp
     src/Core/CandidateEngine.cpp
     src/Core/EnglishSpelling.cpp
@@ -56,6 +58,7 @@ add_library(tekito_core STATIC
     src/Core/Japanese/RomajiTable.cpp
     src/Core/Japanese/SentenceReranker.cpp
     src/Core/Japanese/SortedTsv.cpp
+    src/Core/Japanese/TopicVectors.cpp
     src/Core/LexiconProvider.cpp
     src/Core/MisspellingProvider.cpp
     src/Core/PolicyEngine.cpp
@@ -70,6 +73,7 @@ add_library(tekito_core STATIC
 )
 target_include_directories(tekito_core PUBLIC src)
 target_compile_options(tekito_core PRIVATE ${TEKITO_WARNINGS})
+target_link_libraries(tekito_core PUBLIC advapi32)
 
 set(TEKITO_SQLITE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/sqlite/sqlite-amalgamation-3530400")
 add_library(tekito_sqlite STATIC "${TEKITO_SQLITE_DIR}/sqlite3.c")
@@ -78,6 +82,7 @@ target_compile_definitions(tekito_sqlite PRIVATE SQLITE_THREADSAFE=1 SQLITE_OMIT
 target_compile_options(tekito_sqlite PRIVATE /W0)
 
 add_library(tekito_userdata STATIC
+    src/UserData/AiModelInstall.cpp
     src/UserData/DataPackValidation.cpp
     src/UserData/ImeDictionaryImport.cpp
     src/UserData/PostalCodeImport.cpp
@@ -158,6 +163,65 @@ add_custom_command(TARGET TEKITO POST_BUILD
         "${CMAKE_CURRENT_SOURCE_DIR}/apps/tekito-settings/ui/dist"
         "$<TARGET_FILE_DIR:TEKITO>/settings-ui"
 )
+
+# ---------------------------------------------------------------------------
+# TekitoAI.exe: runs the optional AI models for the input method
+# (apps/tekito-ai). llama.cpp is fetched at a fixed commit and linked in;
+# set FETCHCONTENT_SOURCE_DIR_LL to build from a local checkout.
+
+if(TEKITO_BUILD_AI)
+    include(FetchContent)
+    # The backends are DLLs next to TekitoAI.exe, loaded when it starts: the
+    # CPU one built for each processor generation (the best is picked), and
+    # Vulkan for the GPU when the Vulkan SDK is there at build time; a PC
+    # without a Vulkan driver just goes without it.
+    set(BUILD_SHARED_LIBS ON CACHE BOOL "" FORCE)
+    foreach(on GGML_BACKEND_DL GGML_CPU_ALL_VARIANTS)
+        set(${on} ON CACHE BOOL "" FORCE)
+    endforeach()
+    foreach(off LLAMA_BUILD_COMMON LLAMA_BUILD_TESTS LLAMA_BUILD_TOOLS LLAMA_BUILD_EXAMPLES LLAMA_BUILD_SERVER
+            LLAMA_BUILD_APP LLAMA_OPENSSL LLAMA_ALL_WARNINGS GGML_NATIVE GGML_OPENMP)
+        set(${off} OFF CACHE BOOL "" FORCE)
+    endforeach()
+    find_package(Vulkan COMPONENTS glslc QUIET)
+    set(GGML_VULKAN ${Vulkan_FOUND} CACHE BOOL "" FORCE)
+    # llama.cpp is built in TEKITO_DEPS_DIR: the Vulkan shader tool's build
+    # nests deep enough to pass Windows' 260-character path limit, so a
+    # build folder with a long path needs a short one here.
+    set(TEKITO_DEPS_DIR "${CMAKE_BINARY_DIR}/d" CACHE PATH "Where llama.cpp is fetched and built")
+    set(FETCHCONTENT_BASE_DIR ${TEKITO_DEPS_DIR})
+    FetchContent_Declare(ll
+        GIT_REPOSITORY https://github.com/ggml-org/llama.cpp.git
+        GIT_TAG 74bca3950054eed1795f525cb9cf06bfe796492d
+    )
+    # llama.cpp is C++17 (u8 literals as char), and its DLLs pass C++
+    # objects to each other, so they share the DLL C runtime; TekitoAI only
+    # calls their C API.
+    set(CMAKE_CXX_STANDARD 17)
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
+    FetchContent_MakeAvailable(ll)
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+    set(CMAKE_CXX_STANDARD 20)
+
+    add_executable(TekitoAI apps/tekito-ai/main.cpp)
+    target_compile_definitions(TekitoAI PRIVATE ${TEKITO_WINDOWS_DEFINES})
+    target_compile_options(TekitoAI PRIVATE ${TEKITO_WARNINGS})
+    target_link_libraries(TekitoAI PRIVATE tekito_core llama)
+    # The backends load at run time, so build them with it.
+    get_property(tekito_ggml_targets DIRECTORY ${ll_SOURCE_DIR}/ggml/src PROPERTY BUILDSYSTEM_TARGETS)
+    if(GGML_VULKAN)
+        get_property(tekito_vulkan_targets DIRECTORY ${ll_SOURCE_DIR}/ggml/src/ggml-vulkan PROPERTY BUILDSYSTEM_TARGETS)
+    endif()
+    foreach(target IN LISTS tekito_ggml_targets tekito_vulkan_targets)
+        if(target MATCHES "^ggml-(cpu|vulkan)")
+            add_dependencies(TekitoAI ${target})
+        endif()
+    endforeach()
+    # llama.cpp puts its DLLs in bin/<config>: next to TekitoAI.exe with them.
+    add_custom_command(TARGET TekitoAI POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_BINARY_DIR}/bin/$<CONFIG>" "$<TARGET_FILE_DIR:TekitoAI>"
+    )
+endif()
 
 # ---------------------------------------------------------------------------
 # Setup program. The package-release script appends the package to it.
