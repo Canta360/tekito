@@ -20,6 +20,8 @@ const detectedJapaneseKeyboard = new URLSearchParams(window.location.search).get
 function initialState() {
   return {
     postalCodes: { installed: false },
+    aiModels: { light: { installed: false, bytes: 229322365 }, strong: { installed: false, bytes: 1246265200 },
+      runtime: { installed: false, bytes: 18246900 }, downloading: 0, error: "" },
     settings: {
       startMode: 0,
       switchOrder: 1234,
@@ -61,6 +63,7 @@ function initialState() {
       doubledWordCheck: true,
       englishSpelling: 0,
       recheckPreviousWord: true,
+      capitalizedCorrection: false,
       bracketPairs: false,
       doubleSpacePeriod: false,
       smartPunctuation: false,
@@ -78,6 +81,8 @@ function initialState() {
       japanesePredictionEnabled: true,
       japaneseLiveConversion: false,
       japaneseSentenceCheck: true,
+      japaneseSentenceModel: 0,
+      japaneseAiDevice: 0,
       japaneseSlipAutoApply: true,
       japaneseFirstPageSymbol: true,
       japaneseTypedForms: true,
@@ -218,6 +223,24 @@ export function installMockHost() {
         state.dictionary = state.dictionary.map((entry) => entry.id === message.id ? { ...entry, raw: message.raw, candidate: message.candidate, policy: message.policy } : entry);
       } else if (type === "dictionary.delete") {
         state.dictionary = state.dictionary.filter((entry) => entry.id !== message.id);
+      }
+      if (type === "aiModel.download") {
+        state.aiModels = { ...state.aiModels, downloading: message.model };
+        window.setTimeout(() => {
+          const key = message.model === 1 ? "light" : "strong";
+          state.aiModels = { ...state.aiModels, [key]: { ...state.aiModels[key], installed: true },
+            runtime: { ...state.aiModels.runtime, installed: true }, downloading: 0 };
+          state.settings.japaneseSentenceModel = message.model;
+          const data = JSON.stringify({ type: "state.changed", state });
+          listeners.forEach((listener) => listener({ data }));
+        }, 2500);
+      } else if (type === "aiModel.remove") {
+        const key = message.model === 1 ? "light" : "strong";
+        state.aiModels = { ...state.aiModels, [key]: { ...state.aiModels[key], installed: false } };
+        if (!state.aiModels.light.installed && !state.aiModels.strong.installed) {
+          state.aiModels = { ...state.aiModels, runtime: { ...state.aiModels.runtime, installed: false } };
+        }
+        if (state.settings.japaneseSentenceModel === message.model) state.settings.japaneseSentenceModel = 0;
       }
       if (type === "postalCodes.download") {
         window.setTimeout(() => {

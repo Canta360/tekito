@@ -124,6 +124,7 @@ ul { margin: 0; padding: 0; list-style: none; }
 .radio small, .check small { color: var(--ink-2); font-size: 12px; }
 .row-block > .check { padding: 0 18px 14px 52px; margin-top: -4px; }
 .row-panel .check { padding: 7px 0; }
+.row-sub-action { padding: 0 18px 10px 44px; }
 .row-panel-line { height: 1px; background: var(--line); margin: 6px 0; }
 input[type="radio"], input[type="checkbox"] { accent-color: var(--accent); width: 18px; height: 18px; margin: 0; flex: none; }
 

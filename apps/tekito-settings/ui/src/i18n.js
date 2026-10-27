@@ -8,7 +8,7 @@ const count = (value) => value.toLocaleString("en-US");
 const en = {
   lang: "en",
   settings: "Settings",
-  pages: { general: "General", japanese: "Japanese", mixed: "Mix", auto: "Auto", dictionary: "Dictionary & learning", about: "About", samples: "Typing samples" },
+  pages: { general: "General", japanese: "Japanese", mixed: "Mix", auto: "Auto", ai: "AI", dictionary: "Dictionary & learning", about: "About", samples: "Typing samples" },
   samples: {
     description: "Short clips of what each mode does",
     names: {
@@ -159,6 +159,20 @@ const en = {
     },
   },
 
+  ai: {
+    title: "Check with AI",
+    description: "Also reads the sentence with AI to choose a more natural conversion.",
+    off: "Off",
+    on: "On",
+    memory: ["", "0.4 GB", "1.3 GB"],
+    dialogTitle: "Download the AI model?",
+    dialogBody: (size, memory) => `Downloads about ${size}. It uses about ${memory} of memory while you type. The model is Liquid AI's, under the LFM Open License.`,
+    download: "Download",
+    downloading: "Downloading",
+    remove: "Remove the model",
+    removed: "Removed the AI model",
+    device: { title: "Run AI on", description: "The GPU is faster. Auto uses it when the PC has one.", auto: "Auto" },
+  },
   mixed: {
     live: { title: "Live conversion", description: "Converts Japanese as you type. English stays as typed." },
     prediction: { title: "Predictions" },
@@ -179,6 +193,7 @@ const en = {
     casual: { title: "Casual expressions", description: "How many words like gonna and lol are offered.", stops: ["None", "Common", "Standard", "Broad", "All"] },
     doubled: { title: "Fix repeated words", description: "e.g. the the → the" },
     recheck: { title: "Fix the word before too", description: "Fixes a typo in the previous word when the next one is typed (e.g. have to urn → run)." },
+    capitalized: { title: "Fix words typed with a capital", description: "Also fixes words that start with a capital mid-sentence (e.g. Cjicago → Chicago). Off keeps them as typed, as they may be names." },
     phonetic: { title: "English from Japanese readings", description: "e.g. konpyuta → computer" },
     punctuation: "Punctuation",
     period: { title: "Period on Enter", description: "Ends the sentence with a period on a new line (e.g. Thanks → Thanks.)." },
@@ -315,7 +330,7 @@ const en = {
 const ja = {
   lang: "ja",
   settings: "設定",
-  pages: { general: "一般", japanese: "日本語", mixed: "まぜ打ち", auto: "Auto", dictionary: "辞書と学習", about: "情報", samples: "入力の見本" },
+  pages: { general: "一般", japanese: "日本語", mixed: "まぜ打ち", auto: "Auto", ai: "AI", dictionary: "辞書と学習", about: "情報", samples: "入力の見本" },
   samples: {
     description: "各モードでできる入力を、短い動画で確認できます",
     names: {
@@ -466,6 +481,20 @@ const ja = {
     },
   },
 
+  ai: {
+    title: "AI で見直す",
+    description: "AI でも文を読み、より自然な変換を選びます",
+    off: "使わない",
+    on: "使う",
+    memory: ["", "0.4 GB", "1.3 GB"],
+    dialogTitle: "AI モデルをダウンロードしますか？",
+    dialogBody: (size, memory) => `約 ${size} をダウンロードします。入力中はメモリを約 ${memory} 使います。Liquid AI のモデル（LFM Open License）です。`,
+    download: "ダウンロード",
+    downloading: "ダウンロード中",
+    remove: "モデルを削除",
+    removed: "AI モデルを削除しました",
+    device: { title: "AI の処理", description: "GPU のほうが速く動きます。自動では GPU があれば使います", auto: "自動" },
+  },
   mixed: {
     live: { title: "ライブ変換", description: "日本語を入力と同時に変換します。英語はそのまま表示します" },
     prediction: { title: "予測候補" },
@@ -486,6 +515,7 @@ const ja = {
     casual: { title: "口語表現の候補", description: "gonna、lol などを候補に表示する範囲", stops: ["表示しない", "一般的", "標準", "広め", "すべて"] },
     doubled: { title: "同じ単語の連続を修正", description: "例：the the → the" },
     recheck: { title: "前の単語も修正", description: "次の単語の入力時に、前の単語の入力ミスを修正します（例：have to urn → run）" },
+    capitalized: { title: "大文字で始まる単語も修正", description: "文の途中で大文字から始まる単語の入力ミスも修正します（例：Cjicago → Chicago）。オフにすると、名前の可能性があるため入力どおりにします" },
     phonetic: { title: "日本語の読みから英単語", description: "例：konpyuta → computer" },
     punctuation: "句読点",
     period: { title: "Enter で文末にピリオド", description: "改行時、文末にピリオドを入力します（例：Thanks → Thanks.）" },

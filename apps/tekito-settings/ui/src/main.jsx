@@ -10,8 +10,8 @@ import {
 import "./styles.css";
 
 // The pages, in the order of the list. Japanese and Mix are there while
-// their mode is on.
-const pageIds = ["general", "japanese", "mixed", "auto", "dictionary", "about"];
+// their mode is on; AI with Japanese, which it converts.
+const pageIds = ["general", "japanese", "mixed", "auto", "ai", "dictionary", "about"];
 // Links from before the pages were rearranged.
 const pageAliases = { switching: "general", candidates: "general", english: "auto", typing: "auto", special: "general" };
 
@@ -48,6 +48,7 @@ const initialSettings = {
   doubledWordCheck: true,
   englishSpelling: 0,
   recheckPreviousWord: true,
+  capitalizedCorrection: false,
   bracketPairs: false,
   doubleSpacePeriod: false,
   smartPunctuation: false,
@@ -65,6 +66,8 @@ const initialSettings = {
   japanesePredictionEnabled: true,
   japaneseLiveConversion: false,
   japaneseSentenceCheck: true,
+  japaneseSentenceModel: 0,
+  japaneseAiDevice: 0,
   japaneseSlipAutoApply: true,
   japaneseFirstPageSymbol: true,
   japaneseTypedForms: true,
@@ -122,6 +125,8 @@ function App() {
   const [romaji, setRomaji] = useState([]);
   const [packs, setPacks] = useState([]);
   const [postalCodes, setPostalCodes] = useState({ installed: false });
+  const [aiModels, setAiModels] = useState({ light: { installed: false }, strong: { installed: false }, runtime: { installed: false },
+    downloading: 0, error: "" });
   const [version, setVersion] = useState("");
   const [appearance, setAppearance] = useState({ accent: "#0067c0", systemLanguage: navigator.language.startsWith("ja") ? "ja" : "en" });
   const [modal, setModal] = useState(null);
@@ -145,6 +150,7 @@ function App() {
     setRomaji(state.romaji || []);
     setPacks(state.packs || []);
     if (state.postalCodes) setPostalCodes(state.postalCodes);
+    if (state.aiModels) setAiModels(state.aiModels);
     if (state.version) setVersion(state.version);
     if (state.appearance) setAppearance((value) => ({ ...value, ...state.appearance }));
   }, []);
@@ -241,7 +247,8 @@ function App() {
     return response.ok;
   };
 
-  const shownPages = pageIds.filter((id) => (id !== "japanese" || japanese) && (id !== "mixed" || mixed));
+  const shownPages = pageIds.filter((id) => (id !== "japanese" || japanese) && (id !== "mixed" || mixed) &&
+    (id !== "ai" || japaneseInstalled));
   // 入力の見本 opens from 一般 and is not in the list.
   const current = page === "samples" || shownPages.includes(page) ? page : "general";
   const open = (id) => {
@@ -281,6 +288,7 @@ function App() {
                 {current === "japanese" && <JapanesePage {...pageProps} romaji={romaji} postalCodes={postalCodes} />}
                 {current === "mixed" && <MixedPage {...pageProps} />}
                 {current === "auto" && <AutoPage {...pageProps} />}
+                {current === "ai" && <AiPage {...pageProps} aiModels={aiModels} />}
                 {current === "dictionary" && <DictionaryPage {...pageProps} japanese={japaneseInstalled} learning={learning}
                   dictionary={dictionary} japaneseWords={japaneseWords} setModal={setModal} />}
                 {current === "samples" && <SamplesPage japaneseInstalled={japaneseInstalled} back={() => open("general")} />}
@@ -314,7 +322,7 @@ function App() {
   );
 }
 
-const navIcons = { general: "settings", dictionary: "menu_book", about: "info" };
+const navIcons = { general: "settings", ai: "wand_stars", dictionary: "menu_book", about: "info" };
 
 function NavItem({ id, current, onClick }) {
   const t = useText();
@@ -349,6 +357,7 @@ function searchIndex(t, pages, japaneseInstalled) {
     ["auto", a.correction.title], ["auto", a.spelling.title], ["auto", a.completion.title], ["auto", a.next.title], ["auto", a.casual.title],
     ["auto", a.doubled.title, true], ["auto", a.recheck.title, true], ["auto", a.phonetic.title, true], ["auto", a.period.title, true],
     ["auto", a.doubleSpace.title, true], ["auto", a.smart.title, true],
+    ["ai", t.ai.title], ["ai", t.ai.device.title],
     ["dictionary", d.japaneseWords.title], ["dictionary", d.englishWords.title], ["dictionary", d.files.title],
     ["dictionary", d.learn.title], ["dictionary", d.learned.title], ["dictionary", d.private.title],
     ["about", t.about.report.title], ["about", t.about.bug.title], ["about", t.about.feature.title], ["about", t.about.releases.title],
@@ -870,6 +879,70 @@ function NumbersRow({ settings, setSetting, options, onChange }) {
   );
 }
 
+// The AI model the sentence check also reads with: none, or one of two,
+// downloaded once the user agrees to it.
+// AI: the model that reads conversions again (downloaded with what runs
+// it), and where it runs.
+function AiPage({ settings, setSetting, runAction, setConfirm, aiModels }) {
+  const t = useText();
+  return (
+    <Card label={t.pages.ai}>
+      <AiModelRow settings={settings} setSetting={setSetting} runAction={runAction} setConfirm={setConfirm} aiModels={aiModels} />
+    </Card>
+  );
+}
+
+// Bytes as the download dialog states them (230 MB, 1.3 GB).
+const downloadSize = (bytes) => (bytes >= 1e9 ? `${(bytes / 1e9).toFixed(1)} GB` : `${Math.round(bytes / 1e6)} MB`);
+
+function AiModelRow({ settings, setSetting, runAction, setConfirm, aiModels }) {
+  const t = useText();
+  const a = t.ai;
+  const keys = ["", "light", "strong"];
+  const downloading = aiModels.downloading || 0;
+  const current = settings.japaneseSentenceModel || 0;
+  const choose = (value) => {
+    if (downloading) return;
+    if (value === 0 || aiModels[keys[value]]?.installed) {
+      setSetting("japaneseSentenceModel", value);
+      return;
+    }
+    setConfirm({
+      title: a.dialogTitle,
+      message: a.dialogBody(downloadSize((aiModels[keys[value]]?.bytes || 0) +
+        (aiModels.runtime?.installed ? 0 : aiModels.runtime?.bytes || 0)), a.memory[value]),
+      confirmLabel: a.download,
+      action: () => runAction("aiModel.download", { model: value }),
+    });
+  };
+  return (
+    <>
+    <Row icon="wand_stars" title={a.title}
+      description={(
+        <>
+          {downloading ? "" : aiModels.error || a.description}
+          {downloading > 0 && <span className="row-status"><span className="progress" />{a.downloading}</span>}
+        </>
+      )}
+      sub={current > 0 && !downloading && (
+        <div className="row-sub-action">
+          <Button variant="quiet" onClick={() => runAction("aiModel.remove", { model: current }, a.removed)}>{a.remove}</Button>
+        </div>
+      )}>
+      {/* One model for now (the light one); the larger one comes back once it is trained for TEKITO. */}
+      <Segmented label={a.title} value={Math.min(downloading || current, 1)} options={[[0, a.off], [1, a.on]]}
+        onChange={choose} />
+    </Row>
+    {current > 0 && (
+      <Row icon="memory" title={a.device.title} description={a.device.description}>
+        <Segmented label={a.device.title} value={settings.japaneseAiDevice || 0}
+          options={[[0, a.device.auto], [1, "CPU"], [2, "GPU"]]} onChange={(value) => setSetting("japaneseAiDevice", value)} />
+      </Row>
+    )}
+    </>
+  );
+}
+
 // Postal codes to addresses: Japan Post's data, fetched only once the user
 // agrees to it, or taken from a file they downloaded.
 function PostalCodes({ postalCodes, runAction, setConfirm }) {
@@ -1040,6 +1113,9 @@ function AutoPage({ settings, setSetting, showKeys }) {
           </Row>
           <Row icon="undo" title={a.recheck.title} description={a.recheck.description}>
             <Toggle label={a.recheck.title} checked={settings.recheckPreviousWord} onChange={(value) => setSetting("recheckPreviousWord", value)} />
+          </Row>
+          <Row icon="match_case" title={a.capitalized.title} description={a.capitalized.description}>
+            <Toggle label={a.capitalized.title} checked={settings.capitalizedCorrection} onChange={(value) => setSetting("capitalizedCorrection", value)} />
           </Row>
         </Card>
         <Card label={a.candidates}>

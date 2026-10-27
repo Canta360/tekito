@@ -16,6 +16,7 @@
 #include "Core/Japanese/JapaneseData.h"
 #include "Core/Japanese/RomajiTable.h"
 #include "Dictionary/ExternalDictionaryProvider.h"
+#include "UserData/AiModelInstall.h"
 #include "UserData/DataPackValidation.h"
 #include "UserData/KeyboardLayout.h"
 #include "UserData/ImeDictionaryImport.h"
@@ -74,6 +75,54 @@ struct PostalDownload {
     std::filesystem::path file;
     bool ok{false};
 };
+// An AI model download and install finished (lParam: AiModelDownload*).
+constexpr UINT kAiModelInstalled = WM_APP + 2;
+
+struct AiModelDownload {
+    int model{0};
+    tekito::userdata::AiModelInstallError error{tekito::userdata::AiModelInstallError::None};
+};
+
+// The AI models (japanese::AiModel 1 and 2) Settings downloads, from
+// TEKITO's releases, each checked against its SHA-256
+// (scripts/ja/build-japanese-ai-packs.py prints them).
+struct AiModelInfo {
+    const wchar_t* pack;
+    const wchar_t* url;
+    const char* sha256;
+    unsigned long long bytes;
+};
+constexpr AiModelInfo kAiModels[] = {
+    {L"japanese-ai-light", L"https://github.com/Canta360/tekito/releases/download/ai-models/TEKITO-japanese-ai-light.zip",
+     "4BD6A328D684405C4C5813CA76B5D4B98BA2B7624979268D3B422E5A84B8E78D", 229322365ull},
+    {L"japanese-ai-strong", L"https://github.com/Canta360/tekito/releases/download/ai-models/TEKITO-japanese-ai-strong.zip",
+     "9C80701006F9E60F1837E6C0CB7E586C8897793E4D00E968B106A8E025E9906B", 1246265200ull},
+};
+// What runs them (TekitoAI.exe and llama.cpp), downloaded with the first
+// model and removed with the last.
+constexpr AiModelInfo kAiRuntime{
+    L"ai-runtime", L"https://github.com/Canta360/tekito/releases/download/ai-models/TEKITO-ai-runtime.zip",
+    "BD6AD435F32563FD7F0C6E0AF999FA167662CD3BC2E2A3E23FE927B742E4EA7A", 18246900ull};
+
+// Downloads what runs the models when it is not there yet, then `model`
+// (1 or 2), and installs them into `root`.
+tekito::userdata::AiModelInstallError DownloadAiModel(int model, const std::filesystem::path& root) {
+    using tekito::userdata::AiModelInstallError;
+    for (const AiModelInfo* info : {&kAiRuntime, &kAiModels[model - 1]}) {
+        if (info == &kAiRuntime && tekito::userdata::AiRuntimeInstalled(root)) continue;
+        wchar_t folder[MAX_PATH]{};
+        GetTempPathW(MAX_PATH, folder);
+        const auto file = std::filesystem::path(folder) /
+                          (L"tekito-" + std::wstring(info->pack) + L"-" + std::to_wstring(GetCurrentProcessId()) + L".zip");
+        const auto error = FAILED(URLDownloadToFileW(nullptr, info->url, file.c_str(), 0, nullptr))
+                               ? AiModelInstallError::Download
+                               : tekito::userdata::InstallAiModelPack(file, info->sha256, info->pack, root);
+        std::error_code ignored;
+        std::filesystem::remove(file, ignored);
+        if (error != AiModelInstallError::None) return error;
+    }
+    return AiModelInstallError::None;
+}
 
 // The distributor's site, opened by the About page. Fixed here rather than
 // taken from the page, so the page cannot ask the host to open arbitrary URLs.
@@ -92,6 +141,8 @@ constexpr DataPackInfo kJapaneseDataPacks[] = {
     {L"japanese-lm", L"Japanese Word Pairs"},
     {L"japanese-loanwords", L"Loanwords"},
     {L"japanese-english", L"Katakana and English"},
+    {L"japanese-names", L"Proper Nouns (Wikidata)"},
+    {L"japanese-jmdict", L"Set Phrases and Names (JMdict)"},
     {L"japanese-wiktionary", L"Japanese Meanings (Wiktionary)"},
     {L"japanese-wordnet", L"Japanese Meanings (WordNet)"},
 };
@@ -112,6 +163,7 @@ constexpr DataPackInfo kDataPacks[] = {
     {L"phrase", L"Phrase / N-gram"},
     {L"dictionary-display", L"Dictionary Display"},
     {L"proper-nouns", L"Place Names"},
+    {L"english-names", L"Names (Wikidata)"},
     {L"slang", L"Slang"},
     {L"wiktionary-slang", L"Extended Slang"},
     {L"pronunciation", L"Pronunciation"},
@@ -119,6 +171,7 @@ constexpr DataPackInfo kDataPacks[] = {
     {L"social-expression", L"Social Expressions"},
     {L"japanese-phonetic", L"Japanese Phonetic Suggestions"},
     {L"special-conversions", L"Special Conversions"},
+    {L"kaomoji", L"Kaomoji and ASCII Art"},
     {L"qwerty-typo-catalog", L"QWERTY Typo Evaluation"},
 };
 
@@ -1071,6 +1124,8 @@ private:
         json += settings_.doubledWordCheck ? L"true" : L"false";
         json += L",\"recheckPreviousWord\":";
         json += settings_.recheckPreviousWord ? L"true" : L"false";
+        json += L",\"capitalizedCorrection\":";
+        json += settings_.capitalizedCorrection ? L"true" : L"false";
         json += L",\"doubleSpacePeriod\":";
         json += settings_.doubleSpacePeriod ? L"true" : L"false";
         json += L",\"bracketPairs\":";
@@ -1102,6 +1157,8 @@ private:
         json += settings_.japaneseLiveConversion ? L"true" : L"false";
         json += L",\"japaneseSentenceCheck\":";
         json += settings_.japaneseSentenceCheck ? L"true" : L"false";
+        json += L",\"japaneseSentenceModel\":" + std::to_wstring(settings_.japaneseSentenceModel);
+        json += L",\"japaneseAiDevice\":" + std::to_wstring(settings_.japaneseAiDevice);
         json += L",\"japaneseSlipAutoApply\":";
         json += settings_.japaneseSlipAutoApply ? L"true" : L"false";
         json += L",\"japaneseFirstPageSymbol\":";
@@ -1141,6 +1198,7 @@ private:
         json += L",\"romaji\":" + RomajiJson();
         json += L",\"packs\":" + packs;
         json += L",\"postalCodes\":" + PostalCodesJson();
+        json += L",\"aiModels\":" + AiModelsJson();
         json += L",\"appearance\":{\"accent\":\"" + AccentColorHex() + L"\",\"systemLanguage\":\"" +
                 std::wstring(tekito::userdata::UseJapaneseUi(0) ? L"ja" : L"en") + L"\"}}";
         return json;
@@ -1276,6 +1334,7 @@ private:
             else if (key == L"nextWordPrediction") settings_.nextWordPrediction = value;
             else if (key == L"doubledWordCheck") settings_.doubledWordCheck = value;
             else if (key == L"recheckPreviousWord") settings_.recheckPreviousWord = value;
+            else if (key == L"capitalizedCorrection") settings_.capitalizedCorrection = value;
             else if (key == L"doubleSpacePeriod") settings_.doubleSpacePeriod = value;
             else if (key == L"smartPunctuation") settings_.smartPunctuation = value;
             else if (key == L"bracketPairs") settings_.bracketPairs = value;
@@ -1332,6 +1391,16 @@ private:
             else if (key == L"japanesePredictionEnabled") settings_.japanesePredictionEnabled = value;
             else if (key == L"japaneseLiveConversion") settings_.japaneseLiveConversion = value;
             else if (key == L"japaneseSentenceCheck") settings_.japaneseSentenceCheck = value;
+            else if (key == L"japaneseSentenceModel") {
+                // Only a model that is there (Settings downloads it first).
+                const int model = std::clamp(integerValue, 0, 2);
+                if (model && !tekito::userdata::AiModelPackInstalled(kAiModels[model - 1].pack, AiDataRoot())) {
+                    known = false;
+                } else {
+                    settings_.japaneseSentenceModel = model;
+                }
+            }
+            else if (key == L"japaneseAiDevice") settings_.japaneseAiDevice = std::clamp(integerValue, 0, 2);
             else if (key == L"japaneseSlipAutoApply") settings_.japaneseSlipAutoApply = value;
             else if (key == L"japaneseFirstPageSymbol") settings_.japaneseFirstPageSymbol = value;
             else if (key == L"japaneseTypedForms") settings_.japaneseTypedForms = value;
@@ -1440,6 +1509,42 @@ private:
                 }
                 if (!PostMessageW(hwnd, kPostalDownloaded, 0, reinterpret_cast<LPARAM>(download))) delete download;
             }).detach();
+        } else if (type == L"aiModel.download") {
+            const int model = static_cast<int>(message.Number(L"model"));
+            if (aiDownloading_ || model < 1 || model > 2) {
+                Reply(requestId, false);
+                return;
+            }
+            aiDownloading_ = model;
+            aiError_.clear();
+            auto* download = new AiModelDownload{model};
+            std::thread([hwnd = hwnd_, download, root = AiDataRoot()] {
+                download->error = DownloadAiModel(download->model, root);
+                if (!PostMessageW(hwnd, kAiModelInstalled, 0, reinterpret_cast<LPARAM>(download))) delete download;
+            }).detach();
+            Reply(requestId, true);
+            PostState();
+        } else if (type == L"aiModel.remove") {
+            const int model = static_cast<int>(message.Number(L"model"));
+            if (aiDownloading_ || model < 1 || model > 2) {
+                Reply(requestId, false);
+                return;
+            }
+            if (settings_.japaneseSentenceModel == model) {
+                settings_.japaneseSentenceModel = 0;
+                (void)SaveSettings();
+            }
+            bool removed = tekito::userdata::RemoveAiModelPack(kAiModels[model - 1].pack, AiDataRoot());
+            // With the last model, what runs it goes too.
+            if (removed && std::none_of(std::begin(kAiModels), std::end(kAiModels), [](const AiModelInfo& info) {
+                    return tekito::userdata::AiModelPackInstalled(info.pack, AiDataRoot());
+                })) {
+                removed = tekito::userdata::RemoveAiModelPack(kAiRuntime.pack, AiDataRoot());
+            }
+            Reply(requestId, removed,
+                  removed ? L"" : Text(L"The AI model could not be removed. Close the apps you type in and try again.",
+                                       L"AI モデルを削除できませんでした。入力中のアプリを閉じてから、もう一度お試しください。"));
+            PostState();
         } else if (type == L"postalCodes.remove") {
             const bool removed = tekito::userdata::RemovePostalCodes(PostalCodeDirectory());
             if (removed) runtime_->NotifyDictionaryChanged();
@@ -1742,6 +1847,10 @@ private:
             SetTimer(hwnd, kStateWatchTimer, kStateWatchIntervalMs, nullptr);
             return 0;
         }
+        if (message == kAiModelInstalled) {
+            self->FinishAiModelInstall(std::unique_ptr<AiModelDownload>(reinterpret_cast<AiModelDownload*>(lParam)));
+            return 0;
+        }
         if (message == kPostalDownloaded) {
             self->FinishPostalDownload(std::unique_ptr<PostalDownload>(reinterpret_cast<PostalDownload*>(lParam)));
             return 0;
@@ -1815,6 +1924,48 @@ private:
         std::filesystem::remove(download->file, ignored);
         if (imported) runtime_->NotifyDictionaryChanged();
         Reply(download->requestId, imported.has_value(), imported ? L"" : PostalCodeErrorText(error));
+    }
+
+    static std::filesystem::path AiDataRoot() { return tekito::ExternalLexiconProvider::DataPackRoot(); }
+
+    // The model is used as soon as it is installed.
+    void FinishAiModelInstall(std::unique_ptr<AiModelDownload> download) {
+        aiDownloading_ = 0;
+        using tekito::userdata::AiModelInstallError;
+        switch (download->error) {
+        case AiModelInstallError::None:
+            settings_.japaneseSentenceModel = download->model;
+            (void)SaveSettings();
+            break;
+        case AiModelInstallError::Download:
+            aiError_ = Text(L"The AI model could not be downloaded. Check the connection and try again.",
+                            L"AI モデルをダウンロードできませんでした。接続を確認して、もう一度お試しください。");
+            break;
+        case AiModelInstallError::InUse:
+            aiError_ = Text(L"The AI model could not be replaced. Close the apps you type in and try again.",
+                            L"AI モデルを置き換えられませんでした。入力中のアプリを閉じてから、もう一度お試しください。");
+            break;
+        default:
+            aiError_ = Text(L"The downloaded AI model was damaged. Try again.",
+                            L"ダウンロードした AI モデルが壊れていました。もう一度お試しください。");
+            break;
+        }
+        PostState();
+    }
+
+    std::wstring AiModelsJson() const {
+        std::wstring json = L"{";
+        const wchar_t* names[] = {L"light", L"strong"};
+        for (std::size_t i = 0; i < std::size(kAiModels); ++i) {
+            json += std::wstring(i ? L"," : L"") + L"\"" + names[i] + L"\":{\"installed\":" +
+                    (tekito::userdata::AiModelPackInstalled(kAiModels[i].pack, AiDataRoot()) ? L"true" : L"false") +
+                    L",\"bytes\":" + std::to_wstring(kAiModels[i].bytes) + L"}";
+        }
+        json += std::wstring(L",\"runtime\":{\"installed\":") +
+                (tekito::userdata::AiRuntimeInstalled(AiDataRoot()) ? L"true" : L"false") +
+                L",\"bytes\":" + std::to_wstring(kAiRuntime.bytes) + L"}";
+        json += L",\"downloading\":" + std::to_wstring(aiDownloading_) + L",\"error\":\"" + JsonEscape(aiError_) + L"\"}";
+        return json;
     }
 
     std::wstring PostalCodesJson() const {
@@ -2054,6 +2205,10 @@ private:
     // A file dropped on the page comes with its message (postal codes).
     std::filesystem::path droppedFile_;
     bool postalDownloading_{false};
+    // The AI model being downloaded (1, 2), 0 for none, and why the last
+    // one failed.
+    int aiDownloading_{0};
+    std::wstring aiError_;
     EventRegistrationToken navigationToken_{};
     std::wstring dataPackSummary_{L"Unavailable"};
     std::wstring japaneseDataSummary_{L"0 / 0"};
@@ -2093,10 +2248,38 @@ std::optional<int> ExportDictionariesFromCommandLine() {
     return written ? 0 : 2;
 }
 
+// "--install-ai light|strong" (the installer's, when the user chose AI):
+// downloads and installs the model, and what runs it, with no window, and
+// turns it on. 0 when it is installed, 3 when it could not be downloaded,
+// 4 when it could not be installed.
+std::optional<int> InstallAiFromCommandLine() {
+    int count = 0;
+    LPWSTR* arguments = CommandLineToArgvW(GetCommandLineW(), &count);
+    int model = 0;
+    for (int i = 1; arguments && i + 1 < count; ++i) {
+        if (std::wstring_view(arguments[i]) != L"--install-ai") continue;
+        const std::wstring_view which = arguments[i + 1];
+        model = which == L"light" ? 1 : which == L"strong" ? 2 : -1;
+    }
+    if (arguments) LocalFree(arguments);
+    if (model == 0) return std::nullopt;
+    if (model < 0) return 4;
+    using tekito::userdata::AiModelInstallError;
+    const auto error = DownloadAiModel(model, tekito::ExternalLexiconProvider::DataPackRoot());
+    if (error == AiModelInstallError::Download) return 3;
+    if (error != AiModelInstallError::None) return 4;
+    const auto repository = tekito::userdata::CreateDefaultUserDataRepository();
+    tekito::userdata::UserSettings settings;
+    if (!repository || !repository->Open() || !repository->LoadSettings(settings)) return 4;
+    settings.japaneseSentenceModel = model;
+    return repository->SaveSettings(settings) ? 0 : 4;
+}
+
 }  // namespace
 
 int RunTekitoSettings(HINSTANCE instance) {
     if (const auto exported = ExportDictionariesFromCommandLine()) return *exported;
+    if (const auto installed = InstallAiFromCommandLine()) return *installed;
     const HRESULT comResult = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
     const bool comInitialized = SUCCEEDED(comResult);
     HANDLE singleInstance = CreateMutexW(nullptr, TRUE, L"Local\\TEKITO.Settings.Singleton");

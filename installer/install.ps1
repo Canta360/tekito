@@ -11,7 +11,9 @@
 # SHA-256, and adds TEKITO to the Japanese keyboard list in place of the
 # English one; TEKITO for Japanese has Auto and Direct for English. Pass
 # -KeepEnglishProfile to keep both. Exit code 20: the download failed;
-# 21: the downloaded file did not match.
+# 21: the downloaded file did not match. -AiModel light|strong (with
+# Japanese) also downloads that AI model and turns it on; exit code 30: TEKITO
+# is installed, but the AI model could not be (Settings offers it again).
 [CmdletBinding()]
 param(
     [string]$SourceRoot = $PSScriptRoot,
@@ -20,6 +22,8 @@ param(
     [bool]$Japanese = $false,
     [string]$JapaneseDataPath,
     [bool]$KeepEnglishProfile = $false,
+    [ValidateSet("", "light", "strong")]
+    [string]$AiModel = "",
     [switch]$SkipDataPacks,
     [switch]$SkipRegistration,
     [switch]$SkipPrerequisiteCheck
@@ -181,6 +185,7 @@ $installedDll = Join-Path $installRoot "Tekito.Tsf.dll"
 $installedApp = Join-Path $installRoot "TEKITO.exe"
 $addedTips = @()
 $registeredNewDll = $false
+$aiFailed = $false
 try {
     Copy-Item -LiteralPath (Join-Path $SourceRoot "TEKITO.exe") $stagingRoot
     Copy-Item -LiteralPath (Join-Path $SourceRoot "Tekito.Tsf.dll") $stagingRoot
@@ -266,6 +271,17 @@ try {
         japanese = $Japanese
     } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $installRoot "install-manifest.json") -Encoding UTF8
 
+    # The AI model chosen: TEKITO.exe downloads it, with what runs it, and
+    # turns it on. Not getting it does not stop the install.
+    if ($AiModel -and $Japanese -and -not $SkipDataPacks) {
+        Write-Host "Downloading the AI model ($AiModel)"
+        $ai = Start-Process -FilePath $installedApp -ArgumentList @("--install-ai", $AiModel) -Wait -PassThru
+        if ($ai.ExitCode -ne 0) {
+            Write-Host "The AI model could not be installed ($($ai.ExitCode))."
+            $aiFailed = $true
+        }
+    }
+
     # An uninstall's cleanup left for the next sign-in would delete this.
     Remove-ItemProperty -LiteralPath "HKCU:\Software\Microsoft\Windows\CurrentVersion\RunOnce" -Name "TEKITO cleanup" -ErrorAction SilentlyContinue
 
@@ -318,4 +334,5 @@ finally {
     }
     try { Stop-Transcript | Out-Null } catch { }
 }
+if ($aiFailed) { exit 30 }
 exit 0

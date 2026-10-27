@@ -104,7 +104,7 @@ enum class Screen {
 
 enum class Action {
     Install, Cancel, Options, ReadLicense, Agree, GetRuntime, CheckRuntime,
-    Back, AcceptLicense, Browse, Shortcut, Finish, Retry, Close, Japanese, KeepEnglish, Samples,
+    Back, AcceptLicense, Browse, Shortcut, Finish, Retry, Close, Japanese, Ai, KeepEnglish, Samples,
     WithoutJapanese, SampleMode, SampleClip,
     Uninstall, ExportWords, UninstallWithoutExport, OpenExportFolder,
 };
@@ -213,6 +213,9 @@ struct Wizard {
     // Japanese input: its data is downloaded from the release on GitHub.
     // On by default where Windows shows Japanese.
     bool japanese{UseJapanese()};
+    // With Japanese: the AI model (light) that reads conversions again,
+    // downloaded with what runs it. Off unless chosen.
+    bool ai{false};
     // With Japanese: keep TEKITO in the English keyboard list too (the
     // Japanese one has Auto and Direct for English).
     bool keepEnglish{false};
@@ -477,6 +480,7 @@ struct InstallChoices {
     std::filesystem::path installRoot;
     bool startMenuShortcut{true};
     bool japanese{false};
+    bool ai{false};
     bool keepEnglish{false};
 };
 
@@ -501,6 +505,7 @@ int RunPowerShell(const std::filesystem::path& zipPath, const std::filesystem::p
                          L" -StartMenuShortcut:" + flag(choices.startMenuShortcut) +
                          L" -Japanese:" + flag(choices.japanese) +
                          L" -KeepEnglishProfile:" + flag(choices.keepEnglish) +
+                         (choices.ai ? L" -AiModel light" : L"") +
                          L"; exit $(if ($LASTEXITCODE) { $LASTEXITCODE } else { 0 })\"";
     std::vector<wchar_t> commandLine(command.begin(), command.end());
     commandLine.push_back(L'\0');
@@ -669,7 +674,7 @@ void StartInstall(Wizard& wizard) {
     const HWND window = wizard.window;
     const auto self = wizard.self;
     const InstallChoices choices{wizard.installRoot, wizard.startMenuShortcut, wizard.japanese,
-                                 wizard.japanese && wizard.keepEnglish};
+                                 wizard.japanese && wizard.ai, wizard.japanese && wizard.keepEnglish};
     try {
         wizard.installThread = std::thread([&wizard, window, self, choices] {
             wizard.installExitCode.store(InstallEmbeddedPackage(self, choices));
@@ -738,6 +743,13 @@ std::vector<Control> Controls(const Wizard& wizard) {
                             D2D1::RectF(kMargin, japaneseRow, kMargin + 30.0f + TextWidth(wizard, wizard.body.Get(), japanese),
                                         japaneseRow + 24.0f),
                             japanese, true, wizard.japanese});
+        // The AI model, beside it: only with Japanese, which it converts.
+        const std::wstring ai = Tr(L"Check with AI", L"AI で変換を見直す");
+        const float aiLeft = kMargin + 30.0f + TextWidth(wizard, wizard.body.Get(), japanese) + 28.0f;
+        controls.push_back({Action::Ai, Kind::Checkbox,
+                            D2D1::RectF(aiLeft, japaneseRow, aiLeft + 30.0f + TextWidth(wizard, wizard.body.Get(), ai),
+                                        japaneseRow + 24.0f),
+                            ai, wizard.japanese, wizard.japanese && wizard.ai});
         const std::wstring agree = Tr(L"I agree to the license terms", L"使用許諾契約に同意する");
         const float agreeWidth = TextWidth(wizard, wizard.body.Get(), agree);
         const float row = AgreeRow(wizard);
@@ -1198,10 +1210,15 @@ void Paint(Wizard& wizard) {
                  wizard.body.Get(), D2D1::RectF(kMargin, 170.0f, kMargin + bodyWidth, 214.0f), p.ink2);
         if (wizard.webViewReady) {
             DrawText(wizard,
-                     Tr(L"Downloads the Japanese dictionary and language data (about 88 MB) from TEKITO's release "
-                        L"on GitHub while installing.",
-                        L"インストール中に、日本語の辞書と言語データ（約 88 MB）を GitHub の TEKITO のリリースから"
-                        L"ダウンロードします。"),
+                     wizard.japanese && wizard.ai
+                         ? Tr(L"Downloads the Japanese dictionary and language data (about 88 MB) and the AI model "
+                              L"(about 250 MB) from TEKITO's release on GitHub while installing.",
+                              L"インストール中に、日本語の辞書と言語データ（約 88 MB）と AI モデル（約 250 MB）を "
+                              L"GitHub の TEKITO のリリースからダウンロードします。")
+                         : Tr(L"Downloads the Japanese dictionary and language data (about 88 MB) from TEKITO's release "
+                              L"on GitHub while installing.",
+                              L"インストール中に、日本語の辞書と言語データ（約 88 MB）を GitHub の TEKITO のリリースから"
+                              L"ダウンロードします。"),
                      wizard.caption.Get(),
                      D2D1::RectF(kMargin + 30.0f, JapaneseRow(wizard) + 28.0f, kWidth - kMargin, JapaneseRow(wizard) + 64.0f),
                      p.ink2);
@@ -1378,6 +1395,12 @@ void Paint(Wizard& wizard) {
                     L"使用するアプリを再起動し、タスクバーの入力メニューで TEKITO を選択するか、"
                     L"Win+Space を押してください。"),
                  wizard.bodyCentered.Get(), D2D1::RectF(90.0f, 238.0f, kWidth - 90.0f, 290.0f), p.ink2);
+        if (wizard.installExitCode.load() == 30) {
+            DrawText(wizard,
+                     Tr(L"The AI model couldn't be downloaded. You can add it later in Settings > AI.",
+                        L"AI モデルはダウンロードできませんでした。あとから設定の「AI」で追加できます。"),
+                     wizard.captionCentered.Get(), D2D1::RectF(90.0f, 344.0f, kWidth - 90.0f, 382.0f), p.problem);
+        }
         break;
     }
     case Screen::Samples: {
@@ -1559,6 +1582,7 @@ void Activate(Wizard& wizard, Action action, int index = 0) {
     }
     case Action::Shortcut: wizard.startMenuShortcut = !wizard.startMenuShortcut; break;
     case Action::Japanese: wizard.japanese = !wizard.japanese; break;
+    case Action::Ai: wizard.ai = !wizard.ai; break;
     case Action::KeepEnglish: wizard.keepEnglish = !wizard.keepEnglish; break;
     case Action::Samples:
         wizard.sampleMode = SampleModes(wizard).front();
@@ -1789,7 +1813,9 @@ LRESULT CALLBACK WizardProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
             Go(*wizard, code == 0 || code == 3 ? Screen::Uninstalled : Screen::UninstallFailed);
             return 0;
         }
-        Go(*wizard, wizard->installExitCode.load() == 0 ? Screen::Done : Screen::Failed);
+        // 30: TEKITO is installed, the AI model is not (Done says so).
+        Go(*wizard, wizard->installExitCode.load() == 0 || wizard->installExitCode.load() == 30 ? Screen::Done
+                                                                                                : Screen::Failed);
         return 0;
     case WM_CLOSE:
         if (wizard->screen == Screen::Installing || wizard->screen == Screen::Uninstalling) return 0;  // let it finish
@@ -1808,7 +1834,7 @@ LRESULT CALLBACK WizardProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
 #ifdef TEKITO_SETUP_PREVIEW
 // Preview build (tekito_setup_preview): opens one screen without elevation,
 // saves a screenshot of the window and exits.
-//   tekito_setup_preview.exe <screen> <out.bmp> [nowebview] [unchecked] [nojapanese] [nodownload] [stay]
+//   tekito_setup_preview.exe <screen> <out.bmp> [nowebview] [unchecked] [nojapanese] [nodownload] [ai] [stay]
 // stay: keeps the screen open to try, with no screenshot.
 // screen: welcome | license | options | installing | done | failed | samples
 //         | uninstall | uninstalling | uninstalled | uninstallfailed
@@ -1820,6 +1846,8 @@ struct PreviewRequest {
     bool noJapanese{false};
     // The failed screen after a Japanese download failure.
     bool noDownload{false};
+    // The AI model chosen; on the done screen, it could not be downloaded.
+    bool ai{false};
     bool stay{false};
 };
 PreviewRequest g_preview;
@@ -1918,11 +1946,13 @@ bool ShowWizard(const std::filesystem::path& self, const std::filesystem::path& 
     wizard.webViewReady = !g_preview.noWebView;
     wizard.agreed = g_preview.agreed;
     if (g_preview.noJapanese) wizard.japanese = false;
+    wizard.ai = g_preview.ai;
     if (g_preview.screen == Screen::Installing || g_preview.screen == Screen::Uninstalling) {
         if (g_preview.screen == Screen::Installing) StartInstall(wizard); else StartUninstall(wizard);
         wizard.animation = 0.35f;
     } else {
         if (g_preview.screen == Screen::Failed) wizard.installExitCode.store(g_preview.noDownload ? 20 : 4);
+        if (g_preview.screen == Screen::Done) wizard.installExitCode.store(g_preview.noDownload ? 30 : 0);
         // nodownload: the uninstall that could not export the words.
         if (g_preview.screen == Screen::UninstallFailed) wizard.installExitCode.store(g_preview.noDownload ? 30 : 1);
         if (g_preview.screen == Screen::Uninstalled) {
@@ -1995,6 +2025,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
             if (std::wstring_view(argv[i]) == L"nojapanese") g_preview.noJapanese = true;
             if (std::wstring_view(argv[i]) == L"nodownload") g_preview.noDownload = true;
             if (std::wstring_view(argv[i]) == L"stay") g_preview.stay = true;
+            if (std::wstring_view(argv[i]) == L"ai") g_preview.ai = true;
         }
     }
     LocalFree(argv);
