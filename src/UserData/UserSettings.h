@@ -65,6 +65,9 @@ struct UserSettings {
     // is typed, and put right when the words around it say it was a slip
     // (have to urn the: run).
     bool recheckPreviousWord{true};
+    // English: a word typed with a capital mid-sentence is put right too
+    // (ConversionOptions::capitalizedCorrection); off keeps it as typed.
+    bool capitalizedCorrection{false};
     // English: Space twice after a word ends the sentence with a period.
     bool doubleSpacePeriod{false};
     // English: curly quotes and apostrophes, and "--" as an em dash.
@@ -145,6 +148,13 @@ struct UserSettings {
     // Converting checks the likeliest sentences as a whole (the
     // japanese-reranker pack) and takes the one that reads best.
     bool japaneseSentenceCheck{true};
+    // What the check reads with (japanese::AiModel): 0 = the sentence check
+    // alone, 1 = it and the light AI model, 2 = it and the strong one. An
+    // AI model not installed counts as 0.
+    int japaneseSentenceModel{0};
+    // Where the AI model runs (japanese::AiDevice): 0 = the GPU when the PC
+    // has its own, else the processor; 1 = the processor; 2 = the GPU.
+    int japaneseAiDevice{0};
     // Space may rewrite the reading when keys look like a typing slip
     // (KeyConverter / KanaSlips), then convert; the keys as typed stay a
     // choice. Off: convert as typed; slip readings stay in the list only.

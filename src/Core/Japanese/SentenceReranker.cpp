@@ -336,18 +336,24 @@ std::vector<double> SentenceReranker::LogProbabilities(std::span<const std::wstr
     return result;
 }
 
-std::size_t SentenceReranker::Choose(std::span<const std::wstring> sentences) const {
-    const std::size_t count = std::min(sentences.size(), prior_.size());
-    if (!IsOpen() || count < 2) return 0;
-    const auto logProbabilities = LogProbabilities(sentences.first(count));
+std::size_t SentenceReranker::Choose(std::span<const std::wstring> sentences, std::size_t ranked,
+                                     double penalty) const {
+    ranked = std::min(ranked, sentences.size());
+    const std::size_t count = std::min(ranked, prior_.size());
+    if (!IsOpen() || count + (sentences.size() - ranked) < 2 || count == 0) return 0;
+    std::vector<std::wstring> read(sentences.begin(), sentences.begin() + static_cast<std::ptrdiff_t>(count));
+    read.insert(read.end(), sentences.begin() + static_cast<std::ptrdiff_t>(ranked), sentences.end());
+    const auto logProbabilities = LogProbabilities(read);
     const double ramp = rampChars_ > 0 ? std::min(1.0, CodePoints(sentences[0]) / static_cast<double>(rampChars_)) : 1.0;
     std::size_t best = 0;
-    std::vector<double> scores(count);
-    for (std::size_t i = 0; i < count; ++i) {
-        scores[i] = weight_ * ramp * scale_ * logProbabilities[i] + prior_[i];
+    std::vector<double> scores(read.size());
+    for (std::size_t i = 0; i < read.size(); ++i) {
+        const double prior = i < count ? prior_[i] : prior_.back() - penalty;
+        scores[i] = weight_ * ramp * scale_ * logProbabilities[i] + prior;
         if (scores[i] > scores[best]) best = i;
     }
-    return scores[best] - scores[0] > margin_ ? best : 0;
+    if (scores[best] - scores[0] <= margin_) return 0;
+    return best < count ? best : ranked + (best - count);
 }
 
 }  // namespace tekito::japanese

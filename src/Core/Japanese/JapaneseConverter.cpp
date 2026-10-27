@@ -4,6 +4,7 @@
 #include "Core/Japanese/JapaneseUserDictionary.h"
 #include "Core/Japanese/KanaText.h"
 #include "Core/Japanese/LanguageModel.h"
+#include "Core/Japanese/TopicVectors.h"
 
 #include <algorithm>
 #include <cmath>
@@ -512,6 +513,16 @@ struct PathEntry {
     int previousRank{-1};
 };
 
+// What `node` writes its part of `reading` as.
+std::wstring NodeText(const JapaneseDictionary& dictionary, const Node& node, std::wstring_view reading) {
+    const auto part = reading.substr(node.begin, node.end - node.begin);
+    if (node.numberPrefix > 0) {
+        // In digits, for the number style (三時: 3時).
+        return std::to_wstring(node.numberValue) + dictionary.Surface(node.word, part).substr(node.numberPrefix);
+    }
+    return node.user ? node.text : node.known ? dictionary.Surface(node.word, part) : std::wstring(part);
+}
+
 }  // namespace
 
 std::vector<Phrase> JapaneseConverter::Convert(std::wstring_view reading,
@@ -557,17 +568,10 @@ std::vector<Phrase> JapaneseConverter::Convert(std::wstring_view reading,
     }
     spans.emplace_back(start, path.size());
 
-    const auto textOf = [&](const Node& node) {
-        const auto part = reading.substr(node.begin, node.end - node.begin);
-        if (node.numberPrefix > 0) {
-            // In digits, for the number style (三時: 3時).
-            return std::to_wstring(node.numberValue) + dictionary_.Surface(node.word, part).substr(node.numberPrefix);
-        }
-        return node.user ? node.text : node.known ? dictionary_.Surface(node.word, part) : std::wstring(part);
-    };
+    const auto textOf = [&](const Node& node) { return NodeText(dictionary_, node, reading); };
     // The content words of the likeliest reading, by phrase, for the
     // sentence model: each phrase's candidates meet the others' words.
-    const bool topics = model_ && weights_.costPerTopic > 0;
+    const bool topics = (model_ && weights_.costPerTopic > 0) || (vectors_ && weights_.costPerVector > 0);
     std::vector<std::pair<std::size_t, std::wstring>> sentenceWords;  // (span index, word)
     if (topics) {
         // Words written just before belong to no phrase here.
@@ -711,15 +715,35 @@ std::vector<Phrase> JapaneseConverter::Convert(std::wstring_view reading,
             // keep their places (kana and particles are not told apart so).
             std::vector<std::size_t> places;
             std::vector<std::pair<std::int64_t, PhraseCandidate>> ranked;
+            // How much closer to the topic a candidate must be than the first.
+            constexpr double kTopicMargin = 0.1;
+            TopicVectors::Topic around;
+            if (vectors_ && weights_.costPerVector > 0) {
+                for (const auto& [where, word] : sentenceWords) {
+                    if (where != spanIndex) vectors_->Add(around, word);
+                }
+            }
             for (std::size_t c = 0; c < phrase.candidates.size() && c < heads.size() && c < kTopicCandidates; ++c) {
                 if (heads[c].empty()) continue;
                 double strongest = 0.0;
-                for (const auto& [where, word] : sentenceWords) {
-                    if (where == spanIndex) continue;
-                    if (const auto tie = model_->Topic(heads[c], word)) strongest = std::max(strongest, *tie);
+                if (model_ && weights_.costPerTopic > 0) {
+                    for (const auto& [where, word] : sentenceWords) {
+                        if (where == spanIndex) continue;
+                        if (const auto tie = model_->Topic(heads[c], word)) strongest = std::max(strongest, *tie);
+                    }
+                }
+                // Only a clearly better fit than the first choice counts:
+                // small differences are the other models' to settle.
+                double close = 0.0;
+                if (vectors_ && weights_.costPerVector > 0 && around.words >= 2 && c > 0) {
+                    const auto mine = vectors_->Closeness(around, heads[c]);
+                    const auto first = vectors_->Closeness(around, heads.front());
+                    if (mine && first) close = std::max(0.0, *mine - *first - kTopicMargin);
                 }
                 places.push_back(c);
-                ranked.emplace_back(phrase.candidates[c].cost - std::llround(strongest * static_cast<double>(weights_.costPerTopic)),
+                ranked.emplace_back(phrase.candidates[c].cost -
+                                        std::llround(strongest * static_cast<double>(weights_.costPerTopic)) -
+                                        std::llround(close * static_cast<double>(weights_.costPerVector)),
                                     phrase.candidates[c]);
             }
             std::stable_sort(ranked.begin(), ranked.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
@@ -786,6 +810,83 @@ std::vector<Phrase> JapaneseConverter::Convert(std::wstring_view reading,
         phrases.push_back(std::move(phrase));
     }
     return phrases;
+}
+
+std::vector<SentenceGuess> JapaneseConverter::BestSentences(std::wstring_view reading, std::size_t count,
+                                                            std::uint16_t context,
+                                                            const JapaneseUserDictionary* user) const {
+    const std::size_t n = reading.size();
+    if (n == 0 || count == 0) return {};
+    const ReadingCodes codes = dictionary_.Encode(reading);
+    const std::vector<bool> noBoundary(n + 1, false);
+    const bool pairs = model_ && (weights_.costPerNat > 0 || weights_.penaltyPerNat > 0);
+    const Lattice lattice = BuildLattice(dictionary_, codes, noBoundary, reading, pairs ? model_ : nullptr, user,
+                                         number_ ? &*number_ : nullptr);
+    const auto& nodes = lattice.nodes;
+    // The cheapest few ways to reach each word, as Convert finds a phrase's.
+    std::vector<std::vector<PathEntry>> entries(nodes.size());
+    for (std::size_t i = 0; i < n; ++i) {
+        for (const int k : lattice.beginningAt[i]) {
+            const Node& node = nodes[k];
+            auto& list = entries[k];
+            if (i == 0) {
+                list.push_back({node.cost + matrix_.Cost(context, node.left), -1, -1});
+            } else {
+                for (const int p : lattice.endingAt[i]) {
+                    const std::int64_t connection =
+                        matrix_.Cost(nodes[p].right, node.left) - PairBonus(model_, weights_, nodes[p], node);
+                    for (std::size_t r = 0; r < entries[p].size(); ++r) {
+                        list.push_back({entries[p][r].cost + connection + node.cost, p, static_cast<int>(r)});
+                    }
+                }
+            }
+            const auto cheaper = [](const PathEntry& a, const PathEntry& b) { return a.cost < b.cost; };
+            if (list.size() > kBestPaths) {
+                std::partial_sort(list.begin(), list.begin() + kBestPaths, list.end(), cheaper);
+                list.resize(kBestPaths);
+            } else {
+                std::sort(list.begin(), list.end(), cheaper);
+            }
+        }
+    }
+    struct Ending {
+        std::int64_t cost;
+        int node;
+        int rank;
+    };
+    std::vector<Ending> endings;
+    for (const int k : lattice.endingAt[n]) {
+        for (std::size_t r = 0; r < entries[k].size(); ++r) {
+            endings.push_back({entries[k][r].cost + matrix_.Cost(nodes[k].right, 0), k, static_cast<int>(r)});
+        }
+    }
+    std::sort(endings.begin(), endings.end(), [](const Ending& a, const Ending& b) { return a.cost < b.cost; });
+    std::vector<SentenceGuess> sentences;
+    for (const auto& ending : endings) {
+        if (sentences.size() >= count) break;
+        std::vector<int> parts;
+        for (int k = ending.node, r = ending.rank; k >= 0;) {
+            parts.push_back(k);
+            const PathEntry& entry = entries[k][static_cast<std::size_t>(r)];
+            k = entry.previous;
+            r = entry.previousRank;
+        }
+        SentenceGuess guess;
+        guess.cost = ending.cost;
+        for (auto it = parts.rbegin(); it != parts.rend(); ++it) {
+            const Node& node = nodes[*it];
+            // Where the phrases of this reading would break, by the rules.
+            if (it != parts.rbegin() && matrix_.IsBoundary(nodes[*std::prev(it)].right, node.left)) {
+                guess.breaks.push_back(node.begin);
+            }
+            guess.text += NodeText(dictionary_, node, reading);
+        }
+        if (std::none_of(sentences.begin(), sentences.end(),
+                         [&](const SentenceGuess& other) { return other.text == guess.text; })) {
+            sentences.push_back(std::move(guess));
+        }
+    }
+    return sentences;
 }
 
 bool JapaneseConverter::IsWord(std::wstring_view reading) const {
@@ -882,7 +983,9 @@ std::vector<Prediction> JapaneseConverter::Predict(std::wstring_view reading, st
     const ReadingCodes codes = dictionary_.Encode(reading);
     auto ranges = dictionary_.PrefixRanges(codes);
     // Too many to look through: the dictionary's words are left out.
-    if (ranges[0].second - ranges[0].first + ranges[1].second - ranges[1].first > kMaxKeys) ranges = {};
+    std::size_t keys = 0;
+    for (const auto& [first, end] : ranges) keys += end - first;
+    if (keys > kMaxKeys) ranges.clear();
 
     struct Found {
         std::int64_t cost;
@@ -978,6 +1081,69 @@ std::vector<Prediction> JapaneseConverter::Predict(std::wstring_view reading, st
         if (predictions.size() > limit) predictions.resize(limit);
     }
     return predictions;
+}
+
+bool JapaneseConverter::CanWrite(std::wstring_view reading, std::wstring_view text) const {
+    return Align(reading, text).has_value();
+}
+
+std::optional<std::vector<std::pair<std::size_t, std::size_t>>> JapaneseConverter::Align(std::wstring_view reading,
+                                                                                         std::wstring_view text) const {
+    const std::size_t n = reading.size();
+    const std::size_t m = text.size();
+    if (n == 0 || m == 0 || n > 256 || m > 256) return std::nullopt;
+    // The words that can start at each place in the reading, as written.
+    const ReadingCodes codes = dictionary_.Encode(reading);
+    std::vector<std::vector<std::pair<std::size_t, std::wstring>>> words(n);
+    for (std::size_t at = 0; at < n && at < codes.size(); ++at) {
+        dictionary_.CommonPrefixSearch(ReadingCodesView(codes).substr(at), [&](std::size_t length, std::uint32_t record) {
+            if (at + length > n) return;
+            const auto part = reading.substr(at, length);
+            dictionary_.ForEachWord(record, [&](const DictionaryWord& word) {
+                if (!word.spellingCorrection) words[at].emplace_back(length, dictionary_.Surface(word, part));
+            });
+        });
+    }
+    const auto same = [](wchar_t written, wchar_t read) {
+        if (written == read) return true;
+        // Katakana for hiragana, wide for narrow letters and digits.
+        if (written >= 0x30A1 && written <= 0x30F6 && written - 0x60 == read) return true;
+        if (written >= 0xFF01 && written <= 0xFF5E && written - 0xFEE0 == read) return true;
+        if (read >= 0xFF01 && read <= 0xFF5E && read - 0xFEE0 == written) return true;
+        return false;
+    };
+    // Places reached: (reading, text), breadth first, each with the place
+    // it was reached from.
+    constexpr std::size_t kNone = static_cast<std::size_t>(-1);
+    std::vector<std::size_t> from((n + 1) * (m + 1), kNone);
+    std::vector<std::pair<std::size_t, std::size_t>> queue{{0, 0}};
+    from[0] = 0;
+    for (std::size_t q = 0; q < queue.size(); ++q) {
+        const auto [i, j] = queue[q];
+        if (i == n && j == m) {
+            // Back from the end: the places passed, first to last.
+            std::vector<std::pair<std::size_t, std::size_t>> places{{n, m}};
+            for (std::size_t at = n * (m + 1) + m; at != 0;) {
+                at = from[at];
+                places.emplace_back(at / (m + 1), at % (m + 1));
+            }
+            std::reverse(places.begin(), places.end());
+            return places;
+        }
+        if (i == n || j == m) continue;
+        const auto reach = [&](std::size_t ni, std::size_t nj) {
+            const std::size_t at = ni * (m + 1) + nj;
+            if (from[at] == kNone) {
+                from[at] = i * (m + 1) + j;
+                queue.emplace_back(ni, nj);
+            }
+        };
+        if (same(text[j], reading[i])) reach(i + 1, j + 1);
+        for (const auto& [length, surface] : words[i]) {
+            if (!surface.empty() && text.substr(j).starts_with(surface)) reach(i + length, j + surface.size());
+        }
+    }
+    return std::nullopt;
 }
 
 std::optional<ReadingGuess> JapaneseConverter::ReadingOf(std::wstring_view text) const {

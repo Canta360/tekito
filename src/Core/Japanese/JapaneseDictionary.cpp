@@ -60,12 +60,13 @@ bool JapaneseDictionary::Open(const std::filesystem::path& file) noexcept {
 }
 
 bool JapaneseDictionary::AddWords(const std::filesystem::path& file) {
-    added_.reset();
     if (!IsOpen()) return false;
+    if (added_) return added_->AddWords(file);
     auto added = std::make_unique<JapaneseDictionary>();
     if (!added->Open(file)) return false;
     // The same reading codes: the same characters, in the same order.
     if (added->charCount_ != charCount_ || std::memcmp(added->chars_, chars_, 2ull * charCount_) != 0) return false;
+    added->depth_ = static_cast<std::uint8_t>(depth_ + 1);
     added_ = std::move(added);
     return true;
 }
@@ -103,15 +104,14 @@ std::optional<std::uint32_t> JapaneseDictionary::FindKey(ReadingCodesView codes)
 std::optional<std::uint32_t> JapaneseDictionary::Find(ReadingCodesView codes) const {
     if (const auto record = FindKey(codes)) return record;
     if (!added_) return std::nullopt;
-    const auto record = added_->FindKey(codes);
+    const auto record = added_->Find(codes);
     return record ? std::optional<std::uint32_t>(keyCount_ + *record) : std::nullopt;
 }
 
-std::array<std::pair<std::uint32_t, std::uint32_t>, 2> JapaneseDictionary::PrefixRanges(ReadingCodesView codes) const {
-    std::array<std::pair<std::uint32_t, std::uint32_t>, 2> ranges{PrefixRange(codes), std::pair<std::uint32_t, std::uint32_t>{}};
+std::vector<std::pair<std::uint32_t, std::uint32_t>> JapaneseDictionary::PrefixRanges(ReadingCodesView codes) const {
+    std::vector<std::pair<std::uint32_t, std::uint32_t>> ranges{PrefixRange(codes)};
     if (added_) {
-        const auto [first, end] = added_->PrefixRange(codes);
-        ranges[1] = {keyCount_ + first, keyCount_ + end};
+        for (const auto [first, end] : added_->PrefixRanges(codes)) ranges.emplace_back(keyCount_ + first, keyCount_ + end);
     }
     return ranges;
 }
@@ -153,7 +153,7 @@ std::wstring JapaneseDictionary::KeyText(std::uint32_t record) const {
 }
 
 std::wstring JapaneseDictionary::Surface(const DictionaryWord& word, std::wstring_view reading) const {
-    if (word.added && added_) return added_->Surface(word, reading);
+    if (word.added > depth_ && added_) return added_->Surface(word, reading);
     switch (word.surface) {
     case DictionaryWord::Surface::Reading:
         return std::wstring(reading);
@@ -171,14 +171,14 @@ std::wstring JapaneseDictionary::Surface(const DictionaryWord& word, std::wstrin
 }
 
 std::size_t JapaneseDictionary::PoolSurfaceLength(const DictionaryWord& word) const noexcept {
-    if (word.added && added_) return added_->PoolSurfaceLength(word);
+    if (word.added > depth_ && added_) return added_->PoolSurfaceLength(word);
     if (word.surface != DictionaryWord::Surface::Pool || word.surfaceOffset >= surfaceUnits_) return 0;
     const std::uint16_t length = Read<std::uint16_t>(surfaces_ + 2ull * word.surfaceOffset);
     return word.surfaceOffset + 1ull + length > surfaceUnits_ ? 0 : length;
 }
 
 wchar_t JapaneseDictionary::PoolSurfaceChar(const DictionaryWord& word, std::size_t i) const noexcept {
-    if (word.added && added_) return added_->PoolSurfaceChar(word, i);
+    if (word.added > depth_ && added_) return added_->PoolSurfaceChar(word, i);
     if (i >= PoolSurfaceLength(word)) return 0;
     return static_cast<wchar_t>(Read<std::uint16_t>(surfaces_ + 2ull * (word.surfaceOffset + 1 + i)));
 }

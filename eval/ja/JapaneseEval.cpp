@@ -31,13 +31,18 @@
 #include "Core/ConversionEngine.h"
 #include "Core/EnglishSpelling.h"
 #include "Core/ExternalRankingProviders.h"
+#include "Core/Japanese/AiJudge.h"
 #include "Core/Japanese/ChunkJudge.h"
+#include "Core/ExternalLexiconProvider.h"
+#include "Core/Japanese/KanjiSets.h"
+#include "Core/Japanese/JapaneseData.h"
 #include "Core/Japanese/JapaneseComposer.h"
 #include "Core/Japanese/JapaneseConverter.h"
 #include "Core/Japanese/JapaneseDictionary.h"
 #include "Core/Japanese/JapaneseUserDictionary.h"
 #include "Core/Japanese/KeyConverter.h"
 #include "Core/Japanese/LanguageModel.h"
+#include "Core/Japanese/TopicVectors.h"
 #include "Core/Japanese/Loanwords.h"
 #include "Core/Japanese/RomajiTable.h"
 #include "Core/Japanese/SentenceReranker.h"
@@ -177,6 +182,18 @@ struct Totals {
     std::vector<double> microseconds;
 };
 
+// --ai light|strong: the AI model asked after the sentence check
+// (TekitoAI.exe next to this program, the model installed).
+const tekito::japanese::AiJudge* gAiJudge = nullptr;
+// --context FILE (id, text written before it) and --context-previous (the
+// rows before in the same group, 1-0 then 1-1): what each row follows,
+// given to the composer as if just committed.
+std::map<std::string, std::wstring> gContexts;
+bool gContextPrevious = false;
+// --added DIR (again for more): packs of words added after japanese-wikimedia
+// (japanese-names, japanese-jmdict).
+std::vector<std::filesystem::path> gAddedPacks;
+
 int RunKeys(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary, const JapaneseConverter& converter,
             const std::filesystem::path& corpus, const std::filesystem::path& romaji,
             tekito::japanese::KeyConverter::Costs costs, std::size_t showMisses,
@@ -196,6 +213,26 @@ int RunKeys(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary
     composer.SetKeyConverter(&keyConverter);
     if (loanwords) composer.SetLoanwords(loanwords);
     composer.SetSentenceReranker(reranker);
+    composer.SetAiJudge(gAiJudge, true);
+    // TEKITO_EVAL_WHOLES=N: how many whole texts with other phrase breaks
+    // the sentence check reads too (the composer's default otherwise).
+    if (const char* wholes = std::getenv("TEKITO_EVAL_WHOLES")) composer.SetWholeSentences(std::strtoul(wholes, nullptr, 10));
+    if (const char* penalty = std::getenv("TEKITO_EVAL_WHOLE_PENALTY")) composer.SetWholePenalty(std::strtod(penalty, nullptr));
+    if (const char* keep = std::getenv("TEKITO_EVAL_KEEP_NOTATION")) composer.SetKeepNotation(std::string_view(keep) != "0");
+    // TEKITO_EVAL_KANJI=range[,grade]: the kanji range (KanjiRange: 1 常用+人名, 2 常用, 3 教育 up to the grade),
+    // from the installed kanji-sets pack.
+    static tekito::japanese::KanjiSets kanjiSets;
+    if (const char* kanji = std::getenv("TEKITO_EVAL_KANJI")) {
+        (void)kanjiSets.Load(tekito::ExternalLexiconProvider::PackDirectory(L"kanji-sets") / L"kanji.tsv");
+        const int range = std::atoi(kanji);
+        const char* comma = std::strchr(kanji, ',');
+        composer.SetKanjiSets(&kanjiSets);
+        composer.SetKanjiRange(static_cast<tekito::japanese::KanjiRange>(range), comma ? std::atoi(comma + 1) : 6);
+    }
+    // TEKITO_EVAL_NUMBER_STYLE=N: the number style (JapaneseComposer::NumberStyle, 0 as typed ... 5 official).
+    if (const char* style = std::getenv("TEKITO_EVAL_NUMBER_STYLE")) {
+        composer.SetNumberStyle(static_cast<tekito::japanese::JapaneseComposer::NumberStyle>(std::strtol(style, nullptr, 10)));
+    }
     composer.SetKanaSlips(slips);
 
     // How many whole sentences are put together, and the counts reported.
@@ -211,6 +248,12 @@ int RunKeys(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary
     };
     std::map<std::string, KeyTotals> totals;
     std::size_t shown = 0;
+    // TEKITO_EVAL_KBEST=N: how often what was meant is among the converter's
+    // N likeliest whole-reading texts (BestSentences), and how often only
+    // there (not among the phrases' sentences).
+    const char* kbestSetting = std::getenv("TEKITO_EVAL_KBEST");
+    const std::size_t kbest = kbestSetting ? std::strtoul(kbestSetting, nullptr, 10) : 0;
+    std::size_t kbestIn = 0, kbestOnly = 0, kbestRows = 0;
     // Live: how long each key takes to show, and the pause before Enter.
     std::vector<double> keyMicroseconds;
     std::vector<double> refineMicroseconds;
@@ -232,8 +275,21 @@ int RunKeys(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary
         const auto count = std::stoul(open);
         composer.SetLiveOpenPhrases(count == 0 ? std::size_t{1} << 20 : count);
     }
+    std::string previousGroup;
+    std::wstring previousText;
     for (const auto& row : LoadCorpus(corpus)) {
         composer.Clear();
+        if (!gContexts.empty() || gContextPrevious) {
+            const std::string group = row.id.substr(0, row.id.rfind('-'));
+            std::wstring context;
+            if (const auto found = gContexts.find(row.id); found != gContexts.end()) context = found->second;
+            if (gContextPrevious && row.id.find('-') != std::string::npos && group == previousGroup) context = previousText;
+            composer.SetRecentText(context);
+            previousText = (group == previousGroup ? previousText : std::wstring()) +
+                           (row.expected.empty() ? std::wstring() : row.expected.front());
+            if (previousText.size() > 120) previousText.erase(0, previousText.size() - 120);
+            previousGroup = group;
+        }
         // Each row on its own: Enter (live) commits, which would lead the
         // next row on from it.
         if (live) composer.ForgetContext();
@@ -342,6 +398,15 @@ int RunKeys(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary
             for (std::size_t s = 0; s < sentences.size() && sentenceRank == SIZE_MAX; ++s) {
                 if (std::find(row.expected.begin(), row.expected.end(), sentences[s]) != row.expected.end()) sentenceRank = s;
             }
+            if (kbest > 0) {
+                ++kbestRows;
+                bool in = false;
+                for (const auto& guess : converter.BestSentences(composer.TypedReading(), kbest)) {
+                    in = in || std::find(row.expected.begin(), row.expected.end(), guess.text) != row.expected.end();
+                }
+                kbestIn += in;
+                kbestOnly += in && sentenceRank == SIZE_MAX;
+            }
             if (sentencesOut.is_open()) {
                 for (std::size_t s = 0; s < sentences.size(); ++s) {
                     const bool meant = std::find(row.expected.begin(), row.expected.end(), sentences[s]) != row.expected.end();
@@ -385,6 +450,10 @@ int RunKeys(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary
         }
     }
     std::cout << std::fixed << std::setprecision(1);
+    if (kbestRows > 0) {
+        std::cout << "kbest" << kbest << ": in=" << 100.0 * kbestIn / kbestRows << "% only_there="
+                  << 100.0 * kbestOnly / kbestRows << "%\n";
+    }
     for (const auto& [source, t] : totals) {
         std::cout << source << ": rows=" << t.rows << " top1=" << 100.0 * t.exact / t.rows << "%"
                   << " in_list=" << 100.0 * t.inList / t.rows << "%";
@@ -673,6 +742,7 @@ int main(int argc, char** argv) {
     std::filesystem::path rerankerPack;
     std::filesystem::path slipsPack;
     JapaneseConverter::ModelWeights weights;
+    std::filesystem::path topicPack;
     std::size_t showMisses = 0;
     TypingStudyOptions study;
     ChunkOptions chunks;
@@ -708,11 +778,48 @@ int main(int argc, char** argv) {
         else if (arg == "--by-phrase") byPhrase = true;
         else if (arg == "--lm" && i + 1 < argc) modelPack = argv[++i];
         else if (arg == "--reranker" && i + 1 < argc) rerankerPack = argv[++i];
+        else if (arg == "--context-previous") gContextPrevious = true;
+        else if (arg == "--added" && i + 1 < argc) gAddedPacks.emplace_back(argv[++i]);
+        else if (arg == "--context" && i + 1 < argc) {
+            std::ifstream in(argv[++i], std::ios::binary);
+            for (std::string line; std::getline(in, line);) {
+                if (!line.empty() && line.back() == '\r') line.pop_back();
+                const auto tab = line.find('\t');
+                if (tab != std::string::npos) gContexts[line.substr(0, tab)] = ja_eval::Widen(line.substr(tab + 1));
+            }
+        }
+        else if (arg == "--ai" && i + 1 < argc) {
+            const std::string_view which = argv[++i];
+            const auto model = which == "strong" ? tekito::japanese::AiModel::Strong : tekito::japanese::AiModel::Light;
+            // TEKITO_AI_DEVICE=cpu|gpu (else auto).
+            const char* device = std::getenv("TEKITO_AI_DEVICE");
+            gAiJudge = tekito::japanese::ProcessAiJudge(
+                model, device && std::string_view(device) == "cpu"   ? tekito::japanese::AiDevice::Cpu
+                       : device && std::string_view(device) == "gpu" ? tekito::japanese::AiDevice::Gpu
+                                                                      : tekito::japanese::AiDevice::Auto);
+            if (!gAiJudge) {
+                std::cerr << "the " << which << " AI model is not installed\n";
+                return 1;
+            }
+            // TEKITO_AI_WAIT_MS=N: how long a conversion waits for the answer
+            // (an evaluation on the processor while the GPU trains).
+            if (const char* wait = std::getenv("TEKITO_AI_WAIT_MS")) {
+                static const tekito::japanese::AiHelperClient patient(
+                    model,
+                    device && std::string_view(device) == "cpu"   ? tekito::japanese::AiDevice::Cpu
+                    : device && std::string_view(device) == "gpu" ? tekito::japanese::AiDevice::Gpu
+                                                                  : tekito::japanese::AiDevice::Auto,
+                    std::chrono::milliseconds(std::atoi(wait)), gAiJudge->Top());
+                gAiJudge = &patient;
+            }
+        }
         else if (arg == "--slips" && i + 1 < argc) slipsPack = argv[++i];
         else if (arg == "--lm-scale" && i + 1 < argc) weights.costPerNat = std::stoll(argv[++i]);
         else if (arg == "--lm-penalty" && i + 1 < argc) weights.penaltyPerNat = std::stoll(argv[++i]);
         else if (arg == "--lm-threshold" && i + 1 < argc) weights.threshold = std::stod(argv[++i]);
         else if (arg == "--topic-scale" && i + 1 < argc) weights.costPerTopic = std::stoll(argv[++i]);
+        else if (arg == "--topic-vectors" && i + 1 < argc) topicPack = argv[++i];
+        else if (arg == "--topic-vector-scale" && i + 1 < argc) weights.costPerVector = std::stoll(argv[++i]);
         else if (arg == "--no-context") useContext = false;
         else if (arg == "--show-misses" && i + 1 < argc) showMisses = std::stoul(argv[++i]);
         else if (arg == "--study" && i + 1 < argc) study.study = argv[++i];
@@ -739,6 +846,11 @@ int main(int argc, char** argv) {
         std::cerr << "could not open the language model at " << modelPack.string() << "\n";
         return 1;
     }
+    tekito::japanese::TopicVectors topicVectors;
+    if (!topicPack.empty() && !topicVectors.Open(topicPack)) {
+        std::cerr << "could not open the topic vectors at " << topicPack.string() << "\n";
+        return 1;
+    }
     if (!pack.empty() && !keysCorpus.empty() && !chunkCorpus.empty()) keysCorpus.clear();
     if (!pack.empty() && !chunkCorpus.empty()) {
 #if defined(_WIN32)
@@ -751,8 +863,10 @@ int main(int argc, char** argv) {
             return 1;
         }
         if (!wikimedia.empty()) (void)dictionary.AddWords(wikimedia / "dictionary.bin");
+        for (const auto& more : gAddedPacks) (void)dictionary.AddWords(more / "dictionary.bin");
         JapaneseConverter converter(dictionary, matrix);
         if (model.IsOpen()) converter.SetLanguageModel(&model, weights);
+        if (topicVectors.IsOpen()) converter.SetTopicVectors(&topicVectors);
         SetNumberWord(converter, pack);
         chunks.pack = pack;
         chunks.rerankerPack = rerankerPack;
@@ -774,6 +888,7 @@ int main(int argc, char** argv) {
             return 1;
         }
         if (!wikimedia.empty()) (void)dictionary.AddWords(wikimedia / "dictionary.bin");
+        for (const auto& more : gAddedPacks) (void)dictionary.AddWords(more / "dictionary.bin");
         const JapaneseConverter converter(dictionary, matrix);
         std::ifstream in(guessReadings, std::ios::binary);
         std::ofstream out(guessReadingsOut, std::ios::binary);
@@ -801,8 +916,10 @@ int main(int argc, char** argv) {
             return 1;
         }
         if (!wikimedia.empty()) (void)dictionary.AddWords(wikimedia / "dictionary.bin");
+        for (const auto& more : gAddedPacks) (void)dictionary.AddWords(more / "dictionary.bin");
         JapaneseConverter converter(dictionary, matrix);
         if (model.IsOpen()) converter.SetLanguageModel(&model, weights);
+        if (topicVectors.IsOpen()) converter.SetTopicVectors(&topicVectors);
         SetNumberWord(converter, pack);
         if (!study.study.empty()) {
             study.pack = pack;
@@ -840,8 +957,10 @@ int main(int argc, char** argv) {
         return 1;
     }
     if (!wikimedia.empty()) (void)dictionary.AddWords(wikimedia / "dictionary.bin");
+    for (const auto& more : gAddedPacks) (void)dictionary.AddWords(more / "dictionary.bin");
     JapaneseConverter converter(dictionary, matrix);
         if (model.IsOpen()) converter.SetLanguageModel(&model, weights);
+        if (topicVectors.IsOpen()) converter.SetTopicVectors(&topicVectors);
         SetNumberWord(converter, pack);
     const auto rows = LoadCorpus(corpus);
     if (rows.empty()) {

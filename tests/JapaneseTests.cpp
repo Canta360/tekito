@@ -29,6 +29,7 @@
 #include <iostream>
 #include <memory>
 #include <sstream>
+#include <set>
 #include <string>
 #include <string_view>
 
@@ -450,6 +451,20 @@ void TestAddedWords(const MiniPack& pack) {
     const auto predictions = converter.Predict(L"てんきな", 10);
     Require(std::any_of(predictions.begin(), predictions.end(), [](const auto& p) { return p.text == L"天気中野"; }),
             "an added word is predicted");
+
+    // A second file added after the first (the same words stand in for
+    // another pack's): its records come after, its words are its own.
+    Require(dictionary.AddWords(data / L"japanese-mini-wikimedia" / L"dictionary.bin"), "a second file adds too");
+    Require(dictionary.KeyCount() > *added + 1 && dictionary.PrefixRanges(dictionary.Encode(L"てんき")).size() == 3,
+            "the second file's records come after the first's");
+    std::size_t second = 0;
+    std::wstring written;
+    dictionary.ForEachWord(*added, [&](const DictionaryWord& word) {
+        second += word.added == 2;
+        written += dictionary.Surface(word, L"てんきなかの");
+    });
+    Require(second == 1, "a key both added files have holds both their words");
+    RequireText(written, L"天気中野天気中野", "each written as its file has it");
 }
 
 void TestDictionary(const MiniPack& pack) {
@@ -1670,6 +1685,13 @@ void TestSpecialConversions(const RomajiTable& table, const MiniPack& pack) {
     RequireText(SpecialConversions::Official(L"1234"), L"1,234", "under 万: commas only");
     Require(Contains(special.Numbers(L"123456789"), L"1億2,345万6,789"), "and it is offered");
     Require(special.Numbers(L"12a").empty(), "not a number");
+    // English number words, for their forms in English typing.
+    RequireText(SpecialConversions::EnglishNumber(L"three").value_or(L""), L"3", "three is 3");
+    RequireText(SpecialConversions::EnglishNumber(L"Twenty-one").value_or(L""), L"21", "twenty-one is 21");
+    RequireText(SpecialConversions::EnglishNumber(L"two-hundred-fifty").value_or(L""), L"250", "two-hundred-fifty is 250");
+    Require(!SpecialConversions::EnglishNumber(L"tree") && !SpecialConversions::EnglishNumber(L"one-") &&
+                !SpecialConversions::EnglishNumber(L""),
+            "other words are no number");
 
     RequireText(SpecialConversions::Calculate(L"1+2=").value_or(L""), L"3", "a sum");
     RequireText(SpecialConversions::Calculate(L"（３＋４）＊２＝").value_or(L""), L"14", "full-width arithmetic");
@@ -1685,6 +1707,20 @@ void TestSpecialConversions(const RomajiTable& table, const MiniPack& pack) {
     Require(Contains(special.Symbols(Language::English, L"(c)"), L"©"), "(c) is ©");
     Require(Contains(special.Emoticons(L"にこにこ"), L"(^^)") && special.Emoticons(L"かおもじ").size() > 100,
             "emoticons by reading, and all of them for かおもじ");
+    // The kaomoji pack adds to them, after Mozc's, each face once.
+    const auto mozcSmiles = special.Emoticons(L"にこにこ");
+    Require(special.Load(tekito::ExternalLexiconProvider::PackDirectory(L"kaomoji") / L"rules.tsv"),
+            "the kaomoji pack loads after it");
+    const auto smiles = special.Emoticons(L"にこにこ");
+    Require(smiles.size() > mozcSmiles.size() && std::equal(mozcSmiles.begin(), mozcSmiles.end(), smiles.begin()) &&
+                std::set<std::wstring>(smiles.begin(), smiles.end()).size() == smiles.size(),
+            "more faces for a reading, after Mozc's, none twice");
+    Require(Contains(special.Emoticons(L"ちゃぶだい"), L"(╯°□°）╯︵ ┻━┻") &&
+                special.Emoticons(L"あすきーあーと").size() > 50,
+            "ASCII art by reading, and all of it for あすきーあーと");
+    Require(Contains(special.SymbolsNamed(L"shrug"), L"¯\\_(ツ)_/¯") && Contains(special.SymbolsNamed(L"cry"), L"(T_T)") &&
+                special.SymbolsNamed(L"kaomoji").size() > 200 && Contains(special.SymbolsNamed(L"heart"), L"♡"),
+            "English names give them too (English typing and Mix), beside the symbols");
     Require(!Contains(special.Symbols(Language::Japanese, L"こ"), L"\U0001B038"), "hentaigana only by their name");
     Require(Contains(special.SingleKanji(L"こ"), L"己") && Contains(special.SingleKanji(L"こ"), L"琥"),
             "single kanji by reading, one each");
@@ -1810,6 +1846,14 @@ void TestSpecialConversions(const RomajiTable& table, const MiniPack& pack) {
                     std::any_of(half.FocusedCandidates()->begin(), half.FocusedCandidates()->end(),
                                 [](const auto& c) { return c.text == L"二千二十六"; }),
                 "half-width first, then full-width and kanji");
+        half.Clear();
+        // A number typed in kana has the same forms (じゅうご: ⅩⅤ, ⑮).
+        Type(half, L"juugo");
+        half.Convert();
+        const auto* kana = half.FocusedCandidates();
+        Require(kana && std::any_of(kana->begin(), kana->end(), [](const auto& c) { return c.text == L"\x2169\x2164"; }) &&
+                    std::any_of(kana->begin(), kana->end(), [](const auto& c) { return c.text == L"\x246E"; }),
+                "a number read in kana has its Roman and circled forms");
     }
 
     // After digits, a phrase is learned apart: こ learned as 子 on its own
@@ -1966,6 +2010,15 @@ void TestSentenceReranker(const RomajiTable& table, const MiniPack& pack) {
     checked.Convert();
     RequireText(checked.Segments().front().text, chosen, "the check keeps what learning put first");
     checked.Clear();
+
+    // A writing of a reading lined up with it word by word (the AI model's
+    // writings are split into the phrases so), and one that does not write it.
+    const auto places = converter.Align(L"きかいがとまる", L"機械が止まる");
+    const auto has = [&](std::size_t reading, std::size_t text) {
+        return places && std::find(places->begin(), places->end(), std::pair{reading, text}) != places->end();
+    };
+    Require(has(0, 0) && has(3, 2) && has(4, 3) && has(7, 6), "a writing lines up with its reading where words meet");
+    Require(!converter.Align(L"きかいがとまる", L"機械が止まった").has_value(), "a text that is not the reading lines up with nothing");
 }
 
 // The slip finder (japanese-slips): ln p of kana by the n-grams and the

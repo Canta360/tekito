@@ -10,9 +10,11 @@
 #include "Core/Japanese/PostalCodes.h"
 #include "Core/Japanese/RomajiTable.h"
 #include "Core/Japanese/SentenceReranker.h"
+#include "Core/Japanese/AiJudge.h"
 #include "Core/EnglishSpelling.h"
 
 #include <algorithm>
+#include <functional>
 #include <regex>
 #include <map>
 #include <queue>
@@ -22,6 +24,99 @@
 
 namespace tekito::japanese {
 namespace {
+
+// Whether two writings of one reading differ only in how they are written
+// (じゃがいも, ジャガイモ; おかわり, お代わり; 一日, 1日; 、 and ，), not in
+// which words they are (紙, 髪): wherever they differ, one side is kana,
+// both are numbers, or both are marks.
+bool OnlyNotationDiffers(std::wstring_view a, std::wstring_view b) {
+    if (a == b) return true;
+    constexpr std::size_t kLongest = 200;
+    if (a.size() > kLongest || b.size() > kLongest) return false;
+    const auto kana = [](wchar_t c) { return (c >= 0x3041 && c <= 0x30FF) || c == 0xFF70 || (c >= 0xFF66 && c <= 0xFF9F); };
+    const auto number = [](wchar_t c) {
+        return (c >= L'0' && c <= L'9') || (c >= 0xFF10 && c <= 0xFF19) ||
+               std::wstring_view(L"〇一二三四五六七八九十百千万").find(c) != std::wstring_view::npos;
+    };
+    const auto mark = [](wchar_t c) { return std::iswpunct(c) != 0 || (c >= 0x3000 && c <= 0x303F) || (c >= 0xFF01 && c <= 0xFF0F); };
+    const auto all = [](std::wstring_view text, auto test) {
+        return std::all_of(text.begin(), text.end(), test);
+    };
+    // The longest common subsequence, then the stretches between its
+    // characters.
+    std::vector<std::vector<std::uint8_t>> same(a.size() + 1, std::vector<std::uint8_t>(b.size() + 1, 0));
+    for (std::size_t i = a.size(); i-- > 0;) {
+        for (std::size_t j = b.size(); j-- > 0;) {
+            same[i][j] = a[i] == b[j] ? static_cast<std::uint8_t>(same[i + 1][j + 1] + 1)
+                                      : std::max(same[i + 1][j], same[i][j + 1]);
+        }
+    }
+    std::size_t i = 0, j = 0;
+    while (i < a.size() || j < b.size()) {
+        if (i < a.size() && j < b.size() && a[i] == b[j]) {
+            ++i;
+            ++j;
+            continue;
+        }
+        const std::size_t fromA = i, fromB = j;
+        while ((i < a.size() || j < b.size()) && !(i < a.size() && j < b.size() && a[i] == b[j])) {
+            if (j == b.size() || (i < a.size() && same[i + 1][j] >= same[i][j + 1])) ++i; else ++j;
+        }
+        const auto partA = a.substr(fromA, i - fromA);
+        const auto partB = b.substr(fromB, j - fromB);
+        const bool notation = all(partA, kana) || all(partB, kana) ||
+                              (all(partA, number) && all(partB, number)) ||
+                              (all(partA, mark) && all(partB, mark));
+        if (!notation) return false;
+    }
+    return true;
+}
+
+// A number in kanji numerals or digits as digits (二十二, 22: 22), or
+// nothing when it is not one.
+std::optional<std::wstring> NumeralDigits(std::wstring_view text) {
+    if (text.empty()) return std::nullopt;
+    if (std::all_of(text.begin(), text.end(), [](wchar_t c) { return (c >= L'0' && c <= L'9') || (c >= 0xFF10 && c <= 0xFF19); })) {
+        std::wstring digits;
+        for (const wchar_t c : text) digits += c >= 0xFF10 ? static_cast<wchar_t>(c - 0xFEE0) : c;
+        return digits;
+    }
+    constexpr std::wstring_view kDigits = L"〇一二三四五六七八九";
+    std::uint64_t total = 0, section = 0, digit = 0;
+    bool any = false;
+    for (const wchar_t c : text) {
+        if (const auto d = kDigits.find(c); d != std::wstring_view::npos) {
+            digit = d;
+            any = true;
+            continue;
+        }
+        const std::uint64_t unit = c == L'十' ? 10 : c == L'百' ? 100 : c == L'千' ? 1000 : 0;
+        const std::uint64_t big = c == L'万' ? 10000ull : c == L'億' ? 100000000ull : c == L'兆' ? 1000000000000ull : 0;
+        if (unit) {
+            section += (digit ? digit : 1) * unit;
+            digit = 0;
+        } else if (big) {
+            total += (section + digit) * big;
+            section = digit = 0;
+        } else {
+            return std::nullopt;
+        }
+        any = true;
+    }
+    if (!any) return std::nullopt;
+    return std::to_wstring(total + section + digit);
+}
+
+// A number at the start of `text` and what follows it (22人: 22, 人;
+// 二十二人: 22, 人), or nothing when it does not start with one.
+std::optional<std::pair<std::wstring, std::wstring>> LeadingNumber(std::wstring_view text) {
+    for (std::size_t length = text.size(); length > 0; --length) {
+        if (const auto digits = NumeralDigits(text.substr(0, length))) {
+            return std::pair{*digits, std::wstring(text.substr(length))};
+        }
+    }
+    return std::nullopt;
+}
 
 std::wstring ChangeCase(std::wstring text, int letterCase) {
     switch (letterCase) {
@@ -228,6 +323,7 @@ void JapaneseComposer::SetLiveConversion(bool on) {
 
 void JapaneseComposer::Insert(wchar_t key) {
     lastCommit_.reset();
+    if (aiJudge_ && !chunkJudge_ && !Typing()) aiJudge_->Warm();
     // Mixed typing: a capital is a letter of the chunk like any other; the
     // chunk keeps it for when it is English.
     if (chunkJudge_) {
@@ -524,10 +620,10 @@ bool JapaneseComposer::RefineLive() {
     return RebuildLive() && Preedit() != before;
 }
 
-bool JapaneseComposer::RebuildLive() {
-    if (!Live() || !preview_ || kanaView_ || !pending_.empty() || units_.empty() || LiveRefined()) return false;
+bool JapaneseComposer::RebuildLive(bool again) {
+    if (!Live() || !preview_ || kanaView_ || !pending_.empty() || units_.empty() || (LiveRefined() && !again)) return false;
     // A candidate picked while typing stays, as on Enter.
-    if (std::any_of(phrases_.begin(), phrases_.end(),
+    if (!again && std::any_of(phrases_.begin(), phrases_.end(),
                     [](const PhraseState& phrase) { return phrase.selected != 0 || phrase.form; })) {
         return false;
     }
@@ -543,6 +639,39 @@ bool JapaneseComposer::RebuildLive() {
     listOpen_ = false;
     refinedKeys_ = Keys(false);
     return true;
+}
+
+bool JapaneseComposer::WaitsForAi() {
+    if (!aiWaiting_) return false;
+    if (aiShown_.empty()) {
+        aiShown_ = Preedit();
+        aiKeys_ = Keys(false);
+        aiFocus_ = focus_;
+    }
+    return true;
+}
+
+bool JapaneseComposer::AiAnswerCame() const {
+    return aiWaiting_ && (!aiJudge_ || !aiJudge_->Asking());
+}
+
+bool JapaneseComposer::TakeAiAnswer() {
+    if (!aiWaiting_ || (aiJudge_ && aiJudge_->Asking())) return false;
+    aiWaiting_ = false;
+    const bool same = !aiShown_.empty() && Preedit() == aiShown_ && Keys(false) == aiKeys_ && focus_ == aiFocus_ &&
+                      !listOpen_ && pending_.empty();
+    aiShown_.clear();
+    if (!same) return false;
+    const std::wstring before = Preedit();
+    // Converted again as before, the AI's answer now there for the asking.
+    if (preview_) {
+        if (!RebuildLive(true)) return false;
+    } else if (IsConverted()) {
+        BuildPhrases(true);
+    } else {
+        return false;
+    }
+    return Preedit() != before;
 }
 
 bool JapaneseComposer::LiveRefined() const {
@@ -962,6 +1091,10 @@ void JapaneseComposer::BuildPhrases(bool convert) {
     for (auto& phrase : phrases_) KeepKanjiInRange(phrase);
 }
 
+bool JapaneseComposer::InKanjiRange(std::wstring_view text) const {
+    return !kanjiSets_ || kanjiRange_ == KanjiRange::All || kanjiSets_->Allows(text, kanjiRange_, kanjiGrade_, kanjiNames_);
+}
+
 void JapaneseComposer::KeepKanjiInRange(PhraseState& phrase) const {
     if (!kanjiSets_ || kanjiRange_ == KanjiRange::All || phrase.candidates.empty()) return;
     auto& candidates = phrase.candidates;
@@ -1203,7 +1336,8 @@ void JapaneseComposer::BuildPhrasesFor(bool convert) {
         candidates.insert(candidates.begin() + 1, std::move(english));
     }
     if (convert) JoinEllipsis();
-    if (convert && reranker_ && sentenceCheck_ && !chunkJudge_ && !reconverted_) CheckSentence();
+    // An AI model chosen reads the sentence check's choices, with it on or off.
+    if (convert && reranker_ && (sentenceCheck_ || aiJudge_) && !chunkJudge_ && !reconverted_) CheckSentence();
     if (convert) ApplyNumberStyle();
     if (convert) AddTypedForms();
 }
@@ -1474,6 +1608,8 @@ void JapaneseComposer::AddTypedForms() {
         }
         forms.emplace_back(small(ToHiragana(formReading)), PhraseCandidate::Kind::Hiragana);
         auto& candidates = phrase.candidates;
+        // What the sentence check chose stays chosen as the list moves.
+        const std::wstring chosen = phrase.selected < candidates.size() ? candidates[phrase.selected].text : std::wstring{};
         // One or two kana (i, ki, ai): kanji outside 常用 and 人名用, the
         // long tail of kanji read so, after the common ones.
         if (typedReading && phrases_.size() == 1 && reading.size() <= 2 && kanjiSets_) {
@@ -1499,8 +1635,12 @@ void JapaneseComposer::AddTypedForms() {
                 tail.push_back({std::move(text), cost, kind, false});
             }
         }
-        if (tail.empty()) continue;
-        const std::wstring chosen = phrase.selected < candidates.size() ? candidates[phrase.selected].text : std::wstring{};
+        if (tail.empty()) {
+            const auto kept = std::find_if(candidates.begin(), candidates.end(),
+                                           [&](const PhraseCandidate& c) { return c.text == chosen; });
+            if (kept != candidates.end()) phrase.selected = static_cast<std::size_t>(kept - candidates.begin());
+            continue;
+        }
         candidates.insert(candidates.end(), std::make_move_iterator(tail.rbegin()), std::make_move_iterator(tail.rend()));
         const auto kept = std::find_if(candidates.begin(), candidates.end(),
                                        [&](const PhraseCandidate& c) { return c.text == chosen; });
@@ -1717,17 +1857,202 @@ void JapaneseComposer::CheckSentence() {
         auto& texts = parts.emplace_back();
         for (const std::size_t c : lists[i]) texts.push_back(phrases_[i].candidates[c].text);
     }
-    const auto picks = ReadBest(parts);
+    // Whole texts that break the reading elsewhere (作成 or 作 成) are
+    // read alongside: what was meant is often only among them.
+    // Not when learning put a phrase's choice first: that stays.
+    std::vector<SentenceGuess> guesses;
+    const bool learned = std::any_of(phrases_.begin(), phrases_.end(), [](const PhraseState& p) { return p.learned; });
+    if (converter_ && wholeSentences_ > 0 && !learned) {
+        guesses = converter_->BestSentences(conversionReading_, wholeSentences_, context_, userDictionary_);
+    }
+    std::vector<std::wstring> wholes;
+    for (const auto& guess : guesses) {
+        if (InKanjiRange(guess.text)) wholes.push_back(guess.text);
+    }
+    std::wstring written;
+    const auto picks = ReadBest(parts, true, &written, wholes);
+    if (!written.empty()) {
+        // One of those: its phrases, where they break.
+        const auto guess = std::find_if(guesses.begin(), guesses.end(),
+                                        [&](const SentenceGuess& g) { return g.text == written; });
+        TakeWritten(written, guess != guesses.end() ? std::span<const std::size_t>(guess->breaks)
+                                                    : std::span<const std::size_t>());
+        SelectStyledNumbers();
+        return;
+    }
     for (std::size_t i = 0; i < lists.size(); ++i) phrases_[i].selected = lists[i][picks[i]];
+    SelectStyledNumbers();
 }
 
-std::vector<std::size_t> JapaneseComposer::ReadBest(const std::vector<std::vector<std::wstring>>& parts) const {
+
+void JapaneseComposer::TakeWritten(const std::wstring& text, std::span<const std::size_t> breaks) {
+    if (SelectWritten(text)) return;
+    // Else the reading split where the text's phrases break, when that
+    // makes it.
+    if (!breaks.empty() && converter_) {
+        auto rebuilt = converter_->Convert(conversionReading_, {}, context_, contextWords_, userDictionary_, breaks);
+        // Numbers as the number style writes them, as the first conversion's.
+        for (auto& phrase : rebuilt) StyleKanaNumbers(phrase.candidates);
+        if (!rebuilt.empty()) {
+            auto before = std::move(phrases_);
+            phrases_.clear();
+            AddPhrases(std::move(rebuilt), conversionReading_);
+            for (auto& phrase : phrases_) KeepKanjiInRange(phrase);
+            if (SelectWritten(text)) {
+                focus_ = std::min(focus_, phrases_.size() - 1);
+                return;
+            }
+            phrases_ = std::move(before);
+        }
+    }
+    // Otherwise the whole text, as one choice for all of the input; and
+    // its words in the phrases they fall in, first among their candidates,
+    // so moving to a phrase to change it keeps the others as written.
+    PhraseCandidate whole{text, 0, PhraseCandidate::Kind::Dictionary, false};
+    whole.reading = Reading();
+    auto& first = phrases_.front();
+    first.candidates.insert(first.candidates.begin(), std::move(whole));
+    first.selected = 0;
+    const auto places = converter_ ? converter_->Align(conversionReading_, text) : std::nullopt;
+    if (!places) return;
+    // Numbers read in kana are written as the number style says (二十二 or
+    // 22), as the converter's are, wherever the writing has one on its own.
+    const auto styled = [&](std::size_t from, std::size_t to) {
+        std::wstring out;
+        std::size_t k = from;
+        while (k < to) {
+            // The longest run of places from k that writes a number read in kana.
+            std::size_t run = k;
+            for (std::size_t next = k + 1; next <= to; ++next) {
+                const auto [readFrom, textFrom] = (*places)[k];
+                const auto [readTo, textTo] = (*places)[next];
+                const auto read = std::wstring_view(conversionReading_).substr(readFrom, readTo - readFrom);
+                if (std::any_of(read.begin(), read.end(), IsDigit) ||
+                    !NumeralDigits(std::wstring_view(text).substr(textFrom, textTo - textFrom))) {
+                    break;
+                }
+                run = next;
+            }
+            if (run > k) {
+                const auto written = std::wstring_view(text).substr((*places)[k].second, (*places)[run].second - (*places)[k].second);
+                out += KanaNumberText(*NumeralDigits(written), numberStyle_);
+                k = run;
+            } else {
+                const auto [readFrom, textFrom] = (*places)[k];
+                const auto [readTo, textTo] = (*places)[k + 1];
+                // A letter, digit or mark written in the other width (Ａ for
+                // A, ，for ,) is as the reading has it: the width and
+                // punctuation settings made it so; the model knows nothing
+                // of them.
+                const bool otherWidth = readTo - readFrom == 1 && textTo - textFrom == 1 &&
+                                        text[textFrom] != conversionReading_[readFrom] &&
+                                        ToHalfWidthAscii(std::wstring(1, text[textFrom])) ==
+                                            ToHalfWidthAscii(std::wstring(1, conversionReading_[readFrom]));
+                const auto read = std::wstring_view(conversionReading_).substr(readFrom, readTo - readFrom);
+                const auto piece = std::wstring_view(text).substr(textFrom, textTo - textFrom);
+                // A word that starts with digits for a number read in kana
+                // (22人, 100円): the number as the style writes it, the rest as
+                // written. Kanji that start like a number (十分, 一緒) stay.
+                const auto number = std::none_of(read.begin(), read.end(), IsDigit) &&
+                                             std::any_of(piece.begin(), piece.end(), IsDigit)
+                                         ? LeadingNumber(piece)
+                                         : std::nullopt;
+                if (otherWidth) {
+                    out += read;
+                } else if (number) {
+                    out += KanaNumberText(number->first, numberStyle_) + number->second;
+                } else {
+                    out += piece;
+                }
+                ++k;
+            }
+        }
+        return out;
+    };
+    phrases_.front().candidates.front().text = styled(0, places->size() - 1);
+    const auto textAt = [&](std::size_t reading) -> std::optional<std::size_t> {
+        const auto found = std::find_if(places->begin(), places->end(),
+                                        [&](const auto& place) { return place.first == reading; });
+        return found == places->end() ? std::nullopt : std::optional<std::size_t>(found->second);
+    };
+    for (std::size_t i = 0; i < phrases_.size(); ++i) {
+        auto& phrase = phrases_[i];
+        const auto start = textAt(phrase.begin);
+        const auto end = textAt(phrase.begin + phrase.length);
+        if (!start || !end || *end <= *start) continue;
+        const auto placeOf = [&](std::size_t reading) {
+            return static_cast<std::size_t>(std::find_if(places->begin(), places->end(),
+                                                         [&](const auto& place) { return place.first == reading; }) -
+                                            places->begin());
+        };
+        std::wstring piece = styled(placeOf(phrase.begin), placeOf(phrase.begin + phrase.length));
+        // After the whole text in the first phrase: dropping it shows this.
+        const std::size_t at = i == 0 ? 1 : 0;
+        auto& candidates = phrase.candidates;
+        const auto listed = std::find_if(candidates.begin() + static_cast<std::ptrdiff_t>(at), candidates.end(),
+                                         [&](const PhraseCandidate& c) { return c.text == piece && c.reading.empty(); });
+        PhraseCandidate word = listed != candidates.end() ? *listed
+                                                          : PhraseCandidate{piece, 0, PhraseCandidate::Kind::Dictionary, false};
+        if (listed != candidates.end()) candidates.erase(listed);
+        candidates.insert(candidates.begin() + static_cast<std::ptrdiff_t>(at), std::move(word));
+        if (i > 0) phrase.selected = 0;
+    }
+}
+
+void JapaneseComposer::SelectStyledNumbers() {
+    // A number the sentence check or the AI model took as a dictionary word,
+    // in its own notation or in the other way StyleKanaNumbers offers (二十
+    // or 22 where the style writes 20) is the converter's number as the
+    // number style writes it: the first of them.
+    for (auto& phrase : phrases_) {
+        auto& candidates = phrase.candidates;
+        if (phrase.selected >= candidates.size() || !candidates[phrase.selected].reading.empty()) continue;
+        // A number alone, or digits and what follows them (22人: 22, 人), or
+        // the converter's number; not kanji that only start like one (十分,
+        // 一緒).
+        const auto& text = candidates[phrase.selected].text;
+        const bool digits = std::any_of(text.begin(), text.end(), IsDigit);
+        const auto picked = LeadingNumber(text);
+        if (!picked || (!digits && !picked->second.empty() && !candidates[phrase.selected].kanaNumber)) continue;
+        const auto number = std::find_if(candidates.begin(), candidates.end(), [&](const PhraseCandidate& c) {
+            return c.kanaNumber && LeadingNumber(c.text) == picked;
+        });
+        if (number != candidates.end()) phrase.selected = static_cast<std::size_t>(number - candidates.begin());
+    }
+}
+
+bool JapaneseComposer::SelectWritten(const std::wstring& text) {
+    // The phrases' own candidates, when they make the text: each phrase
+    // keeps its list and can be changed on its own.
+    std::vector<std::size_t> choice(phrases_.size(), 0);
+    const std::function<bool(std::size_t, std::size_t)> fit = [&](std::size_t phrase, std::size_t at) {
+        if (phrase == phrases_.size()) return at == text.size();
+        const auto& candidates = phrases_[phrase].candidates;
+        for (std::size_t c = 0; c < candidates.size(); ++c) {
+            const auto& written = candidates[c].text;
+            if (written.empty() || !candidates[c].reading.empty() || text.compare(at, written.size(), written) != 0) {
+                continue;
+            }
+            choice[phrase] = c;
+            if (fit(phrase + 1, at + written.size())) return true;
+        }
+        return false;
+    };
+    if (!fit(0, 0)) return false;
+    for (std::size_t i = 0; i < phrases_.size(); ++i) phrases_[i].selected = choice[i];
+    return true;
+}
+
+std::vector<std::size_t> JapaneseComposer::ReadBest(const std::vector<std::vector<std::wstring>>& parts,
+                                                     bool ai, std::wstring* written,
+                                                     std::span<const std::wstring> wholes) const {
     std::vector<std::size_t> keep(parts.size(), 0);
     std::vector<std::size_t> sizes;
     for (const auto& part : parts) {
         if (part.empty()) return keep;
         sizes.push_back(part.size());
     }
+    const AiJudge* judge = ai ? aiJudge_ : nullptr;
     // The sentences by the sum of their choices' ranks, each text once.
     std::vector<std::wstring> sentences;
     std::vector<std::vector<std::size_t>> picked;
@@ -1738,8 +2063,15 @@ std::vector<std::size_t> JapaneseComposer::ReadBest(const std::vector<std::vecto
             sentences.push_back(std::move(text));
             picked.push_back(picks);
         }
-        return sentences.size() < reranker_->Top();
+        return sentences.size() < std::max(reranker_->Top(), judge ? judge->Top() : 0);
     });
+    // Then the whole texts read with other phrase breaks, taken as written.
+    const std::size_t combined = sentences.size();
+    for (const auto& whole : wholes) {
+        if (written && std::find(sentences.begin(), sentences.end(), whole) == sentences.end()) {
+            sentences.push_back(whole);
+        }
+    }
     // Numbers are read by the sentence model in kanji, as its text mostly
     // writes them (2時間 read as 二時間, not beaten by 似時間).
     auto read = sentences;
@@ -1749,7 +2081,103 @@ std::vector<std::size_t> JapaneseComposer::ReadBest(const std::vector<std::vecto
         }
         text = KanaNumberText(text, NumberStyle::Kanji);
     }
-    const std::size_t chosen = reranker_->Choose(read);
+    std::size_t chosen = reranker_->Choose(read, combined, wholePenalty_);
+    if (judge && !sentences.empty()) {
+        // The AI reads the first few of the phrases' sentences and all the
+        // whole ones.
+        std::vector<std::size_t> order;
+        for (std::size_t i = 0; i < sentences.size(); ++i) {
+            if (i < std::min(combined, judge->Top()) || i >= combined) order.push_back(i);
+        }
+        if (order.size() > aihelper::kMaxSentences) order.resize(aihelper::kMaxSentences);
+        // Numbers read in kana in half-width digits, as the model's text
+        // writes them (the number style is applied to the choice
+        // afterwards); digits typed stay as typed, as the reading has them.
+        const bool typedWide = std::any_of(conversionReading_.begin(), conversionReading_.end(),
+                                           [](wchar_t c) { return c >= 0xFF10 && c <= 0xFF19; });
+        std::vector<std::wstring> asked;
+        for (const std::size_t i : order) {
+            std::wstring text = sentences[i];
+            for (auto& ch : text) {
+                if (!typedWide && ch >= 0xFF10 && ch <= 0xFF19) ch = static_cast<wchar_t>(ch - 0xFEE0);
+            }
+            asked.push_back(std::move(text));
+        }
+        const auto answer = aiWaits_ ? judge->Convert(conversionReading_, asked, recentText_)
+                                     : judge->Ask(conversionReading_, asked, recentText_);
+        aiWaiting_ = !answer && !aiWaits_ && judge->Asking();
+        aiShown_.clear();
+        const auto at = std::find(order.begin(), order.end(), chosen);
+        if (answer && at != order.end()) {
+            const auto& scores = answer->scores;
+            const std::size_t mine = static_cast<std::size_t>(at - order.begin());
+            std::size_t best = mine;
+            std::optional<std::wstring> own;
+            double bestScore = scores[mine];
+            // What the model makes of the choice: its score, or that of the
+            // choice written otherwise when it reads that better (三時 for
+            // 3時): the words are what it rates, the notation stays.
+            double mineScore = scores[mine];
+            if (keepNotation_ && judge->Writes()) {
+                for (std::size_t i = 0; i < order.size(); ++i) {
+                    if (OnlyNotationDiffers(sentences[chosen], asked[i])) mineScore = std::max(mineScore, scores[i]);
+                }
+                for (const auto& [text, score] : answer->written) {
+                    if (OnlyNotationDiffers(sentences[chosen], text)) mineScore = std::max(mineScore, score);
+                }
+                bestScore = mineScore;
+            }
+            if (judge->Writes()) {
+                // A model trained for conversion: the likeliest of the
+                // sentences and its own writings that write the reading;
+                // not one that only writes the sentence check's choice
+                // otherwise (お代わり for おかわり, 1日 for 一日): the
+                // dictionary's notation, or the user's, stays.
+                for (std::size_t i = 0; i < order.size(); ++i) {
+                    if (scores[i] > bestScore && !(keepNotation_ && OnlyNotationDiffers(sentences[chosen], asked[i]))) {
+                        bestScore = scores[i];
+                        best = i;
+                    }
+                }
+                for (const auto& [text, score] : answer->written) {
+                    const bool listed = std::find(asked.begin(), asked.end(), text) != asked.end();
+                    if (score > bestScore && !listed && written && converter_ && InKanjiRange(text) &&
+                        !(keepNotation_ && OnlyNotationDiffers(sentences[chosen], text)) &&
+                        converter_->CanWrite(conversionReading_, text)) {
+                        bestScore = score;
+                        own = text;
+                    }
+                }
+            } else {
+                // A model that reads sentences alone: not one with fewer
+                // kanji, as it reads a sentence that starts in kana
+                // (あしたは) as likelier than in kanji (明日は).
+                const auto kanji = [](const std::wstring& text) {
+                    return std::count_if(text.begin(), text.end(),
+                                         [](wchar_t c) { return (c >= 0x4E00 && c <= 0x9FFF) || c == 0x3005; });
+                };
+                const auto least = kanji(sentences[chosen]);
+                for (std::size_t i = 0; i < order.size(); ++i) {
+                    if (scores[i] > bestScore && kanji(asked[i]) >= least) {
+                        bestScore = scores[i];
+                        best = i;
+                    }
+                }
+            }
+            // Only a clearly better reading replaces the sentence check's.
+            if (bestScore - mineScore > judge->Margin()) {
+                if (own) {
+                    *written = std::move(*own);
+                    return keep;
+                }
+                chosen = order[best];
+            }
+        }
+    }
+    if (chosen >= combined) {
+        *written = sentences[chosen];
+        return keep;
+    }
     return chosen == 0 ? keep : picked[chosen];
 }
 
@@ -2069,6 +2497,27 @@ void JapaneseComposer::AddSpecial(std::wstring_view reading, std::vector<PhraseC
             const std::wstring rest = first.substr(digits);
             if (rest.front() != L'.' && rest.front() != L',' && rest.front() != L'\xFF0E' && rest.front() != L'\xFF0C') {
                 insert(1, special_->Numbers(reading.substr(0, digits)), rest);
+            }
+        } else if (digits == 0) {
+            // A number read in kana (さん, じゅうご, さんこ): its other forms
+            // too (Ⅲ, ③, 参), right after it -- the converter's number, or
+            // else a candidate in digits (さん alone is read as a word, with
+            // 3 among its candidates).
+            auto number = std::find_if(candidates.begin(), candidates.end(),
+                                       [](const PhraseCandidate& c) { return c.kanaNumber; });
+            if (number == candidates.end()) {
+                number = std::find_if(candidates.begin(), candidates.end(), [](const PhraseCandidate& c) {
+                    return !c.text.empty() && std::all_of(c.text.begin(), c.text.end(), IsDigit);
+                });
+            }
+            if (number != candidates.end()) {
+                const std::wstring text = KanaNumberText(number->text, NumberStyle::HalfWidth);
+                std::size_t length = 0;
+                while (length < text.size() && IsDigit(text[length])) ++length;
+                if (length > 0) {
+                    insert(static_cast<std::size_t>(number - candidates.begin()) + 1,
+                           special_->Numbers(text.substr(0, length)), std::wstring_view(text).substr(length));
+                }
             }
         }
     }
@@ -3360,7 +3809,20 @@ void JapaneseComposer::AddContentWords(std::wstring_view text, std::vector<std::
     }
 }
 
+namespace {
+// As many characters as a few sentences: the AI model reads them all before
+// each sentence it is asked about.
+constexpr std::size_t kRecentCharacters = 120;
+}  // namespace
+
+void JapaneseComposer::SetTextBefore(std::wstring_view text) {
+    if (text.size() > kRecentCharacters) text.remove_prefix(text.size() - kRecentCharacters);
+    recentText_.assign(text);
+}
+
 void JapaneseComposer::RememberWords(std::wstring_view text) {
+    recentText_ += text;
+    if (recentText_.size() > kRecentCharacters) recentText_.erase(0, recentText_.size() - kRecentCharacters);
     AddContentWords(text, contextWords_);
     if (contextWords_.size() > kContextWords) {
         contextWords_.erase(contextWords_.begin(),

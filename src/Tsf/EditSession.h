@@ -44,6 +44,9 @@ struct KeyInput {
         // Not a key: typing paused in live conversion; the text is converted
         // again as Enter would (JapaneseComposer::RefineLive).
         JapaneseRefine,
+        // Not a key: the AI's answer to the conversion shown came
+        // (JapaneseComposer::TakeAiAnswer).
+        JapaneseAiAnswer,
         // Not a key: show the mode by the caret (the user switched modes).
         ShowModeIndicator,
         // English: `character` finishes a symbol's spelling or a sum before

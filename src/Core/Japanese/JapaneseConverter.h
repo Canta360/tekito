@@ -10,6 +10,8 @@
 
 namespace tekito::japanese {
 
+class TopicVectors;
+
 class ConnectionMatrix;
 class JapaneseDictionary;
 class LanguageModel;
@@ -61,6 +63,14 @@ struct Phrase {
     std::vector<PhraseCandidate> candidates;
 };
 
+// A way to write a whole reading, from its words as they follow each other
+// (not phrase by phrase), with where its phrases would break.
+struct SentenceGuess {
+    std::wstring text;
+    std::int64_t cost{0};
+    std::vector<std::size_t> breaks;
+};
+
 // Kana-kanji conversion over the japanese-core dictionary: the most likely
 // words for the reading (Viterbi over the dictionary lattice with the
 // connection costs), split into phrases by Mozc's segmentation rules, with
@@ -90,6 +100,13 @@ public:
                                               const JapaneseUserDictionary* user = nullptr,
                                               std::span<const std::size_t> breaks = {}) const;
 
+    // The `count` likeliest texts for the whole reading, each once, cheapest
+    // first: unlike Convert's phrases, they may split the reading in other
+    // places (作成 or 作 成).
+    [[nodiscard]] std::vector<SentenceGuess> BestSentences(std::wstring_view reading, std::size_t count,
+                                                           std::uint16_t context = 0,
+                                                           const JapaneseUserDictionary* user = nullptr) const;
+
     // Only the likeliest text for the whole reading and its cost, much
     // quicker than Convert (and without the language model); nothing when
     // a character is in no word.
@@ -108,6 +125,16 @@ public:
     // words it is made of; nothing when a kanji is in no word. Looks
     // through the whole dictionary, so it is for a key press, not typing.
     [[nodiscard]] std::optional<ReadingGuess> ReadingOf(std::wstring_view text) const;
+    // Whether `text` writes `reading` word by word: dictionary words read as
+    // their part of the reading, kana as themselves, and other characters
+    // (digits, letters, marks) as typed. An AI model's writing is taken
+    // only so.
+    [[nodiscard]] bool CanWrite(std::wstring_view reading, std::wstring_view text) const;
+    // How `text` writes `reading` so: the places, as (in the reading, in the
+    // text), where its words and kana meet, from (0, 0) to the ends; nothing
+    // when it does not.
+    [[nodiscard]] std::optional<std::vector<std::pair<std::size_t, std::size_t>>> Align(
+        std::wstring_view reading, std::wstring_view text) const;
 
     // Words whose reading starts with `reading` and is longer, likeliest
     // first. Readings shared by too many words to look through quickly give
@@ -135,6 +162,10 @@ public:
         // of LanguageModel::Topic), so "injection" comes before "parking"
         // (both chuusha) after "anesthetic".
         std::int64_t costPerTopic{300};
+        // And by how close each one's word is to the topic the other
+        // phrases' words and those written just before make (the
+        // japanese-topics pack): costPerVector per unit of cosine.
+        std::int64_t costPerVector{20000};
     };
     // Digits (and a decimal point or comma between them) read as one number
     // word of this part of speech (japanese-core/pos.tsv, "number"), so
@@ -152,11 +183,14 @@ public:
         model_ = model;
         weights_ = weights;
     }
+    // The topic vectors (ModelWeights::costPerVector); nullptr: off.
+    void SetTopicVectors(const TopicVectors* vectors) noexcept { vectors_ = vectors; }
 
 private:
     const JapaneseDictionary& dictionary_;
     const ConnectionMatrix& matrix_;
     const LanguageModel* model_{nullptr};
+    const TopicVectors* vectors_{nullptr};
     ModelWeights weights_;
     std::optional<NumberWord> number_;
 };

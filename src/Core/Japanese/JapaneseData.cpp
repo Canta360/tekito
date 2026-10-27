@@ -2,6 +2,7 @@
 
 #include "Core/ExternalLexiconProvider.h"
 #include "Core/ExternalRankingProviders.h"
+#include "Core/Japanese/AiJudge.h"
 #include "Core/Japanese/ChunkJudge.h"
 #include "Core/Japanese/JapaneseComposer.h"
 #include "Core/Japanese/JapaneseConverter.h"
@@ -15,6 +16,7 @@
 #include "Core/Japanese/PostalCodes.h"
 #include "Core/Japanese/RomajiTable.h"
 #include "Core/Japanese/SentenceReranker.h"
+#include "Core/Japanese/TopicVectors.h"
 
 #include <filesystem>
 #include <mutex>
@@ -26,6 +28,7 @@ struct JapaneseData {
     JapaneseDictionary dictionary;
     ConnectionMatrix matrix;
     LanguageModel model;
+    TopicVectors topics;
     SentenceReranker reranker;
     KanaSlips slips;
     Loanwords loanwords;
@@ -49,9 +52,17 @@ const JapaneseData* ProcessJapaneseData() {
         }
         // Words of Wikipedia article titles, a pack of their own (CC BY-SA).
         (void)loaded->dictionary.AddWords(ExternalLexiconProvider::PackDirectory(L"japanese-wikimedia") / L"dictionary.bin");
+        // Proper nouns from Wikidata (CC0), and set phrases and names from
+        // JMdict and JMnedict (CC BY-SA): packs of their own too.
+        for (const wchar_t* pack : {L"japanese-names", L"japanese-jmdict"}) {
+            (void)loaded->dictionary.AddWords(ExternalLexiconProvider::PackDirectory(pack) / L"dictionary.bin");
+        }
         loaded->converter = std::make_unique<JapaneseConverter>(loaded->dictionary, loaded->matrix);
         if (loaded->model.Open(ExternalLexiconProvider::PackDirectory(L"japanese-lm"))) {
             loaded->converter->SetLanguageModel(&loaded->model);
+        }
+        if (loaded->topics.Open(ExternalLexiconProvider::PackDirectory(L"japanese-topics"))) {
+            loaded->converter->SetTopicVectors(&loaded->topics);
         }
         if (const auto* table = ProcessRomajiTable()) {
             loaded->keys = std::make_unique<KeyConverter>(loaded->dictionary, loaded->matrix, *loaded->converter,
@@ -138,6 +149,30 @@ const MeaningDictionary& ProcessMeanings() {
         return opened;
     }();
     return *meanings;
+}
+
+const AiJudge* ProcessAiJudge(AiModel model, AiDevice device) {
+    if (model != AiModel::Light && model != AiModel::Strong) return nullptr;
+    std::error_code error;
+    const auto directory = ExternalLexiconProvider::PackDirectory(AiModelPack(model));
+    if (directory.empty() || !std::filesystem::is_regular_file(directory / L"model.gguf", error)) return nullptr;
+    // One client per model and device, made once its pack is there (it
+    // reads how to use the model from the pack). How long a conversion
+    // waits for it: the light model reads ten sentences and writes five in
+    // about 0.15 s on a GPU, 1 s on a processor; the strong one about four
+    // times that.
+    static std::mutex lock;
+    static std::unique_ptr<AiHelperClient> clients[3][3];
+    const auto m = static_cast<std::size_t>(model);
+    const auto d = static_cast<std::size_t>(std::clamp(static_cast<int>(device), 0, 2));
+    std::lock_guard<std::mutex> hold(lock);
+    if (!clients[m][d]) {
+        using std::chrono::milliseconds;
+        const auto wait = model == AiModel::Light ? milliseconds(device == AiDevice::Cpu ? 1500 : 600)
+                                                  : milliseconds(device == AiDevice::Cpu ? 4000 : 1500);
+        clients[m][d] = std::make_unique<AiHelperClient>(model, device, wait, 10);
+    }
+    return clients[m][d].get();
 }
 
 void AttachJapaneseData(JapaneseComposer& composer) {

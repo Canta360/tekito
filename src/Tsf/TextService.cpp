@@ -631,6 +631,7 @@ HRESULT TextService::ActivateEx(ITfThreadMgr* threadManager, TfClientId clientId
 HRESULT TextService::Deactivate() {
     Trace(L"Deactivate");
     CancelJapaneseRefine();
+    StopWatchingAiAnswer();
     if (settingsLoaded_) SyncRuntimeState();
     if (settingsLoaded_) {
         userdata::UserSettings latestSettings = userSettings_;
@@ -1664,12 +1665,17 @@ void TextService::OnCandidateSelected(std::size_t index) {
 HRESULT TextService::HandleKeyInEditSession(ITfContext* context, TfEditCookie editCookie,
                                             const KeyInput& input) {
     const HRESULT hr = HandleKeyInEditSessionCore(context, editCookie, input);
-    if (input.type != KeyInput::Type::JapaneseRefine) {
+    if (input.type != KeyInput::Type::JapaneseRefine && input.type != KeyInput::Type::JapaneseAiAnswer) {
         if (japanese_.RefinesOnPause()) {
             ScheduleJapaneseRefine();
         } else {
             CancelJapaneseRefine();
         }
+    }
+    if (japanese_.IsComposing() && japanese_.WaitsForAi()) {
+        WatchAiAnswer();
+    } else {
+        StopWatchingAiAnswer();
     }
     // An English word typed with Shift in Japanese ends once it is committed.
     if (englishSegment_ && !state_.IsActive()) EndEnglishSegment();
@@ -1715,6 +1721,10 @@ HRESULT TextService::HandleKeyInEditSessionCore(ITfContext* context, TfEditCooki
         if (context != compositionContext_ || !composition_ || !japanese_.RefineLive()) return S_OK;
         return ShowJapanesePreedit(context, editCookie);
     }
+    if (input.type == KeyInput::Type::JapaneseAiAnswer) {
+        if (context != compositionContext_ || !composition_ || !japanese_.TakeAiAnswer()) return S_OK;
+        return ShowJapanesePreedit(context, editCookie);
+    }
     // Japanese typing, and committing it after the mode or focus changed.
     if ((TypesJapanese(mode_) && !englishSegment_) ||
         input.type == KeyInput::Type::JapaneseCommit || japanese_.IsComposing()) {
@@ -1724,7 +1734,16 @@ HRESULT TextService::HandleKeyInEditSessionCore(ITfContext* context, TfEditCooki
             const HRESULT hr = CommitJapanese(context, editCookie);
             return SUCCEEDED(hr) ? S_FALSE : hr;
         }
-        if (!japanese_.IsComposing()) japanese_.SetFieldForm(FieldKanaForm(context, editCookie));
+        if (!japanese_.IsComposing()) {
+            japanese_.SetFieldForm(FieldKanaForm(context, editCookie));
+            // The AI model reads the text before the caret as what the
+            // sentence follows (it does not change while typing): kept in
+            // memory only, and not read in a private window.
+            if (japanese_.UsesAi() && !privateField_) {
+                const std::wstring before = ReadSelectionContext(context, editCookie);
+                if (!before.empty()) japanese_.SetTextBefore(before);
+            }
+        }
         return HandleJapaneseKey(context, editCookie, input);
     }
     if (state_.Mode() == InputMode::Direct) {
@@ -1880,6 +1899,7 @@ HRESULT TextService::HandleKeyInEditSessionCore(ITfContext* context, TfEditCooki
         // this word's first Space.
         const bool firstSpace = state_.State() == CompositionState::Composing;
         const auto keptBefore = firstSpace ? std::exchange(keptWord_, std::wstring{}) : std::wstring{};
+        const auto typedBefore = firstSpace ? std::exchange(keptTyped_, std::wstring{}) : std::wstring{};
         const auto selectedBefore = state_.SelectedIndex();
         const auto candidateBefore = selectedBefore < state_.Candidates().size()
                                          ? state_.Candidates()[selectedBefore].text
@@ -1921,9 +1941,10 @@ HRESULT TextService::HandleKeyInEditSessionCore(ITfContext* context, TfEditCooki
             if (firstSpace) {
                 std::wstring left = action.text;
                 while (!left.empty() && left.back() == L' ') left.pop_back();
-                if (left == rawBefore) keptWord_ = rawBefore;
+                keptWord_ = left;
+                keptTyped_ = rawBefore;
                 if (userSettings_.recheckPreviousWord && !keptBefore.empty()) {
-                    RecheckPreviousWord(context, editCookie, keptBefore, left);
+                    RecheckPreviousWord(context, editCookie, keptBefore, typedBefore, left);
                 }
             }
         }
@@ -1995,6 +2016,9 @@ HRESULT TextService::HandleKeyInEditSessionCore(ITfContext* context, TfEditCooki
 
     case KeyInput::Type::Punctuation: {
         const auto rawBefore = rawText_;
+        const bool firstMark = state_.State() == CompositionState::Composing;
+        const auto keptBefore = firstMark ? std::exchange(keptWord_, std::wstring{}) : std::wstring{};
+        const auto typedBefore = firstMark ? std::exchange(keptTyped_, std::wstring{}) : std::wstring{};
         const auto selectedBefore = state_.SelectedIndex();
         const auto candidateBefore = selectedBefore < state_.Candidates().size()
                                          ? state_.Candidates()[selectedBefore].text
@@ -2012,6 +2036,20 @@ HRESULT TextService::HandleKeyInEditSessionCore(ITfContext* context, TfEditCooki
         }
         HRESULT hr = ReplaceComposition(context, editCookie, action.text);
         if (FAILED(hr)) return hr;
+        if (firstMark && userSettings_.recheckPreviousWord && candidateEngine_ && !action.text.empty()) {
+            const std::wstring left = action.text.substr(0, action.text.size() - 1);
+            const std::wstring mark = action.text.substr(action.text.size() - 1);
+            // The word before this one, as Space does, now this one is done.
+            if (!keptBefore.empty()) RecheckPreviousWord(context, editCookie, keptBefore, typedBefore, left);
+            // This word, kept as typed, when the mark ends the sentence: it
+            // has only the words before it to go by.
+            if (left == rawBefore && (mark == L"." || mark == L"!" || mark == L"?")) {
+                if (const auto meant = candidateEngine_->Recheck(left, CommitContext(context, editCookie), mark)) {
+                    hr = ReplaceComposition(context, editCookie, *meant + mark);
+                    if (FAILED(hr)) return hr;
+                }
+            }
+        }
         hr = EndComposition(editCookie);
         if (FAILED(hr)) return hr;
         candidateWindow_.Hide();
@@ -2364,6 +2402,7 @@ void TextService::RefreshCandidates(ITfContext* context, TfEditCookie editCookie
     request.context.sentenceStart = sentenceStart_;
     request.capitalization.origin = capitalizationOrigin_;
     request.options.correctionEnabled = userSettings_.correctionEnabled;
+    request.options.capitalizedCorrection = userSettings_.capitalizedCorrection;
     request.options.commonMisspellingsEnabled = userSettings_.commonMisspellingsEnabled;
     request.options.contextSuggestionsEnabled = userSettings_.contextSuggestionsEnabled;
     request.options.completionEnabled = userSettings_.completionEnabled;
@@ -2516,14 +2555,15 @@ std::wstring TextService::CommitContext(ITfContext* context, TfEditCookie editCo
 }
 
 void TextService::RecheckPreviousWord(ITfContext* context, TfEditCookie editCookie, const std::wstring& word,
-                                      const std::wstring& following) {
+                                      const std::wstring& typed, const std::wstring& following) {
     if (!candidateEngine_ || !composition_) return;
     // The text before the composition ends with the word and its space.
     const std::wstring before = CommitContext(context, editCookie);
     const std::wstring ending = word + L" ";
     if (!before.ends_with(ending)) return;
     const std::wstring preceding = before.substr(0, before.size() - ending.size());
-    const auto meant = candidateEngine_->Recheck(word, preceding, following);
+    const auto meant = typed.empty() || typed == word ? candidateEngine_->Recheck(word, preceding, following)
+                                                      : candidateEngine_->Revise(typed, word, preceding, following);
     if (!meant) return;
     ComPtr<ITfRange> range;
     ComPtr<ITfRange> previous;

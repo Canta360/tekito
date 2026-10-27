@@ -204,6 +204,11 @@ private:
     void ScheduleJapaneseRefine();
     void CancelJapaneseRefine();
     static void CALLBACK OnJapaneseRefineTimer(HWND, UINT, UINT_PTR id, DWORD);
+    // While the AI's answer to the conversion shown is to come, a timer
+    // looks for it, and applies it when it came.
+    void WatchAiAnswer();
+    void StopWatchingAiAnswer();
+    static void CALLBACK OnAiAnswerTimer(HWND, UINT, UINT_PTR id, DWORD);
     // The composition text as the composer's segments, each underlined by
     // what it is.
     HRESULT ReplaceJapaneseComposition(ITfContext* context, TfEditCookie editCookie);
@@ -263,13 +268,16 @@ private:
     DWORD activateFlags_{0};
 
     std::wstring rawText_;
-    // English: the word Space last left as typed, to look at again once
-    // the next word is typed (UserSettings::recheckPreviousWord).
+    // English: the word Space last left, as written and as typed (the same
+    // when kept as typed), to look at again once the next word is typed
+    // (UserSettings::recheckPreviousWord).
     std::wstring keptWord_;
-    // Puts the word kept as typed before the composition right when the
-    // word after it (`following`) shows it was a slip.
+    std::wstring keptTyped_;
+    // Puts the word before the composition (`word`, typed as `typed`) right
+    // when the word after it (`following`) shows it was a slip, or another
+    // fix than the one Space made.
     void RecheckPreviousWord(ITfContext* context, TfEditCookie editCookie, const std::wstring& word,
-                             const std::wstring& following);
+                             const std::wstring& typed, const std::wstring& following);
     CapitalizationOrigin capitalizationOrigin_{CapitalizationOrigin::Unknown};
     bool sentenceStart_{false};
     // What the composition shows now, and the end of what was typed here
@@ -335,6 +343,7 @@ private:
     bool symbolComposition_{false};
     japanese::JapaneseComposer japanese_;
     UINT_PTR refineTimer_{0};
+    UINT_PTR aiTimer_{0};
     // The key OnTestKeyDown finished the word for and let through (Enter in
     // English), so that it is not handled a second time.
     std::optional<std::pair<WPARAM, LPARAM>> keyFinishedInTest_;

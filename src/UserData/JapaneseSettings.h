@@ -1,6 +1,8 @@
 #pragma once
 
+#include "Core/Japanese/AiJudge.h"
 #include "Core/Japanese/JapaneseComposer.h"
+#include "Core/Japanese/JapaneseData.h"
 #include "Core/Japanese/JapaneseKeys.h"
 #include "Core/SpecialConversions.h"
 #include "UserData/UserSettings.h"
@@ -60,6 +62,11 @@ inline void ApplyJapaneseSettings(japanese::JapaneseComposer& composer, const Us
     composer.SetLearning(settings.learningEnabled ? learning : nullptr);
     composer.SetLiveConversion(settings.japaneseLiveConversion);
     composer.SetSentenceCheck(settings.japaneseSentenceCheck);
+    // The text service applies the AI's answer once it comes (TakeAiAnswer).
+    composer.SetAiJudge(japanese::ProcessAiJudge(
+                            static_cast<japanese::AiModel>(std::clamp(settings.japaneseSentenceModel, 0, 2)),
+                            static_cast<japanese::AiDevice>(std::clamp(settings.japaneseAiDevice, 0, 2))),
+                        false);
     composer.SetSlipAutoApply(settings.japaneseSlipAutoApply);
     composer.SetTypedForms(settings.japaneseTypedForms);
     composer.SetSingleVowelKana(settings.mixSingleVowelKana);

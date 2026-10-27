@@ -7,6 +7,9 @@
 
 namespace tekito::japanese {
 
+class AiJudge;
+enum class AiModel : int;
+enum class AiDevice : int;
 class JapaneseComposer;
 class MeaningDictionary;
 class PostalCodes;
@@ -39,6 +42,10 @@ void ReloadUserRomaji();
 [[nodiscard]] std::shared_ptr<const PostalCodes> ProcessPostalCodes();
 // The meaning packs, mapped on first use; lookups read them in place.
 [[nodiscard]] const MeaningDictionary& ProcessMeanings();
+
+// The AI model `model` as converting asks it (TekitoAI.exe); null for
+// AiModel::None or while its pack is not installed.
+[[nodiscard]] const AiJudge* ProcessAiJudge(AiModel model, AiDevice device);
 
 // Mixed typing (JapaneseComposer::SetMixedTyping) on or off for `composer`;
 // stays off when the English word scores are missing.

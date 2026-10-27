@@ -34,8 +34,11 @@ public:
     // ln p of each sentence: its pieces and the end, after the start.
     [[nodiscard]] std::vector<double> LogProbabilities(std::span<const std::wstring> sentences) const;
     // Which of `sentences` (likeliest first, as the converter ranks them)
-    // to take: 0 keeps the first. Only the first Top() are looked at.
-    [[nodiscard]] std::size_t Choose(std::span<const std::wstring> sentences) const;
+    // to take: 0 keeps the first. Only the first Top() of the first
+    // `ranked` are looked at; those after `ranked` (whole texts read with
+    // other phrase breaks) count as the last rank less `penalty`.
+    [[nodiscard]] std::size_t Choose(std::span<const std::wstring> sentences, std::size_t ranked = SIZE_MAX,
+                                     double penalty = 0.0) const;
 
 private:
     struct Piece {

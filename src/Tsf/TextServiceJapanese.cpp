@@ -505,6 +505,43 @@ void TextService::CancelJapaneseRefine() {
     if (refineOwner == this) refineOwner = nullptr;
 }
 
+namespace {
+// How often the timer looks for the AI's answer.
+constexpr UINT kAiLookMs = 30;
+thread_local TextService* aiOwner = nullptr;
+}  // namespace
+
+void TextService::WatchAiAnswer() {
+    if (aiTimer_ && aiOwner == this) return;
+    aiOwner = this;
+    aiTimer_ = SetTimer(nullptr, aiTimer_, kAiLookMs, &TextService::OnAiAnswerTimer);
+}
+
+void TextService::StopWatchingAiAnswer() {
+    if (aiTimer_) KillTimer(nullptr, aiTimer_);
+    aiTimer_ = 0;
+    if (aiOwner == this) aiOwner = nullptr;
+}
+
+void CALLBACK TextService::OnAiAnswerTimer(HWND, UINT, UINT_PTR id, DWORD) {
+    TextService* self = aiOwner;
+    if (!self || id != self->aiTimer_) {
+        KillTimer(nullptr, id);
+        return;
+    }
+    if (!self->japanese_.AiAnswerCame()) return;
+    self->StopWatchingAiAnswer();
+    if (!self->compositionContext_) return;
+    KeyInput input{};
+    input.type = KeyInput::Type::JapaneseAiAnswer;
+    auto* session = new (std::nothrow) KeyEditSession(self, self->compositionContext_, input);
+    if (!session) return;
+    HRESULT sessionResult = E_FAIL;
+    (void)self->compositionContext_->RequestEditSession(self->clientId_, session, TF_ES_ASYNCDONTCARE | TF_ES_READWRITE,
+                                                         &sessionResult);
+    session->Release();
+}
+
 void CALLBACK TextService::OnJapaneseRefineTimer(HWND, UINT, UINT_PTR id, DWORD) {
     TextService* self = refineOwner;
     if (!self || id != self->refineTimer_) {

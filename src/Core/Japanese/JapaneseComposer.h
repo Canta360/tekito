@@ -28,6 +28,7 @@ class Loanwords;
 class PostalCodes;
 class RomajiTable;
 class SentenceReranker;
+class AiJudge;
 class KanaSlips;
 
 // One romaji unit: the keys it took and the kana it made. Keys the table
@@ -119,6 +120,34 @@ public:
     void SetSentenceReranker(const SentenceReranker* reranker) noexcept { reranker_ = reranker; }
     // The user's switch for it (on by default).
     void SetSentenceCheck(bool on) noexcept { sentenceCheck_ = on; }
+    // How many whole texts that break the reading in other places the
+    // sentence check also reads (0: only the phrases' choices).
+    void SetWholeSentences(std::size_t count) noexcept { wholeSentences_ = count; }
+    // How much less likely the sentence check takes them to be than its
+    // last ranked sentence (nats).
+    void SetWholePenalty(double penalty) noexcept { wholePenalty_ = penalty; }
+    // Whether the AI model is kept from replacing the sentence check's
+    // choice with one that only writes it otherwise (kana for kanji,
+    // katakana for hiragana, digits for kanji numbers). Off by default: it
+    // also kept kana TEKITO had not converted (きどく for 既読), costing more
+    // than it saved.
+    void SetKeepNotation(bool on) noexcept { keepNotation_ = on; }
+    // An AI model that reads the likeliest sentences after the sentence
+    // check and takes one that reads clearly better (Japanese mode only);
+    // nullptr: the sentence check alone. `waits`: converting waits for its
+    // answer; otherwise the sentence check's choice is shown and
+    // TakeAiAnswer applies the answer once it comes.
+    void SetAiJudge(const AiJudge* judge, bool waits) noexcept {
+        aiJudge_ = judge;
+        aiWaits_ = waits;
+    }
+    // The AI's answer to the conversion shown is still to come.
+    [[nodiscard]] bool WaitsForAi();
+    // The answer WaitsForAi waits for came (or the AI gave none).
+    [[nodiscard]] bool AiAnswerCame() const;
+    // Once it came (the AI no longer Asking): converts again with it, if
+    // nothing was changed since. Whether what is shown changed.
+    bool TakeAiAnswer();
     // Space (and live refine) may undo typing slips in the keys and convert
     // the reading as meant. Off: convert as typed; slip candidates stay in
     // the list. On by default, as UserSettings::japaneseSlipAutoApply.
@@ -287,6 +316,7 @@ public:
     void ForgetContext() noexcept {
         context_ = 0;
         contextWords_.clear();
+        recentText_.clear();
         englishRun_ = 0;
         englishText_.clear();
         spaceAfterEnglish_ = false;
@@ -302,6 +332,16 @@ public:
         return drop;
     }
     [[nodiscard]] std::uint16_t Context() const noexcept { return context_; }
+    // What was committed lately, as the AI model reads it before the
+    // sentence (SetAiJudge); in memory only, and gone with ForgetContext.
+    [[nodiscard]] const std::wstring& RecentText() const noexcept { return recentText_; }
+    // Evaluations: what the writer wrote just before, as if committed.
+    void SetRecentText(std::wstring text) { recentText_ = std::move(text); }
+    // The text before the caret in the document, read as typing starts: it
+    // is what the sentence follows, for the AI model (RecentText).
+    void SetTextBefore(std::wstring_view text);
+    // Whether an AI model reads the conversions (SetAiJudge).
+    [[nodiscard]] bool UsesAi() const noexcept { return aiJudge_ != nullptr; }
     // Space and Henkan: converts, then steps through the candidates.
     void Convert();
     void NextCandidate();
@@ -434,6 +474,8 @@ private:
     // Candidates with kanji outside SetKanjiRange taken out (the phrase's
     // kana when none is left).
     void KeepKanjiInRange(PhraseState& phrase) const;
+    // Whether every kanji of `text` is in SetKanjiRange's range.
+    [[nodiscard]] bool InKanjiRange(std::wstring_view text) const;
     // The likeliest sentences the phrases' candidates make, checked as a
     // whole (SetSentenceReranker); the one taken is selected.
     void CheckSentence();
@@ -445,7 +487,23 @@ private:
     // of each part the sentence model reads best, all 0 to keep the first.
     // The phrases of a conversion, the chunks of a mixed sentence and the
     // pieces of English run into Japanese are checked with it alike.
-    [[nodiscard]] std::vector<std::size_t> ReadBest(const std::vector<std::vector<std::wstring>>& parts) const;
+    // `ai`: the AI model (SetAiJudge) has the last word; when it chooses a
+    // writing of its own, that is put in `written` and the picks keep the
+    // first. `wholes`: texts for the whole input read alongside (with
+    // `written`), put there when chosen.
+    [[nodiscard]] std::vector<std::size_t> ReadBest(const std::vector<std::vector<std::wstring>>& parts,
+                                                    bool ai = false, std::wstring* written = nullptr,
+                                                    std::span<const std::wstring> wholes = {}) const;
+    // A writing of the whole input taken (the AI model's own, or a text
+    // that breaks the reading elsewhere): the phrases' candidates that make
+    // it selected; else the reading split at `breaks` if that makes it;
+    // else it as one choice.
+    void TakeWritten(const std::wstring& text, std::span<const std::size_t> breaks = {});
+    // Selects the phrases' candidates that make `text`; false when none do.
+    bool SelectWritten(const std::wstring& text);
+    // Phrases whose choice is a number not written by the number style (a
+    // dictionary word 二十, or a writing's 22) take the converter's number.
+    void SelectStyledNumbers();
     // The keys with their likeliest slips undone (SetKanaSlips), converted
     // in place of the phrases when that reads better; whether it did.
     bool FixSlips();
@@ -533,8 +591,9 @@ private:
     [[nodiscard]] bool LiveRefined() const;
     // Live: the whole text converted again as Space converts it before live
     // conversion (slips undone, English run in, the whole input read at
-    // once), unless something was picked while typing. True when it ran.
-    bool RebuildLive();
+    // once), unless something was picked while typing (`again`: what it
+    // picked itself is redone). True when it ran.
+    bool RebuildLive(bool again = false);
 
     // What Commit cleared, for UndoCommit.
     struct CommitRecord {
@@ -647,6 +706,19 @@ private:
     SpecialConversionOptions specialOptions_;
     JapaneseLearningStore* learning_{nullptr};
     const SentenceReranker* reranker_{nullptr};
+    const AiJudge* aiJudge_{nullptr};
+    // How many texts read with other phrase breaks (BestSentences) the
+    // sentence check reads too (SetWholeSentences).
+    std::size_t wholeSentences_{10};
+    double wholePenalty_{0.0};
+    bool keepNotation_{false};
+    bool aiWaits_{true};
+    // The conversion shown waits for the AI's answer (WaitsForAi), and what
+    // it showed then, for TakeAiAnswer to see nothing changed.
+    mutable bool aiWaiting_{false};
+    mutable std::wstring aiShown_;
+    std::wstring aiKeys_;
+    std::size_t aiFocus_{0};
     bool sentenceCheck_{true};
     bool slipAutoApply_{true};
     bool emojiOnFirstPage_{true};
@@ -690,6 +762,7 @@ private:
     std::vector<std::size_t> readingKeys_;
     std::uint16_t context_{0};
     std::vector<std::wstring> contextWords_;
+    std::wstring recentText_;
     std::size_t focus_{0};
     bool listOpen_{false};
     bool live_{false};
