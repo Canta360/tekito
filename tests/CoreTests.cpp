@@ -1886,7 +1886,7 @@ void TestDataPackValidation() {
                              L"dictionary-display", L"frequency", L"phrase", L"slang",
                              L"wiktionary-slang", L"proper-nouns", L"pronunciation",
                              L"emoji", L"social-expression", L"japanese-phonetic",
-                             L"qwerty-typo-catalog", L"special-conversions"}) {
+                             L"qwerty-typo-catalog", L"special-conversions", L"kaomoji"}) {
         if (IsOptionalPack(pack) && !OptionalPackInstalled(pack)) continue;
         tekito::userdata::DataPackStatus status;
         const bool valid = tekito::userdata::ValidateDataPack(tekito::FindDataPack(dataRoot, pack), status);

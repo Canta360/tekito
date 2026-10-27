@@ -29,6 +29,8 @@ struct SharedProviders {
     ExternalSlangProvider slangProvider;
     ExternalSlangProvider wiktionarySlangProvider;
     ExternalSlangProvider properNounProvider;
+    // Names from Wikidata (english-names): people, companies, brands, works.
+    ExternalSlangProvider namesProvider;
     ExternalSlangProvider emojiProvider;
     ExternalSlangProvider socialExpressionProvider;
     ExternalSlangProvider japanesePhoneticProvider;
@@ -41,6 +43,7 @@ struct SharedProviders {
     CompositeLexiconProvider emojiWithExpressions;
     CompositeLexiconProvider socialWithExpressions;
     CompositeLexiconProvider phoneticWithExpressions;
+    CompositeLexiconProvider namesWithPhonetic;
     CompositeLexiconProvider supplementaryProvider;
 
     SharedProviders()
@@ -50,6 +53,8 @@ struct SharedProviders {
                                   CandidateSourceWiktionary),
           properNounProvider(ExternalLexiconProvider::PackDirectory(L"proper-nouns") / L"entries.tsv",
                              CandidateSourceProperNoun),
+          namesProvider(ExternalLexiconProvider::PackDirectory(L"english-names") / L"entries.tsv",
+                        CandidateSourceProperNoun),
           emojiProvider(ExternalLexiconProvider::PackDirectory(L"emoji") / L"entries.tsv",
                         CandidateSourceEmoji),
           socialExpressionProvider(ExternalLexiconProvider::PackDirectory(L"social-expression") / L"entries.tsv",
@@ -64,7 +69,8 @@ struct SharedProviders {
           emojiWithExpressions(emojiProvider, wiktionaryWithSlang),
           socialWithExpressions(socialExpressionProvider, emojiWithExpressions),
           phoneticWithExpressions(japanesePhoneticProvider, socialWithExpressions),
-          supplementaryProvider(properNounProvider, phoneticWithExpressions) {}
+          namesWithPhonetic(namesProvider, phoneticWithExpressions),
+          supplementaryProvider(properNounProvider, namesWithPhonetic) {}
 };
 
 std::mutex g_sharedProvidersMutex;
@@ -176,6 +182,7 @@ ConversionResult CandidateEngine::Convert(const ConversionRequest& request) cons
     }
     if (request.options.special.dates) AddDates(rawText, candidates);
     if (request.options.special.symbols) AddSymbols(rawText, candidates);
+    if (request.options.special.numbers) AddNumbers(rawText, candidates);
     // Numbered as listed, with what was added.
     for (std::size_t i = 0; i < candidates.size(); ++i) candidates[i].id = static_cast<std::uint32_t>(i + 1);
     return {std::move(candidates)};
@@ -185,6 +192,13 @@ std::optional<std::wstring> CandidateEngine::Recheck(std::wstring_view word, std
                                                      std::wstring_view followingText) const {
     if (!generator_) return std::nullopt;
     return generator_->Recheck(word, precedingText, followingText);
+}
+
+std::optional<std::wstring> CandidateEngine::Revise(std::wstring_view typed, std::wstring_view applied,
+                                                    std::wstring_view precedingText,
+                                                    std::wstring_view followingText) const {
+    if (!generator_) return std::nullopt;
+    return generator_->Revise(typed, applied, precedingText, followingText);
 }
 
 void CandidateEngine::AddDates(std::wstring_view rawText, std::vector<Candidate>& candidates) {
@@ -223,6 +237,29 @@ void CandidateEngine::AddSymbols(std::wstring_view rawText, std::vector<Candidat
         if (seen) continue;
         Candidate candidate;
         candidate.text = std::move(symbol);
+        candidate.isProtected = true;
+        candidate.policyFlags = CandidatePolicySuggestOnly;
+        at = candidates.insert(at, std::move(candidate)) + 1;
+    }
+}
+
+void CandidateEngine::AddNumbers(std::wstring_view rawText, std::vector<Candidate>& candidates) {
+    const auto digits = SpecialConversions::EnglishNumber(rawText);
+    if (!digits || candidates.empty()) return;
+    auto numbers = SpecialConversions::Installed().Numbers(*digits);
+    numbers.insert(numbers.begin(), *digits);
+    // After the word as typed and its emoji, as symbols are: a number is
+    // only ever offered.
+    auto at = std::find_if(candidates.begin(), candidates.end(),
+                           [](const Candidate& candidate) { return candidate.isOriginal; });
+    at = at == candidates.end() ? candidates.begin() + 1 : at + 1;
+    while (at != candidates.end() && at->label == SemanticLabel::Emoji) ++at;
+    for (auto& number : numbers) {
+        const bool seen = std::any_of(candidates.begin(), candidates.end(),
+                                      [&](const Candidate& candidate) { return candidate.text == number; });
+        if (seen) continue;
+        Candidate candidate;
+        candidate.text = std::move(number);
         candidate.isProtected = true;
         candidate.policyFlags = CandidatePolicySuggestOnly;
         at = candidates.insert(at, std::move(candidate)) + 1;

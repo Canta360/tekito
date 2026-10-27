@@ -67,6 +67,9 @@ public:
     // as a Roman numeral (up to 3999) and circled (up to 50). Empty unless
     // `digits` is all digits.
     [[nodiscard]] std::vector<std::wstring> Numbers(std::wstring_view digits) const;
+    // An English number word in digits ("three": 3, "twenty-one": 21,
+    // "two-hundred": 200), up to 999,999; nothing for any other word.
+    [[nodiscard]] static std::optional<std::wstring> EnglishNumber(std::wstring_view word);
 
     // What English text before the caret ends with, typed outside words: a
     // symbol's ASCII spelling ("->", "(c)") or a sum ("1+2=", "3 * 4 ="),

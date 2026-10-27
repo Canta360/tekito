@@ -402,10 +402,14 @@ int RunTyped(const EnglishStudyOptions& options) {
             for (std::size_t c = 0; c < candidates.size() && c < 9; ++c) choices.push_back(candidates[c].text);
             text.replace(word.begin, word.text.size(), after);
             shift += static_cast<std::ptrdiff_t>(after.size()) - static_cast<std::ptrdiff_t>(word.text.size());
-            // The word before, kept as typed, looked at again.
-            if (options.nextWord && !done.empty() && done.back().after == done.back().typed) {
+            // The word before, kept as typed or put right, looked at again.
+            if (options.nextWord && !done.empty()) {
                 auto& previous = done.back();
-                if (const auto meant = engine->Recheck(previous.after, text.substr(0, previous.begin), after)) {
+                const auto preceding = text.substr(0, previous.begin);
+                const auto meant = previous.after == previous.typed
+                                       ? engine->Recheck(previous.after, preceding, after)
+                                       : engine->Revise(previous.typed, previous.after, preceding, after);
+                if (meant) {
                     text.replace(previous.begin, previous.after.size(), *meant);
                     const auto grown = static_cast<std::ptrdiff_t>(meant->size()) -
                                        static_cast<std::ptrdiff_t>(previous.after.size());
@@ -415,6 +419,17 @@ int RunTyped(const EnglishStudyOptions& options) {
                 }
             }
             done.push_back({word.begin, word.text, after, std::move(choices)});
+        }
+        // The sentence's last word, kept as typed, looked at again when a
+        // mark ends the sentence (TextService does on . ! ?).
+        if (options.nextWord && !done.empty() && done.back().after == done.back().typed) {
+            auto& last = done.back();
+            const std::size_t end = last.begin + last.after.size();
+            const std::wstring_view following = std::wstring_view(text).substr(std::min(end, text.size()));
+            if (const auto meant = engine->Recheck(last.after, text.substr(0, last.begin), following)) {
+                text.replace(last.begin, last.after.size(), *meant);
+                last.after = *meant;
+            }
         }
         // TEKITO_EVAL_OUTPUT: the sentence as it ends up (source, id, text),
         // as the real-input benchmark writes it; an id "source:id" gives both.

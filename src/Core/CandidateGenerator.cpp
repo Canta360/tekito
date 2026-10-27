@@ -399,6 +399,18 @@ std::uint32_t CandidateGenerator::Offered(std::wstring_view lowerRaw, std::wstri
     return (flags & ~kAutomatic) | CandidatePolicySuggestOnly;
 }
 
+namespace {
+
+// Whether `word`, starting with a capital after `context`, was capitalized
+// by the user mid-sentence rather than for starting a sentence.
+bool CapitalMidSentence(std::wstring_view word, std::wstring_view context) {
+    if (word.empty() || !std::iswupper(word.front())) return false;
+    const auto last = context.find_last_not_of(L" \t");
+    return last != std::wstring_view::npos && std::wstring_view(L".!?\n").find(context[last]) == std::wstring_view::npos;
+}
+
+}  // namespace
+
 std::optional<std::wstring> CandidateGenerator::Recheck(std::wstring_view word, std::wstring_view context,
                                                        std::wstring_view followingContext) const {
     // The meant word must fit both sides this much better (the phrase
@@ -409,8 +421,10 @@ std::optional<std::wstring> CandidateGenerator::Recheck(std::wstring_view word, 
     constexpr double kCommonWord = 3.0;
     constexpr double kCommonerBy = 1.0;
     constexpr double kTypedFitsAt = 10.0;
-    // Written with capitals inside (API, iOS): as meant.
-    if (word.size() < 2 || std::any_of(word.begin() + 1, word.end(), [](wchar_t c) { return std::iswupper(c) != 0; })) {
+    // Written with capitals inside (API, iOS), or with one mid-sentence (a
+    // name): as meant.
+    if (word.size() < 2 || std::any_of(word.begin() + 1, word.end(), [](wchar_t c) { return std::iswupper(c) != 0; }) ||
+        CapitalMidSentence(word, context)) {
         return std::nullopt;
     }
     const auto lower = Lower(word);
@@ -419,17 +433,23 @@ std::optional<std::wstring> CandidateGenerator::Recheck(std::wstring_view word, 
     }
     const auto previousWords = ContextWords(context);
     const auto followingWords = ContextWords(followingContext);
-    if (previousWords.empty() || followingWords.empty()) return std::nullopt;
+    // The last word of a sentence (what follows starts with . ! or ?) goes
+    // by the word before alone, counted twice to weigh as two sides do.
+    const auto mark = followingContext.find_first_not_of(L' ');
+    const bool sentenceEnd = followingWords.empty() && mark != std::wstring_view::npos &&
+                             std::wstring_view(L".!?").find(followingContext[mark]) != std::wstring_view::npos;
+    if (previousWords.empty() || (followingWords.empty() && !sentenceEnd)) return std::nullopt;
     // How well a word goes with the word before and the one after; both
     // must know it.
     const auto fit = [&](const std::wstring& candidate) -> std::optional<double> {
         const double before = phraseProvider_.Score(candidate, previousWords.back());
+        if (sentenceEnd) return before > 0.0 ? std::optional<double>(2.0 * before) : std::nullopt;
         const double after = phraseProvider_.Score(followingWords.front(), candidate);
         if (before <= 0.0 || after <= 0.0) return std::nullopt;
         return before + after;
     };
     if (phraseProvider_.Score(lower, previousWords.back()) >= kTypedFitsAt ||
-        phraseProvider_.Score(followingWords.front(), lower) >= kTypedFitsAt) {
+        (!sentenceEnd && phraseProvider_.Score(followingWords.front(), lower) >= kTypedFitsAt)) {
         return std::nullopt;
     }
     const double typed = fit(lower).value_or(0.0);
@@ -460,10 +480,15 @@ std::optional<std::wstring> CandidateGenerator::Recheck(std::wstring_view word, 
     // for another: those are what a correct sentence has (eval/en: 5 words
     // typed right were changed, now 2; slips fixed 313 -> 310 of 400).
     constexpr double kCommonBetterBy = 35.0;
-    double bestFit = typed + (typedFrequency >= kCommonWord ? kCommonBetterBy : kBetterBy);
+    // One side seen only: it must fit better still, and not be the word
+    // with a letter less (ink. to in., too. to to.).
+    constexpr double kSentenceEndBy = 20.0;
+    double bestFit = typed + (typedFrequency >= kCommonWord ? kCommonBetterBy : kBetterBy) +
+                     (sentenceEnd ? kSentenceEndBy : 0.0);
     for (const auto& candidate : near) {
         const double frequency = frequencyProvider_.Score(candidate);
         if (candidate == lower || frequency < kCommonWord || frequency < typedFrequency + kCommonerBy) continue;
+        if (sentenceEnd && candidate.size() < lower.size()) continue;
         const auto score = fit(candidate);
         if (score && *score > bestFit) {
             bestFit = *score;
@@ -472,6 +497,68 @@ std::optional<std::wstring> CandidateGenerator::Recheck(std::wstring_view word, 
     }
     if (!best) return std::nullopt;
     if (std::iswupper(word.front())) best->front() = static_cast<wchar_t>(std::towupper(best->front()));
+    return best;
+}
+
+std::optional<std::wstring> CandidateGenerator::Revise(std::wstring_view typed, std::wstring_view applied,
+                                                      std::wstring_view context,
+                                                      std::wstring_view followingContext) const {
+    // Another word must fit both sides this much better than the fix (the
+    // phrase pack's scores, as in Recheck) and be this common.
+    constexpr double kBetterBy = 10.0;
+    constexpr double kCommonWord = 3.0;
+    if (typed.size() < 2 || std::any_of(typed.begin() + 1, typed.end(), [](wchar_t c) { return std::iswupper(c) != 0; }) ||
+        CapitalMidSentence(typed, context)) {
+        return std::nullopt;
+    }
+    const auto lower = Lower(typed);
+    const auto fixed = Lower(applied);
+    const auto letters = [](std::wstring_view word) {
+        return !word.empty() && std::all_of(word.begin(), word.end(), [](wchar_t c) { return c >= L'a' && c <= L'z'; });
+    };
+    if (!letters(lower) || !letters(fixed)) return std::nullopt;
+    const auto previousWords = ContextWords(context);
+    const auto followingWords = ContextWords(followingContext);
+    if (previousWords.empty() || followingWords.empty()) return std::nullopt;
+    const auto fit = [&](const std::wstring& candidate) {
+        return phraseProvider_.Score(candidate, previousWords.back()) +
+               phraseProvider_.Score(followingWords.front(), candidate);
+    };
+    const auto both = [&](const std::wstring& candidate) {
+        return phraseProvider_.Score(candidate, previousWords.back()) > 0.0 &&
+               phraseProvider_.Score(followingWords.front(), candidate) > 0.0;
+    };
+    // The words one slip from what was typed, as Space found them.
+    std::vector<std::wstring> near;
+    for (std::size_t i = 0; i < lower.size(); ++i) {
+        for (wchar_t c = L'a'; c <= L'z'; ++c) {
+            if (AreQwertyNeighbors(lower[i], c)) near.push_back(lower.substr(0, i) + c + lower.substr(i + 1));
+        }
+        if (lower.size() > 2) near.push_back(lower.substr(0, i) + lower.substr(i + 1));
+        if (i + 1 < lower.size() && lower[i] != lower[i + 1]) {
+            auto swapped = lower;
+            std::swap(swapped[i], swapped[i + 1]);
+            near.push_back(std::move(swapped));
+        }
+    }
+    for (std::size_t i = 0; i <= lower.size(); ++i) {
+        for (wchar_t c = L'a'; c <= L'z'; ++c) near.push_back(lower.substr(0, i) + c + lower.substr(i));
+    }
+    std::optional<std::wstring> best;
+    double bestFit = fit(fixed) + kBetterBy;
+    for (const auto& candidate : near) {
+        if (candidate == fixed || candidate == lower || frequencyProvider_.Score(candidate) < kCommonWord ||
+            !both(candidate)) {
+            continue;
+        }
+        const double score = fit(candidate);
+        if (score > bestFit) {
+            bestFit = score;
+            best = candidate;
+        }
+    }
+    if (!best) return std::nullopt;
+    if (std::iswupper(applied.front())) best->front() = static_cast<wchar_t>(std::towupper(best->front()));
     return best;
 }
 
@@ -869,6 +956,7 @@ std::vector<Candidate> CandidateGenerator::Generate(std::wstring_view rawText,
 
     if (!HasOriginal(output)) AddOriginal(output, seen, rawText);
     ApplyWritingRules(output, seen, rawText, lower, exact && !exactHasWeakFrequency, options);
+    if (options.correctionEnabled && options.capitalizedCorrection) ApplyCapitalizedSlip(output, rawText, lower, exact);
     ApplyDoubledWord(output, rawText, lower, context, options);
     // A word in quotes ('hi', 'hi') or a plural's apostrophe (students'):
     // not a slip, so nothing replaces it on its own.
@@ -889,6 +977,72 @@ std::vector<Candidate> CandidateGenerator::Generate(std::wstring_view rawText,
     AddPredictions(output, seen, rawText, lower, context, options);
     FinalizeCandidates(output, rawText);
     return output;
+}
+
+namespace {
+
+// Whether `a` becomes `b` (compared without case) by one slip: a letter
+// changed, left out, added, or two side by side swapped.
+bool OneSlipApart(std::wstring_view a, std::wstring_view b) {
+    const auto same = [](wchar_t x, wchar_t y) { return std::towlower(x) == std::towlower(y); };
+    if (a.size() == b.size()) {
+        std::size_t first = 0;
+        while (first < a.size() && same(a[first], b[first])) ++first;
+        if (first == a.size()) return false;
+        if (std::equal(a.begin() + first + 1, a.end(), b.begin() + first + 1, same)) return true;
+        return first + 1 < a.size() && same(a[first], b[first + 1]) && same(a[first + 1], b[first]) &&
+               std::equal(a.begin() + first + 2, a.end(), b.begin() + first + 2, same);
+    }
+    const auto& longer = a.size() > b.size() ? a : b;
+    const auto& shorter = a.size() > b.size() ? b : a;
+    if (longer.size() != shorter.size() + 1) return false;
+    std::size_t at = 0;
+    while (at < shorter.size() && same(longer[at], shorter[at])) ++at;
+    return std::equal(longer.begin() + at + 1, longer.end(), shorter.begin() + at, same);
+}
+
+}  // namespace
+
+void CandidateGenerator::ApplyCapitalizedSlip(std::vector<Candidate>& output, std::wstring_view rawText,
+                                              std::wstring_view lower, bool exact) const {
+    constexpr std::size_t kShortest = 4;
+    if (exact || rawText.size() < kShortest || !IsCapitalized(rawText) || HasTwoInitialCapitals(rawText) ||
+        IsWord(lower)) {
+        return;
+    }
+    const auto original = std::find_if(output.begin(), output.end(),
+                                       [](const Candidate& candidate) { return candidate.isOriginal; });
+    // Only a word kept as typed for its capital, not one the user keeps.
+    if (original == output.end() || (original->sourceFlags & CandidateSourceProtectedPattern) == 0) return;
+    Candidate* meant = nullptr;
+    for (auto& candidate : output) {
+        if (candidate.isOriginal || candidate.text.empty() || !std::iswupper(candidate.text.front()) ||
+            !OneSlipApart(rawText, candidate.text)) {
+            continue;
+        }
+        if (meant) return;  // two such words: the user picks
+        meant = &candidate;
+    }
+    if (!meant) return;
+    original->isProtected = false;
+    original->policyFlags &= ~(CandidatePolicyProtect | CandidatePolicySuggestOnly);
+    for (auto& candidate : output) {
+        if (candidate.isOriginal) continue;
+        if (&candidate == meant) {
+            candidate.policyFlags = (candidate.policyFlags & ~(CandidatePolicySuggestOnly | CandidatePolicyProtect)) |
+                                    CandidatePolicyCorrect;
+        } else if ((candidate.policyFlags & (CandidatePolicyCorrect | CandidatePolicyNormalize)) != 0) {
+            candidate.policyFlags = (candidate.policyFlags & ~(CandidatePolicyCorrect | CandidatePolicyNormalize)) |
+                                    CandidatePolicySuggestOnly;
+        }
+    }
+    // First, as Space takes the first; the word as typed right after it.
+    const auto at = static_cast<std::size_t>(meant - output.data());
+    std::rotate(output.begin(), output.begin() + static_cast<std::ptrdiff_t>(at),
+                output.begin() + static_cast<std::ptrdiff_t>(at) + 1);
+    const auto typed = std::find_if(output.begin() + 1, output.end(),
+                                    [](const Candidate& candidate) { return candidate.isOriginal; });
+    if (typed != output.end()) std::rotate(output.begin() + 1, typed, typed + 1);
 }
 
 void CandidateGenerator::ApplySpellingVariety(std::vector<Candidate>& output, std::wstring_view rawText,

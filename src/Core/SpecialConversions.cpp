@@ -199,6 +199,8 @@ const SpecialConversions& SpecialConversions::Installed() {
     static const SpecialConversions installed = [] {
         SpecialConversions loaded;
         loaded.Load(ExternalLexiconProvider::PackDirectory(L"special-conversions") / L"rules.tsv");
+        // More kaomoji and one-line ASCII art, after Mozc's.
+        loaded.Load(ExternalLexiconProvider::PackDirectory(L"kaomoji") / L"rules.tsv");
         return loaded;
     }();
     return installed;
@@ -245,7 +247,12 @@ void SpecialConversions::Parse(std::string_view text) {
             englishSymbolKeys_.push_back(key);
             if (englishSymbolEnds_.find(key.back()) == std::wstring::npos) englishSymbolEnds_.push_back(key.back());
         }
-        rows_[RowKey(section, language, key)].push_back(std::move(value));
+        auto& row = rows_[RowKey(section, language, key)];
+        // A second pack (kaomoji) may list what the first did.
+        if ((section == L"emoticon" || section == L"symbolname") && std::find(row.begin(), row.end(), value) != row.end()) {
+            continue;
+        }
+        row.push_back(std::move(value));
     }
     std::sort(eras_.begin(), eras_.end(), [](const Era& a, const Era& b) { return a.start > b.start; });
 }
@@ -469,6 +476,44 @@ std::vector<std::wstring> SpecialConversions::Numbers(std::wstring_view text) co
         if (value <= kLargestCircled) AddUnique(out, Circled(value));
     }
     return out;
+}
+
+std::optional<std::wstring> SpecialConversions::EnglishNumber(std::wstring_view word) {
+    static constexpr std::wstring_view kSmall[] = {
+        L"zero", L"one", L"two", L"three", L"four", L"five", L"six", L"seven", L"eight", L"nine", L"ten",
+        L"eleven", L"twelve", L"thirteen", L"fourteen", L"fifteen", L"sixteen", L"seventeen", L"eighteen", L"nineteen"};
+    static constexpr std::wstring_view kTens[] = {L"twenty", L"thirty", L"forty", L"fifty",
+                                                  L"sixty", L"seventy", L"eighty", L"ninety"};
+    std::wstring lower(word);
+    for (auto& c : lower) c = static_cast<wchar_t>(std::towlower(c));
+    std::uint64_t total = 0, current = 0;
+    bool any = false;
+    for (std::size_t start = 0; start <= lower.size();) {
+        auto end = lower.find(L'-', start);
+        if (end == std::wstring::npos) end = lower.size();
+        const std::wstring_view part = std::wstring_view(lower).substr(start, end - start);
+        start = end + 1;
+        if (part.empty()) return std::nullopt;
+        const auto small = std::find(std::begin(kSmall), std::end(kSmall), part);
+        const auto tens = std::find(std::begin(kTens), std::end(kTens), part);
+        if (small != std::end(kSmall)) {
+            current += static_cast<std::uint64_t>(small - std::begin(kSmall));
+        } else if (tens != std::end(kTens)) {
+            current += 20 + 10 * static_cast<std::uint64_t>(tens - std::begin(kTens));
+        } else if (part == L"hundred") {
+            current = (current ? current : 1) * 100;
+        } else if (part == L"thousand") {
+            total += (current ? current : 1) * 1000;
+            current = 0;
+        } else {
+            return std::nullopt;
+        }
+        any = true;
+        if (end == lower.size()) break;
+    }
+    const auto value = total + current;
+    if (!any || value > 999999) return std::nullopt;
+    return std::to_wstring(value);
 }
 
 bool SpecialConversions::MayEndEnglish(wchar_t c, SpecialConversionOptions options) const noexcept {

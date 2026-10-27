@@ -36,6 +36,10 @@ struct CapitalizationInfo {
 
 struct ConversionOptions {
     bool correctionEnabled{true};
+    // A word typed with a capital mid-sentence may be put right too
+    // (Cjicago: Chicago). Off: such a word stays as typed, as it may be a
+    // name no list knows.
+    bool capitalizedCorrection{false};
     bool commonMisspellingsEnabled{true};
     bool contextSuggestionsEnabled{true};
     bool completionEnabled{true};
@@ -77,6 +81,15 @@ public:
     [[nodiscard]] virtual std::optional<std::wstring> Recheck(std::wstring_view /*word*/,
                                                               std::wstring_view /*precedingText*/,
                                                               std::wstring_view /*followingText*/) const {
+        return std::nullopt;
+    }
+    // A word Space put right (`applied` for `typed`), looked at again once
+    // the word after it is known: another word one slip from what was
+    // typed, when the words around it say so far more clearly (do it gain
+    // tomorrow: again). Nothing when the fix fits.
+    [[nodiscard]] virtual std::optional<std::wstring> Revise(std::wstring_view /*typed*/, std::wstring_view /*applied*/,
+                                                             std::wstring_view /*precedingText*/,
+                                                             std::wstring_view /*followingText*/) const {
         return std::nullopt;
     }
     // Re-reads the UserDictionary the engine was created with, after it was

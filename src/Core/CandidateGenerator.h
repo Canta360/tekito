@@ -52,6 +52,9 @@ public:
     // goes with the words before and after it far better.
     [[nodiscard]] std::optional<std::wstring> Recheck(std::wstring_view word, std::wstring_view context,
                                                       std::wstring_view followingContext) const;
+    // IConversionEngine::Revise.
+    [[nodiscard]] std::optional<std::wstring> Revise(std::wstring_view typed, std::wstring_view applied,
+                                                     std::wstring_view context, std::wstring_view followingContext) const;
 
 private:
     // `flags` for `candidate`, except that a correction the user undid for
@@ -66,6 +69,11 @@ private:
                            std::wstring_view rawText, std::wstring_view lower, bool exact,
                            const ConversionOptions& options) const;
     // "the the": the second one taken out, or offered to be.
+    // A capitalized word no list knows (Cjicago, Sunddays) one slip from
+    // the only known capitalized word that close (Chicago, Sundays): that
+    // word on Space, the word as typed still offered.
+    void ApplyCapitalizedSlip(std::vector<Candidate>& output, std::wstring_view rawText, std::wstring_view lower,
+                              bool exact) const;
     void ApplyDoubledWord(std::vector<Candidate>& output, std::wstring_view rawText, std::wstring_view lower,
                           std::wstring_view context, const ConversionOptions& options) const;
     // Words in the other spelling (colour, for American) offered in the one
