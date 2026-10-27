@@ -23,6 +23,7 @@ LANGUAGE = {
     "phrase": "en",
     "pronunciation": "en",
     "proper-nouns": "en",
+    "english-names": "en",
     "qwerty-typo-catalog": "en",
     "slang": "en",
     "social-expression": "en",
@@ -36,10 +37,13 @@ LANGUAGE = {
     "japanese-romaji": "ja",
     "japanese-slang": "ja",
     "japanese-wikimedia": "ja",
+    "japanese-names": "ja",
+    "japanese-jmdict": "ja",
     "japanese-wiktionary": "ja",
     "japanese-wordnet": "ja",
     "japanese-zipcode": "ja",
     "special-conversions": "common",
+    "kaomoji": "common",
 }
 
 

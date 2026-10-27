@@ -32,6 +32,8 @@ data/ja/japanese-core/
 # Built by scripts/ja/build-japanese-packs.py from the words of Wikipedia
 # article titles and Wiktionary's set phrases
 data/ja/japanese-wikimedia/
+data/ja/japanese-names/
+data/ja/japanese-jmdict/
 # Built by scripts/ja/build-japanese-english-pack.py from JMdict, Japanese
 # Wikipedia and the Leipzig corpora
 data/ja/japanese-english/
@@ -42,6 +44,9 @@ data/ja/japanese-lm/
 data/ja/japanese-reranker/
 # Built by scripts/ja/build-japanese-slips-pack.py from the zenz-v2.5 readings
 data/ja/japanese-slips/
+# Built by scripts/ja/build-japanese-topics-pack.py from word vectors trained
+# on the zenz-v2.5 dataset (scripts/ja/train-japanese-topics.py).
+data/ja/japanese-topics/
 # Built by scripts/ja/build-japanese-meaning-packs.py from the slang list,
 # Wiktionary and WordNet
 data/ja/japanese-slang/
@@ -49,3 +54,4 @@ data/ja/japanese-wiktionary/
 data/ja/japanese-wordnet/
 data/ja/english-meanings-ja/
 data/ja/japanese-meanings-en/
+data/en/english-names/

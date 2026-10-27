@@ -43,6 +43,10 @@ Usage:
   python scripts/ja/build-japanese-packs.py --mozc ... --commit ... --out tests/data/ja/japanese-mini \\
       --sentences tests/data/ja/japanese-mini-sentences.txt
 
+With --names-words / --names-out it also builds japanese-names (proper
+nouns from Wikidata, CC0), and with --jmdict-words / --jmdict-out
+japanese-jmdict (set phrases and names from JMdict and JMnedict, CC BY-SA
+4.0), each a pack of its own as japanese-wikimedia is.
 With --wikimedia-words <words.tsv>... --wikimedia-out <dir> it also builds
 japanese-wikimedia: the words of Wikipedia article titles
 (build-japanese-wikipedia-words.py) and the set phrases of Wiktionary
@@ -436,13 +440,21 @@ def main() -> None:
                         help="words of Wikipedia titles (build-japanese-wikipedia-words.py) and Wiktionary's "
                              "set phrases (build-japanese-wiktionary-phrases.py) for the japanese-wikimedia pack")
     parser.add_argument("--wikimedia-out", type=Path, help="where to build the japanese-wikimedia pack")
+    parser.add_argument("--names-words", type=Path, nargs="+",
+                        help="proper nouns from Wikidata (build-japanese-names-words.py) for japanese-names")
+    parser.add_argument("--names-out", type=Path, help="where to build the japanese-names pack")
+    parser.add_argument("--jmdict-words", type=Path, nargs="+",
+                        help="set phrases and names from JMdict and JMnedict (build-japanese-jmdict-words.py) "
+                             "for japanese-jmdict")
+    parser.add_argument("--jmdict-out", type=Path, help="where to build the japanese-jmdict pack")
     args = parser.parse_args()
 
     entries = read_entries(args.mozc)
     pos_names = read_pos_names(args.mozc)
     entries.extend(read_slang_entries(pos_names, entries))
-    if bool(args.wikimedia_words) != bool(args.wikimedia_out):
-        parser.error("--wikimedia-words and --wikimedia-out go together")
+    for name in ("wikimedia", "names", "jmdict"):
+        if bool(getattr(args, f"{name}_words")) != bool(getattr(args, f"{name}_out")):
+            parser.error(f"--{name}-words and --{name}-out go together")
     size, costs = read_matrix(args.mozc)
     if size != len(pos_names):
         raise ValueError("id.def and the connection matrix disagree on the id count")
@@ -490,44 +502,85 @@ def main() -> None:
                                            encoding="utf-8", newline="\n")
     report = {"dictionary": dictionary, "matrix": matrix}
     if args.wikimedia_words:
-        report["wikimedia"] = build_wikimedia_pack(args.wikimedia_words, args.wikimedia_out, pos_names,
-                                                   entries, unknown_id)
+        report["wikimedia"] = build_added_pack(args.wikimedia_words, args.wikimedia_out, pos_names,
+                                               entries, unknown_id, WIKIMEDIA_PACK)
+    if args.names_words:
+        report["names"] = build_added_pack(args.names_words, args.names_out, pos_names, entries, unknown_id,
+                                           NAMES_PACK)
+    if args.jmdict_words:
+        report["jmdict"] = build_added_pack(args.jmdict_words, args.jmdict_out, pos_names, entries, unknown_id,
+                                            JMDICT_PACK)
     print(json.dumps(report, indent=2))
 
 
-def build_wikimedia_pack(words: list[Path], out: Path, pos_names: list[str], core_entries, unknown_id: int) -> dict:
-    """japanese-wikimedia: words TEKITO adds to japanese-core's, a pack of
-    their own for their license, with the same reading codes."""
+# The packs of words TEKITO adds to japanese-core's, each a pack of its own
+# for its license.
+WIKIMEDIA_PACK = {
+    "pack_id": "japanese-wikimedia",
+    "display_name": "Japanese Words from Wikipedia and Wiktionary",
+    "version": "jawiki-2026.10",
+    "license": "CC-BY-SA-4.0",
+    "source": "https://dumps.wikimedia.org/jawiki/ (pages-articles, langlinks), "
+              "https://kaikki.org/ (English and Japanese Wiktionary), KANJIDIC2",
+    "notice": "japanese-wikimedia holds words of Japanese Wikipedia article titles and their readings, from "
+              "Japanese Wikipedia (https://ja.wikipedia.org/), by Wikipedia contributors, and Japanese set "
+              "phrases (四字熟語, 慣用句, ことわざ) and their readings, from the English and the Japanese "
+              "Wiktionary (https://en.wiktionary.org/, https://ja.wiktionary.org/), by Wiktionary "
+              "contributors, as extracted by wiktextract (https://kaikki.org/), all under CC BY-SA 4.0 "
+              "(https://creativecommons.org/licenses/by-sa/4.0/). The kanji readings that check them come "
+              "from KANJIDIC2 (Electronic Dictionary Research and Development Group, https://www.edrdg.org/, "
+              "CC BY-SA 4.0). This pack is shared under CC BY-SA 4.0.\n",
+}
+NAMES_PACK = {
+    "pack_id": "japanese-names",
+    "display_name": "Proper Nouns from Wikidata",
+    "version": "wikidata-2026.10",
+    "license": "CC0-1.0",
+    "source": "https://www.wikidata.org/ (Japanese labels, P1814 name in kana, P31, sitelinks), "
+              "queried at https://qlever.dev/",
+    "notice": "japanese-names holds proper nouns (places, people, organizations and works) and their "
+              "readings from Wikidata (https://www.wikidata.org/), by Wikidata contributors, under CC0 1.0 "
+              "(https://creativecommons.org/publicdomain/zero/1.0/).\n",
+}
+JMDICT_PACK = {
+    "pack_id": "japanese-jmdict",
+    "display_name": "Set Phrases and Names from JMdict and JMnedict",
+    "version": "jmdict-2026.10",
+    "license": "CC-BY-SA-4.0",
+    "source": "http://ftp.edrdg.org/pub/Nihongo/JMdict_e.gz, http://ftp.edrdg.org/pub/Nihongo/JMnedict.xml.gz",
+    "notice": "japanese-jmdict holds Japanese set phrases (四字熟語, idioms, proverbs) from JMdict, and "
+              "place, station, company, organization and family names from JMnedict, with their readings. "
+              "JMdict and JMnedict are the property of the Electronic Dictionary Research and Development "
+              "Group (https://www.edrdg.org/), used in conformance with the Group's licence "
+              "(https://www.edrdg.org/edrdg/licence.html), under CC BY-SA 4.0 "
+              "(https://creativecommons.org/licenses/by-sa/4.0/). This pack is shared under CC BY-SA 4.0.\n",
+}
+
+
+def build_added_pack(words: list[Path], out: Path, pos_names: list[str], core_entries, unknown_id: int,
+                     meta: dict) -> dict:
+    """Words TEKITO adds to japanese-core's (as build-japanese-wikipedia-words.py
+    lists them), a pack of their own, with the same reading codes."""
     chars = reading_chars(core_entries)
     known = set(chars)
     entries = [entry for entry in read_wikipedia_entries(words, pos_names, core_entries)
                if set(entry[0]) <= known]
     out.mkdir(parents=True, exist_ok=True)
     dictionary = build_dictionary(entries, unknown_id, out / "dictionary.bin", chars)
-    (out / "NOTICE").write_text(
-        "japanese-wikimedia holds words of Japanese Wikipedia article titles and their readings, from "
-        "Japanese Wikipedia (https://ja.wikipedia.org/), by Wikipedia contributors, and Japanese set "
-        "phrases (四字熟語, 慣用句, ことわざ) and their readings, from the English and the Japanese "
-        "Wiktionary (https://en.wiktionary.org/, https://ja.wiktionary.org/), by Wiktionary "
-        "contributors, as extracted by wiktextract (https://kaikki.org/), all under CC BY-SA 4.0 "
-        "(https://creativecommons.org/licenses/by-sa/4.0/). The kanji readings that check them come "
-        "from KANJIDIC2 (Electronic Dictionary Research and Development Group, https://www.edrdg.org/, "
-        "CC BY-SA 4.0). This pack is shared under CC BY-SA 4.0.\n",
-        encoding="utf-8", newline="\n")
+    (out / "NOTICE").write_text(meta["notice"], encoding="utf-8", newline="\n")
     manifest = {
-        "pack_id": "japanese-wikimedia",
-        "display_name": "Japanese Words from Wikipedia and Wiktionary",
+        "pack_id": meta["pack_id"],
+        "display_name": meta["display_name"],
         "schema_version": 1,
-        "version": "jawiki-2026.10",
+        "version": meta["version"],
         "language": "ja-JP",
         "type": "japanese-dictionary",
         "format": "ja-dict-v1",
         "file": "dictionary.bin",
         "entry_count": dictionary["words"],
         "sha256": {"file": sha256(out / "dictionary.bin")},
-        "license": "CC-BY-SA-4.0",
-        "source": "https://dumps.wikimedia.org/jawiki/ (pages-articles, langlinks), "
-                  "https://kaikki.org/ (English and Japanese Wiktionary), KANJIDIC2",
+        "license": meta["license"],
+        "source": meta["source"],
         "notice_file": "NOTICE",
     }
     (out / "manifest.json").write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n",

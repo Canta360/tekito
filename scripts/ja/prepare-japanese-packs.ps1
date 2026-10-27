@@ -41,6 +41,14 @@ $listed = @("words.tsv", "phrases.tsv") | ForEach-Object { Join-Path $repoRoot "
 $extra = if ($listed) {
     @("--wikimedia-words") + @($listed) + @("--wikimedia-out", (Join-Path (Split-Path $Output -Parent) "japanese-wikimedia"))
 } else { @() }
+# And japanese-names (Wikidata) and japanese-jmdict (JMdict, JMnedict), when
+# listed (scripts\ja\build-japanese-names-words.py, build-japanese-jmdict-words.py).
+foreach ($pack in @(@("names", "wikidata\names_words.tsv"), @("jmdict", "jmdict\jmdict_words.tsv"))) {
+    $words = Join-Path $repoRoot ".cache\tekito-data\$($pack[1])"
+    if (Test-Path $words) {
+        $extra += @("--$($pack[0])-words", $words, "--$($pack[0])-out", (Join-Path (Split-Path $Output -Parent) "japanese-$($pack[0])"))
+    }
+}
 python (Join-Path $PSScriptRoot "build-japanese-packs.py") --mozc $mozc --commit $Commit --out $Output @extra
 if ($LASTEXITCODE -ne 0) { throw "build-japanese-packs.py failed with exit code $LASTEXITCODE" }
 Write-Host "Built $Output"

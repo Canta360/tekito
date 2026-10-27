@@ -16,6 +16,7 @@ download that setup fetches when Japanese is chosen.
 | `phrase` | Which words follow which | Leipzig Corpora, English news 2025 | CC BY 4.0 |
 | `dictionary-display` | Short definitions and parts of speech | WordNet 3.0 | WordNet license |
 | `proper-nouns` | Countries, regions, cities of 15,000+ people, continents and seas | GeoNames | CC BY 4.0 |
+| `english-names` | Names for English typing (people, companies, brands, works and places, and the words of those names), offered with their capitals and never taken for typos | Wikidata English and multilingual labels of items with 15 or more sitelinks, leaving out ordinary English words (`scripts/en/build-english-names-pack.py`) | CC0 1.0 |
 | `slang` | Chat abbreviations and informal spellings, kept as typed | Written for TEKITO (`scripts/en/slang-seeds.tsv`) | TEKITO (see `LICENSE.md`) |
 | `wiktionary-slang` | More slang and abbreviations | Wiktionary via kaikki.org | CC BY-SA 4.0 |
 | `pronunciation` | Pronunciations | CMU Pronouncing Dictionary | CMUdict license |
@@ -23,10 +24,13 @@ download that setup fetches when Japanese is chosen.
 | `social-expression` | Emoji, emoticons, kaomoji, symbols and short forms for chat words | Written for TEKITO (`scripts/en/social-expression-seeds.tsv`) | TEKITO (see `LICENSE.md`) |
 | `japanese-phonetic` | English words from how they sound in romaji ("konpyuutaa" → computer) | Generated from CMUdict; words chosen by Leipzig frequency | CMUdict license |
 | `special-conversions` | Dates and times for words like "today" and "きょう", symbols by ASCII spelling ("->" → →) or Japanese reading ("やじるし" → →), emoji by Japanese reading ("ねこ" → 🐱), Japanese emoticons ("にこにこ" → (^^)), single kanji by reading, and the kanji for numbers | Written for TEKITO (`scripts/build-special-conversions.py`); Japanese symbols, emoji, emoticons and single kanji from Mozc (`src/data/symbol`, `src/data/emoji`, `src/data/emoticon`, `src/data/single_kanji`) | TEKITO (see `LICENSE.md`), BSD-3-Clause, Unicode License V3 (emoji) |
+| `kaomoji` | More kaomoji (顔文字) and one-line ASCII art by reading (にこにこ, ちゃぶだい, がっくり); かおもじ and あすきーあーと list them all | Collected and written for TEKITO (`scripts/build-kaomoji-pack.py`) | TEKITO (see `LICENSE.md`) |
 | `qwerty-typo-catalog` | Synthetic typos of common words, for evaluation only | Generated for TEKITO | TEKITO (see `LICENSE.md`) |
 | `japanese-romaji` | How typed keys become kana in Japanese input | Written for TEKITO (`scripts/ja/build-japanese-romaji.py`) | TEKITO (see `LICENSE.md`) |
 | `japanese-core` | Words, readings and how they join, for kana-kanji conversion | Mozc OSS dictionary (IPAdic, Okinawa dictionary) plus TEKITO slang entries | IPAdic license, BSD-3-Clause, TEKITO source license |
 | `japanese-wikimedia` | More words for kana-kanji conversion: names of people, places, organizations and works, terms, and set phrases (四字熟語, 慣用句, ことわざ) | Japanese Wikipedia article titles and the readings their opening sentences give; set phrases of the English and Japanese Wiktionary (wiktextract); readings checked with KANJIDIC2 | CC BY-SA 4.0 |
+| `japanese-names` | Proper nouns for kana-kanji conversion: places, people, organizations and works, Japanese and foreign (ボストン, ドナルド・トランプ) | Wikidata: Japanese labels with their name in kana (P1814), and labels all in katakana (`scripts/ja/build-japanese-names-words.py`) | CC0 1.0 |
+| `japanese-jmdict` | Set phrases (四字熟語, idioms, proverbs) and place, station, company, organization and family names for kana-kanji conversion | JMdict and JMnedict (EDRDG) (`scripts/ja/build-japanese-jmdict-words.py`) | CC BY-SA 4.0 (kept as its own pack) |
 | `japanese-lm` | Which words go together, for conversion to prefer them (neighbor pairs, and content words of one sentence) | Leipzig Corpora Collection, Japanese news crawl 2019 and Wikipedia 2021 | CC BY 4.0 |
 | `japanese-reranker` | A small language model of word pieces that checks the likeliest converted sentences as a whole and picks the one that reads best | Trained for TEKITO (`scripts/ja/train-japanese-wordlm.py`, `scripts/ja/build-japanese-reranker-pack.py`) on the zenz-v2.5 dataset's llm-jp-corpus-v3 part; holds weights and word pieces only, no sentences | TEKITO (see `LICENSE.md`); dataset ODC-BY 1.0 |
 | `japanese-slips` | What reads as Japanese kana (kana n-grams and a small kana LSTM), to find slips in typed keys before conversion | Computed for TEKITO (`scripts/ja/build-japanese-slips-pack.py`) from the zenz-v2.5 dataset's readings; holds statistics and weights only, no sentences | TEKITO (see `LICENSE.md`); dataset ODC-BY 1.0 |
@@ -81,7 +85,10 @@ and runs `build-japanese-packs.py`, which adds the curated terms from
 Wikipedia article and langlinks dumps, `scripts\ja\build-japanese-wiktionary-phrases.py`
 from the Wiktionary extracts, both checked with KANJIDIC2), it also builds
 `japanese-wikimedia`, the words TEKITO adds to the dictionary's; a pack of
-their own, for their license. Without japanese-core, Japanese input types kana
+their own, for their license. Likewise `japanese-names` (from Wikidata, when
+`scripts\ja\build-japanese-names-words.py` has listed them) and
+`japanese-jmdict` (from JMdict and JMnedict, listed by
+`scripts\ja\build-japanese-jmdict-words.py`). Without japanese-core, Japanese input types kana
 but cannot convert to kanji. The pack also carries `pos.tsv`, the part of
 speech each kind of word a user adds in Settings takes, and the one digits
 typed in Japanese take so counters join them (3こ -> 3個); a pack built before

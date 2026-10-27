@@ -1,0 +1,17 @@
+{
+  "pack_id": "kaomoji",
+  "display_name": "Kaomoji and ASCII Art",
+  "schema_version": 1,
+  "version": "2026.10",
+  "language": "ja-JP+en-US",
+  "type": "special-conversions",
+  "format": "rules-tsv-v1",
+  "file": "rules.tsv",
+  "entry_count": 2147,
+  "sha256": {
+    "file": "235ED3C33D8400A1781F87372A607C4081000D97F8F16C48CA6FF367DF9B3788"
+  },
+  "license": "TEKITO-OWNED",
+  "source": "scripts/build-kaomoji-pack.py",
+  "notice_file": "NOTICE"
+}
