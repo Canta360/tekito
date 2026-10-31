@@ -3021,6 +3021,14 @@ void JapaneseComposer::SettleChunk() {
     lastChunkEnglish_ = false;
     // Japanese settled as typed (Enter) stays as typed.
     if (asTyped && !chunk.isEnglish) chunk.locked = chunk.picked = true;
+    // English run into the Japanese (meetingde: meetingで) was split off
+    // as it is: the sentence check and the run converted again on Enter,
+    // which read only kana, leave it.
+    if (!chunk.isEnglish && std::any_of(text.begin(), text.end(), [](wchar_t c) {
+            return (c >= L'a' && c <= L'z') || (c >= L'A' && c <= L'Z');
+        })) {
+        chunk.locked = true;
+    }
     // As it was taken (a candidate picked stays).
     (chunk.isEnglish ? chunk.english : chunk.japanese) = text;
     // What was taken comes first.

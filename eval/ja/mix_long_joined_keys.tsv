@@ -1,0 +1,220 @@
+fresh-long-particle	1	kyouno meetingde releaseno nitteiwo kimemasu.	今日のmeetingでreleaseの日程を決めます。
+fresh-long-particle	2	kono branchwo mainni mergeshitekara deployshitekudasai.	このbranchをmainにmergeしてからdeployしてください。
+fresh-long-particle	3	sakkino bugha mou fixshitanode testwo mouichido mawashimasu.	さっきのbugはもうfixしたのでtestをもう一度回します。
+fresh-long-particle	4	ashitano presentationno slidewo googledoraibuni ageteokimashita.	明日のpresentationのslideをGoogleドライブに上げておきました。
+fresh-long-particle	5	clientkarano feedbackwo yonde, shiyouwo sukoshi kaerukotoni shimashita.	clientからのfeedbackを読んで、仕様を少し変えることにしました。
+fresh-long-particle	6	slackde kyouyuushita documentni mewo tooshiteoite kudasai.	Slackで共有したdocumentに目を通しておいてください。
+fresh-long-particle	7	raishuuno schedulega mada kimatteinainode, chouseiwo onegaishimasu.	来週のscheduleがまだ決まっていないので、調整をお願いします。
+fresh-long-particle	8	serverno fukaga takainode, cachewo irete yousuwo mimasu.	serverの負荷が高いので、cacheを入れて様子を見ます。
+fresh-long-particle	9	databaseno backupha maibann jidoude totteimasu.	databaseのbackupは毎晩自動で取っています。
+fresh-long-particle	10	atarashii featureno designwo figmade tsukurinaoshimashita.	新しいfeatureのdesignをFigmaで作り直しました。
+fresh-long-particle	11	reviewga owattara, sono pull* requestwo closeshitekudasai.	reviewが終わったら、そのpull requestをcloseしてください。
+fresh-long-particle	12	konkaino updatede loginno gamenga ookiku kawarimasu.	今回のupdateでloginの画面が大きく変わります。
+fresh-long-particle	13	errorno logwo miruto, timeoutga genninnno youdesu.	errorのlogを見ると、timeoutが原因のようです。
+fresh-long-particle	14	shuumatsuni pythonde scriptwo kaite, sagyouwo jidoukashimashita.	週末にPythonでscriptを書いて、作業を自動化しました。
+fresh-long-particle	15	deadlineni maniawanaikamo shirenainode, prioritywo minaoshimashou.	deadlineに間に合わないかもしれないので、priorityを見直しましょう。
+fresh-long-particle	16	zoomno linkwo calendarni hatteokimashita.	Zoomのlinkをcalendarに貼っておきました。
+fresh-long-particle	17	kono issueha supportno tantouni mawashitekudasai.	このissueはsupportの担当に回してください。
+fresh-long-particle	18	sampleno codewo ugokashitemitara, suguni crashshimashita.	sampleのcodeを動かしてみたら、すぐにcrashしました。
+fresh-long-particle	19	projectno memberga fuetanode, channelwo wakerukotoni shimashita.	projectのmemberが増えたので、channelを分けることにしました。
+fresh-long-particle	20	kinouno sessionha totemo sankouni nattanode, recordingwo kyouyuushimasu.	昨日のsessionはとても参考になったので、recordingを共有します。
+fresh-long-particle	21	browserno cachewo keshitekara, mouichido reloadshitemitekudasai.	browserのcacheを消してから、もう一度reloadしてみてください。
+fresh-long-particle	22	sono kenha emaildehanaku chatde soudanshimashou.	その件はemailではなくchatで相談しましょう。
+fresh-long-particle	23	testno coveragega sagatteirunode, tsuikade casewo kakimasu.	testのcoverageが下がっているので、追加でcaseを書きます。
+fresh-long-particle	24	maiasano standupde susumiguaiwo kyouyuushiteimasu.	毎朝のstandupで進み具合を共有しています。
+fresh-long-particle	25	contractno naiyouwo legalni checkshitemoraimasu.	contractの内容をlegalにcheckしてもらいます。
+fresh-long-particle	26	kono pageha mobilede miruto hyoujiga kuzuremasu.	このpageはmobileで見ると表示が崩れます。
+fresh-long-particle	27	versionwo agetara, pluginga ugokanaku narimashita.	versionを上げたら、pluginが動かなくなりました。	versionをあげたら、pluginが動かなくなりました。
+fresh-long-particle	28	natsuyasumino maeni budgetno shinseiwo dashiteokitaidesu.	夏休みの前にbudgetの申請を出しておきたいです。
+fresh-long-particle	29	marketingno teamto isshoni campaignno anwo kangaeteimasu.	marketingのteamと一緒にcampaignの案を考えています。
+fresh-long-particle	30	kyouha remotede hataraiteirunode, callde hanashimashou.	今日はremoteで働いているので、callで話しましょう。
+fresh-long-particle	31	kono tableno columnwo hitotsu fuyashite hoshiidesu.	このtableのcolumnを一つ増やしてほしいです。
+fresh-long-particle	32	passwordwo wasuretanode, resetno mailwo okutte moraemasuka.	passwordを忘れたので、resetのmailを送ってもらえますか。
+fresh-long-particle	33	dashboardno suujiga kinoukara koushinsareteimasenn.	dashboardの数字が昨日から更新されていません。
+fresh-long-particle	34	kono kinouha betananode, feedbackwo kangeishimasu.	この機能はbetaなので、feedbackを歓迎します。
+fresh-long-particle	35	onboardingno shiryouwo atarashii hitomukeni kakinaoshimashita.	onboardingの資料を新しい人向けに書き直しました。
+fresh-long-particle	36	kinnyoubimadeni draftwo okurunode, commentwo onegaishimasu.	金曜日までにdraftを送るので、commentをお願いします。
+fresh-long-particle	37	networkga osoi seide, uploadni jikanga kakatteimasu.	networkが遅いせいで、uploadに時間がかかっています。
+fresh-long-particle	38	teireino agendani konkaino incidentwo ireteokimasu.	定例のagendaに今回のincidentを入れておきます。
+fresh-long-particle	39	kono siteha searchno kekkaga totemo miyasuidesu.	このsiteはsearchの結果がとても見やすいです。
+fresh-long-particle	40	shopno openni awasete salewo hajimeru yoteidesu.	shopのopenに合わせてsaleを始める予定です。
+fresh-long-particle	41	atarashii laptopga todoitanode, kankyouno setupwo shiteimasu.	新しいlaptopが届いたので、環境のsetupをしています。
+fresh-long-particle	42	kono taskha raishuuno sprintni mawashitemo iidesuka.	このtaskは来週のsprintに回してもいいですか。
+fresh-long-particle	43	excelno filewo hirakuto, mojiga bakete shimaimasu.	Excelのfileを開くと、文字が化けてしまいます。
+fresh-long-particle	44	interviewno nitteiga kimattara, roomwo yoyakushimasu.	interviewの日程が決まったら、roomを予約します。
+fresh-long-particle	45	omona targetha nijuudaino joseidesu.	主なtargetは二十代の女性です。	主なtargetは20代の女性です。
+fresh-long-particle	46	kono plandato, costga takasugiruto omoimasu.	このplanだと、costが高すぎると思います。
+fresh-long-particle	47	sizega awanakattanode, betsuno colorni koukanshimashita.	sizeが合わなかったので、別のcolorに交換しました。
+fresh-long-particle	48	menuni aru atarashii itemwo tameshite mimashita.	menuにある新しいitemを試してみました。
+fresh-long-particle	49	tutorialwo saigomade yareba, kihonha wakarimasu.	tutorialを最後までやれば、基本は分かります。	tutorialを最後までやれば、基本はわかります。
+fresh-long-particle	50	kono gameha onlinede tomodachito asobemasu.	このgameはonlineで友達と遊べます。
+fresh-long-particle	51	raigetsukara officeno bashoga kawarimasu.	来月からofficeの場所が変わります。
+fresh-long-particle	52	buchouno approvalga detanode, orderwo susumemasu.	部長のapprovalが出たので、orderを進めます。
+fresh-long-particle	53	kono stepwo tobasuto, installni shippaishimasu.	このstepを飛ばすと、installに失敗します。
+fresh-long-particle	54	storyno junbanwo irekaetara, hanashiga wakariyasuku narimashita.	storyの順番を入れ替えたら、話が分かりやすくなりました。	storyの順番を入れ替えたら、話がわかりやすくなりました。
+fresh-long-particle	55	camerano setteiwo kaetara, photoga akaruku narimashita.	cameraの設定を変えたら、photoが明るくなりました。
+fresh-long-particle	56	kono questionniha atode matomete kotaemasu.	このquestionには後でまとめて答えます。
+fresh-long-particle	57	trainga okureteirunode, meetingni sukoshi okuremasu.	trainが遅れているので、meetingに少し遅れます。
+fresh-long-particle	58	hotelno yoyakuha webde sumasemashita.	hotelの予約はwebで済ませました。
+fresh-long-particle	59	kono formni namaeto addresswo iretekudasai.	このformに名前とaddressを入れてください。
+fresh-long-particle	60	trafficga fuetanode, serverwo ichidai tashimashita.	trafficが増えたので、serverを一台足しました。	trafficが増えたので、serverを1台足しました。
+fresh-long-particle	61	kono commandwo utsuto, zenbuno containerga tomarimasu.	このcommandを打つと、全部のcontainerが止まります。
+fresh-long-particle	62	dockerno imagega ookisugite, buildni jikanga kakarimasu.	Dockerのimageが大きすぎて、buildに時間がかかります。
+fresh-long-particle	63	raishuuno eventde demowo miseru yoteidesu.	来週のeventでdemoを見せる予定です。
+fresh-long-particle	64	kono categoryno uriageha sengetsuyori nobiteimasu.	このcategoryの売り上げは先月より伸びています。	このcategoryの売上げは先月より伸びています。	このcategoryの売上は先月より伸びています。
+fresh-long-particle	65	phoneno denchiga suguni kirerunode, atarashii casewo kaimashita.	phoneの電池がすぐに切れるので、新しいcaseを買いました。
+fresh-long-particle	66	kono listkara sukina optionwo erandekudasai.	このlistから好きなoptionを選んでください。
+fresh-long-particle	67	recipeno toorini tsukuttanoni, ajiga zenzenn chigaimasu.	recipeの通りに作ったのに、味が全然違います。
+fresh-long-particle	68	workshopno sankashani surveywo okurimashita.	workshopの参加者にsurveyを送りました。
+fresh-long-particle	69	kono modelha seidoga takaikeredo, speedga osoidesu.	このmodelは精度が高いけれど、speedが遅いです。
+fresh-long-particle	70	atarashii logono colornitsuite ikenwo kudasai.	新しいlogoのcolorについて意見をください。
+fresh-long-particle	71	konnyano matchha tomodachito barde miru yoteidesu.	今夜のmatchは友達とbarで見る予定です。
+fresh-long-particle	72	musicwo kikinagara sagyousuruto shuuchuudekimasu.	musicを聞きながら作業すると集中できます。
+fresh-long-particle	73	kono projectno goalwo mouichido kakuninshimashou.	このprojectのgoalをもう一度確認しましょう。
+fresh-long-particle	74	releaseno noteni henkoutenwo matometeokimashita.	releaseのnoteに変更点をまとめておきました。
+fresh-long-particle	75	userno koewo atsumerutameni, formwo tsukurimashita.	userの声を集めるために、formを作りました。
+fresh-long-particle	76	kono keywo osuto, windowga tojimasu.	このkeyを押すと、windowが閉じます。
+fresh-long-particle	77	printerno kamiga kireteirunode, hojuushitekudasai.	printerの紙が切れているので、補充してください。
+fresh-long-particle	78	nenmatsuha yasumiga ooinode, deliveryno hiwo hayamemasu.	年末は休みが多いので、deliveryの日を早めます。
+fresh-long-particle	79	kono bookha beginnernimo osusumedesu.	このbookはbeginnerにもおすすめです。	このbookはbeginnerにもお勧めです。
+fresh-long-particle	80	courseno tochuudemo canceldekimasuka.	courseの途中でもcancelできますか。
+fresh-long-particle	81	jibunnno profileno shashinwo kaemashita.	自分のprofileの写真を変えました。
+fresh-long-particle	82	kono videoha jimakuwo onni suruto miyasuidesu.	このvideoは字幕をonにすると見やすいです。
+fresh-long-particle	83	accountwo tsukurutokini, phoneno bangouga hitsuyoudesu.	accountを作るときに、phoneの番号が必要です。	accountを作る時に、phoneの番号が必要です。
+fresh-long-particle	84	queueni tamatta jobwo junbannni shorishiteimasu.	queueに溜まったjobを順番に処理しています。	queueにたまったjobを順番に処理しています。
+fresh-long-particle	85	kono functionha hikisuuga oosugite yominikuidesu.	このfunctionは引数が多すぎて読みにくいです。
+fresh-long-particle	86	reportno formatwo touitsushite hoshiito iwaremashita.	reportのformatを統一してほしいと言われました。
+fresh-long-particle	87	atarashii policynitsuite managerkara setsumeiga arimashita.	新しいpolicyについてmanagerから説明がありました。
+fresh-long-particle	88	kono storedeha cardshika tsukaemasenn.	このstoreではcardしか使えません。
+fresh-long-particle	89	clienttono callga nagabiitanode, lunchwo tabesokonemashita.	clientとのcallが長引いたので、lunchを食べ損ねました。
+fresh-long-particle	90	raishuuha trainingno tameni oosakahe ikimasu.	来週はtrainingのために大阪へ行きます。
+fresh-long-particle	91	kono softwareha freede tsukaerunoga benridesu.	このsoftwareはfreeで使えるのが便利です。
+fresh-long-particle	92	sensorno ataiga okashiinode, devicewo saikidoushimashita.	sensorの値がおかしいので、deviceを再起動しました。
+fresh-long-particle	93	kono graphwo miruto, trendga hakkiri wakarimasu.	このgraphを見ると、trendがはっきり分かります。	このgraphを見ると、trendがはっきりわかります。
+fresh-long-particle	94	partyno junbiha checkno listwo tsukutte susumeteimasu.	partyの準備はcheckのlistを作って進めています。
+fresh-long-particle	95	kono ruleha wakarinikuinode, reiwo tashimashou.	このruleは分かりにくいので、例を足しましょう。	このruleはわかりにくいので、例を足しましょう。
+fresh-long-particle	96	historywo mireba, darega itsu kaetaka wakarimasu.	historyを見れば、誰がいつ変えたか分かります。	historyを見れば、誰がいつ変えたかわかります。
+fresh-long-particle	97	templatewo tsukaeba, maikai onaji katachide kakemasu.	templateを使えば、毎回同じ形で書けます。
+fresh-long-particle	98	kono buttonno ichiga wakarinikuitoiu koega arimashita.	このbuttonの位置が分かりにくいという声がありました。	このbuttonの位置がわかりにくいという声がありました。
+fresh-long-particle	99	projectorno choushiga waruinode, betsuno roomwo tsukaimashou.	projectorの調子が悪いので、別のroomを使いましょう。
+fresh-long-particle	100	kyouno topicha rainennno strategynitsuitedesu.	今日のtopicは来年のstrategyについてです。
+fresh-long-particle	101	coffeewo nomisugite, yoruni nemuremasendeshita.	coffeeを飲みすぎて、夜に眠れませんでした。
+fresh-long-particle	102	kono brandno shoesha karukute arukiyasuidesu.	このbrandのshoesは軽くて歩きやすいです。
+fresh-long-particle	103	weatherno appde ashitano amewo kakuninshimashita.	weatherのappで明日の雨を確認しました。
+fresh-long-particle	104	networkno setteiha adminshika kaeraremasenn.	networkの設定はadminしか変えられません。
+fresh-long-particle	105	kono chartha kyonennno datawo motoni tsukurimashita.	このchartは去年のdataをもとに作りました。
+fresh-long-particle	106	newsno sitede atarashii productno kijiwo yomimashita.	newsのsiteで新しいproductの記事を読みました。
+fresh-long-particle	107	kono folderni haitteiru fileha zenbu keshite daijoubudesu.	このfolderに入っているfileは全部消して大丈夫です。
+fresh-long-particle	108	contentno ryouga oosugirunode, sectionwo wakemashita.	contentの量が多すぎるので、sectionを分けました。
+fresh-long-particle	109	kono messageha jidoude okurareteimasu.	このmessageは自動で送られています。
+fresh-long-particle	110	bossni tanomareta taskwo yuugatamadeni owarasemasu.	bossに頼まれたtaskを夕方までに終わらせます。
+fresh-long-clause	1	kyounomeetingdereleasenonitteiwokimemasu.	今日のmeetingでreleaseの日程を決めます。
+fresh-long-clause	2	konobranchwomainnimergeshitekaradeployshitekudasai.	このbranchをmainにmergeしてからdeployしてください。
+fresh-long-clause	3	sakkinobughamoufixshitanodetestwomouichidomawashimasu.	さっきのbugはもうfixしたのでtestをもう一度回します。
+fresh-long-clause	4	ashitanopresentationnoslidewogoogledoraibuniageteokimashita.	明日のpresentationのslideをGoogleドライブに上げておきました。
+fresh-long-clause	5	clientkaranofeedbackwoyonde, shiyouwosukoshikaerukotonishimashita.	clientからのfeedbackを読んで、仕様を少し変えることにしました。
+fresh-long-clause	6	slackdekyouyuushitadocumentnimewotooshiteoitekudasai.	Slackで共有したdocumentに目を通しておいてください。
+fresh-long-clause	7	raishuunoschedulegamadakimatteinainode, chouseiwoonegaishimasu.	来週のscheduleがまだ決まっていないので、調整をお願いします。
+fresh-long-clause	8	servernofukagatakainode, cachewoireteyousuwomimasu.	serverの負荷が高いので、cacheを入れて様子を見ます。
+fresh-long-clause	9	databasenobackuphamaibannjidoudetotteimasu.	databaseのbackupは毎晩自動で取っています。
+fresh-long-clause	10	atarashiifeaturenodesignwofigmadetsukurinaoshimashita.	新しいfeatureのdesignをFigmaで作り直しました。
+fresh-long-clause	11	reviewgaowattara, sonopullrequestwocloseshitekudasai.	reviewが終わったら、そのpull requestをcloseしてください。
+fresh-long-clause	12	konkainoupdatedeloginnogamengaookikukawarimasu.	今回のupdateでloginの画面が大きく変わります。
+fresh-long-clause	13	errornologwomiruto, timeoutgagenninnnoyoudesu.	errorのlogを見ると、timeoutが原因のようです。
+fresh-long-clause	14	shuumatsunipythondescriptwokaite, sagyouwojidoukashimashita.	週末にPythonでscriptを書いて、作業を自動化しました。
+fresh-long-clause	15	deadlinenimaniawanaikamoshirenainode, prioritywominaoshimashou.	deadlineに間に合わないかもしれないので、priorityを見直しましょう。
+fresh-long-clause	16	zoomnolinkwocalendarnihatteokimashita.	Zoomのlinkをcalendarに貼っておきました。
+fresh-long-clause	17	konoissuehasupportnotantounimawashitekudasai.	このissueはsupportの担当に回してください。
+fresh-long-clause	18	samplenocodewougokashitemitara, sugunicrashshimashita.	sampleのcodeを動かしてみたら、すぐにcrashしました。
+fresh-long-clause	19	projectnomembergafuetanode, channelwowakerukotonishimashita.	projectのmemberが増えたので、channelを分けることにしました。
+fresh-long-clause	20	kinounosessionhatotemosankouninattanode, recordingwokyouyuushimasu.	昨日のsessionはとても参考になったので、recordingを共有します。
+fresh-long-clause	21	browsernocachewokeshitekara, mouichidoreloadshitemitekudasai.	browserのcacheを消してから、もう一度reloadしてみてください。
+fresh-long-clause	22	sonokenhaemaildehanakuchatdesoudanshimashou.	その件はemailではなくchatで相談しましょう。
+fresh-long-clause	23	testnocoveragegasagatteirunode, tsuikadecasewokakimasu.	testのcoverageが下がっているので、追加でcaseを書きます。
+fresh-long-clause	24	maiasanostandupdesusumiguaiwokyouyuushiteimasu.	毎朝のstandupで進み具合を共有しています。
+fresh-long-clause	25	contractnonaiyouwolegalnicheckshitemoraimasu.	contractの内容をlegalにcheckしてもらいます。
+fresh-long-clause	26	konopagehamobiledemirutohyoujigakuzuremasu.	このpageはmobileで見ると表示が崩れます。
+fresh-long-clause	27	versionwoagetara, plugingaugokanakunarimashita.	versionを上げたら、pluginが動かなくなりました。	versionをあげたら、pluginが動かなくなりました。
+fresh-long-clause	28	natsuyasuminomaenibudgetnoshinseiwodashiteokitaidesu.	夏休みの前にbudgetの申請を出しておきたいです。
+fresh-long-clause	29	marketingnoteamtoisshonicampaignnoanwokangaeteimasu.	marketingのteamと一緒にcampaignの案を考えています。
+fresh-long-clause	30	kyouharemotedehataraiteirunode, calldehanashimashou.	今日はremoteで働いているので、callで話しましょう。
+fresh-long-clause	31	konotablenocolumnwohitotsufuyashitehoshiidesu.	このtableのcolumnを一つ増やしてほしいです。
+fresh-long-clause	32	passwordwowasuretanode, resetnomailwookuttemoraemasuka.	passwordを忘れたので、resetのmailを送ってもらえますか。
+fresh-long-clause	33	dashboardnosuujigakinoukarakoushinsareteimasenn.	dashboardの数字が昨日から更新されていません。
+fresh-long-clause	34	konokinouhabetananode, feedbackwokangeishimasu.	この機能はbetaなので、feedbackを歓迎します。
+fresh-long-clause	35	onboardingnoshiryouwoatarashiihitomukenikakinaoshimashita.	onboardingの資料を新しい人向けに書き直しました。
+fresh-long-clause	36	kinnyoubimadenidraftwookurunode, commentwoonegaishimasu.	金曜日までにdraftを送るので、commentをお願いします。
+fresh-long-clause	37	networkgaosoiseide, uploadnijikangakakatteimasu.	networkが遅いせいで、uploadに時間がかかっています。
+fresh-long-clause	38	teireinoagendanikonkainoincidentwoireteokimasu.	定例のagendaに今回のincidentを入れておきます。
+fresh-long-clause	39	konositehasearchnokekkagatotemomiyasuidesu.	このsiteはsearchの結果がとても見やすいです。
+fresh-long-clause	40	shopnoopenniawasetesalewohajimeruyoteidesu.	shopのopenに合わせてsaleを始める予定です。
+fresh-long-clause	41	atarashiilaptopgatodoitanode, kankyounosetupwoshiteimasu.	新しいlaptopが届いたので、環境のsetupをしています。
+fresh-long-clause	42	konotaskharaishuunosprintnimawashitemoiidesuka.	このtaskは来週のsprintに回してもいいですか。
+fresh-long-clause	43	excelnofilewohirakuto, mojigabaketeshimaimasu.	Excelのfileを開くと、文字が化けてしまいます。
+fresh-long-clause	44	interviewnonitteigakimattara, roomwoyoyakushimasu.	interviewの日程が決まったら、roomを予約します。
+fresh-long-clause	45	omonatargethanijuudainojoseidesu.	主なtargetは二十代の女性です。	主なtargetは20代の女性です。
+fresh-long-clause	46	konoplandato, costgatakasugirutoomoimasu.	このplanだと、costが高すぎると思います。
+fresh-long-clause	47	sizegaawanakattanode, betsunocolornikoukanshimashita.	sizeが合わなかったので、別のcolorに交換しました。
+fresh-long-clause	48	menuniaruatarashiiitemwotameshitemimashita.	menuにある新しいitemを試してみました。
+fresh-long-clause	49	tutorialwosaigomadeyareba, kihonhawakarimasu.	tutorialを最後までやれば、基本は分かります。	tutorialを最後までやれば、基本はわかります。
+fresh-long-clause	50	konogamehaonlinedetomodachitoasobemasu.	このgameはonlineで友達と遊べます。
+fresh-long-clause	51	raigetsukaraofficenobashogakawarimasu.	来月からofficeの場所が変わります。
+fresh-long-clause	52	buchounoapprovalgadetanode, orderwosusumemasu.	部長のapprovalが出たので、orderを進めます。
+fresh-long-clause	53	konostepwotobasuto, installnishippaishimasu.	このstepを飛ばすと、installに失敗します。
+fresh-long-clause	54	storynojunbanwoirekaetara, hanashigawakariyasukunarimashita.	storyの順番を入れ替えたら、話が分かりやすくなりました。	storyの順番を入れ替えたら、話がわかりやすくなりました。
+fresh-long-clause	55	cameranosetteiwokaetara, photogaakarukunarimashita.	cameraの設定を変えたら、photoが明るくなりました。
+fresh-long-clause	56	konoquestionnihaatodematometekotaemasu.	このquestionには後でまとめて答えます。
+fresh-long-clause	57	traingaokureteirunode, meetingnisukoshiokuremasu.	trainが遅れているので、meetingに少し遅れます。
+fresh-long-clause	58	hotelnoyoyakuhawebdesumasemashita.	hotelの予約はwebで済ませました。
+fresh-long-clause	59	konoformninamaetoaddresswoiretekudasai.	このformに名前とaddressを入れてください。
+fresh-long-clause	60	trafficgafuetanode, serverwoichidaitashimashita.	trafficが増えたので、serverを一台足しました。	trafficが増えたので、serverを1台足しました。
+fresh-long-clause	61	konocommandwoutsuto, zenbunocontainergatomarimasu.	このcommandを打つと、全部のcontainerが止まります。
+fresh-long-clause	62	dockernoimagegaookisugite, buildnijikangakakarimasu.	Dockerのimageが大きすぎて、buildに時間がかかります。
+fresh-long-clause	63	raishuunoeventdedemowomiseruyoteidesu.	来週のeventでdemoを見せる予定です。
+fresh-long-clause	64	konocategorynouriagehasengetsuyorinobiteimasu.	このcategoryの売り上げは先月より伸びています。	このcategoryの売上げは先月より伸びています。	このcategoryの売上は先月より伸びています。
+fresh-long-clause	65	phonenodenchigasugunikirerunode, atarashiicasewokaimashita.	phoneの電池がすぐに切れるので、新しいcaseを買いました。
+fresh-long-clause	66	konolistkarasukinaoptionwoerandekudasai.	このlistから好きなoptionを選んでください。
+fresh-long-clause	67	recipenotoorinitsukuttanoni, ajigazenzennchigaimasu.	recipeの通りに作ったのに、味が全然違います。
+fresh-long-clause	68	workshopnosankashanisurveywookurimashita.	workshopの参加者にsurveyを送りました。
+fresh-long-clause	69	konomodelhaseidogatakaikeredo, speedgaosoidesu.	このmodelは精度が高いけれど、speedが遅いです。
+fresh-long-clause	70	atarashiilogonocolornitsuiteikenwokudasai.	新しいlogoのcolorについて意見をください。
+fresh-long-clause	71	konnyanomatchhatomodachitobardemiruyoteidesu.	今夜のmatchは友達とbarで見る予定です。
+fresh-long-clause	72	musicwokikinagarasagyousurutoshuuchuudekimasu.	musicを聞きながら作業すると集中できます。
+fresh-long-clause	73	konoprojectnogoalwomouichidokakuninshimashou.	このprojectのgoalをもう一度確認しましょう。
+fresh-long-clause	74	releasenonotenihenkoutenwomatometeokimashita.	releaseのnoteに変更点をまとめておきました。
+fresh-long-clause	75	usernokoewoatsumerutameni, formwotsukurimashita.	userの声を集めるために、formを作りました。
+fresh-long-clause	76	konokeywoosuto, windowgatojimasu.	このkeyを押すと、windowが閉じます。
+fresh-long-clause	77	printernokamigakireteirunode, hojuushitekudasai.	printerの紙が切れているので、補充してください。
+fresh-long-clause	78	nenmatsuhayasumigaooinode, deliverynohiwohayamemasu.	年末は休みが多いので、deliveryの日を早めます。
+fresh-long-clause	79	konobookhabeginnernimoosusumedesu.	このbookはbeginnerにもおすすめです。	このbookはbeginnerにもお勧めです。
+fresh-long-clause	80	coursenotochuudemocanceldekimasuka.	courseの途中でもcancelできますか。
+fresh-long-clause	81	jibunnnoprofilenoshashinwokaemashita.	自分のprofileの写真を変えました。
+fresh-long-clause	82	konovideohajimakuwoonnisurutomiyasuidesu.	このvideoは字幕をonにすると見やすいです。
+fresh-long-clause	83	accountwotsukurutokini, phonenobangougahitsuyoudesu.	accountを作るときに、phoneの番号が必要です。	accountを作る時に、phoneの番号が必要です。
+fresh-long-clause	84	queuenitamattajobwojunbannnishorishiteimasu.	queueに溜まったjobを順番に処理しています。	queueにたまったjobを順番に処理しています。
+fresh-long-clause	85	konofunctionhahikisuugaoosugiteyominikuidesu.	このfunctionは引数が多すぎて読みにくいです。
+fresh-long-clause	86	reportnoformatwotouitsushitehoshiitoiwaremashita.	reportのformatを統一してほしいと言われました。
+fresh-long-clause	87	atarashiipolicynitsuitemanagerkarasetsumeigaarimashita.	新しいpolicyについてmanagerから説明がありました。
+fresh-long-clause	88	konostoredehacardshikatsukaemasenn.	このstoreではcardしか使えません。
+fresh-long-clause	89	clienttonocallganagabiitanode, lunchwotabesokonemashita.	clientとのcallが長引いたので、lunchを食べ損ねました。
+fresh-long-clause	90	raishuuhatrainingnotamenioosakaheikimasu.	来週はtrainingのために大阪へ行きます。
+fresh-long-clause	91	konosoftwarehafreedetsukaerunogabenridesu.	このsoftwareはfreeで使えるのが便利です。
+fresh-long-clause	92	sensornoataigaokashiinode, devicewosaikidoushimashita.	sensorの値がおかしいので、deviceを再起動しました。
+fresh-long-clause	93	konographwomiruto, trendgahakkiriwakarimasu.	このgraphを見ると、trendがはっきり分かります。	このgraphを見ると、trendがはっきりわかります。
+fresh-long-clause	94	partynojunbihachecknolistwotsukuttesusumeteimasu.	partyの準備はcheckのlistを作って進めています。
+fresh-long-clause	95	konorulehawakarinikuinode, reiwotashimashou.	このruleは分かりにくいので、例を足しましょう。	このruleはわかりにくいので、例を足しましょう。
+fresh-long-clause	96	historywomireba, daregaitsukaetakawakarimasu.	historyを見れば、誰がいつ変えたか分かります。	historyを見れば、誰がいつ変えたかわかります。
+fresh-long-clause	97	templatewotsukaeba, maikaionajikatachidekakemasu.	templateを使えば、毎回同じ形で書けます。
+fresh-long-clause	98	konobuttonnoichigawakarinikuitoiukoegaarimashita.	このbuttonの位置が分かりにくいという声がありました。	このbuttonの位置がわかりにくいという声がありました。
+fresh-long-clause	99	projectornochoushigawaruinode, betsunoroomwotsukaimashou.	projectorの調子が悪いので、別のroomを使いましょう。
+fresh-long-clause	100	kyounotopicharainennnostrategynitsuitedesu.	今日のtopicは来年のstrategyについてです。
+fresh-long-clause	101	coffeewonomisugite, yoruninemuremasendeshita.	coffeeを飲みすぎて、夜に眠れませんでした。
+fresh-long-clause	102	konobrandnoshoeshakarukutearukiyasuidesu.	このbrandのshoesは軽くて歩きやすいです。
+fresh-long-clause	103	weathernoappdeashitanoamewokakuninshimashita.	weatherのappで明日の雨を確認しました。
+fresh-long-clause	104	networknosetteihaadminshikakaeraremasenn.	networkの設定はadminしか変えられません。
+fresh-long-clause	105	konocharthakyonennnodatawomotonitsukurimashita.	このchartは去年のdataをもとに作りました。
+fresh-long-clause	106	newsnositedeatarashiiproductnokijiwoyomimashita.	newsのsiteで新しいproductの記事を読みました。
+fresh-long-clause	107	konofoldernihaitteirufilehazenbukeshitedaijoubudesu.	このfolderに入っているfileは全部消して大丈夫です。
+fresh-long-clause	108	contentnoryougaoosugirunode, sectionwowakemashita.	contentの量が多すぎるので、sectionを分けました。
+fresh-long-clause	109	konomessagehajidoudeokurareteimasu.	このmessageは自動で送られています。
+fresh-long-clause	110	bossnitanomaretataskwoyuugatamadeniowarasemasu.	bossに頼まれたtaskを夕方までに終わらせます。
