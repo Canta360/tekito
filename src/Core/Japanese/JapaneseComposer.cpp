@@ -3219,12 +3219,25 @@ void JapaneseComposer::CheckMixedSentence() {
         if (chunk.isEnglish || !chunk.either || chunk.locked || chunk.marksOnly) continue;
         const auto katakana = loanwords_->ForEnglish(chunk.keys, 1);
         if (katakana.empty() || katakana.front().katakana.empty()) continue;
-        auto english = read;
-        english[i] = katakana.front().katakana;
+        // With the word in, the other chunks may read better another way
+        // too (去年のデータをもとに, not データを下に): the sentence is
+        // checked again with it.
+        auto withWord = parts;
+        for (std::size_t k = 0; k < withWord.size(); ++k) {
+            if (k != i && settled_[k].isEnglish && !settled_[k].marksOnly) withWord[k] = {read[k]};
+        }
+        withWord[i] = {katakana.front().katakana};
+        const auto again = ReadBest(withWord);
+        std::vector<std::wstring> english(parts.size());
+        for (std::size_t k = 0; k < parts.size(); ++k) english[k] = withWord[k][again[k]];
         const std::wstring both[] = {join(read), join(english)};
         const auto scores = reranker_->LogProbabilities(both);
         if (scores.size() == 2 && scores[1] - scores[0] > kLanguageMargin) {
             chunk.isEnglish = true;
+            for (std::size_t k = 0; k < parts.size(); ++k) {
+                if (k != i && !settled_[k].isEnglish && !settled_[k].marksOnly) settled_[k].japanese = english[k];
+                read[k] = english[k];
+            }
             read[i] = EnglishForModel(chunk.english);
         }
     }
@@ -3324,8 +3337,10 @@ void JapaneseComposer::JudgeWholeSentence(std::optional<ChunkJudge::Judgement>& 
         bool english = whole[k].english;
         if (english && singleVowelKana_ && vowel(chunk.keys)) english = (k > 0 && englishWord(k - 1)) || englishWord(k + 1);
         if (englishSentence && english) {
-            // As English Auto writes it in the sentence (slips put right).
+            // As English Auto writes it in the sentence (slips put right;
+            // i is I wherever it is).
             std::wstring written = withoutMarks(whole[k].written);
+            if (written == L"i") written = L"I";
             if (chunk.sentenceStart && !written.empty() && written.front() >= L'a' && written.front() <= L'z') {
                 written.front() = static_cast<wchar_t>(written.front() - L'a' + L'A');
             }

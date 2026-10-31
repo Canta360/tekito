@@ -1,0 +1,150 @@
+{"text": "今日のmeetingでreleaseの日程を決めます。", "chunks": ["きょうの", "@meeting", "で", "@release", "の", "にっていを", "きめます。"], "also": []}
+{"text": "このbranchをmainにmergeしてからdeployしてください。", "chunks": ["この", "@branch", "を", "@main", "に", "@merge", "してから", "@deploy", "してください。"], "also": []}
+{"text": "さっきのbugはもうfixしたのでtestをもう一度回します。", "chunks": ["さっきの", "@bug", "は", "もう", "@fix", "したので", "@test", "を", "もういちど", "まわします。"], "also": []}
+{"text": "明日のpresentationのslideをGoogleドライブに上げておきました。", "chunks": ["あしたの", "@presentation", "の", "@slide", "を", "@google", "どらいぶに", "あげておきました。"], "also": []}
+{"text": "clientからのfeedbackを読んで、仕様を少し変えることにしました。", "chunks": ["@client", "からの", "@feedback", "を", "よんで、", "しようを", "すこし", "かえることに", "しました。"], "also": []}
+{"text": "Slackで共有したdocumentに目を通しておいてください。", "chunks": ["@slack", "で", "きょうゆうした", "@document", "に", "めを", "とおしておいて", "ください。"], "also": []}
+{"text": "来週のscheduleがまだ決まっていないので、調整をお願いします。", "chunks": ["らいしゅうの", "@schedule", "が", "まだ", "きまっていないので、", "ちょうせいを", "おねがいします。"], "also": []}
+{"text": "serverの負荷が高いので、cacheを入れて様子を見ます。", "chunks": ["@server", "の", "ふかが", "たかいので、", "@cache", "を", "いれて", "ようすを", "みます。"], "also": []}
+{"text": "databaseのbackupは毎晩自動で取っています。", "chunks": ["@database", "の", "@backup", "は", "まいばん", "じどうで", "とっています。"], "also": []}
+{"text": "新しいfeatureのdesignをFigmaで作り直しました。", "chunks": ["あたらしい", "@feature", "の", "@design", "を", "@figma", "で", "つくりなおしました。"], "also": []}
+{"text": "reviewが終わったら、そのpull requestをcloseしてください。", "chunks": ["@review", "が", "おわったら、", "その", "@pull", "@request", "を", "@close", "してください。"], "also": []}
+{"text": "今回のupdateでloginの画面が大きく変わります。", "chunks": ["こんかいの", "@update", "で", "@login", "の", "がめんが", "おおきく", "かわります。"], "also": []}
+{"text": "errorのlogを見ると、timeoutが原因のようです。", "chunks": ["@error", "の", "@log", "を", "みると、", "@timeout", "が", "げんいんの", "ようです。"], "also": []}
+{"text": "週末にPythonでscriptを書いて、作業を自動化しました。", "chunks": ["しゅうまつに", "@python", "で", "@script", "を", "かいて、", "さぎょうを", "じどうかしました。"], "also": []}
+{"text": "deadlineに間に合わないかもしれないので、priorityを見直しましょう。", "chunks": ["@deadline", "に", "まにあわないかも", "しれないので、", "@priority", "を", "みなおしましょう。"], "also": []}
+{"text": "Zoomのlinkをcalendarに貼っておきました。", "chunks": ["@zoom", "の", "@link", "を", "@calendar", "に", "はっておきました。"], "also": []}
+{"text": "このissueはsupportの担当に回してください。", "chunks": ["この", "@issue", "は", "@support", "の", "たんとうに", "まわしてください。"], "also": []}
+{"text": "sampleのcodeを動かしてみたら、すぐにcrashしました。", "chunks": ["@sample", "の", "@code", "を", "うごかしてみたら、", "すぐに", "@crash", "しました。"], "also": []}
+{"text": "projectのmemberが増えたので、channelを分けることにしました。", "chunks": ["@project", "の", "@member", "が", "ふえたので、", "@channel", "を", "わけることに", "しました。"], "also": []}
+{"text": "昨日のsessionはとても参考になったので、recordingを共有します。", "chunks": ["きのうの", "@session", "は", "とても", "さんこうに", "なったので、", "@recording", "を", "きょうゆうします。"], "also": []}
+{"text": "browserのcacheを消してから、もう一度reloadしてみてください。", "chunks": ["@browser", "の", "@cache", "を", "けしてから、", "もういちど", "@reload", "してみてください。"], "also": []}
+{"text": "その件はemailではなくchatで相談しましょう。", "chunks": ["その", "けんは", "@email", "ではなく", "@chat", "で", "そうだんしましょう。"], "also": []}
+{"text": "testのcoverageが下がっているので、追加でcaseを書きます。", "chunks": ["@test", "の", "@coverage", "が", "さがっているので、", "ついかで", "@case", "を", "かきます。"], "also": []}
+{"text": "毎朝のstandupで進み具合を共有しています。", "chunks": ["まいあさの", "@standup", "で", "すすみぐあいを", "きょうゆうしています。"], "also": []}
+{"text": "contractの内容をlegalにcheckしてもらいます。", "chunks": ["@contract", "の", "ないようを", "@legal", "に", "@check", "してもらいます。"], "also": []}
+{"text": "このpageはmobileで見ると表示が崩れます。", "chunks": ["この", "@page", "は", "@mobile", "で", "みると", "ひょうじが", "くずれます。"], "also": []}
+{"text": "versionを上げたら、pluginが動かなくなりました。", "chunks": ["@version", "を", "あげたら、", "@plugin", "が", "うごかなく", "なりました。"], "also": ["versionをあげたら、pluginが動かなくなりました。"]}
+{"text": "夏休みの前にbudgetの申請を出しておきたいです。", "chunks": ["なつやすみの", "まえに", "@budget", "の", "しんせいを", "だしておきたいです。"], "also": []}
+{"text": "marketingのteamと一緒にcampaignの案を考えています。", "chunks": ["@marketing", "の", "@team", "と", "いっしょに", "@campaign", "の", "あんを", "かんがえています。"], "also": []}
+{"text": "今日はremoteで働いているので、callで話しましょう。", "chunks": ["きょうは", "@remote", "で", "はたらいているので、", "@call", "で", "はなしましょう。"], "also": []}
+{"text": "このtableのcolumnを一つ増やしてほしいです。", "chunks": ["この", "@table", "の", "@column", "を", "ひとつ", "ふやして", "ほしいです。"], "also": []}
+{"text": "passwordを忘れたので、resetのmailを送ってもらえますか。", "chunks": ["@password", "を", "わすれたので、", "@reset", "の", "@mail", "を", "おくって", "もらえますか。"], "also": []}
+{"text": "dashboardの数字が昨日から更新されていません。", "chunks": ["@dashboard", "の", "すうじが", "きのうから", "こうしんされていません。"], "also": []}
+{"text": "この機能はbetaなので、feedbackを歓迎します。", "chunks": ["この", "きのうは", "@beta", "なので、", "@feedback", "を", "かんげいします。"], "also": []}
+{"text": "onboardingの資料を新しい人向けに書き直しました。", "chunks": ["@onboarding", "の", "しりょうを", "あたらしい", "ひとむけに", "かきなおしました。"], "also": []}
+{"text": "金曜日までにdraftを送るので、commentをお願いします。", "chunks": ["きんようびまでに", "@draft", "を", "おくるので、", "@comment", "を", "おねがいします。"], "also": []}
+{"text": "networkが遅いせいで、uploadに時間がかかっています。", "chunks": ["@network", "が", "おそい", "せいで、", "@upload", "に", "じかんが", "かかっています。"], "also": []}
+{"text": "定例のagendaに今回のincidentを入れておきます。", "chunks": ["ていれいの", "@agenda", "に", "こんかいの", "@incident", "を", "いれておきます。"], "also": []}
+{"text": "このsiteはsearchの結果がとても見やすいです。", "chunks": ["この", "@site", "は", "@search", "の", "けっかが", "とても", "みやすいです。"], "also": []}
+{"text": "shopのopenに合わせてsaleを始める予定です。", "chunks": ["@shop", "の", "@open", "に", "あわせて", "@sale", "を", "はじめる", "よていです。"], "also": []}
+{"text": "新しいlaptopが届いたので、環境のsetupをしています。", "chunks": ["あたらしい", "@laptop", "が", "とどいたので、", "かんきょうの", "@setup", "を", "しています。"], "also": []}
+{"text": "このtaskは来週のsprintに回してもいいですか。", "chunks": ["この", "@task", "は", "らいしゅうの", "@sprint", "に", "まわしても", "いいですか。"], "also": []}
+{"text": "Excelのfileを開くと、文字が化けてしまいます。", "chunks": ["@excel", "の", "@file", "を", "ひらくと、", "もじが", "ばけて", "しまいます。"], "also": []}
+{"text": "interviewの日程が決まったら、roomを予約します。", "chunks": ["@interview", "の", "にっていが", "きまったら、", "@room", "を", "よやくします。"], "also": []}
+{"text": "主なtargetは二十代の女性です。", "chunks": ["おもな", "@target", "は", "にじゅうだいの", "じょせいです。"], "also": ["主なtargetは20代の女性です。"]}
+{"text": "このplanだと、costが高すぎると思います。", "chunks": ["この", "@plan", "だと、", "@cost", "が", "たかすぎると", "おもいます。"], "also": []}
+{"text": "sizeが合わなかったので、別のcolorに交換しました。", "chunks": ["@size", "が", "あわなかったので、", "べつの", "@color", "に", "こうかんしました。"], "also": []}
+{"text": "menuにある新しいitemを試してみました。", "chunks": ["@menu", "に", "ある", "あたらしい", "@item", "を", "ためして", "みました。"], "also": []}
+{"text": "tutorialを最後までやれば、基本は分かります。", "chunks": ["@tutorial", "を", "さいごまで", "やれば、", "きほんは", "わかります。"], "also": ["tutorialを最後までやれば、基本はわかります。"]}
+{"text": "このgameはonlineで友達と遊べます。", "chunks": ["この", "@game", "は", "@online", "で", "ともだちと", "あそべます。"], "also": []}
+{"text": "来月からofficeの場所が変わります。", "chunks": ["らいげつから", "@office", "の", "ばしょが", "かわります。"], "also": []}
+{"text": "部長のapprovalが出たので、orderを進めます。", "chunks": ["ぶちょうの", "@approval", "が", "でたので、", "@order", "を", "すすめます。"], "also": []}
+{"text": "このstepを飛ばすと、installに失敗します。", "chunks": ["この", "@step", "を", "とばすと、", "@install", "に", "しっぱいします。"], "also": []}
+{"text": "storyの順番を入れ替えたら、話が分かりやすくなりました。", "chunks": ["@story", "の", "じゅんばんを", "いれかえたら、", "はなしが", "わかりやすく", "なりました。"], "also": ["storyの順番を入れ替えたら、話がわかりやすくなりました。"]}
+{"text": "cameraの設定を変えたら、photoが明るくなりました。", "chunks": ["@camera", "の", "せっていを", "かえたら、", "@photo", "が", "あかるく", "なりました。"], "also": []}
+{"text": "このquestionには後でまとめて答えます。", "chunks": ["この", "@question", "には", "あとで", "まとめて", "こたえます。"], "also": []}
+{"text": "trainが遅れているので、meetingに少し遅れます。", "chunks": ["@train", "が", "おくれているので、", "@meeting", "に", "すこし", "おくれます。"], "also": []}
+{"text": "hotelの予約はwebで済ませました。", "chunks": ["@hotel", "の", "よやくは", "@web", "で", "すませました。"], "also": []}
+{"text": "このformに名前とaddressを入れてください。", "chunks": ["この", "@form", "に", "なまえと", "@address", "を", "いれてください。"], "also": []}
+{"text": "trafficが増えたので、serverを一台足しました。", "chunks": ["@traffic", "が", "ふえたので、", "@server", "を", "いちだい", "たしました。"], "also": ["trafficが増えたので、serverを1台足しました。"]}
+{"text": "このcommandを打つと、全部のcontainerが止まります。", "chunks": ["この", "@command", "を", "うつと、", "ぜんぶの", "@container", "が", "とまります。"], "also": []}
+{"text": "Dockerのimageが大きすぎて、buildに時間がかかります。", "chunks": ["@docker", "の", "@image", "が", "おおきすぎて、", "@build", "に", "じかんが", "かかります。"], "also": []}
+{"text": "来週のeventでdemoを見せる予定です。", "chunks": ["らいしゅうの", "@event", "で", "@demo", "を", "みせる", "よていです。"], "also": []}
+{"text": "このcategoryの売り上げは先月より伸びています。", "chunks": ["この", "@category", "の", "うりあげは", "せんげつより", "のびています。"], "also": ["このcategoryの売上げは先月より伸びています。", "このcategoryの売上は先月より伸びています。"]}
+{"text": "phoneの電池がすぐに切れるので、新しいcaseを買いました。", "chunks": ["@phone", "の", "でんちが", "すぐに", "きれるので、", "あたらしい", "@case", "を", "かいました。"], "also": []}
+{"text": "このlistから好きなoptionを選んでください。", "chunks": ["この", "@list", "から", "すきな", "@option", "を", "えらんでください。"], "also": []}
+{"text": "recipeの通りに作ったのに、味が全然違います。", "chunks": ["@recipe", "の", "とおりに", "つくったのに、", "あじが", "ぜんぜん", "ちがいます。"], "also": []}
+{"text": "workshopの参加者にsurveyを送りました。", "chunks": ["@workshop", "の", "さんかしゃに", "@survey", "を", "おくりました。"], "also": []}
+{"text": "このmodelは精度が高いけれど、speedが遅いです。", "chunks": ["この", "@model", "は", "せいどが", "たかいけれど、", "@speed", "が", "おそいです。"], "also": []}
+{"text": "新しいlogoのcolorについて意見をください。", "chunks": ["あたらしい", "@logo", "の", "@color", "について", "いけんを", "ください。"], "also": []}
+{"text": "今夜のmatchは友達とbarで見る予定です。", "chunks": ["こんやの", "@match", "は", "ともだちと", "@bar", "で", "みる", "よていです。"], "also": []}
+{"text": "musicを聞きながら作業すると集中できます。", "chunks": ["@music", "を", "ききながら", "さぎょうすると", "しゅうちゅうできます。"], "also": []}
+{"text": "このprojectのgoalをもう一度確認しましょう。", "chunks": ["この", "@project", "の", "@goal", "を", "もういちど", "かくにんしましょう。"], "also": []}
+{"text": "releaseのnoteに変更点をまとめておきました。", "chunks": ["@release", "の", "@note", "に", "へんこうてんを", "まとめておきました。"], "also": []}
+{"text": "userの声を集めるために、formを作りました。", "chunks": ["@user", "の", "こえを", "あつめるために、", "@form", "を", "つくりました。"], "also": []}
+{"text": "このkeyを押すと、windowが閉じます。", "chunks": ["この", "@key", "を", "おすと、", "@window", "が", "とじます。"], "also": []}
+{"text": "printerの紙が切れているので、補充してください。", "chunks": ["@printer", "の", "かみが", "きれているので、", "ほじゅうしてください。"], "also": []}
+{"text": "年末は休みが多いので、deliveryの日を早めます。", "chunks": ["ねんまつは", "やすみが", "おおいので、", "@delivery", "の", "ひを", "はやめます。"], "also": []}
+{"text": "このbookはbeginnerにもおすすめです。", "chunks": ["この", "@book", "は", "@beginner", "にも", "おすすめです。"], "also": ["このbookはbeginnerにもお勧めです。"]}
+{"text": "courseの途中でもcancelできますか。", "chunks": ["@course", "の", "とちゅうでも", "@cancel", "できますか。"], "also": []}
+{"text": "自分のprofileの写真を変えました。", "chunks": ["じぶんの", "@profile", "の", "しゃしんを", "かえました。"], "also": []}
+{"text": "このvideoは字幕をonにすると見やすいです。", "chunks": ["この", "@video", "は", "じまくを", "@on", "に", "すると", "みやすいです。"], "also": []}
+{"text": "accountを作るときに、phoneの番号が必要です。", "chunks": ["@account", "を", "つくるときに、", "@phone", "の", "ばんごうが", "ひつようです。"], "also": ["accountを作る時に、phoneの番号が必要です。"]}
+{"text": "queueに溜まったjobを順番に処理しています。", "chunks": ["@queue", "に", "たまった", "@job", "を", "じゅんばんに", "しょりしています。"], "also": ["queueにたまったjobを順番に処理しています。"]}
+{"text": "このfunctionは引数が多すぎて読みにくいです。", "chunks": ["この", "@function", "は", "ひきすうが", "おおすぎて", "よみにくいです。"], "also": []}
+{"text": "reportのformatを統一してほしいと言われました。", "chunks": ["@report", "の", "@format", "を", "とういつして", "ほしいと", "いわれました。"], "also": []}
+{"text": "新しいpolicyについてmanagerから説明がありました。", "chunks": ["あたらしい", "@policy", "について", "@manager", "から", "せつめいが", "ありました。"], "also": []}
+{"text": "このstoreではcardしか使えません。", "chunks": ["この", "@store", "では", "@card", "しか", "つかえません。"], "also": []}
+{"text": "clientとのcallが長引いたので、lunchを食べ損ねました。", "chunks": ["@client", "との", "@call", "が", "ながびいたので、", "@lunch", "を", "たべそこねました。"], "also": []}
+{"text": "来週はtrainingのために大阪へ行きます。", "chunks": ["らいしゅうは", "@training", "の", "ために", "おおさかへ", "いきます。"], "also": []}
+{"text": "このsoftwareはfreeで使えるのが便利です。", "chunks": ["この", "@software", "は", "@free", "で", "つかえるのが", "べんりです。"], "also": []}
+{"text": "sensorの値がおかしいので、deviceを再起動しました。", "chunks": ["@sensor", "の", "あたいが", "おかしいので、", "@device", "を", "さいきどうしました。"], "also": []}
+{"text": "このgraphを見ると、trendがはっきり分かります。", "chunks": ["この", "@graph", "を", "みると、", "@trend", "が", "はっきり", "わかります。"], "also": ["このgraphを見ると、trendがはっきりわかります。"]}
+{"text": "partyの準備はcheckのlistを作って進めています。", "chunks": ["@party", "の", "じゅんびは", "@check", "の", "@list", "を", "つくって", "すすめています。"], "also": []}
+{"text": "このruleは分かりにくいので、例を足しましょう。", "chunks": ["この", "@rule", "は", "わかりにくいので、", "れいを", "たしましょう。"], "also": ["このruleはわかりにくいので、例を足しましょう。"]}
+{"text": "historyを見れば、誰がいつ変えたか分かります。", "chunks": ["@history", "を", "みれば、", "だれが", "いつ", "かえたか", "わかります。"], "also": ["historyを見れば、誰がいつ変えたかわかります。"]}
+{"text": "templateを使えば、毎回同じ形で書けます。", "chunks": ["@template", "を", "つかえば、", "まいかい", "おなじ", "かたちで", "かけます。"], "also": []}
+{"text": "このbuttonの位置が分かりにくいという声がありました。", "chunks": ["この", "@button", "の", "いちが", "わかりにくいという", "こえが", "ありました。"], "also": ["このbuttonの位置がわかりにくいという声がありました。"]}
+{"text": "projectorの調子が悪いので、別のroomを使いましょう。", "chunks": ["@projector", "の", "ちょうしが", "わるいので、", "べつの", "@room", "を", "つかいましょう。"], "also": []}
+{"text": "今日のtopicは来年のstrategyについてです。", "chunks": ["きょうの", "@topic", "は", "らいねんの", "@strategy", "についてです。"], "also": []}
+{"text": "coffeeを飲みすぎて、夜に眠れませんでした。", "chunks": ["@coffee", "を", "のみすぎて、", "よるに", "ねむれませんでした。"], "also": []}
+{"text": "このbrandのshoesは軽くて歩きやすいです。", "chunks": ["この", "@brand", "の", "@shoes", "は", "かるくて", "あるきやすいです。"], "also": []}
+{"text": "weatherのappで明日の雨を確認しました。", "chunks": ["@weather", "の", "@app", "で", "あしたの", "あめを", "かくにんしました。"], "also": []}
+{"text": "networkの設定はadminしか変えられません。", "chunks": ["@network", "の", "せっていは", "@admin", "しか", "かえられません。"], "also": []}
+{"text": "このchartは去年のdataをもとに作りました。", "chunks": ["この", "@chart", "は", "きょねんの", "@data", "を", "もとに", "つくりました。"], "also": []}
+{"text": "newsのsiteで新しいproductの記事を読みました。", "chunks": ["@news", "の", "@site", "で", "あたらしい", "@product", "の", "きじを", "よみました。"], "also": []}
+{"text": "このfolderに入っているfileは全部消して大丈夫です。", "chunks": ["この", "@folder", "に", "はいっている", "@file", "は", "ぜんぶ", "けして", "だいじょうぶです。"], "also": []}
+{"text": "contentの量が多すぎるので、sectionを分けました。", "chunks": ["@content", "の", "りょうが", "おおすぎるので、", "@section", "を", "わけました。"], "also": []}
+{"text": "このmessageは自動で送られています。", "chunks": ["この", "@message", "は", "じどうで", "おくられています。"], "also": []}
+{"text": "bossに頼まれたtaskを夕方までに終わらせます。", "chunks": ["@boss", "に", "たのまれた", "@task", "を", "ゆうがたまでに", "おわらせます。"], "also": []}
+{"text": "明日は朝から会議があるので、早めに家を出るつもりです。", "chunks": ["あしたは", "あさから", "かいぎが", "あるので、", "はやめに", "いえを", "でる", "つもりです。"], "also": []}
+{"text": "駅の近くに新しい本屋ができたので、週末に行ってみたいです。", "chunks": ["えきの", "ちかくに", "あたらしい", "ほんやが", "できたので、", "しゅうまつに", "いってみたいです。"], "also": ["駅の近くに新しい本屋が出来たので、週末に行ってみたいです。"]}
+{"text": "雨が降りそうなので、傘を持って出かけたほうがいいですよ。", "chunks": ["あめが", "ふりそうなので、", "かさを", "もって", "でかけたほうが", "いいですよ。"], "also": []}
+{"text": "この料理は思ったより簡単に作れるので、ぜひ試してみてください。", "chunks": ["この", "りょうりは", "おもったより", "かんたんに", "つくれるので、", "ぜひ", "ためして", "みてください。"], "also": []}
+{"text": "去年の夏に行った旅行の写真を整理しています。", "chunks": ["きょねんの", "なつに", "いった", "りょこうの", "しゃしんを", "せいりしています。"], "also": []}
+{"text": "子供の頃に読んだ本をもう一度読み返しています。", "chunks": ["こどもの", "ころに", "よんだ", "ほんを", "もういちど", "よみかえしています。"], "also": ["子どもの頃に読んだ本をもう一度読み返しています。"]}
+{"text": "体調が悪いので、今日は早めに休ませてください。", "chunks": ["たいちょうが", "わるいので、", "きょうは", "はやめに", "やすませてください。"], "also": []}
+{"text": "来月の引っ越しに向けて、少しずつ荷物をまとめています。", "chunks": ["らいげつの", "ひっこしに", "むけて、", "すこしずつ", "にもつを", "まとめています。"], "also": []}
+{"text": "先週の土曜日に友達と映画を見に行きました。", "chunks": ["せんしゅうの", "どようびに", "ともだちと", "えいがを", "みに", "いきました。"], "also": []}
+{"text": "この道をまっすぐ行くと、右側に郵便局があります。", "chunks": ["この", "みちを", "まっすぐ", "いくと、", "みぎがわに", "ゆうびんきょくが", "あります。"], "also": []}
+{"text": "お忙しいところ申し訳ありませんが、確認をお願いできますか。", "chunks": ["おいそがしい", "ところ", "もうしわけ", "ありませんが、", "かくにんを", "おねがい", "できますか。"], "also": []}
+{"text": "毎日少しずつでも続けることが大切だと思います。", "chunks": ["まいにち", "すこしずつでも", "つづけることが", "たいせつだと", "おもいます。"], "also": []}
+{"text": "昨日は風が強くて、自転車に乗るのが大変でした。", "chunks": ["きのうは", "かぜが", "つよくて、", "じてんしゃに", "のるのが", "たいへんでした。"], "also": []}
+{"text": "冷蔵庫の中に残っていた野菜でスープを作りました。", "chunks": ["れいぞうこの", "なかに", "のこっていた", "やさいで", "すーぷを", "つくりました。"], "also": []}
+{"text": "図書館で借りた本の返却日が明日までです。", "chunks": ["としょかんで", "かりた", "ほんの", "へんきゃくびが", "あしたまでです。"], "also": []}
+{"text": "新しい仕事にはだいぶ慣れてきましたが、まだ覚えることが多いです。", "chunks": ["あたらしい", "しごとには", "だいぶ", "なれてきましたが、", "まだ", "おぼえることが", "おおいです。"], "also": []}
+{"text": "週末は天気が良ければ、山に登りに行く予定です。", "chunks": ["しゅうまつは", "てんきが", "よければ、", "やまに", "のぼりに", "いく", "よていです。"], "also": ["週末は天気がよければ、山に登りに行く予定です。"]}
+{"text": "電車の中で寝てしまって、降りる駅を通り過ぎました。", "chunks": ["でんしゃの", "なかで", "ねてしまって、", "おりる", "えきを", "とおりすぎました。"], "also": []}
+{"text": "久しぶりに実家に帰ったら、両親がとても喜んでくれました。", "chunks": ["ひさしぶりに", "じっかに", "かえったら、", "りょうしんが", "とても", "よろこんで", "くれました。"], "also": []}
+{"text": "その件については、後ほど担当者から改めてご連絡します。", "chunks": ["その", "けんに", "ついては、", "のちほど", "たんとうしゃから", "あらためて", "ごれんらく", "します。"], "also": []}
+{"text": "I will send you the report by Friday.", "chunks": ["@i", "@will", "@send", "@you", "@the", "@report", "@by", "@friday."], "also": []}
+{"text": "Can we move the meeting to next week?", "chunks": ["@can", "@we", "@move", "@the", "@meeting", "@to", "@next", "@week?"], "also": []}
+{"text": "The build failed again, so I am looking into it.", "chunks": ["@the", "@build", "@failed", "@again,", "@so", "@i", "@am", "@looking", "@into", "@it."], "also": []}
+{"text": "Thanks for the quick review.", "chunks": ["@thanks", "@for", "@the", "@quick", "@review."], "also": []}
+{"text": "Please let me know if you have any questions.", "chunks": ["@please", "@let", "@me", "@know", "@if", "@you", "@have", "@any", "@questions."], "also": []}
+{"text": "I think we should ship this after the tests pass.", "chunks": ["@i", "@think", "@we", "@should", "@ship", "@this", "@after", "@the", "@tests", "@pass."], "also": []}
+{"text": "Sorry for the late reply, I was out of the office.", "chunks": ["@sorry", "@for", "@the", "@late", "@reply,", "@i", "@was", "@out", "@of", "@the", "@office."], "also": []}
+{"text": "Let me check the logs and get back to you.", "chunks": ["@let", "@me", "@check", "@the", "@logs", "@and", "@get", "@back", "@to", "@you."], "also": []}
+{"text": "The new version looks much faster than the old one.", "chunks": ["@the", "@new", "@version", "@looks", "@much", "@faster", "@than", "@the", "@old", "@one."], "also": []}
+{"text": "Could you share the slides from yesterday?", "chunks": ["@could", "@you", "@share", "@the", "@slides", "@from", "@yesterday?"], "also": []}
+{"text": "We need to fix this before the release.", "chunks": ["@we", "@need", "@to", "@fix", "@this", "@before", "@the", "@release."], "also": []}
+{"text": "I am going to be a little late today.", "chunks": ["@i", "@am", "@going", "@to", "@be", "@a", "@little", "@late", "@today."], "also": []}
+{"text": "Do you have time for a quick call this afternoon?", "chunks": ["@do", "@you", "@have", "@time", "@for", "@a", "@quick", "@call", "@this", "@afternoon?"], "also": []}
+{"text": "The server is down, but we are working on it.", "chunks": ["@the", "@server", "@is", "@down,", "@but", "@we", "@are", "@working", "@on", "@it."], "also": []}
+{"text": "Have a nice weekend and see you on Monday.", "chunks": ["@have", "@a", "@nice", "@weekend", "@and", "@see", "@you", "@on", "@monday."], "also": []}
+{"text": "I just pushed the changes to the main branch.", "chunks": ["@i", "@just", "@pushed", "@the", "@changes", "@to", "@the", "@main", "@branch."], "also": []}
+{"text": "That sounds good to me.", "chunks": ["@that", "@sounds", "@good", "@to", "@me."], "also": []}
+{"text": "The client wants the design to be simpler.", "chunks": ["@the", "@client", "@wants", "@the", "@design", "@to", "@be", "@simpler."], "also": []}
+{"text": "I will be working from home tomorrow.", "chunks": ["@i", "@will", "@be", "@working", "@from", "@home", "@tomorrow."], "also": []}
+{"text": "We can talk about it at lunch.", "chunks": ["@we", "@can", "@talk", "@about", "@it", "@at", "@lunch."], "also": []}

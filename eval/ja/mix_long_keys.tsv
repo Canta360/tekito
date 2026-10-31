@@ -1,0 +1,150 @@
+fresh-long	1	kyouno meeting* de release* no nitteiwo kimemasu.	今日のmeetingでreleaseの日程を決めます。
+fresh-long	2	kono branch* wo main* ni merge* shitekara deploy* shitekudasai.	このbranchをmainにmergeしてからdeployしてください。
+fresh-long	3	sakkino bug* ha mou fix* shitanode test* wo mouichido mawashimasu.	さっきのbugはもうfixしたのでtestをもう一度回します。
+fresh-long	4	ashitano presentation* no slide* wo google* doraibuni ageteokimashita.	明日のpresentationのslideをGoogleドライブに上げておきました。
+fresh-long	5	client* karano feedback* wo yonde, shiyouwo sukoshi kaerukotoni shimashita.	clientからのfeedbackを読んで、仕様を少し変えることにしました。
+fresh-long	6	slack* de kyouyuushita document* ni mewo tooshiteoite kudasai.	Slackで共有したdocumentに目を通しておいてください。
+fresh-long	7	raishuuno schedule* ga mada kimatteinainode, chouseiwo onegaishimasu.	来週のscheduleがまだ決まっていないので、調整をお願いします。
+fresh-long	8	server* no fukaga takainode, cache* wo irete yousuwo mimasu.	serverの負荷が高いので、cacheを入れて様子を見ます。
+fresh-long	9	database* no backup* ha maibann jidoude totteimasu.	databaseのbackupは毎晩自動で取っています。
+fresh-long	10	atarashii feature* no design* wo figma* de tsukurinaoshimashita.	新しいfeatureのdesignをFigmaで作り直しました。
+fresh-long	11	review* ga owattara, sono pull* request* wo close* shitekudasai.	reviewが終わったら、そのpull requestをcloseしてください。
+fresh-long	12	konkaino update* de login* no gamenga ookiku kawarimasu.	今回のupdateでloginの画面が大きく変わります。
+fresh-long	13	error* no log* wo miruto, timeout* ga genninnno youdesu.	errorのlogを見ると、timeoutが原因のようです。
+fresh-long	14	shuumatsuni python* de script* wo kaite, sagyouwo jidoukashimashita.	週末にPythonでscriptを書いて、作業を自動化しました。
+fresh-long	15	deadline* ni maniawanaikamo shirenainode, priority* wo minaoshimashou.	deadlineに間に合わないかもしれないので、priorityを見直しましょう。
+fresh-long	16	zoom* no link* wo calendar* ni hatteokimashita.	Zoomのlinkをcalendarに貼っておきました。
+fresh-long	17	kono issue* ha support* no tantouni mawashitekudasai.	このissueはsupportの担当に回してください。
+fresh-long	18	sample* no code* wo ugokashitemitara, suguni crash* shimashita.	sampleのcodeを動かしてみたら、すぐにcrashしました。
+fresh-long	19	project* no member* ga fuetanode, channel* wo wakerukotoni shimashita.	projectのmemberが増えたので、channelを分けることにしました。
+fresh-long	20	kinouno session* ha totemo sankouni nattanode, recording* wo kyouyuushimasu.	昨日のsessionはとても参考になったので、recordingを共有します。
+fresh-long	21	browser* no cache* wo keshitekara, mouichido reload* shitemitekudasai.	browserのcacheを消してから、もう一度reloadしてみてください。
+fresh-long	22	sono kenha email* dehanaku chat* de soudanshimashou.	その件はemailではなくchatで相談しましょう。
+fresh-long	23	test* no coverage* ga sagatteirunode, tsuikade case* wo kakimasu.	testのcoverageが下がっているので、追加でcaseを書きます。
+fresh-long	24	maiasano standup* de susumiguaiwo kyouyuushiteimasu.	毎朝のstandupで進み具合を共有しています。
+fresh-long	25	contract* no naiyouwo legal* ni check* shitemoraimasu.	contractの内容をlegalにcheckしてもらいます。
+fresh-long	26	kono page* ha mobile* de miruto hyoujiga kuzuremasu.	このpageはmobileで見ると表示が崩れます。
+fresh-long	27	version* wo agetara, plugin* ga ugokanaku narimashita.	versionを上げたら、pluginが動かなくなりました。	versionをあげたら、pluginが動かなくなりました。
+fresh-long	28	natsuyasumino maeni budget* no shinseiwo dashiteokitaidesu.	夏休みの前にbudgetの申請を出しておきたいです。
+fresh-long	29	marketing* no team* to isshoni campaign* no anwo kangaeteimasu.	marketingのteamと一緒にcampaignの案を考えています。
+fresh-long	30	kyouha remote* de hataraiteirunode, call* de hanashimashou.	今日はremoteで働いているので、callで話しましょう。
+fresh-long	31	kono table* no column* wo hitotsu fuyashite hoshiidesu.	このtableのcolumnを一つ増やしてほしいです。
+fresh-long	32	password* wo wasuretanode, reset* no mail* wo okutte moraemasuka.	passwordを忘れたので、resetのmailを送ってもらえますか。
+fresh-long	33	dashboard* no suujiga kinoukara koushinsareteimasenn.	dashboardの数字が昨日から更新されていません。
+fresh-long	34	kono kinouha beta* nanode, feedback* wo kangeishimasu.	この機能はbetaなので、feedbackを歓迎します。
+fresh-long	35	onboarding* no shiryouwo atarashii hitomukeni kakinaoshimashita.	onboardingの資料を新しい人向けに書き直しました。
+fresh-long	36	kinnyoubimadeni draft* wo okurunode, comment* wo onegaishimasu.	金曜日までにdraftを送るので、commentをお願いします。
+fresh-long	37	network* ga osoi seide, upload* ni jikanga kakatteimasu.	networkが遅いせいで、uploadに時間がかかっています。
+fresh-long	38	teireino agenda* ni konkaino incident* wo ireteokimasu.	定例のagendaに今回のincidentを入れておきます。
+fresh-long	39	kono site* ha search* no kekkaga totemo miyasuidesu.	このsiteはsearchの結果がとても見やすいです。
+fresh-long	40	shop* no open* ni awasete sale* wo hajimeru yoteidesu.	shopのopenに合わせてsaleを始める予定です。
+fresh-long	41	atarashii laptop* ga todoitanode, kankyouno setup* wo shiteimasu.	新しいlaptopが届いたので、環境のsetupをしています。
+fresh-long	42	kono task* ha raishuuno sprint* ni mawashitemo iidesuka.	このtaskは来週のsprintに回してもいいですか。
+fresh-long	43	excel* no file* wo hirakuto, mojiga bakete shimaimasu.	Excelのfileを開くと、文字が化けてしまいます。
+fresh-long	44	interview* no nitteiga kimattara, room* wo yoyakushimasu.	interviewの日程が決まったら、roomを予約します。
+fresh-long	45	omona target* ha nijuudaino joseidesu.	主なtargetは二十代の女性です。	主なtargetは20代の女性です。
+fresh-long	46	kono plan* dato, cost* ga takasugiruto omoimasu.	このplanだと、costが高すぎると思います。
+fresh-long	47	size* ga awanakattanode, betsuno color* ni koukanshimashita.	sizeが合わなかったので、別のcolorに交換しました。
+fresh-long	48	menu* ni aru atarashii item* wo tameshite mimashita.	menuにある新しいitemを試してみました。
+fresh-long	49	tutorial* wo saigomade yareba, kihonha wakarimasu.	tutorialを最後までやれば、基本は分かります。	tutorialを最後までやれば、基本はわかります。
+fresh-long	50	kono game* ha online* de tomodachito asobemasu.	このgameはonlineで友達と遊べます。
+fresh-long	51	raigetsukara office* no bashoga kawarimasu.	来月からofficeの場所が変わります。
+fresh-long	52	buchouno approval* ga detanode, order* wo susumemasu.	部長のapprovalが出たので、orderを進めます。
+fresh-long	53	kono step* wo tobasuto, install* ni shippaishimasu.	このstepを飛ばすと、installに失敗します。
+fresh-long	54	story* no junbanwo irekaetara, hanashiga wakariyasuku narimashita.	storyの順番を入れ替えたら、話が分かりやすくなりました。	storyの順番を入れ替えたら、話がわかりやすくなりました。
+fresh-long	55	camera* no setteiwo kaetara, photo* ga akaruku narimashita.	cameraの設定を変えたら、photoが明るくなりました。
+fresh-long	56	kono question* niha atode matomete kotaemasu.	このquestionには後でまとめて答えます。
+fresh-long	57	train* ga okureteirunode, meeting* ni sukoshi okuremasu.	trainが遅れているので、meetingに少し遅れます。
+fresh-long	58	hotel* no yoyakuha web* de sumasemashita.	hotelの予約はwebで済ませました。
+fresh-long	59	kono form* ni namaeto address* wo iretekudasai.	このformに名前とaddressを入れてください。
+fresh-long	60	traffic* ga fuetanode, server* wo ichidai tashimashita.	trafficが増えたので、serverを一台足しました。	trafficが増えたので、serverを1台足しました。
+fresh-long	61	kono command* wo utsuto, zenbuno container* ga tomarimasu.	このcommandを打つと、全部のcontainerが止まります。
+fresh-long	62	docker* no image* ga ookisugite, build* ni jikanga kakarimasu.	Dockerのimageが大きすぎて、buildに時間がかかります。
+fresh-long	63	raishuuno event* de demo* wo miseru yoteidesu.	来週のeventでdemoを見せる予定です。
+fresh-long	64	kono category* no uriageha sengetsuyori nobiteimasu.	このcategoryの売り上げは先月より伸びています。	このcategoryの売上げは先月より伸びています。	このcategoryの売上は先月より伸びています。
+fresh-long	65	phone* no denchiga suguni kirerunode, atarashii case* wo kaimashita.	phoneの電池がすぐに切れるので、新しいcaseを買いました。
+fresh-long	66	kono list* kara sukina option* wo erandekudasai.	このlistから好きなoptionを選んでください。
+fresh-long	67	recipe* no toorini tsukuttanoni, ajiga zenzenn chigaimasu.	recipeの通りに作ったのに、味が全然違います。
+fresh-long	68	workshop* no sankashani survey* wo okurimashita.	workshopの参加者にsurveyを送りました。
+fresh-long	69	kono model* ha seidoga takaikeredo, speed* ga osoidesu.	このmodelは精度が高いけれど、speedが遅いです。
+fresh-long	70	atarashii logo* no color* nitsuite ikenwo kudasai.	新しいlogoのcolorについて意見をください。
+fresh-long	71	konnyano match* ha tomodachito bar* de miru yoteidesu.	今夜のmatchは友達とbarで見る予定です。
+fresh-long	72	music* wo kikinagara sagyousuruto shuuchuudekimasu.	musicを聞きながら作業すると集中できます。
+fresh-long	73	kono project* no goal* wo mouichido kakuninshimashou.	このprojectのgoalをもう一度確認しましょう。
+fresh-long	74	release* no note* ni henkoutenwo matometeokimashita.	releaseのnoteに変更点をまとめておきました。
+fresh-long	75	user* no koewo atsumerutameni, form* wo tsukurimashita.	userの声を集めるために、formを作りました。
+fresh-long	76	kono key* wo osuto, window* ga tojimasu.	このkeyを押すと、windowが閉じます。
+fresh-long	77	printer* no kamiga kireteirunode, hojuushitekudasai.	printerの紙が切れているので、補充してください。
+fresh-long	78	nenmatsuha yasumiga ooinode, delivery* no hiwo hayamemasu.	年末は休みが多いので、deliveryの日を早めます。
+fresh-long	79	kono book* ha beginner* nimo osusumedesu.	このbookはbeginnerにもおすすめです。	このbookはbeginnerにもお勧めです。
+fresh-long	80	course* no tochuudemo cancel* dekimasuka.	courseの途中でもcancelできますか。
+fresh-long	81	jibunnno profile* no shashinwo kaemashita.	自分のprofileの写真を変えました。
+fresh-long	82	kono video* ha jimakuwo on* ni suruto miyasuidesu.	このvideoは字幕をonにすると見やすいです。
+fresh-long	83	account* wo tsukurutokini, phone* no bangouga hitsuyoudesu.	accountを作るときに、phoneの番号が必要です。	accountを作る時に、phoneの番号が必要です。
+fresh-long	84	queue* ni tamatta job* wo junbannni shorishiteimasu.	queueに溜まったjobを順番に処理しています。	queueにたまったjobを順番に処理しています。
+fresh-long	85	kono function* ha hikisuuga oosugite yominikuidesu.	このfunctionは引数が多すぎて読みにくいです。
+fresh-long	86	report* no format* wo touitsushite hoshiito iwaremashita.	reportのformatを統一してほしいと言われました。
+fresh-long	87	atarashii policy* nitsuite manager* kara setsumeiga arimashita.	新しいpolicyについてmanagerから説明がありました。
+fresh-long	88	kono store* deha card* shika tsukaemasenn.	このstoreではcardしか使えません。
+fresh-long	89	client* tono call* ga nagabiitanode, lunch* wo tabesokonemashita.	clientとのcallが長引いたので、lunchを食べ損ねました。
+fresh-long	90	raishuuha training* no tameni oosakahe ikimasu.	来週はtrainingのために大阪へ行きます。
+fresh-long	91	kono software* ha free* de tsukaerunoga benridesu.	このsoftwareはfreeで使えるのが便利です。
+fresh-long	92	sensor* no ataiga okashiinode, device* wo saikidoushimashita.	sensorの値がおかしいので、deviceを再起動しました。
+fresh-long	93	kono graph* wo miruto, trend* ga hakkiri wakarimasu.	このgraphを見ると、trendがはっきり分かります。	このgraphを見ると、trendがはっきりわかります。
+fresh-long	94	party* no junbiha check* no list* wo tsukutte susumeteimasu.	partyの準備はcheckのlistを作って進めています。
+fresh-long	95	kono rule* ha wakarinikuinode, reiwo tashimashou.	このruleは分かりにくいので、例を足しましょう。	このruleはわかりにくいので、例を足しましょう。
+fresh-long	96	history* wo mireba, darega itsu kaetaka wakarimasu.	historyを見れば、誰がいつ変えたか分かります。	historyを見れば、誰がいつ変えたかわかります。
+fresh-long	97	template* wo tsukaeba, maikai onaji katachide kakemasu.	templateを使えば、毎回同じ形で書けます。
+fresh-long	98	kono button* no ichiga wakarinikuitoiu koega arimashita.	このbuttonの位置が分かりにくいという声がありました。	このbuttonの位置がわかりにくいという声がありました。
+fresh-long	99	projector* no choushiga waruinode, betsuno room* wo tsukaimashou.	projectorの調子が悪いので、別のroomを使いましょう。
+fresh-long	100	kyouno topic* ha rainennno strategy* nitsuitedesu.	今日のtopicは来年のstrategyについてです。
+fresh-long	101	coffee* wo nomisugite, yoruni nemuremasendeshita.	coffeeを飲みすぎて、夜に眠れませんでした。
+fresh-long	102	kono brand* no shoes* ha karukute arukiyasuidesu.	このbrandのshoesは軽くて歩きやすいです。
+fresh-long	103	weather* no app* de ashitano amewo kakuninshimashita.	weatherのappで明日の雨を確認しました。
+fresh-long	104	network* no setteiha admin* shika kaeraremasenn.	networkの設定はadminしか変えられません。
+fresh-long	105	kono chart* ha kyonennno data* wo motoni tsukurimashita.	このchartは去年のdataをもとに作りました。
+fresh-long	106	news* no site* de atarashii product* no kijiwo yomimashita.	newsのsiteで新しいproductの記事を読みました。
+fresh-long	107	kono folder* ni haitteiru file* ha zenbu keshite daijoubudesu.	このfolderに入っているfileは全部消して大丈夫です。
+fresh-long	108	content* no ryouga oosugirunode, section* wo wakemashita.	contentの量が多すぎるので、sectionを分けました。
+fresh-long	109	kono message* ha jidoude okurareteimasu.	このmessageは自動で送られています。
+fresh-long	110	boss* ni tanomareta task* wo yuugatamadeni owarasemasu.	bossに頼まれたtaskを夕方までに終わらせます。
+fresh-long_ja	1	ashitaha asakara kaigiga arunode, hayameni iewo deru tsumoridesu.	明日は朝から会議があるので、早めに家を出るつもりです。
+fresh-long_ja	2	ekino chikakuni atarashii honnyaga dekitanode, shuumatsuni ittemitaidesu.	駅の近くに新しい本屋ができたので、週末に行ってみたいです。	駅の近くに新しい本屋が出来たので、週末に行ってみたいです。
+fresh-long_ja	3	amega furisounanode, kasawo motte dekaketahouga iidesuyo.	雨が降りそうなので、傘を持って出かけたほうがいいですよ。
+fresh-long_ja	4	kono ryouriha omottayori kantannni tsukurerunode, zehi tameshite mitekudasai.	この料理は思ったより簡単に作れるので、ぜひ試してみてください。
+fresh-long_ja	5	kyonennno natsuni itta ryokouno shashinwo seirishiteimasu.	去年の夏に行った旅行の写真を整理しています。
+fresh-long_ja	6	kodomono koroni yonda honwo mouichido yomikaeshiteimasu.	子供の頃に読んだ本をもう一度読み返しています。	子どもの頃に読んだ本をもう一度読み返しています。
+fresh-long_ja	7	taichouga waruinode, kyouha hayameni yasumasetekudasai.	体調が悪いので、今日は早めに休ませてください。
+fresh-long_ja	8	raigetsuno hikkoshini mukete, sukoshizutsu nimotsuwo matometeimasu.	来月の引っ越しに向けて、少しずつ荷物をまとめています。
+fresh-long_ja	9	senshuuno doyoubini tomodachito eigawo mini ikimashita.	先週の土曜日に友達と映画を見に行きました。
+fresh-long_ja	10	kono michiwo massugu ikuto, migigawani yuubinkyokuga arimasu.	この道をまっすぐ行くと、右側に郵便局があります。
+fresh-long_ja	11	oisogashii tokoro moushiwake arimasenga, kakuninwo onegai dekimasuka.	お忙しいところ申し訳ありませんが、確認をお願いできますか。
+fresh-long_ja	12	mainichi sukoshizutsudemo tsudukerukotoga taisetsudato omoimasu.	毎日少しずつでも続けることが大切だと思います。
+fresh-long_ja	13	kinouha kazega tsuyokute, jitenshani norunoga taihendeshita.	昨日は風が強くて、自転車に乗るのが大変でした。
+fresh-long_ja	14	reizoukono nakani nokotteita yasaide su-puwo tsukurimashita.	冷蔵庫の中に残っていた野菜でスープを作りました。
+fresh-long_ja	15	toshokande karita honnno henkyakubiga ashitamadedesu.	図書館で借りた本の返却日が明日までです。
+fresh-long_ja	16	atarashii shigotoniha daibu naretekimashitaga, mada oboerukotoga ooidesu.	新しい仕事にはだいぶ慣れてきましたが、まだ覚えることが多いです。
+fresh-long_ja	17	shuumatsuha tenkiga yokereba, yamani noborini iku yoteidesu.	週末は天気が良ければ、山に登りに行く予定です。	週末は天気がよければ、山に登りに行く予定です。
+fresh-long_ja	18	denshano nakade neteshimatte, oriru ekiwo toorisugimashita.	電車の中で寝てしまって、降りる駅を通り過ぎました。
+fresh-long_ja	19	hisashiburini jikkani kaettara, ryoushinga totemo yorokonde kuremashita.	久しぶりに実家に帰ったら、両親がとても喜んでくれました。
+fresh-long_ja	20	sono kennni tsuiteha, nochihodo tantoushakara aratamete gorenraku shimasu.	その件については、後ほど担当者から改めてご連絡します。
+fresh-long_en	1	i* will* send* you* the* report* by* friday.*	I will send you the report by Friday.
+fresh-long_en	2	can* we* move* the* meeting* to* next* week?*	Can we move the meeting to next week?
+fresh-long_en	3	the* build* failed* again,* so* i* am* looking* into* it.*	The build failed again, so I am looking into it.
+fresh-long_en	4	thanks* for* the* quick* review.*	Thanks for the quick review.
+fresh-long_en	5	please* let* me* know* if* you* have* any* questions.*	Please let me know if you have any questions.
+fresh-long_en	6	i* think* we* should* ship* this* after* the* tests* pass.*	I think we should ship this after the tests pass.
+fresh-long_en	7	sorry* for* the* late* reply,* i* was* out* of* the* office.*	Sorry for the late reply, I was out of the office.
+fresh-long_en	8	let* me* check* the* logs* and* get* back* to* you.*	Let me check the logs and get back to you.
+fresh-long_en	9	the* new* version* looks* much* faster* than* the* old* one.*	The new version looks much faster than the old one.
+fresh-long_en	10	could* you* share* the* slides* from* yesterday?*	Could you share the slides from yesterday?
+fresh-long_en	11	we* need* to* fix* this* before* the* release.*	We need to fix this before the release.
+fresh-long_en	12	i* am* going* to* be* a* little* late* today.*	I am going to be a little late today.
+fresh-long_en	13	do* you* have* time* for* a* quick* call* this* afternoon?*	Do you have time for a quick call this afternoon?
+fresh-long_en	14	the* server* is* down,* but* we* are* working* on* it.*	The server is down, but we are working on it.
+fresh-long_en	15	have* a* nice* weekend* and* see* you* on* monday.*	Have a nice weekend and see you on Monday.
+fresh-long_en	16	i* just* pushed* the* changes* to* the* main* branch.*	I just pushed the changes to the main branch.
+fresh-long_en	17	that* sounds* good* to* me.*	That sounds good to me.
+fresh-long_en	18	the* client* wants* the* design* to* be* simpler.*	The client wants the design to be simpler.
+fresh-long_en	19	i* will* be* working* from* home* tomorrow.*	I will be working from home tomorrow.
+fresh-long_en	20	we* can* talk* about* it* at* lunch.*	We can talk about it at lunch.

@@ -6,7 +6,9 @@ Input: JSON lines, one sentence each:
 
   {"text": "今日はGitHubに…", "chunks": ["きょうは", "@github", "に", …]}
 
-A chunk starting with @ is an English word, typed as it is. Each Japanese
+A chunk starting with @ is an English word, typed as it is, with the
+punctuation typed right after it (@tomorrow.). "also" lists other texts
+that are right too (["20代"] beside 二十代). Each Japanese
 chunk's keys are checked to read back as its kana with the japanese-romaji
 table; a sentence with one that does not is left out.
 
@@ -125,7 +127,7 @@ def main() -> int:
             for chunk in chunks:
                 chunk = chunk.strip()
                 if chunk.startswith("@"):
-                    if not re.fullmatch(r"[a-z]+", chunk[1:]):
+                    if not re.fullmatch(r"[a-z]+[.,!?]?", chunk[1:]):
                         raise ValueError(f"english {chunk!r}")
                     keys.append(chunk[1:] + "*")
                     continue
@@ -138,7 +140,8 @@ def main() -> int:
                 if read is None or read + tail != hiragana(chunk):
                     raise ValueError(f"{typed!r} reads {read!r}, not {chunk!r}")
                 keys.append(typed)
-            kept.append("\t".join([f"fresh-{category}", str(number), " ".join(keys), row["text"].strip()]))
+            texts = [row["text"].strip()] + [t.strip() for t in row.get("also", []) if t.strip()]
+            kept.append("\t".join([f"fresh-{category}", str(number), " ".join(keys)] + texts))
         except (KeyError, ValueError, TypeError, json.JSONDecodeError) as error:
             dropped += 1
             print(f"  left out {number}: {error}", file=sys.stderr)
