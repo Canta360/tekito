@@ -122,6 +122,14 @@ public:
     // The sentences it reads are put together by the converter's costs (on
     // by default) or, off, by the sum of each phrase's rank.
     void SetSentencesByCost(bool on) noexcept { sentencesByCost_ = on; }
+    // How much more each candidate of `list` (indices into `candidates`,
+    // best first) costs than the first, rising.
+    [[nodiscard]] static std::vector<std::int64_t> CostDeltas(const std::vector<PhraseCandidate>& candidates,
+                                                              const std::vector<std::size_t>& list);
+    // Where in `candidates` the likeliest slip undone goes: right after the
+    // first when it is `likelier`, otherwise further down; never before the
+    // chunk in the other language, nor second in a chunk taken as English.
+    [[nodiscard]] static std::size_t SlipPosition(const std::vector<PhraseCandidate>& candidates, bool likelier) noexcept;
     // Space (and live refine) may undo typing slips in the keys and convert
     // the reading as meant. Off: convert as typed; slip candidates stay in
     // the list. On by default, as UserSettings::japaneseSlipAutoApply.
@@ -452,10 +460,10 @@ private:
     // order by the converter's costs; without, by the sum of the ranks.
     [[nodiscard]] std::vector<std::size_t> ReadBest(const std::vector<std::vector<std::wstring>>& parts,
                                                     const std::vector<std::vector<std::int64_t>>* deltas = nullptr) const;
-    // How much more each candidate of `list` (indices into `candidates`,
-    // best first) costs than the first, rising.
-    [[nodiscard]] static std::vector<std::int64_t> CostDeltas(const std::vector<PhraseCandidate>& candidates,
-                                                              const std::vector<std::size_t>& list);
+    // A katakana word typed with a vowel for ー (にゅうす: ニュース), into the
+    // phrase's list.
+    void AddLongVowelWords(std::vector<PhraseCandidate>& candidates, std::wstring_view reading,
+                           bool overSlip = false) const;
     // The keys with their likeliest slips undone (SetKanaSlips), converted
     // in place of the phrases when that reads better; whether it did.
     bool FixSlips();

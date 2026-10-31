@@ -624,7 +624,18 @@ int RunChunks(const ConnectionMatrix& matrix, const JapaneseDictionary& dictiona
     std::map<std::string, ChunkTotals> totals;
     std::map<std::string, std::size_t> sentenceRows, sentenceRight;
     std::size_t shownMisses = 0, shownChunks = 0;
-    for (const auto& row : LoadCorpus(corpus)) {
+    for (auto row : LoadCorpus(corpus)) {
+        // An English word starting the sentence may take a capital, as Mix
+        // gives it one (Dataを for dataを): both are right.
+        for (std::size_t e = 0, n = row.expected.size(); e < n; ++e) {
+            std::wstring capital = row.expected[e];
+            if (!capital.empty() && capital.front() >= L'a' && capital.front() <= L'z') {
+                capital.front() = static_cast<wchar_t>(capital.front() - L'a' + L'A');
+                if (std::find(row.expected.begin(), row.expected.end(), capital) == row.expected.end()) {
+                    row.expected.push_back(std::move(capital));
+                }
+            }
+        }
         std::wstring output;
         std::size_t englishBefore = 0;
         std::wstring englishText;
@@ -687,6 +698,19 @@ int RunChunks(const ConnectionMatrix& matrix, const JapaneseDictionary& dictiona
                     }
                 }
                 chunkRanks.push_back(at);
+            }
+            // TEKITO_EVAL_PICK=1: the choice is picked before Enter, as the
+            // typist would, so the next chunks go on from it (top1 then counts
+            // what the picks make).
+            static const bool pick = [] {
+                const char* value = std::getenv("TEKITO_EVAL_PICK");
+                return value && *value == '1';
+            }();
+            const std::size_t segmentCount = composer.Segments().size();
+            if (pick && at && *at > 0 && *at < 9 && segmentCount > 0) {
+                composer.MoveFocus(-static_cast<int>(segmentCount));
+                composer.ShowCandidates();
+                composer.SelectCandidate(*at);
             }
             const auto committed = composer.Commit();
             fixed += at ? choices[*at] : committed;

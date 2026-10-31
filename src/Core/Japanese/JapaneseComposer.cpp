@@ -1200,6 +1200,11 @@ void JapaneseComposer::BuildPhrasesFor(bool convert) {
                               std::move(whole));
         }
     }
+    // A slip undone read the keys another way (nyuusu: にゅうしゅ, 入手); the
+    // keys as typed may be a katakana word with a vowel for ー (ニュース).
+    if (slipUndone && phrases_.size() == 1 && Reading() != conversionReading_) {
+        AddLongVowelWords(phrases_.front().candidates, Reading(), true);
+    }
     // Japanese, but it reads as English too: the English for the whole
     // chunk is the next choice.
     if (chunk && chunk->either && !phrases_.front().candidates.empty()) {
@@ -2006,6 +2011,7 @@ void JapaneseComposer::AddPhrases(std::vector<Phrase> phrases, const std::wstrin
         if (learning_) learning_->Reorder(LearningReading(reading, phrase.begin, phrase.length), phrase.candidates);
         const bool learned = phrase.candidates.front().text != first;
         AddLoanwords(phrase.candidates, phraseReading);
+        AddLongVowelWords(phrase.candidates, phraseReading);
         AddOtherWidth(phrase.candidates);
         AddSpecial(std::wstring_view(reading).substr(phrase.begin, phrase.length), phrase.candidates);
         phrases_.push_back({phrase.begin, phrase.length, std::move(phrase.candidates)});
@@ -2024,6 +2030,71 @@ std::vector<RomajiToken> JapaneseComposer::ParseRomaji(const RomajiTable& table,
         tokens.push_back({unit.keys.size(), std::move(unit.kana), leftover});
     }
     return tokens;
+}
+
+namespace {
+
+// The vowel a kana ends in (か: あ, しゅ's ゅ: う), or 0.
+wchar_t VowelOf(wchar_t kana) {
+    constexpr std::wstring_view kRows[] = {
+        L"あぁかがさざただなはばぱまやゃらわ", L"いぃきぎしじちぢにひびぴみり", L"うぅくぐすずつづぬふぶぷむゆゅる",
+        L"えぇけげせぜてでねへべぺめれ", L"おぉこごそぞとどのほぼぽもよょろを"};
+    constexpr wchar_t kVowels[] = {L'あ', L'い', L'う', L'え', L'お'};
+    for (std::size_t r = 0; r < std::size(kRows); ++r) {
+        if (kRows[r].find(kana) != std::wstring_view::npos) return kVowels[r];
+    }
+    return 0;
+}
+
+// `reading` with each vowel that only draws out the one before written ー,
+// as katakana words are read in the dictionary (にゅうす: にゅーす, ばあじょん:
+// ばーじょん, こんぴゅうたあ: こんぴゅーたー); おう and えい too (しょう:
+// しょー). The same reading when there is none.
+std::wstring LongVowelReading(std::wstring_view reading) {
+    std::wstring out(reading);
+    for (std::size_t i = 1; i < out.size(); ++i) {
+        const wchar_t vowel = VowelOf(out[i - 1]);
+        const wchar_t c = out[i];
+        if (vowel != 0 && (c == vowel || (vowel == L'お' && c == L'う') || (vowel == L'え' && c == L'い'))) {
+            out[i] = L'ー';
+        }
+    }
+    return out;
+}
+
+}  // namespace
+
+void JapaneseComposer::AddLongVowelWords(std::vector<PhraseCandidate>& candidates, std::wstring_view reading,
+                                         bool overSlip) const {
+    // Katakana words typed with a vowel for ー (nyuusu: ニュース, baajon:
+    // バージョン): the reading with ー, when it is a katakana word, with a
+    // particle after it kept as it is.
+    if (!converter_ || candidates.empty() || reading.size() < 3) return;
+    constexpr std::wstring_view kParticles = L"をがにでのはともへや";
+    for (const std::size_t rest : {std::size_t{0}, std::size_t{1}}) {
+        if (rest > 0 && (reading.size() < 4 || kParticles.find(reading.back()) == std::wstring_view::npos)) continue;
+        const auto word = reading.substr(0, reading.size() - rest);
+        const std::wstring drawn = LongVowelReading(word);
+        if (drawn == word || !converter_->IsWord(drawn)) continue;
+        const auto best = converter_->Best(drawn);
+        const auto isKatakana = [](wchar_t c) { return (c >= L'\x30A1' && c <= L'\x30F6') || c == L'ー'; };
+        if (!best || best->text.empty() || !std::all_of(best->text.begin(), best->text.end(), isKatakana)) continue;
+        std::wstring text = best->text + std::wstring(reading.substr(reading.size() - rest));
+        if (std::any_of(candidates.begin(), candidates.end(), [&](const PhraseCandidate& c) { return c.text == text; })) {
+            return;
+        }
+        // Second when the keys as typed are no word (にゅうす), otherwise
+        // where a slip undone would go.
+        // `overSlip`: first, before a slip undone, which changed keys where
+        // this changes none.
+        const bool typedIsWord = converter_->IsWord(word);
+        const std::size_t at = overSlip && !typedIsWord ? 0
+                               : std::min(candidates.size(), typedIsWord ? kSlipPosition : std::size_t{1});
+        PhraseCandidate candidate{std::move(text), best->cost, PhraseCandidate::Kind::Dictionary, false};
+        candidate.rightId = best->rightId;
+        candidates.insert(candidates.begin() + static_cast<std::ptrdiff_t>(at), std::move(candidate));
+        return;
+    }
 }
 
 void JapaneseComposer::AddLoanwords(std::vector<PhraseCandidate>& candidates, std::wstring_view reading) const {
@@ -2466,19 +2537,29 @@ void JapaneseComposer::AddSlipCandidatesFor(PhraseState& phrase) const {
     // Only the likeliest on the first page, with the words read the same
     // and the emoji; the rest after the first page, not filling it.
     constexpr std::size_t kFirstPage = 9;
-    // A chunk Mix took as English is not a slip of Japanese: Japanese read
-    // from its keys (online: 鬼ね) waits further down.
-    if (!phrase.candidates.empty() && phrase.candidates.front().kind == PhraseCandidate::Kind::English) likelier = false;
-    std::size_t at = std::min(phrase.candidates.size(), likelier ? std::size_t{1} : kSlipPosition);
-    // The chunk in the other language keeps its place right after the
-    // first (data: 立た, data, then だった).
-    while (at < phrase.candidates.size() && at > 0 && phrase.candidates[at].otherLanguage) ++at;
+    const std::size_t at = SlipPosition(phrase.candidates, likelier);
     phrase.candidates.insert(phrase.candidates.begin() + static_cast<std::ptrdiff_t>(at), std::move(added.front()));
     if (phrase.selected >= at) ++phrase.selected;
     const std::size_t rest = std::min(phrase.candidates.size(), std::max(at + 1, kFirstPage));
     phrase.candidates.insert(phrase.candidates.begin() + static_cast<std::ptrdiff_t>(rest),
                              std::make_move_iterator(added.begin() + 1), std::make_move_iterator(added.end()));
     if (phrase.selected >= rest) phrase.selected += added.size() - 1;
+}
+
+std::size_t JapaneseComposer::SlipPosition(const std::vector<PhraseCandidate>& candidates, bool likelier) noexcept {
+    // A chunk Mix took as English is not a slip of Japanese: Japanese read
+    // from its keys (online: 鬼ね) waits further down.
+    if (!candidates.empty() && candidates.front().kind == PhraseCandidate::Kind::English) likelier = false;
+    // Nor are keys that spell a word in both languages (sake: 避け, Sake,
+    // then 酒, not だけ): their own words come before a slip undone.
+    if (std::any_of(candidates.begin(), candidates.end(), [](const PhraseCandidate& c) { return c.otherLanguage; })) {
+        likelier = false;
+    }
+    std::size_t at = std::min(candidates.size(), likelier ? std::size_t{1} : kSlipPosition);
+    // The chunk in the other language keeps its place right after the
+    // first (data: 立た, data, then だった).
+    while (at < candidates.size() && at > 0 && candidates[at].otherLanguage) ++at;
+    return at;
 }
 
 bool JapaneseComposer::SamePhrasing(const std::wstring& reading, const std::vector<std::size_t>& starts,
