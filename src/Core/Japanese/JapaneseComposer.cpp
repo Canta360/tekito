@@ -1207,6 +1207,7 @@ void JapaneseComposer::BuildPhrasesFor(bool convert) {
         PhraseCandidate english{EnglishAsWritten(chunk->written), candidates.front().cost,
                                 PhraseCandidate::Kind::English, false};
         english.reading = conversionReading_;
+        english.otherLanguage = true;
         candidates.insert(candidates.begin() + 1, std::move(english));
     }
     if (convert) JoinEllipsis();
@@ -2465,7 +2466,13 @@ void JapaneseComposer::AddSlipCandidatesFor(PhraseState& phrase) const {
     // Only the likeliest on the first page, with the words read the same
     // and the emoji; the rest after the first page, not filling it.
     constexpr std::size_t kFirstPage = 9;
-    const std::size_t at = std::min(phrase.candidates.size(), likelier ? std::size_t{1} : kSlipPosition);
+    // A chunk Mix took as English is not a slip of Japanese: Japanese read
+    // from its keys (online: 鬼ね) waits further down.
+    if (!phrase.candidates.empty() && phrase.candidates.front().kind == PhraseCandidate::Kind::English) likelier = false;
+    std::size_t at = std::min(phrase.candidates.size(), likelier ? std::size_t{1} : kSlipPosition);
+    // The chunk in the other language keeps its place right after the
+    // first (data: 立た, data, then だった).
+    while (at < phrase.candidates.size() && at > 0 && phrase.candidates[at].otherLanguage) ++at;
     phrase.candidates.insert(phrase.candidates.begin() + static_cast<std::ptrdiff_t>(at), std::move(added.front()));
     if (phrase.selected >= at) ++phrase.selected;
     const std::size_t rest = std::min(phrase.candidates.size(), std::max(at + 1, kFirstPage));

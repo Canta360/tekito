@@ -2,19 +2,15 @@
 
 #include "Core/DataPackPath.h"
 #include "Core/ExternalLexiconProvider.h"
+#include "Core/Utf8.h"
 
 #include <algorithm>
 #include <cctype>
 #if defined(_WIN32)
 #include <windows.h>
-#else
-#include <codecvt>
 #endif
 #include <filesystem>
 #include <fstream>
-#if !defined(_WIN32)
-#include <locale>
-#endif
 #include <string>
 #include <string_view>
 #include <utility>
@@ -53,11 +49,9 @@ std::wstring Wide(std::string_view text) {
         }
     }
 #else
-    try {
-        std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
-        return converter.from_bytes(text.data(), text.data() + text.size());
-    } catch (...) {
-    }
+    // codecvt_utf8_utf16 would write UTF-16 surrogates into a 32-bit
+    // wchar_t (🫥 as two broken characters).
+    if (auto decoded = utf8::Decode(text)) return *std::move(decoded);
 #endif
     std::wstring result;
     result.reserve(text.size());

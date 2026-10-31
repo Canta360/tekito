@@ -37,6 +37,10 @@ struct PhraseCandidate {
     bool kanaNumber{false};
     // Has a set phrase in it (画竜点睛), which the sentence check leaves.
     bool setPhrase{false};
+    // Mix: the chunk in the other language (Japanese read as English, or
+    // English as Japanese), as likely as the first. It keeps the place
+    // right after the first: other second choices (a slip undone) go after.
+    bool otherLanguage{false};
 };
 
 // A word that starts with what has been typed, for prediction.

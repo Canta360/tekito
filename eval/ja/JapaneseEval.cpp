@@ -615,6 +615,11 @@ int RunChunks(const ConnectionMatrix& matrix, const JapaneseDictionary& dictiona
         std::size_t chunks{0}, english{0}, englishRight{0}, japanese{0}, japaneseRight{0};
         // Sentences whose every chunk was taken as the right language.
         std::size_t judgedRows{0};
+        // Without --hold: chunks whose list (first nine) has what the
+        // sentence needs there, how far down it is (the picks it takes),
+        // and sentences every chunk of which can be put right so.
+        std::size_t listedChunks{0}, reachedChunks{0}, picks{0}, reachedRows{0};
+        std::size_t rank[9]{};
     };
     std::map<std::string, ChunkTotals> totals;
     std::map<std::string, std::size_t> sentenceRows, sentenceRight;
@@ -629,6 +634,8 @@ int RunChunks(const ConnectionMatrix& matrix, const JapaneseDictionary& dictiona
         std::vector<std::pair<bool, bool>> judged;  // English meant, English said
         std::wistringstream words(row.reading);
         std::size_t chunkIndex = 0;
+        std::vector<std::optional<std::size_t>> chunkRanks;
+        std::wstring fixed;  // the output with each chunk put right where its list can
         for (std::wstring chunk; words >> chunk; ++chunkIndex) {
             const bool meant = chunk.back() == L'*';
             if (meant) chunk.pop_back();
@@ -653,8 +660,36 @@ int RunChunks(const ConnectionMatrix& matrix, const JapaneseDictionary& dictiona
             for (const wchar_t key : chunk) composer.Insert(key);
             composer.Convert();
             if (options.hold) continue;
-            const auto choices = written.is_open() ? OnePickAway(composer) : std::vector<std::wstring>{};
+            const auto choices = OnePickAway(composer);
+            // TEKITO_EVAL_DUMP_LISTS=1: each chunk's list as shown.
+            if (const char* dump = std::getenv("TEKITO_EVAL_DUMP_LISTS"); dump && *dump == '1') {
+                std::cout << "list " << row.source << ":" << row.id << " " << Narrow(chunk) << ":";
+                for (std::size_t c = 0; c < choices.size(); ++c) std::cout << " [" << c + 1 << "]" << Narrow(choices[c]);
+                std::cout << "\n";
+            }
+            // Where in this chunk's list the text the sentence goes on with
+            // is: the first choice that keeps the output a start of an
+            // acceptable text (spaces left out).
+            std::optional<std::size_t> at;
+            {
+                const auto squeeze = [](std::wstring text) {
+                    std::erase(text, L' ');
+                    return text;
+                };
+                for (std::size_t c = 0; c < choices.size() && !at; ++c) {
+                    std::wstring so = fixed + choices[c];
+                    so = squeeze(so);
+                    for (const auto& expected : row.expected) {
+                        if (squeeze(expected).starts_with(so)) {
+                            at = c;
+                            break;
+                        }
+                    }
+                }
+                chunkRanks.push_back(at);
+            }
             const auto committed = composer.Commit();
+            fixed += at ? choices[*at] : committed;
             if (written.is_open()) {
                 written << row.source << '\t' << row.id << '\t' << chunkIndex << '\t' << Narrow(committed) << '\t';
                 for (std::size_t c = 0; c < choices.size(); ++c) {
@@ -710,6 +745,20 @@ int RunChunks(const ConnectionMatrix& matrix, const JapaneseDictionary& dictiona
             ++t->rows;
             if (distance == 0) ++t->exact;
             if (allJudged) ++t->judgedRows;
+            if (!options.hold) {
+                bool reached = true;
+                for (const auto& at : chunkRanks) {
+                    ++t->listedChunks;
+                    if (!at) {
+                        reached = false;
+                        continue;
+                    }
+                    ++t->reachedChunks;
+                    t->picks += *at;
+                    if (*at < std::size(t->rank)) ++t->rank[*at];
+                }
+                if (reached) ++t->reachedRows;
+            }
             t->errors += distance;
             t->characters += length;
             for (const auto& [meant, said] : judged) {
@@ -733,6 +782,12 @@ int RunChunks(const ConnectionMatrix& matrix, const JapaneseDictionary& dictiona
     for (const auto& [source, t] : totals) {
         std::cout << source << ": rows=" << t.rows << " top1=" << 100.0 * t.exact / t.rows << "%"
                   << " judged_rows=" << 100.0 * t.judgedRows / t.rows << "%"
+                  << (options.hold ? std::string{}
+                                   : " in_lists=" + std::to_string(100.0 * t.reachedRows / std::max<std::size_t>(t.rows, 1)) +
+                                         "% chunk_rank1/2/3=" + std::to_string(t.rank[0]) + "/" +
+                                         std::to_string(t.rank[1]) + "/" + std::to_string(t.rank[2]) +
+                                         " missing=" + std::to_string(t.listedChunks - t.reachedChunks) +
+                                         " picks=" + std::to_string(t.picks))
                   << " cer=" << (t.characters ? 100.0 * t.errors / t.characters : 0.0) << "%"
                   << " english_chunks=" << t.english << " judged_english="
                   << (t.english ? 100.0 * t.englishRight / t.english : 0.0) << "%"
