@@ -17,6 +17,12 @@ option(TEKITO_BUILD_TESTS "Build the unit tests" ON)
 option(TEKITO_BUILD_BENCHMARKS "Build the engine latency benchmark" OFF)
 option(TEKITO_BUILD_EVAL "Build the offline accuracy evaluation" OFF)
 
+# Without Windows only the engine, its tests and the evaluations build.
+if(NOT WIN32)
+    include(cmake/NonWindows.cmake)
+    return()
+endif()
+
 set(TEKITO_WARNINGS /W4 /permissive- /EHsc /utf-8)
 set(TEKITO_WINDOWS_DEFINES UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
 

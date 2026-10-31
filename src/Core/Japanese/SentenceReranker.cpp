@@ -3,10 +3,6 @@
 #include "Core/Japanese/NeuralMath.h"
 #include "Core/Japanese/SortedTsv.h"
 
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#include <windows.h>
 
 #include <algorithm>
 #include <cmath>
@@ -73,7 +69,10 @@ void AppendUtf8(char32_t c, std::vector<std::uint8_t>& out) {
 std::size_t CodePoints(std::wstring_view text) noexcept {
     std::size_t count = 0;
     for (std::size_t i = 0; i < text.size(); ++i) {
-        if (IS_HIGH_SURROGATE(text[i]) && i + 1 < text.size() && IS_LOW_SURROGATE(text[i + 1])) ++i;
+        if (text[i] >= 0xD800 && text[i] <= 0xDBFF && i + 1 < text.size() && text[i + 1] >= 0xDC00 &&
+            text[i + 1] <= 0xDFFF) {
+            ++i;
+        }
         ++count;
     }
     return count;
@@ -192,7 +191,10 @@ std::vector<std::uint32_t> SentenceReranker::Pieces(std::wstring_view text) cons
     std::vector<std::size_t> starts;  // code point offsets, and the end
     for (std::size_t i = 0; i < normalized.size(); ++i) {
         starts.push_back(i);
-        if (IS_HIGH_SURROGATE(normalized[i]) && i + 1 < normalized.size() && IS_LOW_SURROGATE(normalized[i + 1])) ++i;
+        if (normalized[i] >= 0xD800 && normalized[i] <= 0xDBFF && i + 1 < normalized.size() &&
+            normalized[i + 1] >= 0xDC00 && normalized[i + 1] <= 0xDFFF) {
+            ++i;  // a surrogate pair (where wchar_t is UTF-16)
+        }
     }
     starts.push_back(normalized.size());
     const std::size_t n = starts.size() - 1;

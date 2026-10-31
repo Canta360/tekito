@@ -6,6 +6,8 @@
 #include <system_error>
 #include <vector>
 
+#include "Core/Utf8.h"
+
 #if defined(_WIN32)
 #include <windows.h>
 #endif
@@ -24,7 +26,7 @@ std::wstring FromUtf8(std::string_view bytes) {
                         out.data(), length);
     return out;
 #else
-    return std::wstring(bytes.begin(), bytes.end());
+    return utf8::Decode(bytes).value_or(std::wstring{});
 #endif
 }
 
@@ -155,7 +157,7 @@ bool RomajiTable::WriteChanges(const std::filesystem::path& file, const std::vec
                             nullptr);
     }
 #else
-    std::string bytes(text.begin(), text.end());
+    std::string bytes = utf8::Encode(text);
 #endif
     std::ofstream out(file, std::ios::binary | std::ios::trunc);
     if (!out) return false;
@@ -170,7 +172,19 @@ std::vector<RomajiTable::Change> RomajiTable::ParseTable(const std::filesystem::
     const std::string bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
     std::wstring text;
     if (bytes.size() >= 2 && static_cast<unsigned char>(bytes[0]) == 0xFF && static_cast<unsigned char>(bytes[1]) == 0xFE) {
-        text.assign(reinterpret_cast<const wchar_t*>(bytes.data() + 2), (bytes.size() - 2) / 2);
+        // UTF-16 little-endian, as Microsoft IME writes it.
+        for (std::size_t i = 2; i + 1 < bytes.size(); i += 2) {
+            char32_t c = static_cast<unsigned char>(bytes[i]) | (static_cast<unsigned char>(bytes[i + 1]) << 8);
+            if (c >= 0xD800 && c <= 0xDBFF && i + 3 < bytes.size()) {
+                const char32_t low = static_cast<unsigned char>(bytes[i + 2]) |
+                                     (static_cast<unsigned char>(bytes[i + 3]) << 8);
+                if (low >= 0xDC00 && low <= 0xDFFF) {
+                    c = 0x10000 + ((c - 0xD800) << 10) + (low - 0xDC00);
+                    i += 2;
+                }
+            }
+            utf8::AppendCodePoint(text, c);
+        }
     } else {
         std::string_view utf8 = bytes;
         if (utf8.starts_with("\xEF\xBB\xBF")) utf8.remove_prefix(3);

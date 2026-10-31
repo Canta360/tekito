@@ -148,10 +148,13 @@ public:
     void SetNumberWord(std::optional<NumberWord> number) noexcept { number_ = number; }
 
     // nullptr turns the model off.
-    void SetLanguageModel(const LanguageModel* model, ModelWeights weights = {}) noexcept {
+    void SetLanguageModel(const LanguageModel* model, ModelWeights weights) noexcept {
         model_ = model;
         weights_ = weights;
     }
+    // With the default weights (not "= {}", which GCC and Clang reject for
+    // a nested struct with member initializers).
+    void SetLanguageModel(const LanguageModel* model) noexcept { SetLanguageModel(model, ModelWeights{}); }
 
 private:
     const JapaneseDictionary& dictionary_;

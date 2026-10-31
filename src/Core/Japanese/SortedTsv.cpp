@@ -2,37 +2,13 @@
 
 #include <algorithm>
 
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
-#include <windows.h>
+#include "Core/Utf8.h"
 
 namespace tekito::japanese {
 
-std::string ToUtf8(std::wstring_view text) {
-    if (text.empty()) return {};
-    const int length = WideCharToMultiByte(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), nullptr, 0,
-                                           nullptr, nullptr);
-    std::string bytes(static_cast<std::size_t>(std::max(length, 0)), '\0');
-    if (length > 0) {
-        WideCharToMultiByte(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), bytes.data(), length, nullptr,
-                            nullptr);
-    }
-    return bytes;
-}
+std::string ToUtf8(std::wstring_view text) { return utf8::Encode(text); }
 
-std::wstring FromUtf8(std::string_view bytes) {
-    if (bytes.empty()) return {};
-    const int length = MultiByteToWideChar(CP_UTF8, 0, bytes.data(), static_cast<int>(bytes.size()), nullptr, 0);
-    std::wstring text(static_cast<std::size_t>(std::max(length, 0)), L'\0');
-    if (length > 0) {
-        MultiByteToWideChar(CP_UTF8, 0, bytes.data(), static_cast<int>(bytes.size()), text.data(), length);
-    }
-    return text;
-}
+std::wstring FromUtf8(std::string_view bytes) { return utf8::DecodeLenient(bytes); }
 
 bool SortedTsv::Open(const std::filesystem::path& path) noexcept {
     std::error_code error;

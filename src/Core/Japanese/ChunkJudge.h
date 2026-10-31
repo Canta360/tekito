@@ -49,9 +49,15 @@ public:
     };
 
     ChunkJudge(const RomajiTable& table, const JapaneseConverter& converter, const KeyConverter* slips,
-               const IFrequencyProvider& english, const Loanwords* names, Thresholds thresholds = {}) noexcept
+               const IFrequencyProvider& english, const Loanwords* names, Thresholds thresholds) noexcept
         : table_(table), converter_(converter), slips_(slips), english_(english), names_(names),
           thresholds_(thresholds) {}
+    // With the default thresholds. (A separate constructor, not "= {}":
+    // GCC and Clang cannot use a nested struct's member initializers in a
+    // default argument of the class that holds it.)
+    ChunkJudge(const RomajiTable& table, const JapaneseConverter& converter, const KeyConverter* slips,
+               const IFrequencyProvider& english, const Loanwords* names) noexcept
+        : ChunkJudge(table, converter, slips, english, names, Thresholds{}) {}
 
     // `keys` may be the start of a common English word (meetin: meeting), so
     // Mix's live conversion leaves them as typed.

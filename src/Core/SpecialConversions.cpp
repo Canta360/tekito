@@ -4,6 +4,8 @@
 #include "Core/Japanese/KanaText.h"
 #include "Core/Japanese/SortedTsv.h"
 
+#include <cwchar>
+#include <iterator>
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -46,7 +48,7 @@ std::wstring RowKey(std::wstring_view section, std::wstring_view language, std::
 
 std::wstring Padded(int value) {
     wchar_t buffer[16]{};
-    swprintf_s(buffer, L"%02d", value);
+    std::swprintf(buffer, std::size(buffer), L"%02d", value);
     return buffer;
 }
 
@@ -191,7 +193,11 @@ private:
 LocalTime LocalTime::Now() {
     const std::time_t now = std::time(nullptr);
     std::tm local{};
+#if defined(_WIN32)
     localtime_s(&local, &now);
+#else
+    localtime_r(&now, &local);
+#endif
     return {local.tm_year + 1900, local.tm_mon + 1, local.tm_mday, local.tm_hour, local.tm_min};
 }
 
@@ -232,7 +238,7 @@ void SpecialConversions::Parse(std::string_view text) {
         if (section == L"era") {
             // key: the era's name, value: the day it began (yyyy-mm-dd).
             int year = 0, month = 0, day = 0;
-            if (swscanf_s(value.c_str(), L"%d-%d-%d", &year, &month, &day) == 3) {
+            if (std::swscanf(value.c_str(), L"%d-%d-%d", &year, &month, &day) == 3) {
                 eras_.push_back({year * 10000 + month * 100 + day, std::move(key)});
             }
             continue;
@@ -550,9 +556,9 @@ std::optional<std::wstring> SpecialConversions::Calculate(std::wstring_view expr
     if (result == 0.0) result = 0.0;  // no "-0"
     wchar_t buffer[64]{};
     if (std::abs(result) < 1e15 && result == std::floor(result)) {
-        swprintf_s(buffer, L"%.0f", result);
+        std::swprintf(buffer, std::size(buffer), L"%.0f", result);
     } else {
-        swprintf_s(buffer, L"%.10g", result);
+        std::swprintf(buffer, std::size(buffer), L"%.10g", result);
     }
     return std::wstring(buffer);
 }

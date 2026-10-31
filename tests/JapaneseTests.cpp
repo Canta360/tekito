@@ -32,6 +32,8 @@
 #include <string>
 #include <string_view>
 
+#include "Core/Utf8.h"
+
 #if defined(_WIN32)
 #include <windows.h>
 #endif
@@ -52,7 +54,7 @@ std::string Utf8(std::wstring_view text) {
                         nullptr, nullptr);
     return out;
 #else
-    return std::string(text.begin(), text.end());
+    return tekito::utf8::Encode(text);
 #endif
 }
 
