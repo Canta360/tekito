@@ -53,6 +53,7 @@
 #include <iomanip>
 #include <iostream>
 #include <map>
+#include <functional>
 #include <queue>
 #include <set>
 #include <sstream>
@@ -146,6 +147,63 @@ std::vector<std::wstring> SentencesByRank(const std::vector<std::vector<std::wst
     return sentences;
 }
 
+// The same, but by how much likelier the converter found each pick than the
+// phrase's first (its cost less the first's), so a second choice almost as
+// likely as the first comes before one far behind. `deltas` go with
+// `lists`, each list's rising (the place in the list kept).
+std::vector<std::wstring> SentencesByCost(const std::vector<std::vector<std::wstring>>& lists,
+                                          const std::vector<std::vector<std::int64_t>>& deltas, std::size_t count) {
+    std::vector<std::wstring> sentences;
+    if (lists.empty() || std::any_of(lists.begin(), lists.end(), [](const auto& l) { return l.empty(); })) {
+        return sentences;
+    }
+    using Picks = std::vector<std::size_t>;
+    const auto costOf = [&](const Picks& picks) {
+        std::int64_t sum = 0;
+        for (std::size_t i = 0; i < picks.size(); ++i) sum += deltas[i][picks[i]];
+        return sum;
+    };
+    using Entry = std::pair<std::int64_t, Picks>;
+    std::priority_queue<Entry, std::vector<Entry>, std::greater<Entry>> queue;
+    std::set<Picks> seen;
+    queue.push({0, Picks(lists.size(), 0)});
+    seen.insert(Picks(lists.size(), 0));
+    std::set<std::wstring> written;
+    while (!queue.empty() && sentences.size() < count) {
+        const Picks picks = queue.top().second;
+        queue.pop();
+        std::wstring text;
+        for (std::size_t i = 0; i < lists.size(); ++i) text += lists[i][picks[i]];
+        if (written.insert(text).second) sentences.push_back(std::move(text));
+        for (std::size_t i = 0; i < lists.size(); ++i) {
+            if (picks[i] + 1 >= lists[i].size()) continue;
+            Picks next = picks;
+            ++next[i];
+            if (seen.insert(next).second) queue.push({costOf(next), std::move(next)});
+        }
+    }
+    return sentences;
+}
+
+// TEKITO_EVAL_SENTENCE_ORDER=cost puts the whole sentences together by
+// SentencesByCost instead of by rank; TEKITO_EVAL_KANA_COST (default 3000)
+// is what a kana or other candidate without a cost of its own is taken to
+// cost over the phrase's first.
+bool SentencesByCostChosen() {
+    static const bool chosen = [] {
+        const char* order = std::getenv("TEKITO_EVAL_SENTENCE_ORDER");
+        return order && std::string_view(order) == "cost";
+    }();
+    return chosen;
+}
+std::int64_t KanaCost() {
+    static const std::int64_t cost = [] {
+        const char* value = std::getenv("TEKITO_EVAL_KANA_COST");
+        return value && *value ? std::stoll(value) : std::int64_t{3000};
+    }();
+    return cost;
+}
+
 // TEKITO_EVAL_OUTPUT=<path>: each row's text as committed (source, id, text),
 // in the layout the real-input benchmark writes, to be scored the same way.
 void WriteOutput(const std::string& source, const std::string& id, const std::wstring& text) {
@@ -196,6 +254,11 @@ int RunKeys(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary
     composer.SetKeyConverter(&keyConverter);
     if (loanwords) composer.SetLoanwords(loanwords);
     composer.SetSentenceReranker(reranker);
+    // TEKITO_EVAL_CHECK_ORDER=rank: the sentence check reads sentences put
+    // together by rank, as before it took the converter's costs.
+    if (const char* order = std::getenv("TEKITO_EVAL_CHECK_ORDER"); order && std::string_view(order) == "rank") {
+        composer.SetSentencesByCost(false);
+    }
     composer.SetKanaSlips(slips);
 
     // How many whole sentences are put together, and the counts reported.
@@ -317,6 +380,7 @@ int RunKeys(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary
         std::size_t sentenceRank = SIZE_MAX;
         if (!byPhrase) {
             std::vector<std::vector<std::wstring>> lists;
+            std::vector<std::vector<std::int64_t>> deltas;
             std::vector<std::wstring> wholes;
             for (std::size_t f = 0; f < phraseCount; ++f) {
                 composer.MoveFocus(-static_cast<int>(phraseCount));
@@ -325,17 +389,30 @@ int RunKeys(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary
                 composer.PreviousCandidate();
                 const auto* candidates = composer.FocusedCandidates();
                 lists.emplace_back();
+                deltas.emplace_back();
+                std::int64_t first = 0;
                 for (std::size_t j = 0; candidates && j < candidates->size() && lists.back().size() < 20; ++j) {
+                    const auto& candidate = (*candidates)[j];
                     // A whole-input candidate is a sentence of its own.
-                    if (!(*candidates)[j].reading.empty()) {
-                        wholes.push_back((*candidates)[j].text);
-                    } else if (std::find(lists.back().begin(), lists.back().end(), (*candidates)[j].text) ==
+                    if (!candidate.reading.empty()) {
+                        wholes.push_back(candidate.text);
+                    } else if (std::find(lists.back().begin(), lists.back().end(), candidate.text) ==
                                lists.back().end()) {
-                        lists.back().push_back((*candidates)[j].text);
+                        // Kana, typed forms and the like have no cost of
+                        // their own: KanaCost over the first. The list's
+                        // order stays (each delta at least the one before).
+                        const bool costed = candidate.kind == tekito::japanese::PhraseCandidate::Kind::Dictionary &&
+                                            candidate.cost > 0 && candidate.cost < (std::int64_t{1} << 30);
+                        if (lists.back().empty()) first = costed ? candidate.cost : 0;
+                        std::int64_t delta = lists.back().empty() ? 0 : costed ? candidate.cost - first : KanaCost();
+                        if (!deltas.back().empty()) delta = std::max(delta, deltas.back().back());
+                        lists.back().push_back(candidate.text);
+                        deltas.back().push_back(delta);
                     }
                 }
             }
-            auto sentences = SentencesByRank(lists, kSentences);
+            auto sentences = SentencesByCostChosen() ? SentencesByCost(lists, deltas, kSentences)
+                                                     : SentencesByRank(lists, kSentences);
             for (auto& whole : wholes) {
                 if (std::find(sentences.begin(), sentences.end(), whole) == sentences.end()) sentences.push_back(whole);
             }
@@ -501,6 +578,11 @@ int RunChunks(const ConnectionMatrix& matrix, const JapaneseDictionary& dictiona
         return 1;
     }
     if (reranker.IsOpen()) composer.SetSentenceReranker(&reranker);
+    // TEKITO_EVAL_CHECK_ORDER=rank: the sentence check reads sentences put
+    // together by rank, as before it took the converter's costs.
+    if (const char* order = std::getenv("TEKITO_EVAL_CHECK_ORDER"); order && std::string_view(order) == "rank") {
+        composer.SetSentencesByCost(false);
+    }
     tekito::japanese::KanaSlips kanaSlips;
     if (!options.slipsPack.empty() && !kanaSlips.Open(options.slipsPack)) {
         std::cerr << "could not open the slip finder at " << options.slipsPack.string() << "\n";

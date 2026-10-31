@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <regex>
 #include <map>
+#include <functional>
 #include <queue>
 #include <set>
 #include <cwctype>
@@ -134,29 +135,35 @@ void PutDigitsAfterWords(std::vector<PhraseCandidate>& candidates) {
 // order of the sum of the choices' ranks, the first choices first; `visit`
 // takes each and returns false to stop. The sentence check of a conversion
 // (parts: phrases) and of a mixed sentence (parts: chunks) share it.
+// Each pick of one choice per part, likeliest first, until `visit` says
+// stop: by the sum of the ranks picked, or with `deltas` (how much more
+// each choice costs than its part's first, rising along each part) by the
+// sum of those, so a second choice nearly as likely as the first comes
+// before one far behind it.
 template <class Visit>
-void ForPicksByRank(const std::vector<std::size_t>& sizes, Visit visit) {
+void ForPicksByRank(const std::vector<std::size_t>& sizes, Visit visit,
+                    const std::vector<std::vector<std::int64_t>>* deltas = nullptr) {
     using Picks = std::vector<std::size_t>;
-    const auto rankSum = [](const Picks& picks) {
-        std::size_t sum = 0;
-        for (const std::size_t p : picks) sum += p;
+    const auto weight = [&](const Picks& picks) {
+        std::int64_t sum = 0;
+        for (std::size_t i = 0; i < picks.size(); ++i) {
+            sum += deltas ? (*deltas)[i][picks[i]] : static_cast<std::int64_t>(picks[i]);
+        }
         return sum;
     };
-    const auto later = [&](const Picks& a, const Picks& b) {
-        return rankSum(a) > rankSum(b) || (rankSum(a) == rankSum(b) && a > b);
-    };
-    std::priority_queue<Picks, std::vector<Picks>, decltype(later)> queue(later);
+    using Entry = std::pair<std::int64_t, Picks>;
+    std::priority_queue<Entry, std::vector<Entry>, std::greater<Entry>> queue;
     std::set<Picks> seen{Picks(sizes.size(), 0)};
-    queue.push(Picks(sizes.size(), 0));
+    queue.push({0, Picks(sizes.size(), 0)});
     while (!queue.empty()) {
-        const Picks picks = queue.top();
+        const Picks picks = queue.top().second;
         queue.pop();
         if (!visit(picks)) return;
         for (std::size_t i = 0; i < sizes.size(); ++i) {
             if (picks[i] + 1 >= sizes[i]) continue;
             Picks next = picks;
             ++next[i];
-            if (seen.insert(next).second) queue.push(std::move(next));
+            if (seen.insert(next).second) queue.push({weight(next), std::move(next)});
         }
     }
 }
@@ -1713,15 +1720,41 @@ void JapaneseComposer::CheckSentence() {
         lists.push_back(std::move(list));
     }
     std::vector<std::vector<std::wstring>> parts;
+    std::vector<std::vector<std::int64_t>> deltas;
     for (std::size_t i = 0; i < lists.size(); ++i) {
         auto& texts = parts.emplace_back();
         for (const std::size_t c : lists[i]) texts.push_back(phrases_[i].candidates[c].text);
+        if (sentencesByCost_) deltas.push_back(CostDeltas(phrases_[i].candidates, lists[i]));
     }
-    const auto picks = ReadBest(parts);
+    const auto picks = ReadBest(parts, sentencesByCost_ ? &deltas : nullptr);
     for (std::size_t i = 0; i < lists.size(); ++i) phrases_[i].selected = lists[i][picks[i]];
 }
 
-std::vector<std::size_t> JapaneseComposer::ReadBest(const std::vector<std::vector<std::wstring>>& parts) const {
+std::vector<std::int64_t> JapaneseComposer::CostDeltas(const std::vector<PhraseCandidate>& candidates,
+                                                       const std::vector<std::size_t>& list) {
+    // Kana, typed forms, English and the like have no cost of their own:
+    // kUncostedDelta over the first. The list's order stays (each at least
+    // the one before), as learning and the user's words set it.
+    constexpr std::int64_t kUncostedDelta = 3000;
+    std::vector<std::int64_t> deltas;
+    std::int64_t first = 0;
+    for (const std::size_t c : list) {
+        const auto& candidate = candidates[c];
+        const bool costed = candidate.kind == PhraseCandidate::Kind::Dictionary && candidate.cost > 0 &&
+                            candidate.cost < (std::int64_t{1} << 30);
+        if (deltas.empty()) {
+            first = costed ? candidate.cost : 0;
+            deltas.push_back(0);
+            continue;
+        }
+        const std::int64_t delta = costed ? candidate.cost - first : kUncostedDelta;
+        deltas.push_back(std::max(delta, deltas.back()));
+    }
+    return deltas;
+}
+
+std::vector<std::size_t> JapaneseComposer::ReadBest(const std::vector<std::vector<std::wstring>>& parts,
+                                                    const std::vector<std::vector<std::int64_t>>* deltas) const {
     std::vector<std::size_t> keep(parts.size(), 0);
     std::vector<std::size_t> sizes;
     for (const auto& part : parts) {
@@ -1739,7 +1772,7 @@ std::vector<std::size_t> JapaneseComposer::ReadBest(const std::vector<std::vecto
             picked.push_back(picks);
         }
         return sentences.size() < reranker_->Top();
-    });
+    }, deltas);
     // Numbers are read by the sentence model in kanji, as its text mostly
     // writes them (2時間 read as 二時間, not beaten by 似時間).
     auto read = sentences;

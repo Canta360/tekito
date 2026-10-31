@@ -119,6 +119,9 @@ public:
     void SetSentenceReranker(const SentenceReranker* reranker) noexcept { reranker_ = reranker; }
     // The user's switch for it (on by default).
     void SetSentenceCheck(bool on) noexcept { sentenceCheck_ = on; }
+    // The sentences it reads are put together by the converter's costs (on
+    // by default) or, off, by the sum of each phrase's rank.
+    void SetSentencesByCost(bool on) noexcept { sentencesByCost_ = on; }
     // Space (and live refine) may undo typing slips in the keys and convert
     // the reading as meant. Off: convert as typed; slip candidates stay in
     // the list. On by default, as UserSettings::japaneseSlipAutoApply.
@@ -445,7 +448,14 @@ private:
     // of each part the sentence model reads best, all 0 to keep the first.
     // The phrases of a conversion, the chunks of a mixed sentence and the
     // pieces of English run into Japanese are checked with it alike.
-    [[nodiscard]] std::vector<std::size_t> ReadBest(const std::vector<std::vector<std::wstring>>& parts) const;
+    // `deltas` (CostDeltas for each part) puts the sentences it reads in
+    // order by the converter's costs; without, by the sum of the ranks.
+    [[nodiscard]] std::vector<std::size_t> ReadBest(const std::vector<std::vector<std::wstring>>& parts,
+                                                    const std::vector<std::vector<std::int64_t>>* deltas = nullptr) const;
+    // How much more each candidate of `list` (indices into `candidates`,
+    // best first) costs than the first, rising.
+    [[nodiscard]] static std::vector<std::int64_t> CostDeltas(const std::vector<PhraseCandidate>& candidates,
+                                                              const std::vector<std::size_t>& list);
     // The keys with their likeliest slips undone (SetKanaSlips), converted
     // in place of the phrases when that reads better; whether it did.
     bool FixSlips();
@@ -648,6 +658,7 @@ private:
     JapaneseLearningStore* learning_{nullptr};
     const SentenceReranker* reranker_{nullptr};
     bool sentenceCheck_{true};
+    bool sentencesByCost_{true};
     bool slipAutoApply_{true};
     bool emojiOnFirstPage_{true};
     bool typedForms_{true};
