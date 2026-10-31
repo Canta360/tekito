@@ -122,6 +122,9 @@ public:
     // The sentences it reads are put together by the converter's costs (on
     // by default) or, off, by the sum of each phrase's rank.
     void SetSentencesByCost(bool on) noexcept { sentencesByCost_ = on; }
+    // Mix: Japanese chunks have slips undone with the slips pack too (on by
+    // default), as in Japanese mode.
+    void SetMixSlips(bool on) noexcept { mixSlips_ = on; }
     // How much more each candidate of `list` (indices into `candidates`,
     // best first) costs than the first, rising.
     [[nodiscard]] static std::vector<std::int64_t> CostDeltas(const std::vector<PhraseCandidate>& candidates,
@@ -674,6 +677,7 @@ private:
     const SentenceReranker* reranker_{nullptr};
     bool sentenceCheck_{true};
     bool sentencesByCost_{true};
+    bool mixSlips_{true};
     bool slipAutoApply_{true};
     bool emojiOnFirstPage_{true};
     bool typedForms_{true};

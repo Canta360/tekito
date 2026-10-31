@@ -128,11 +128,21 @@ def main() -> int:
     args = parser.parse_args()
     args.work.mkdir(parents=True, exist_ok=True)
 
+    def tool(name: str) -> str:
+        # tekito_ja_eval.exe on Windows, tekito_ja_eval elsewhere.
+        exe = args.bin / f"{name}.exe"
+        return str(exe if exe.exists() else args.bin / name)
+
     def run_ja(keys: Path, out: Path, mode: str, slips: bool) -> None:
         d = args.ja_data
-        command = [str(args.bin / "tekito_ja_eval.exe"), "--pack", str(d / "japanese-core"), "--chunks", str(keys),
+        # English word scores: installed beside the Japanese data, or in the
+        # repository's data/en.
+        scores = d / "frequency" / "word-scores.tsv"
+        if not scores.exists() and args.en_data:
+            scores = args.en_data / "en" / "frequency" / "word-scores.tsv"
+        command = [tool("tekito_ja_eval"), "--pack", str(d / "japanese-core"), "--chunks", str(keys),
                    "--romaji", str(d / "japanese-romaji"), "--lm", str(d / "japanese-lm"),
-                   "--english-scores", str(d / "frequency" / "word-scores.tsv"),
+                   "--english-scores", str(scores.resolve()),
                    "--loanwords", str(d / "japanese-loanwords"), "--japanese-english", str(d / "japanese-english"),
                    "--write-chunks", str(out)] + args.ja_args.split()
         if mode == "japanese":
@@ -148,7 +158,7 @@ def main() -> int:
 
     def run_en(sentences: Path, out: Path) -> None:
         env = dict(os.environ, TEKITO_DATA_PACK_DIR=str(args.en_data))
-        command = [str(args.bin / "tekito_core_eval.exe"), "--typed", str(sentences), "--write-words", str(out)]
+        command = [tool("tekito_core_eval"), "--typed", str(sentences), "--write-words", str(out)]
         if args.next_word:
             command.append("--next-word")
         subprocess.run(command, check=True, env=env, stdout=subprocess.DEVNULL)

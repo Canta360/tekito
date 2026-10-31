@@ -183,8 +183,16 @@ ChunkJudge::Judgement ChunkJudge::Judge(std::wstring_view keys, std::size_t engl
             judgement.english = true;
             return judgement;
         }
-        // A slip correction makes Japanese of it: when in doubt, Japanese.
-        if (EnglishThenJapanese(keys) || slip) return judgement;
+        // English run into Japanese (pcwotukau) is Japanese. An English
+        // word with a slip in it (chaannel: channel), as English Auto puts it
+        // right to a word Japanese text writes in Latin letters, comes before
+        // a slip correction that makes Japanese of it, after English or with
+        // letters romaji hardly uses; otherwise, in Japanese, when in doubt
+        // Japanese (iktuo: 行くと, not into).
+        if (EnglishThenJapanese(keys)) return judgement;
+        const bool japaneseSoFar = japaneseInSentence && englishBefore == 0;
+        if ((!japaneseSoFar || ForeignLetters(keys, false)) && spelled()) return judgement;
+        if (slip) return judgement;
         if (spelled()) return judgement;
         judgement.english = true;
         return judgement;

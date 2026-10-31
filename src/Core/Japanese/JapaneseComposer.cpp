@@ -1109,7 +1109,12 @@ void JapaneseComposer::BuildPhrasesFor(bool convert) {
         } else {
             AddPhrases(ConvertReading(reading, 0, context_, contextWords_), reading);
         }
-        if (slipAutoApply_ && slips_ && table_ && !chunkJudge_ && !HasAscii() && !KanaTyped() && !reconverted_ &&
+        // In Mix, a chunk taken as Japanese that reads as no English (not
+        // either, no word) is Japanese with a slip as in Japanese mode
+        // (ktouno: 今日の); English-looking keys are left to the English.
+        const bool japaneseChunk = !chunkJudge_ || (chunk && !chunk->english && !chunk->either && !chunk->word &&
+                                                    mixSlips_);
+        if (slipAutoApply_ && slips_ && table_ && japaneseChunk && !HasAscii() && !KanaTyped() && !reconverted_ &&
             !endsInLetters && !phrases_.empty() && FixSlips()) {
             slipUndone = true;
         }
@@ -1527,7 +1532,10 @@ bool JapaneseComposer::FixSlips() {
     // conversions are weighed with the sentence model, the kana score
     // counting half. Chosen on dev sets only: lower gates fix more slips
     // that still read as kana but change sentences typed right.
-    constexpr double kSlipGate = 12.0;
+    // A Mix chunk is shorter than a sentence and has less to go on: 8.
+    // (Chosen on eval/ja/mix_long_keys.tsv with two slips a sentence: more
+    // slips put right, no more text typed right changed.)
+    const double kSlipGate = chunkJudge_ ? 8.0 : 12.0;
     // ...and the corrected conversion must then win by this much. More
     // than one corrected reading tried loses: the sentence model likes the
     // shorter ones.

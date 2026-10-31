@@ -108,43 +108,43 @@ fresh-long	107	kono folder* ni haitteiru file* ha zenbu keshite daijoubudesu.	�
 fresh-long	108	content* no ryouga oosugirunode, section* wo wakemashita.	contentの量が多すぎるので、sectionを分けました。
 fresh-long	109	kono message* ha jidoude okurareteimasu.	このmessageは自動で送られています。
 fresh-long	110	boss* ni tanomareta task* wo yuugatamadeni owarasemasu.	bossに頼まれたtaskを夕方までに終わらせます。
-fresh-long_ja	1	ashitaha asakara kaigiga arunode, hayameni iewo deru tsumoridesu.	明日は朝から会議があるので、早めに家を出るつもりです。
-fresh-long_ja	2	ekino chikakuni atarashii honnyaga dekitanode, shuumatsuni ittemitaidesu.	駅の近くに新しい本屋ができたので、週末に行ってみたいです。	駅の近くに新しい本屋が出来たので、週末に行ってみたいです。
-fresh-long_ja	3	amega furisounanode, kasawo motte dekaketahouga iidesuyo.	雨が降りそうなので、傘を持って出かけたほうがいいですよ。
-fresh-long_ja	4	kono ryouriha omottayori kantannni tsukurerunode, zehi tameshite mitekudasai.	この料理は思ったより簡単に作れるので、ぜひ試してみてください。
-fresh-long_ja	5	kyonennno natsuni itta ryokouno shashinwo seirishiteimasu.	去年の夏に行った旅行の写真を整理しています。
-fresh-long_ja	6	kodomono koroni yonda honwo mouichido yomikaeshiteimasu.	子供の頃に読んだ本をもう一度読み返しています。	子どもの頃に読んだ本をもう一度読み返しています。
-fresh-long_ja	7	taichouga waruinode, kyouha hayameni yasumasetekudasai.	体調が悪いので、今日は早めに休ませてください。
-fresh-long_ja	8	raigetsuno hikkoshini mukete, sukoshizutsu nimotsuwo matometeimasu.	来月の引っ越しに向けて、少しずつ荷物をまとめています。
-fresh-long_ja	9	senshuuno doyoubini tomodachito eigawo mini ikimashita.	先週の土曜日に友達と映画を見に行きました。
-fresh-long_ja	10	kono michiwo massugu ikuto, migigawani yuubinkyokuga arimasu.	この道をまっすぐ行くと、右側に郵便局があります。
-fresh-long_ja	11	oisogashii tokoro moushiwake arimasenga, kakuninwo onegai dekimasuka.	お忙しいところ申し訳ありませんが、確認をお願いできますか。
-fresh-long_ja	12	mainichi sukoshizutsudemo tsudukerukotoga taisetsudato omoimasu.	毎日少しずつでも続けることが大切だと思います。
-fresh-long_ja	13	kinouha kazega tsuyokute, jitenshani norunoga taihendeshita.	昨日は風が強くて、自転車に乗るのが大変でした。
-fresh-long_ja	14	reizoukono nakani nokotteita yasaide su-puwo tsukurimashita.	冷蔵庫の中に残っていた野菜でスープを作りました。
-fresh-long_ja	15	toshokande karita honnno henkyakubiga ashitamadedesu.	図書館で借りた本の返却日が明日までです。
-fresh-long_ja	16	atarashii shigotoniha daibu naretekimashitaga, mada oboerukotoga ooidesu.	新しい仕事にはだいぶ慣れてきましたが、まだ覚えることが多いです。
-fresh-long_ja	17	shuumatsuha tenkiga yokereba, yamani noborini iku yoteidesu.	週末は天気が良ければ、山に登りに行く予定です。	週末は天気がよければ、山に登りに行く予定です。
-fresh-long_ja	18	denshano nakade neteshimatte, oriru ekiwo toorisugimashita.	電車の中で寝てしまって、降りる駅を通り過ぎました。
-fresh-long_ja	19	hisashiburini jikkani kaettara, ryoushinga totemo yorokonde kuremashita.	久しぶりに実家に帰ったら、両親がとても喜んでくれました。
-fresh-long_ja	20	sono kennni tsuiteha, nochihodo tantoushakara aratamete gorenraku shimasu.	その件については、後ほど担当者から改めてご連絡します。
-fresh-long_en	1	i* will* send* you* the* report* by* friday.*	I will send you the report by Friday.
-fresh-long_en	2	can* we* move* the* meeting* to* next* week?*	Can we move the meeting to next week?
-fresh-long_en	3	the* build* failed* again,* so* i* am* looking* into* it.*	The build failed again, so I am looking into it.
-fresh-long_en	4	thanks* for* the* quick* review.*	Thanks for the quick review.
-fresh-long_en	5	please* let* me* know* if* you* have* any* questions.*	Please let me know if you have any questions.
-fresh-long_en	6	i* think* we* should* ship* this* after* the* tests* pass.*	I think we should ship this after the tests pass.
-fresh-long_en	7	sorry* for* the* late* reply,* i* was* out* of* the* office.*	Sorry for the late reply, I was out of the office.
-fresh-long_en	8	let* me* check* the* logs* and* get* back* to* you.*	Let me check the logs and get back to you.
-fresh-long_en	9	the* new* version* looks* much* faster* than* the* old* one.*	The new version looks much faster than the old one.
-fresh-long_en	10	could* you* share* the* slides* from* yesterday?*	Could you share the slides from yesterday?
-fresh-long_en	11	we* need* to* fix* this* before* the* release.*	We need to fix this before the release.
-fresh-long_en	12	i* am* going* to* be* a* little* late* today.*	I am going to be a little late today.
-fresh-long_en	13	do* you* have* time* for* a* quick* call* this* afternoon?*	Do you have time for a quick call this afternoon?
-fresh-long_en	14	the* server* is* down,* but* we* are* working* on* it.*	The server is down, but we are working on it.
-fresh-long_en	15	have* a* nice* weekend* and* see* you* on* monday.*	Have a nice weekend and see you on Monday.
-fresh-long_en	16	i* just* pushed* the* changes* to* the* main* branch.*	I just pushed the changes to the main branch.
-fresh-long_en	17	that* sounds* good* to* me.*	That sounds good to me.
-fresh-long_en	18	the* client* wants* the* design* to* be* simpler.*	The client wants the design to be simpler.
-fresh-long_en	19	i* will* be* working* from* home* tomorrow.*	I will be working from home tomorrow.
-fresh-long_en	20	we* can* talk* about* it* at* lunch.*	We can talk about it at lunch.
+fresh-long_ja	111	ashitaha asakara kaigiga arunode, hayameni iewo deru tsumoridesu.	明日は朝から会議があるので、早めに家を出るつもりです。
+fresh-long_ja	112	ekino chikakuni atarashii honnyaga dekitanode, shuumatsuni ittemitaidesu.	駅の近くに新しい本屋ができたので、週末に行ってみたいです。	駅の近くに新しい本屋が出来たので、週末に行ってみたいです。
+fresh-long_ja	113	amega furisounanode, kasawo motte dekaketahouga iidesuyo.	雨が降りそうなので、傘を持って出かけたほうがいいですよ。
+fresh-long_ja	114	kono ryouriha omottayori kantannni tsukurerunode, zehi tameshite mitekudasai.	この料理は思ったより簡単に作れるので、ぜひ試してみてください。
+fresh-long_ja	115	kyonennno natsuni itta ryokouno shashinwo seirishiteimasu.	去年の夏に行った旅行の写真を整理しています。
+fresh-long_ja	116	kodomono koroni yonda honwo mouichido yomikaeshiteimasu.	子供の頃に読んだ本をもう一度読み返しています。	子どもの頃に読んだ本をもう一度読み返しています。
+fresh-long_ja	117	taichouga waruinode, kyouha hayameni yasumasetekudasai.	体調が悪いので、今日は早めに休ませてください。
+fresh-long_ja	118	raigetsuno hikkoshini mukete, sukoshizutsu nimotsuwo matometeimasu.	来月の引っ越しに向けて、少しずつ荷物をまとめています。
+fresh-long_ja	119	senshuuno doyoubini tomodachito eigawo mini ikimashita.	先週の土曜日に友達と映画を見に行きました。
+fresh-long_ja	120	kono michiwo massugu ikuto, migigawani yuubinkyokuga arimasu.	この道をまっすぐ行くと、右側に郵便局があります。
+fresh-long_ja	121	oisogashii tokoro moushiwake arimasenga, kakuninwo onegai dekimasuka.	お忙しいところ申し訳ありませんが、確認をお願いできますか。
+fresh-long_ja	122	mainichi sukoshizutsudemo tsudukerukotoga taisetsudato omoimasu.	毎日少しずつでも続けることが大切だと思います。
+fresh-long_ja	123	kinouha kazega tsuyokute, jitenshani norunoga taihendeshita.	昨日は風が強くて、自転車に乗るのが大変でした。
+fresh-long_ja	124	reizoukono nakani nokotteita yasaide su-puwo tsukurimashita.	冷蔵庫の中に残っていた野菜でスープを作りました。
+fresh-long_ja	125	toshokande karita honnno henkyakubiga ashitamadedesu.	図書館で借りた本の返却日が明日までです。
+fresh-long_ja	126	atarashii shigotoniha daibu naretekimashitaga, mada oboerukotoga ooidesu.	新しい仕事にはだいぶ慣れてきましたが、まだ覚えることが多いです。
+fresh-long_ja	127	shuumatsuha tenkiga yokereba, yamani noborini iku yoteidesu.	週末は天気が良ければ、山に登りに行く予定です。	週末は天気がよければ、山に登りに行く予定です。
+fresh-long_ja	128	denshano nakade neteshimatte, oriru ekiwo toorisugimashita.	電車の中で寝てしまって、降りる駅を通り過ぎました。
+fresh-long_ja	129	hisashiburini jikkani kaettara, ryoushinga totemo yorokonde kuremashita.	久しぶりに実家に帰ったら、両親がとても喜んでくれました。
+fresh-long_ja	130	sono kennni tsuiteha, nochihodo tantoushakara aratamete gorenraku shimasu.	その件については、後ほど担当者から改めてご連絡します。
+fresh-long_en	131	i* will* send* you* the* report* by* friday.*	I will send you the report by Friday.
+fresh-long_en	132	can* we* move* the* meeting* to* next* week?*	Can we move the meeting to next week?
+fresh-long_en	133	the* build* failed* again,* so* i* am* looking* into* it.*	The build failed again, so I am looking into it.
+fresh-long_en	134	thanks* for* the* quick* review.*	Thanks for the quick review.
+fresh-long_en	135	please* let* me* know* if* you* have* any* questions.*	Please let me know if you have any questions.
+fresh-long_en	136	i* think* we* should* ship* this* after* the* tests* pass.*	I think we should ship this after the tests pass.
+fresh-long_en	137	sorry* for* the* late* reply,* i* was* out* of* the* office.*	Sorry for the late reply, I was out of the office.
+fresh-long_en	138	let* me* check* the* logs* and* get* back* to* you.*	Let me check the logs and get back to you.
+fresh-long_en	139	the* new* version* looks* much* faster* than* the* old* one.*	The new version looks much faster than the old one.
+fresh-long_en	140	could* you* share* the* slides* from* yesterday?*	Could you share the slides from yesterday?
+fresh-long_en	141	we* need* to* fix* this* before* the* release.*	We need to fix this before the release.
+fresh-long_en	142	i* am* going* to* be* a* little* late* today.*	I am going to be a little late today.
+fresh-long_en	143	do* you* have* time* for* a* quick* call* this* afternoon?*	Do you have time for a quick call this afternoon?
+fresh-long_en	144	the* server* is* down,* but* we* are* working* on* it.*	The server is down, but we are working on it.
+fresh-long_en	145	have* a* nice* weekend* and* see* you* on* monday.*	Have a nice weekend and see you on Monday.
+fresh-long_en	146	i* just* pushed* the* changes* to* the* main* branch.*	I just pushed the changes to the main branch.
+fresh-long_en	147	that* sounds* good* to* me.*	That sounds good to me.
+fresh-long_en	148	the* client* wants* the* design* to* be* simpler.*	The client wants the design to be simpler.
+fresh-long_en	149	i* will* be* working* from* home* tomorrow.*	I will be working from home tomorrow.
+fresh-long_en	150	we* can* talk* about* it* at* lunch.*	We can talk about it at lunch.

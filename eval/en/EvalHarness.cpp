@@ -8,6 +8,8 @@
 #include "Core/ExternalLexiconProvider.h"
 #include "EnglishTypingStudy.h"
 
+#include "Core/Utf8.h"
+
 #include <algorithm>
 #include <cmath>
 #include <chrono>
@@ -48,6 +50,8 @@ std::wstring Wide(std::string_view text) {
             }
         }
     }
+#else
+    if (auto decoded = tekito::utf8::Decode(text)) return *std::move(decoded);
 #endif
     std::wstring result;
     result.reserve(text.size());

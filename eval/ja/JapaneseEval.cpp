@@ -259,6 +259,10 @@ int RunKeys(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary
     if (const char* order = std::getenv("TEKITO_EVAL_CHECK_ORDER"); order && std::string_view(order) == "rank") {
         composer.SetSentencesByCost(false);
     }
+    // TEKITO_EVAL_MIX_SLIPS=0: Mix's Japanese chunks without the slips pack.
+    if (const char* mixSlips = std::getenv("TEKITO_EVAL_MIX_SLIPS"); mixSlips && *mixSlips == '0') {
+        composer.SetMixSlips(false);
+    }
     composer.SetKanaSlips(slips);
 
     // How many whole sentences are put together, and the counts reported.
@@ -582,6 +586,9 @@ int RunChunks(const ConnectionMatrix& matrix, const JapaneseDictionary& dictiona
     // together by rank, as before it took the converter's costs.
     if (const char* order = std::getenv("TEKITO_EVAL_CHECK_ORDER"); order && std::string_view(order) == "rank") {
         composer.SetSentencesByCost(false);
+    }
+    if (const char* mixSlips = std::getenv("TEKITO_EVAL_MIX_SLIPS"); mixSlips && *mixSlips == '0') {
+        composer.SetMixSlips(false);
     }
     tekito::japanese::KanaSlips kanaSlips;
     if (!options.slipsPack.empty() && !kanaSlips.Open(options.slipsPack)) {

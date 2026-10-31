@@ -1,0 +1,60 @@
+1	I will send you the report by Friday.
+2	Can we move the meeting to next week?
+3	The build failed again, so I am looking into it.
+4	Thanks for the quick review.
+5	Please let me know if you have any questions.
+6	I think we should ship this after the tests pass.
+7	Sorry for the late reply, I was out of the office.
+8	Let me check the logs and get back to you.
+9	The new version looks much faster than the old one.
+10	Could you share the slides from yesterday?
+11	We need to fix this before the release.
+12	I am going to be a little late today.
+13	Do you have time for a quick call this afternoon?
+14	The server is down, but we are working on it.
+15	Have a nice weekend and see you on Monday.
+16	I just pushed the changes to the main branch.
+17	That sounds good to me.
+18	The client wants the design to be simpler.
+19	I will be working from home tomorrow.
+20	We can talk about it at lunch.
+21	I left my umbrella on the train this morning.
+22	We should book the restaurant before the weekend.
+23	The package arrived two days earlier than expected.
+24	Could you remind me to call the dentist tomorrow?
+25	My sister is moving to a new apartment next month.
+26	The weather was perfect for a walk in the park.
+27	I forgot to bring the charger for my laptop.
+28	Please read the document before the meeting starts.
+29	The kids are excited about the trip to the beach.
+30	I usually drink coffee while I check my email.
+31	Our team finished the project ahead of schedule.
+32	The library is closed on public holidays.
+33	He asked me to review the contract carefully.
+34	Let me know when you are ready to leave.
+35	The new restaurant near the station is very popular.
+36	I need to renew my passport before the summer.
+37	She explained the problem in a simple way.
+38	We are planning a small party for his birthday.
+39	The movie was longer than I thought it would be.
+40	Please turn off the lights when you leave the room.
+41	I have been learning to play the guitar this year.
+42	The bus was late because of the heavy snow.
+43	Thank you for helping me with the presentation.
+44	They decided to paint the kitchen a lighter color.
+45	I will pick up some groceries on the way home.
+46	The museum has a special exhibition this month.
+47	Our flight was delayed by almost three hours.
+48	I prefer working early in the morning when it is quiet.
+49	The doctor told me to get more sleep.
+50	We watched the sunset from the top of the hill.
+51	Please send me the address of the hotel.
+52	The teacher gave us a lot of homework today.
+53	I am not sure which option is better for us.
+54	The garden looks beautiful after the rain.
+55	He always brings homemade cookies to the office.
+56	I will write a short summary of the discussion.
+57	The store offers free delivery for large orders.
+58	We need more chairs for the guests this evening.
+59	My phone battery died in the middle of the call.
+60	The results of the survey were quite surprising.

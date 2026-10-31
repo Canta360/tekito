@@ -32,6 +32,9 @@
 #include <string>
 #include <string_view>
 
+#include "Core/ConversionEngine.h"
+#include "Core/EnglishSpelling.h"
+#include "Core/ExternalRankingProviders.h"
 #include "Core/Utf8.h"
 
 #if defined(_WIN32)
@@ -2050,6 +2053,24 @@ void TestKanaSlips(const RomajiTable& table, const MiniPack& pack) {
     composer.SetLiveConversion(false);
 }
 
+// English typed with a slip among Japanese (Mix): put right as English
+// Auto would, before a slip that makes Japanese of it, after English or
+// with letters romaji hardly uses.
+void TestMixEnglishSlips(const RomajiTable& table, const MiniPack& pack) {
+    tekito::PreloadDefaultEngineData();
+    const auto engine = tekito::CreateDefaultConversionEngine();
+    Require(engine != nullptr, "English Auto loads for the Mix slip tests");
+    const tekito::EnglishSpelling spelling(*engine);
+    const tekito::ExternalFrequencyProvider scores(tekito::ExternalFrequencyProvider::DefaultPath());
+    const tekito::japanese::JapaneseConverter converter(pack.dictionary, pack.matrix);
+    const tekito::japanese::KeyConverter keys(pack.dictionary, pack.matrix, converter, table);
+    const tekito::japanese::ChunkJudge judge(table, converter, &keys, scores, nullptr);
+    const auto channel = judge.Judge(L"chaannel", 0, true, &spelling);
+    Require(channel.english && channel.written == L"channel", "chaannel in Japanese is channel with a key typed twice");
+    const auto review = judge.Judge(L"reviw", 1, true, &spelling, L"code ");
+    Require(review.english && review.written == L"review", "after English, reviw is review");
+}
+
 // UTF-8 the same where wchar_t is 16 bits (Windows) or 32 (Linux).
 void TestUtf8() {
     namespace utf8 = tekito::utf8;
@@ -2227,6 +2248,7 @@ int main(int argc, char** argv) {
     TestSentenceReranker(*table, *pack);
     TestKanaSlips(*table, *pack);
     TestCandidateOrder(*table, *pack);
+    TestMixEnglishSlips(*table, *pack);
     TestUtf8();
     TestKanjiSets();
     TestMeanings();
