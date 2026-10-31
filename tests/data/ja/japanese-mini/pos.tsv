@@ -1,12 +1,12 @@
-# kind	left id	right id	cost (scripts/build-japanese-packs.py)
-noun	203	203	4000
-proper-noun	229	229	4000
-person	230	230	4000
-surname	232	232	4000
-given-name	231	231	4000
-place	233	233	4000
-organization	236	236	4000
-suru-noun	201	201	4000
-symbol	360	360	4000
-interjection	330	330	4000
-number	285	285	2500
+# kind	left id	right id	cost (scripts/ja/build-japanese-packs.py)
+noun	212	212	4000
+proper-noun	238	238	4000
+person	239	239	4000
+surname	241	241	4000
+given-name	240	240	4000
+place	242	242	4000
+organization	245	245	4000
+suru-noun	210	210	4000
+symbol	370	370	4000
+interjection	340	340	4000
+number	295	295	2500

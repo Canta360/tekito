@@ -2,20 +2,21 @@
   "pack_id": "japanese-core",
   "display_name": "Japanese Conversion Dictionary",
   "schema_version": 1,
-  "version": "mozc-b9c3fcbd6d76",
+  "version": "mozc-b9c3fcbd6d76-slang-2026.09",
   "language": "ja-JP",
   "type": "japanese-dictionary",
   "format": "ja-dict-v1+ja-matrix-v1",
   "file": "dictionary.bin",
   "index_file": "connection.bin",
   "pos_file": "pos.tsv",
-  "entry_count": 2856,
+  "entry_count": 2932,
   "sha256": {
-    "file": "182A68DB3459F9B9ABA02A52B6CA4A898A07592D20A1911E2C84703F50947B57",
-    "index": "222E8CDE02648CF8A735095D30C974F8208C4698A8AFE98703C9B6886E03526F",
-    "pos": "78E3C815BDE26EE85046B8E77C8D36C350FB739C034B431AAC683EC65C01F5E9"
+    "file": "BB47E3CA1703C3AC8528D013DFB32A4DF319C98A6A498A08D47DD2C14F34E86B",
+    "index": "33E8DED677E6177DC6AE3FC337F1161B4397778BF470310D6282CA9A4BF259C0",
+    "pos": "89FF2E04E57AF3248252247766F281B0FF604F82E80252BB4CDDD59F5A78BE73"
   },
-  "license": "IPAdic + BSD-3-Clause (Mozc)",
+  "license": "IPAdic + BSD-3-Clause (Mozc), TEKITO-OWNED",
   "source": "https://github.com/google/mozc/tree/b9c3fcbd6d76b19649ef572324fa9da2559bc18e/src/data",
+  "supplemental_source": "scripts/ja/japanese-slang-seeds.tsv",
   "notice_file": "NOTICE"
 }
