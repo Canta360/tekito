@@ -2989,10 +2989,13 @@ void JapaneseComposer::SettleChunk() {
     if (word > 0) {
         const auto judged = JudgeChunk(chunk.keys);
         chunk.english = EnglishAsWritten(TypedWithCapitals(chunk.keys).value_or(judged.written)) + marks;
+        chunk.either = judged.either;
     } else {
         chunk.english = marks;
     }
     if (converter_ && word > 0) {
+        chunk.reading = ApplyTypingStyle(Reading());
+        chunk.context = context_;
         const auto phrases = ConvertReading(ApplyTypingStyle(Reading()), 0, context_, contextWords_);
         for (const auto& phrase : phrases) {
             if (!phrase.candidates.empty()) chunk.japanese += phrase.candidates.front().text;
@@ -3103,10 +3106,87 @@ std::wstring JapaneseComposer::JoinChunks(const std::vector<SettledChunk>& chunk
     return text;
 }
 
+void JapaneseComposer::ConvertJapaneseRuns() {
+    if (!converter_) return;
+    const auto convertible = [](const SettledChunk& chunk) {
+        return !chunk.isEnglish && !chunk.marksOnly && !chunk.locked && !chunk.reading.empty() &&
+               std::none_of(chunk.reading.begin(), chunk.reading.end(), IsDigit);
+    };
+    for (std::size_t first = 0; first < settled_.size();) {
+        if (!convertible(settled_[first])) {
+            ++first;
+            continue;
+        }
+        std::size_t end = first;
+        std::wstring reading;
+        std::vector<std::size_t> breaks;
+        while (end < settled_.size() && convertible(settled_[end])) {
+            if (end > first) breaks.push_back(reading.size());
+            reading += settled_[end].reading;
+            ++end;
+        }
+        if (end - first < 2) {
+            first = end;
+            continue;
+        }
+        const auto phrases =
+            converter_->Convert(reading, {}, settled_[first].context, contextWords_, userDictionary_, breaks);
+        // Each chunk's phrases, as the breaks keep them.
+        std::size_t p = 0, at = 0;
+        bool whole = true;
+        std::vector<std::vector<Phrase>> perChunk(end - first);
+        for (std::size_t c = first; c < end && whole; ++c) {
+            const std::size_t chunkEnd = at + settled_[c].reading.size();
+            while (p < phrases.size() && phrases[p].begin + phrases[p].length <= chunkEnd) {
+                PhraseState state{phrases[p].begin, phrases[p].length, phrases[p].candidates};
+                // As a chunk's own conversion has them (AddPhrases): what the
+                // user chose before, loanwords, katakana typed with a vowel
+                // for ー (first: nyuusu was shown ニュース).
+                const auto phraseReading = std::wstring_view(reading).substr(state.begin, state.length);
+                if (learning_) learning_->Reorder(LearningReading(reading, state.begin, state.length), state.candidates);
+                AddLoanwords(state.candidates, phraseReading);
+                AddLongVowelWords(state.candidates, phraseReading, true);
+                StyleKanaNumbers(state.candidates);
+                KeepKanjiInRange(state);
+                perChunk[c - first].push_back({state.begin, state.length, std::move(state.candidates)});
+                ++p;
+            }
+            whole = !perChunk[c - first].empty() && perChunk[c - first].back().begin + perChunk[c - first].back().length == chunkEnd;
+            at = chunkEnd;
+        }
+        if (!whole) {
+            first = end;
+            continue;
+        }
+        constexpr std::size_t kChoices = 6;
+        for (std::size_t c = first; c < end; ++c) {
+            auto& chunk = settled_[c];
+            std::wstring text;
+            for (const auto& phrase : perChunk[c - first]) {
+                if (phrase.candidates.empty()) {
+                    text.clear();
+                    break;
+                }
+                text += phrase.candidates.front().text;
+            }
+            if (text.empty() || text == chunk.japanese) continue;
+            // The chunk as the whole run reads it first; what it was before
+            // stays a choice for the sentence check.
+            auto choices = TopConversions(perChunk[c - first], kChoices);
+            for (const auto& before : chunk.japaneseChoices) {
+                if (std::find(choices.begin(), choices.end(), before) == choices.end()) choices.push_back(before);
+            }
+            chunk.japanese = std::move(text);
+            chunk.japaneseChoices = std::move(choices);
+        }
+        first = end;
+    }
+}
+
 void JapaneseComposer::CheckMixedSentence() {
     // Each chunk as taken first, then its other conversions when it was
-    // taken as Japanese. Picked or typed with capitals stays as it is; so
-    // does each chunk's language (the sentence model knows little English).
+    // taken as Japanese. Picked or typed with capitals stays as it is. The
+    // model knows little English: an English chunk is read as それ.
     std::vector<std::vector<std::wstring>> parts;
     for (const auto& chunk : settled_) {
         if (chunk.isEnglish && !chunk.marksOnly) {
@@ -3121,9 +3201,37 @@ void JapaneseComposer::CheckMixedSentence() {
     for (std::size_t i = 0; i < settled_.size(); ++i) {
         if (picks[i] > 0) settled_[i].japanese = parts[i][picks[i]];
     }
+    // A chunk taken as Japanese that reads as English too (data: 立たを
+    // 更新する) becomes English when the sentence reads clearly better with
+    // the word in it, as Japanese writes it in katakana (データを更新する).
+    // A word without a katakana form stays (mou: もう); それ would fit any.
+    if (!loanwords_) return;
+    constexpr double kLanguageMargin = 5.0;
+    std::vector<std::wstring> read(parts.size());
+    for (std::size_t i = 0; i < parts.size(); ++i) read[i] = parts[i][picks[i]];
+    const auto join = [](const std::vector<std::wstring>& texts) {
+        std::wstring text;
+        for (const auto& part : texts) text += part;
+        return text;
+    };
+    for (std::size_t i = 0; i < settled_.size(); ++i) {
+        auto& chunk = settled_[i];
+        if (chunk.isEnglish || !chunk.either || chunk.locked || chunk.marksOnly) continue;
+        const auto katakana = loanwords_->ForEnglish(chunk.keys, 1);
+        if (katakana.empty() || katakana.front().katakana.empty()) continue;
+        auto english = read;
+        english[i] = katakana.front().katakana;
+        const std::wstring both[] = {join(read), join(english)};
+        const auto scores = reranker_->LogProbabilities(both);
+        if (scores.size() == 2 && scores[1] - scores[0] > kLanguageMargin) {
+            chunk.isEnglish = true;
+            read[i] = EnglishForModel(chunk.english);
+        }
+    }
 }
 
 std::wstring JapaneseComposer::CommitSentence() {
+    ConvertJapaneseRuns();
     if (reranker_ && sentenceCheck_) CheckMixedSentence();
     std::wstring text = SettledText();
     const bool firstJapanese = !settled_.front().marksOnly && !settled_.front().isEnglish;

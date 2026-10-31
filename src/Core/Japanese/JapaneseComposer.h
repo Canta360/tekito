@@ -445,6 +445,10 @@ private:
     // Candidates with kanji outside SetKanjiRange taken out (the phrase's
     // kana when none is left).
     void KeepKanjiInRange(PhraseState& phrase) const;
+    // Mix on Enter: runs of Japanese chunks converted again as one reading,
+    // each chunk still its own phrases, so a word reads on from the ones
+    // after it (sake wo nomu: 酒を飲む, not 避けを飲む).
+    void ConvertJapaneseRuns();
     // The likeliest sentences the phrases' candidates make, checked as a
     // whole (SetSentenceReranker); the one taken is selected.
     void CheckSentence();
@@ -593,6 +597,9 @@ private:
         bool locked{false};     // picked from the list or typed with capitals
         bool picked{false};     // picked from the list, or Japanese taken as typed
         bool sentenceStart{false};  // it began a sentence (English capitalized)
+        bool either{false};     // it reads as either language (data, sake)
+        std::wstring reading;   // Japanese: the kana converted
+        std::uint16_t context{0};  // what conversion went on from
     };
     std::vector<SettledChunk> settled_;
     // English was committed just before the sentence, with its space after.

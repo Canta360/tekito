@@ -2166,6 +2166,22 @@ void TestCandidateOrder(const RomajiTable& table, const MiniPack& pack) {
         }
         composer.Clear();
 
+        // Japanese chunks are converted again as one on Enter, so a word
+        // reads on from those after it: sake wo nomu is 酒を飲む, as
+        // sakewonomu would be, whatever sake alone converts to.
+        composer.ForgetContext();
+        for (const auto* chunk : {L"sake", L"wo", L"nomu"}) {
+            Type(composer, chunk);
+            composer.Convert();
+        }
+        JapaneseComposer whole(&table);
+        whole.SetConverter(&converter);
+        Type(whole, L"sakewonomu");
+        whole.Convert();
+        const std::wstring together = whole.Commit();
+        RequireText(composer.Commit(), together, "Japanese chunks read as one sentence on Enter");
+        composer.ForgetContext();
+
         Type(composer, L"push");
         composer.Convert();
         composer.ShowCandidates();
