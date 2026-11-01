@@ -25,6 +25,7 @@ const initialSettings = {
   completionEnabled: true,
   candidateWindowEnabled: true,
   learningEnabled: true,
+  secretMode: false,
   japanesePhoneticSuggestionsEnabled: true,
   socialExpressionRange: 1,
   socialPersonalization: 1,
@@ -360,7 +361,7 @@ function searchIndex(t, pages, japaneseInstalled) {
     ["auto", a.doubleSpace.title, true], ["auto", a.smart.title, true],
     ["ai", t.ai.title], ["ai", t.ai.device.title],
     ["dictionary", d.japaneseWords.title], ["dictionary", d.englishWords.title], ["dictionary", d.files.title],
-    ["dictionary", d.learn.title], ["dictionary", d.learned.title], ["dictionary", d.private.title],
+    ["dictionary", d.learn.title], ["dictionary", d.learned.title], ["dictionary", d.secret.title], ["dictionary", d.private.title],
     ["about", t.about.report.title], ["about", t.about.bug.title], ["about", t.about.feature.title], ["about", t.about.releases.title],
     ["about", t.about.diagnostics], ["about", t.about.license],
   ];
@@ -1284,6 +1285,9 @@ function DictionaryPage({ settings, setSetting, runAction, setConfirm, japanese,
           )}>
           <Button onClick={learned ? () => setLearned(null) : showLearned}>{learned ? t.close : t.list}</Button>
           <Button onClick={askClear}>{d.learned.clear}</Button>
+        </Row>
+        <Row icon="lock" title={d.secret.title} description={d.secret.description}>
+          <Toggle label={d.secret.title} checked={settings.secretMode} onChange={(value) => setSetting("secretMode", value)} />
         </Row>
         <Row icon="lock" title={d.private.title} description={d.private.description}>
           <Toggle label={d.private.title} checked={settings.noLearningInPrivate} onChange={(value) => setSetting("noLearningInPrivate", value)} />

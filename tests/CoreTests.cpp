@@ -2413,7 +2413,7 @@ void TestSqliteUserSettingsRepository() {
 }
 
 void TestRuntimeModeState() {
-    constexpr wchar_t mappingName[] = L"Local\\TEKITO.RuntimeState.CoreTests.V3";
+    constexpr wchar_t mappingName[] = L"Local\\TEKITO.RuntimeState.CoreTests.V4";
     tekito::userdata::RuntimeModeState first(tekito::InputMode::Convert, mappingName);
     tekito::userdata::RuntimeModeState second(tekito::InputMode::Convert, mappingName);
     Require(first.IsAvailable() && second.IsAvailable(),
@@ -2443,6 +2443,13 @@ void TestRuntimeModeState() {
     first.NotifyLearningChanged();
     Require(second.LearningGeneration() > learningGeneration,
             "runtime learning notification is visible across clients");
+    Require(!second.Secret(), "secret mode starts off");
+    const auto secretGeneration = second.ModeGeneration();
+    first.SetSecret(true);
+    Require(second.Secret() && second.ModeGeneration() > secretGeneration,
+            "secret mode is shared by every client, as a mode change");
+    first.SetSecret(false);
+    Require(!second.Secret(), "and turned off for all");
 }
 
 }  // namespace

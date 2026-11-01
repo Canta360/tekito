@@ -19,10 +19,11 @@ public:
     using ModeSetter = std::function<void(InputMode)>;
     using SettingsLauncher = std::function<void()>;
     using Query = std::function<bool()>;
+    using Switch = std::function<void(bool)>;
 
     ModeLangBarItem(HINSTANCE instance, ModeGetter getMode, ModeSetter setMode,
                     ModeGetter toggledMode, Query japaneseProfile, SettingsLauncher launchSettings,
-                    Query japaneseUi, Query mixedAvailable);
+                    Query japaneseUi, Query mixedAvailable, Query secret, Switch setSecret);
 
     HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void** object) override;
     ULONG STDMETHODCALLTYPE AddRef() override;
@@ -50,6 +51,7 @@ private:
     [[nodiscard]] InputMode Mode() const;
     [[nodiscard]] bool JapaneseProfile() const;
     [[nodiscard]] bool MixedAvailable() const { return mixedAvailable_ && mixedAvailable_(); }
+    [[nodiscard]] bool Secret() const { return secret_ && secret_(); }
     [[nodiscard]] const wchar_t* Text(const wchar_t* english, const wchar_t* japanese) const;
     void ShowContextMenu(POINT point);
 
@@ -63,6 +65,8 @@ private:
     SettingsLauncher launchSettings_;
     Query japaneseUi_;
     Query mixedAvailable_;
+    Query secret_;
+    Switch setSecret_;
     ITfLangBarItemSink* sink_{nullptr};
 };
 

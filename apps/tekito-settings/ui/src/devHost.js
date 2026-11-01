@@ -93,6 +93,7 @@ function initialState() {
       mixSingleVowelKana: true,
       mixLiveConversion: false,
       noLearningInPrivate: true,
+      secretMode: false,
       japaneseIgnoreCapsLock: true,
       japaneseNumpadDirect: true,
       uiLanguage: 0,

@@ -1082,6 +1082,9 @@ private:
         json += settings_.candidateWindowEnabled ? L"true" : L"false";
         json += L",\"learningEnabled\":";
         json += settings_.learningEnabled ? L"true" : L"false";
+        // Secret mode lives in the session's shared state, never saved.
+        json += L",\"secretMode\":";
+        json += runtime_ && runtime_->Secret() ? L"true" : L"false";
         json += L",\"japanesePhoneticSuggestionsEnabled\":";
         json += settings_.japanesePhoneticSuggestionsEnabled ? L"true" : L"false";
         json += L",\"socialExpressionRange\":" + std::to_wstring(settings_.socialExpressionRange);
@@ -1319,6 +1322,9 @@ private:
             else if (key == L"completionEnabled") settings_.completionEnabled = value;
             else if (key == L"candidateWindowEnabled") settings_.candidateWindowEnabled = value;
             else if (key == L"learningEnabled") settings_.learningEnabled = value;
+            else if (key == L"secretMode") {
+                if (runtime_) runtime_->SetSecret(value);
+            }
             else if (key == L"japanesePhoneticSuggestionsEnabled") {
                 settings_.japanesePhoneticSuggestionsEnabled = value;
             }

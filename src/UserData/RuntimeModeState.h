@@ -7,11 +7,12 @@
 
 namespace tekito::userdata {
 
-inline constexpr const wchar_t* kRuntimeStateName = L"Local\\TEKITO.RuntimeState.V3";
+inline constexpr const wchar_t* kRuntimeStateName = L"Local\\TEKITO.RuntimeState.V4";
 
 // State every TEKITO client in the session shares: the English profile's
-// mode, the Japanese profile's, and counters that tell clients to reload
-// settings, the dictionary or learning. The fallbacks seed a new session.
+// mode, the Japanese profile's, secret mode, and counters that tell clients
+// to reload settings, the dictionary or learning. The fallbacks seed a new
+// session.
 class RuntimeModeState final {
 public:
     explicit RuntimeModeState(InputMode fallbackMode,
@@ -33,6 +34,10 @@ public:
     [[nodiscard]] std::uint32_t LearningGeneration() const noexcept;
     void SetMode(InputMode mode) noexcept;
     void SetJapaneseMode(InputMode mode) noexcept;
+    // Secret mode, for the session only (never saved): nothing typed is
+    // learned or kept, as in a private window, in every app.
+    [[nodiscard]] bool Secret() const noexcept;
+    void SetSecret(bool on) noexcept;
     void NotifySettingsChanged() noexcept;
     void NotifyDictionaryChanged() noexcept;
     void NotifyLearningChanged() noexcept;

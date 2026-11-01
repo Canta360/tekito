@@ -234,6 +234,7 @@ const en = {
     learning: "Learning",
     learn: { title: "Learn from chosen candidates", description: "Shows candidates you chose higher next time." },
     learned: { title: "What was learned", count: (n) => `${count(n)} items`, clear: "Delete all" },
+    secret: { title: "Secret mode", description: "Nothing you type is learned or kept, until you turn it off or sign out." },
     private: { title: "Don't learn in private windows", description: "Nothing typed in a browser's private window is learned." },
   },
 
@@ -557,6 +558,7 @@ const ja = {
     learning: "学習",
     learn: { title: "選択した候補の学習", description: "選択した候補を、次回から上位に表示します" },
     learned: { title: "学習した内容", count: (n) => `${count(n)} 件`, clear: "すべて削除" },
+    secret: { title: "シークレットモード", description: "オフにするかサインアウトするまで、入力を学習・記録しません" },
     private: { title: "プライベートウィンドウでは学習しない", description: "ブラウザのシークレットウィンドウでの入力は学習しません" },
   },
 

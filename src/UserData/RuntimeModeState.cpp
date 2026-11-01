@@ -18,6 +18,7 @@ struct SharedRuntimeState {
     volatile LONG dictionaryGeneration;
     volatile LONG learningGeneration;
     volatile LONG japaneseMode;
+    volatile LONG secret;
 };
 
 InputMode JapaneseModeFrom(LONG value) noexcept {
@@ -51,6 +52,7 @@ RuntimeModeState::RuntimeModeState(InputMode fallbackMode, const wchar_t* mappin
     if (InterlockedCompareExchange(&impl_->state->magic, kInitializing, 0) == 0) {
         InterlockedExchange(&impl_->state->mode, static_cast<LONG>(fallbackMode_));
         InterlockedExchange(&impl_->state->japaneseMode, static_cast<LONG>(japaneseFallbackMode_));
+        InterlockedExchange(&impl_->state->secret, 0);
         InterlockedExchange(&impl_->state->modeGeneration, 1);
         InterlockedExchange(&impl_->state->settingsGeneration, 1);
         InterlockedExchange(&impl_->state->dictionaryGeneration, 1);
@@ -125,6 +127,19 @@ void RuntimeModeState::SetJapaneseMode(InputMode mode) noexcept {
     }
     const LONG value = static_cast<LONG>(mode);
     if (InterlockedExchange(&impl_->state->japaneseMode, value) != value) {
+        InterlockedIncrement(&impl_->state->modeGeneration);
+    }
+}
+
+bool RuntimeModeState::Secret() const noexcept {
+    return IsAvailable() && InterlockedCompareExchange(&impl_->state->secret, 0, 0) != 0;
+}
+
+void RuntimeModeState::SetSecret(bool on) noexcept {
+    if (!IsAvailable()) return;
+    // Clients show it with the mode (the taskbar button), so they refresh
+    // as for a mode change.
+    if (InterlockedExchange(&impl_->state->secret, on ? 1 : 0) != (on ? 1 : 0)) {
         InterlockedIncrement(&impl_->state->modeGeneration);
     }
 }

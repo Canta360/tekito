@@ -7,6 +7,7 @@
 #include <ctffunc.h>
 #include <oleauto.h>
 #include <cwchar>
+#include <string>
 
 namespace tekito::tsf {
 namespace {
@@ -16,6 +17,7 @@ constexpr UINT kMenuDirect = 2;
 constexpr UINT kMenuSettings = 3;
 constexpr UINT kMenuJapanese = 4;
 constexpr UINT kMenuMixed = 5;
+constexpr UINT kMenuSecret = 6;
 
 // Whether the taskbar, where the mode icon shows, is dark (Settings >
 // Personalization > Colors > "Choose your default Windows mode").
@@ -32,7 +34,8 @@ bool TaskbarIsDark() {
 
 ModeLangBarItem::ModeLangBarItem(HINSTANCE instance, ModeGetter getMode, ModeSetter setMode,
                                  ModeGetter toggledMode, Query japaneseProfile,
-                                 SettingsLauncher launchSettings, Query japaneseUi, Query mixedAvailable)
+                                 SettingsLauncher launchSettings, Query japaneseUi, Query mixedAvailable,
+                                 Query secret, Switch setSecret)
     : instance_(instance),
       getMode_(std::move(getMode)),
       setMode_(std::move(setMode)),
@@ -40,7 +43,9 @@ ModeLangBarItem::ModeLangBarItem(HINSTANCE instance, ModeGetter getMode, ModeSet
       japaneseProfile_(std::move(japaneseProfile)),
       launchSettings_(std::move(launchSettings)),
       japaneseUi_(std::move(japaneseUi)),
-      mixedAvailable_(std::move(mixedAvailable)) {}
+      mixedAvailable_(std::move(mixedAvailable)),
+      secret_(std::move(secret)),
+      setSecret_(std::move(setSecret)) {}
 
 const wchar_t* ModeLangBarItem::Text(const wchar_t* english, const wchar_t* japanese) const {
     return japaneseUi_ && japaneseUi_() ? japanese : english;
@@ -98,11 +103,12 @@ HRESULT ModeLangBarItem::Show(BOOL) { return E_NOTIMPL; }
 HRESULT ModeLangBarItem::GetTooltipString(BSTR* tooltip) {
     if (!tooltip) return E_INVALIDARG;
     const auto mode = Mode();
-    *tooltip = SysAllocString(mode == InputMode::Japanese ? Text(L"TEKITO Japanese", L"TEKITO 日本語")
-                              : mode == InputMode::Mixed ? Text(L"TEKITO Mix", L"TEKITO まぜ打ち")
-                              : mode == InputMode::Direct
-                                  ? Text(L"TEKITO Direct mode", L"TEKITO Direct モード")
-                                  : Text(L"TEKITO Auto mode", L"TEKITO Auto モード"));
+    std::wstring text = mode == InputMode::Japanese ? Text(L"TEKITO Japanese", L"TEKITO 日本語")
+                        : mode == InputMode::Mixed  ? Text(L"TEKITO Mix", L"TEKITO まぜ打ち")
+                        : mode == InputMode::Direct ? Text(L"TEKITO Direct mode", L"TEKITO Direct モード")
+                                                    : Text(L"TEKITO Auto mode", L"TEKITO Auto モード");
+    if (Secret()) text += Text(L" (secret)", L"（シークレット）");
+    *tooltip = SysAllocString(text.c_str());
     return *tooltip ? S_OK : E_OUTOFMEMORY;
 }
 
@@ -130,6 +136,7 @@ void ModeLangBarItem::ShowContextMenu(POINT point) {
     if (JapaneseProfile()) AppendMenuW(menu, flags(InputMode::Japanese), kMenuJapanese, Text(L"Japanese", L"日本語"));
     if (MixedAvailable()) AppendMenuW(menu, flags(InputMode::Mixed), kMenuMixed, Text(L"Mix", L"まぜ打ち"));
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
+    AppendMenuW(menu, MF_STRING | (Secret() ? MF_CHECKED : 0), kMenuSecret, Text(L"Secret mode", L"シークレットモード"));
     AppendMenuW(menu, MF_STRING, kMenuSettings, Text(L"Settings...", L"設定..."));
 
     const HWND owner = GetForegroundWindow();
@@ -164,12 +171,20 @@ HRESULT ModeLangBarItem::InitMenu(ITfMenu* menu) {
     }
     hr = addItem(0, TF_LBMENUF_SEPARATOR, nullptr);
     if (FAILED(hr)) return hr;
+    hr = addItem(kMenuSecret, Secret() ? static_cast<DWORD>(TF_LBMENUF_CHECKED) : 0,
+                 Text(L"Secret mode", L"シークレットモード"));
+    if (FAILED(hr)) return hr;
     return addItem(kMenuSettings, 0, Text(L"Settings...", L"設定..."));
 }
 
 HRESULT ModeLangBarItem::OnMenuSelect(UINT id) {
     if (id == kMenuSettings) {
         if (launchSettings_) launchSettings_();
+        return S_OK;
+    }
+    if (id == kMenuSecret) {
+        if (setSecret_) setSecret_(!Secret());
+        NotifyUpdate();
         return S_OK;
     }
 

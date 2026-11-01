@@ -761,6 +761,8 @@ void TextService::SyncRuntimeState() {
         // Each app keeps the mode it was left in, if Settings says so; a mode
         // changed here is still shared, for apps that start next.
         if (!userSettings_.modePerApp) SetInputMode(SharedMode());
+        // Secret mode turned on or off shows on the button too.
+        if (modeLangBarItem_) modeLangBarItem_->NotifyUpdate();
         runtimeModeGeneration_ = modeGeneration;
     }
 }
@@ -1061,7 +1063,11 @@ void TextService::RegisterLangBarItem() {
         [this]() { return JapaneseModeAvailable(); },
         [this]() { OpenSettings(); },
         [this]() { return userdata::UseJapaneseUi(userSettings_.uiLanguage); },
-        [this]() { return MixedModeAvailable(); });
+        [this]() { return MixedModeAvailable(); },
+        [this]() { return runtimeMode_ && runtimeMode_->Secret(); },
+        [this](bool on) {
+            if (runtimeMode_) runtimeMode_->SetSecret(on);
+        });
     if (!item) return;
 
     ComPtr<ModeLangBarItem> ownedItem(item);
@@ -1686,9 +1692,12 @@ HRESULT TextService::HandleKeyInEditSessionCore(ITfContext* context, TfEditCooki
                                                 const KeyInput& input) {
     Trace(L"HandleKeyInEditSession");
     if (!context) return E_INVALIDARG;
-    // Nothing is learned from what is typed in a private window.
-    privateField_ = ContextIsPrivate(context, editCookie);
-    const bool privateField = userSettings_.noLearningInPrivate && privateField_;
+    // Nothing is learned from what is typed in a private window, nor
+    // anywhere in secret mode (which also keeps nothing, as a private
+    // window does whatever the settings say).
+    const bool secret = runtimeMode_ && runtimeMode_->Secret();
+    privateField_ = ContextIsPrivate(context, editCookie) || secret;
+    const bool privateField = (userSettings_.noLearningInPrivate && privateField_) || secret;
     japanese_.SetLearning(userSettings_.learningEnabled && !privateField ? &japaneseLearning_ : nullptr);
     if (input.type == KeyInput::Type::ShowModeIndicator) {
         ShowModeBadge(CaretAnchor(context, editCookie));
