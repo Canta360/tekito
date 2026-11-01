@@ -1,0 +1,19 @@
+{
+  "pack_id": "written-forms",
+  "display_name": "TEKITO Written Forms",
+  "schema_version": 1,
+  "version": "2026.09",
+  "language": "en-US",
+  "type": "written-forms",
+  "format": "indexed-tsv-v1",
+  "file": "entries.tsv",
+  "index_file": "entries.tsv.idx",
+  "entry_count": 131,
+  "sha256": {
+    "file": "2F98CCD4FF0A5AC0BC5F87F1842BB95FDDF0CF56AA3B0F01A8B7791105338AE3",
+    "index": "063409B915D9208BBBFE9134395745D68F1FEA9621EEF3F4BD2C5501A00557BD"
+  },
+  "license": "TEKITO-OWNED",
+  "source": "scripts/en/written-form-seeds.tsv",
+  "notice_file": "NOTICE"
+}

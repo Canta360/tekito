@@ -17,6 +17,7 @@ download that setup fetches when Japanese is chosen.
 | `dictionary-display` | Short definitions and parts of speech | WordNet 3.0 | WordNet license |
 | `proper-nouns` | Countries, regions, cities of 15,000+ people, continents and seas | GeoNames | CC BY 4.0 |
 | `english-names` | Names for English typing (people, companies, brands, works and places, and the words of those names), offered with their capitals and never taken for typos | Wikidata English and multilingual labels of items with 15 or more sitelinks, leaving out ordinary English words (`scripts/en/build-english-names-pack.py`) | CC0 1.0 |
+| `written-forms` | How English words typed in small letters are written by their own names in Mix (ram → RAM, wifi → Wi-Fi, nvidia → NVIDIA) | Written for TEKITO (`scripts/en/written-form-seeds.tsv`, `scripts/en/build-expression-packs.py`) | TEKITO (see `LICENSE.md`) |
 | `slang` | Chat abbreviations and informal spellings, kept as typed | Written for TEKITO (`scripts/en/slang-seeds.tsv`) | TEKITO (see `LICENSE.md`) |
 | `wiktionary-slang` | More slang and abbreviations | Wiktionary via kaikki.org | CC BY-SA 4.0 |
 | `pronunciation` | Pronunciations | CMU Pronouncing Dictionary | CMUdict license |
@@ -39,6 +40,7 @@ download that setup fetches when Japanese is chosen.
 | `japanese-slips` | What reads as Japanese kana (kana n-grams and a small kana LSTM), to find slips in typed keys before conversion | Computed for TEKITO (`scripts/ja/build-japanese-slips-pack.py`) from the zenz-v2.5 dataset's readings; holds statistics and weights only, no sentences | TEKITO (see `LICENSE.md`); dataset ODC-BY 1.0 |
 | `japanese-loanwords` | English words for katakana candidates (ミーティング → meeting) | Generated from japanese-phonetic (CMUdict) with Leipzig frequencies | CMUdict license, CC BY 4.0 |
 | `japanese-english` | Katakana and the English it is written as, both ways (グーグル ↔ Google, ミーティング ↔ meeting): English for katakana candidates first, and how English chunks are written in Mix mode | JMdict loanwords (EDRDG); Japanese Wikipedia titles, redirects, language links and the reading in each article's opening sentence (`scripts/ja/build-japanese-english-pack.py`) | CC BY-SA 4.0 (kept as its own pack) |
+| `japanese-letter-odds` | How much more each letter reads as an English spelling than as romaji, for Mix to tell English no list has from Japanese | Counted for TEKITO (`scripts/ja/build-japanese-letter-odds.py`) from the `frequency` word list (Leipzig) and the Mozc dictionary's readings; numbers only, no words | TEKITO (see `LICENSE.md`); CC BY 4.0 (Leipzig), BSD-3-Clause (Mozc) |
 | `japanese-slang` | Short definitions for curated Japanese slang; these meanings take priority for matching headwords | Written for TEKITO (`scripts/ja/japanese-slang-seeds.tsv`) | TEKITO (see `LICENSE.md`) |
 | `japanese-wiktionary` | What Japanese words mean, shown beside the highlighted candidate | Japanese Wiktionary via kaikki.org | CC BY-SA 4.0 (kept as its own pack) |
 | `japanese-wordnet` | Meanings of the words Wiktionary lacks | Japanese WordNet 1.1 (NICT) | Japanese WordNet license |

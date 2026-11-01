@@ -49,6 +49,7 @@ data/ja/japanese-slips/
 # Built by scripts/ja/build-japanese-topics-pack.py from word vectors trained
 # on the zenz-v2.5 dataset (scripts/ja/train-japanese-topics.py).
 data/ja/japanese-topics/
+data/ja/japanese-letter-odds/
 # Built by scripts/ja/build-japanese-meaning-packs.py from the slang list,
 # Wiktionary and WordNet
 data/ja/japanese-slang/

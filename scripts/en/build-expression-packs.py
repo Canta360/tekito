@@ -35,6 +35,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 from datapacks import DATA, manifests, pack_dir  # noqa: E402
 SEEDS = Path(__file__).with_name("social-expression-seeds.tsv")
 SLANG_SEEDS = Path(__file__).with_name("slang-seeds.tsv")
+WRITTEN_FORM_SEEDS = Path(__file__).with_name("written-form-seeds.tsv")
 VERSION = "2026.09"
 
 
@@ -161,6 +162,45 @@ is included in this pack.
 
 TEKITO never corrects a spelling listed here; the meaning is offered as a
 suggestion only.
+""", len(rows))
+
+
+# ---------------------------------------------------------------------------
+# written-forms
+
+
+def build_written_forms() -> dict:
+    rows = {}
+    for number, line in enumerate(WRITTEN_FORM_SEEDS.read_text(encoding="utf-8").splitlines(), 1):
+        if not line.strip() or line.startswith("#"):
+            continue
+        fields = line.split("\t")
+        if len(fields) != 2 or fields[1] not in ("always", "japanese"):
+            raise ValueError(f"{WRITTEN_FORM_SEEDS.name}:{number}: expected written form, always|japanese")
+        key = re.sub(r"[ .\-]", "", fields[0]).lower()
+        if not re.fullmatch(r"[a-z]+", key):
+            raise ValueError(f"{WRITTEN_FORM_SEEDS.name}:{number}: {fields[0]!r} has no key of small letters")
+        if key in rows:
+            raise ValueError(f"{WRITTEN_FORM_SEEDS.name}:{number}: {key} twice")
+        rows[key] = (fields[0], fields[1])
+    pack = new_pack("written-forms")
+    with (pack / "entries.tsv").open("w", encoding="utf-8", newline="\n") as output:
+        for key in sorted(rows):
+            written, scope = rows[key]
+            output.write(f"{key}\t{written}\t{scope}\ten-US\tTEKITO-owned\n")
+    return finish(
+        pack, "TEKITO Written Forms", "written-forms", "entries.tsv", "TEKITO-OWNED",
+        "scripts/en/written-form-seeds.tsv",
+        """
+How words typed in small letters are written by their own names (RAM,
+ASRock, NVIDIA, iPhone, Wi-Fi), for English typed among Japanese (Mix).
+Words that are plain English too (line, word, ram) are marked to be written
+so only in Japanese text.
+
+Copyright 2026 Capitata. Written for TEKITO and covered by the TEKITO
+source license (LICENSE.md in the TEKITO repository). No third-party corpus
+is included in this pack. Product and company names are trademarks of their
+owners and are listed only to write them correctly.
 """, len(rows))
 
 
@@ -640,13 +680,14 @@ the Leipzig Corpora Collection (English news 2025), licensed CC BY 4.0.
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument("--only", choices=("slang", "social-expression", "japanese-phonetic",
+    parser.add_argument("--only", choices=("slang", "written-forms", "social-expression", "japanese-phonetic",
                                            "qwerty-typo-catalog", "japanese-loanwords"))
     parser.add_argument("--phonetic-words", type=int, default=20000)
     parser.add_argument("--typo-words", type=int, default=5000)
     args = parser.parse_args()
     builders = {
         "slang": build_slang,
+        "written-forms": build_written_forms,
         "social-expression": build_social,
         "japanese-phonetic": lambda: build_japanese_phonetic(args.phonetic_words),
         "qwerty-typo-catalog": lambda: build_typo_catalog(args.typo_words),

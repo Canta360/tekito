@@ -55,6 +55,7 @@ add_library(tekito_core STATIC
     src/Core/Japanese/KanaSlips.cpp
     src/Core/Japanese/KeyConverter.cpp
     src/Core/Japanese/LanguageModel.cpp
+    src/Core/Japanese/LetterOdds.cpp
     src/Core/Japanese/Loanwords.cpp
     src/Core/Japanese/MappedFile.cpp
     src/Core/Japanese/NeuralMath.cpp
@@ -65,6 +66,7 @@ add_library(tekito_core STATIC
     src/Core/Japanese/SentenceReranker.cpp
     src/Core/Japanese/SortedTsv.cpp
     src/Core/Japanese/TopicVectors.cpp
+    src/Core/Japanese/WrittenForms.cpp
     src/Core/LexiconProvider.cpp
     src/Core/MisspellingProvider.cpp
     src/Core/PolicyEngine.cpp

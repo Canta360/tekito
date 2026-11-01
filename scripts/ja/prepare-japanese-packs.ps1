@@ -65,6 +65,10 @@ python (Join-Path $PSScriptRoot "build-japanese-packs.py") --mozc $mozc --commit
 if ($LASTEXITCODE -ne 0) { throw "build-japanese-packs.py failed with exit code $LASTEXITCODE" }
 Write-Host "Built $Output"
 
+# How English letters differ from romaji, for Mix (from the same Mozc readings).
+python (Join-Path $PSScriptRoot "build-japanese-letter-odds.py") --mozc $mozc --out (Join-Path (Split-Path $Output -Parent) "japanese-letter-odds")
+if ($LASTEXITCODE -ne 0) { throw "build-japanese-letter-odds.py failed with exit code $LASTEXITCODE" }
+
 python (Join-Path $PSScriptRoot "build-japanese-lm.py")
 if ($LASTEXITCODE -ne 0) { throw "build-japanese-lm.py failed with exit code $LASTEXITCODE" }
 
