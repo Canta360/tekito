@@ -143,6 +143,8 @@ constexpr DataPackInfo kJapaneseDataPacks[] = {
     {L"japanese-english", L"Katakana and English"},
     {L"japanese-names", L"Proper Nouns (Wikidata)"},
     {L"japanese-jmdict", L"Set Phrases and Names (JMdict)"},
+    {L"japanese-sudachi", L"Japanese Nouns (SudachiDict)"},
+    {L"japanese-places", L"Place Names (Japan Post)"},
     {L"japanese-wiktionary", L"Japanese Meanings (Wiktionary)"},
     {L"japanese-wordnet", L"Japanese Meanings (WordNet)"},
 };
@@ -1165,6 +1167,8 @@ private:
         json += settings_.japaneseFirstPageSymbol ? L"true" : L"false";
         json += L",\"japaneseTypedForms\":";
         json += settings_.japaneseTypedForms ? L"true" : L"false";
+        json += L",\"japaneseKanjiVariants\":";
+        json += settings_.japaneseKanjiVariants ? L"true" : L"false";
         json += L",\"japaneseLiveRefine\":";
         json += settings_.japaneseLiveRefine ? L"true" : L"false";
         json += L",\"japaneseKanaInput\":";
@@ -1404,6 +1408,7 @@ private:
             else if (key == L"japaneseSlipAutoApply") settings_.japaneseSlipAutoApply = value;
             else if (key == L"japaneseFirstPageSymbol") settings_.japaneseFirstPageSymbol = value;
             else if (key == L"japaneseTypedForms") settings_.japaneseTypedForms = value;
+            else if (key == L"japaneseKanjiVariants") settings_.japaneseKanjiVariants = value;
             else if (key == L"japaneseLiveRefine") settings_.japaneseLiveRefine = value;
             else if (key == L"japaneseKanaInput") settings_.japaneseKanaInput = value;
             else if (key == L"japaneseKanaInputKey") settings_.japaneseKanaInputKey = value;

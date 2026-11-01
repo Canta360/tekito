@@ -158,6 +158,9 @@ public:
     void SetEmojiOnFirstPage(bool on) noexcept { emojiOnFirstPage_ = on; }
     // The list ends with what was typed in every form (AddTypedForms).
     void SetTypedForms(bool on) noexcept { typedForms_ = on; }
+    // The first words' kanji written another way (異体字: 髙橋, 﨑) come
+    // after a phrase's words, before the typed forms (AddVariantForms).
+    void SetKanjiVariants(bool on) noexcept { kanjiVariants_ = on; }
     // Mixed typing: a vowel typed alone (i, a) with no English just before
     // is kana (い) rather than the letter (I); the other comes next.
     void SetSingleVowelKana(bool on) noexcept { singleVowelKana_ = on; }
@@ -483,6 +486,7 @@ private:
     // katakana, half-width katakana and the keys in full and half width
     // (what F6-F10 give), for people who look for them there.
     void AddTypedForms();
+    void AddVariantForms();
     // A sentence in parts, each with its choices (best first): the choice
     // of each part the sentence model reads best, all 0 to keep the first.
     // The phrases of a conversion, the chunks of a mixed sentence and the
@@ -723,6 +727,7 @@ private:
     bool slipAutoApply_{true};
     bool emojiOnFirstPage_{true};
     bool typedForms_{true};
+    bool kanjiVariants_{true};
     bool singleVowelKana_{true};
     bool liveRefine_{true};
     bool mixLive_{false};

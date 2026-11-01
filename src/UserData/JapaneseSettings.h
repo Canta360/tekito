@@ -69,6 +69,7 @@ inline void ApplyJapaneseSettings(japanese::JapaneseComposer& composer, const Us
                         false);
     composer.SetSlipAutoApply(settings.japaneseSlipAutoApply);
     composer.SetTypedForms(settings.japaneseTypedForms);
+    composer.SetKanjiVariants(settings.japaneseKanjiVariants);
     composer.SetSingleVowelKana(settings.mixSingleVowelKana);
     composer.SetEnglishCorrection(settings.mixCorrection);
     composer.SetLiveRefine(settings.japaneseLiveRefine);

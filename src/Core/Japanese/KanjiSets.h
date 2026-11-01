@@ -1,8 +1,11 @@
 #pragma once
 
+#include <cstddef>
 #include <filesystem>
+#include <string>
 #include <string_view>
 #include <unordered_map>
+#include <vector>
 
 namespace tekito::japanese {
 
@@ -32,8 +35,18 @@ public:
     // Every kanji in `text` is 常用 or 人名用.
     [[nodiscard]] bool Common(std::wstring_view text) const { return Allows(text, KanjiRange::JoyoAndJinmei); }
 
+    // Kanji variant forms (異体字), from the japanese-variants pack:
+    // variants.tsv, "kanji<TAB>its variants" (高<TAB>髙).
+    bool LoadVariants(const std::filesystem::path& file);
+    void AddVariants(char32_t kanji, std::u32string variants) { variants_[kanji] = std::move(variants); }
+    [[nodiscard]] bool HasVariants() const noexcept { return !variants_.empty(); }
+    // `text` with one of its kanji written another way (高橋: 髙橋, 崎: 﨑),
+    // kanji by kanji and each kanji's variants in order, at most `most`.
+    [[nodiscard]] std::vector<std::wstring> VariantForms(std::wstring_view text, std::size_t most) const;
+
 private:
     std::unordered_map<char32_t, int> levels_;
+    std::unordered_map<char32_t, std::u32string> variants_;
 };
 
 }  // namespace tekito::japanese

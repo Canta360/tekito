@@ -352,6 +352,7 @@ function searchIndex(t, pages, japaneseInstalled) {
     ["japanese", j.punctuation.title, true], ["japanese", j.space.title, true], ["japanese", j.letters.title, true],
     ["japanese", j.symbols.title, true], ["japanese", j.spacing.title, true], ["japanese", j.slipAutoApply.title, true],
     ["japanese", j.sentenceCheck.title, true], ["japanese", j.firstPageSymbol.title, true], ["japanese", j.typedForms.title, true],
+    ["japanese", j.kanjiVariants.title, true],
     ["mixed", m.live.title], ["mixed", m.prediction.title], ["mixed", m.singleVowel.title], ["mixed", m.correction.title],
     ["mixed", m.firstPageSymbol.title, true], ["mixed", m.marker.title, true],
     ["auto", a.correction.title], ["auto", a.spelling.title], ["auto", a.completion.title], ["auto", a.next.title], ["auto", a.casual.title],
@@ -836,6 +837,9 @@ function JapanesePage({ settings, setSetting, runAction, setConfirm, showKeys, r
           </Row>
           <Row icon="text_fields" title={j.typedForms.title} description={j.typedForms.description}>
             <Toggle label={j.typedForms.title} checked={settings.japaneseTypedForms} onChange={(value) => setSetting("japaneseTypedForms", value)} />
+          </Row>
+          <Row icon="ink_highlighter" title={j.kanjiVariants.title} description={j.kanjiVariants.description}>
+            <Toggle label={j.kanjiVariants.title} checked={settings.japaneseKanjiVariants} onChange={(value) => setSetting("japaneseKanjiVariants", value)} />
           </Row>
         </Card>
         <KeysCard page="japanese" showKeys={showKeys} />

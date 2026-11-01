@@ -34,6 +34,8 @@ data/ja/japanese-core/
 data/ja/japanese-wikimedia/
 data/ja/japanese-names/
 data/ja/japanese-jmdict/
+data/ja/japanese-sudachi/
+data/ja/japanese-places/
 # Built by scripts/ja/build-japanese-english-pack.py from JMdict, Japanese
 # Wikipedia and the Leipzig corpora
 data/ja/japanese-english/

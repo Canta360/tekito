@@ -1,0 +1,18 @@
+{
+  "pack_id": "japanese-variants",
+  "display_name": "Kanji Variant Forms",
+  "schema_version": 1,
+  "version": "2026.10",
+  "language": "ja-JP",
+  "type": "japanese-variants",
+  "format": "tsv",
+  "file": "variants.tsv",
+  "entry_count": 2158,
+  "sha256": {
+    "file": "B54B2164D9D78FAAEDF01FE885053E895187C77834DAC622DA5ED8AE343837B5"
+  },
+  "license": "Unicode-3.0 (Unihan) + public domain (SKK-JISYO.itaiji)",
+  "ai_training": true,
+  "source": "https://www.unicode.org/Public/UCD/latest/ucd/Unihan.zip (Unihan_Variants.txt, Unihan_IRGSources.txt), https://github.com/skk-dev/dict (SKK-JISYO.itaiji)",
+  "notice_file": "NOTICE"
+}

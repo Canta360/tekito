@@ -31,6 +31,9 @@ download that setup fetches when Japanese is chosen.
 | `japanese-wikimedia` | More words for kana-kanji conversion: names of people, places, organizations and works, terms, and set phrases (四字熟語, 慣用句, ことわざ) | Japanese Wikipedia article titles and the readings their opening sentences give; set phrases of the English and Japanese Wiktionary (wiktextract); readings checked with KANJIDIC2 | CC BY-SA 4.0 |
 | `japanese-names` | Proper nouns for kana-kanji conversion: places, people, organizations and works, Japanese and foreign (ボストン, ドナルド・トランプ) | Wikidata: Japanese labels with their name in kana (P1814), and labels all in katakana (`scripts/ja/build-japanese-names-words.py`) | CC0 1.0 |
 | `japanese-jmdict` | Set phrases (四字熟語, idioms, proverbs) and place, station, company, organization and family names for kana-kanji conversion | JMdict and JMnedict (EDRDG) (`scripts/ja/build-japanese-jmdict-words.py`) | CC BY-SA 4.0 (kept as its own pack) |
+| `japanese-sudachi` | More nouns for kana-kanji conversion: new words, compounds, and names of people, places and things that japanese-core lacks | SudachiDict (Works Applications), which carries parts of UniDic and NEologd (`scripts/ja/build-japanese-sudachi-words.py`) | Apache-2.0 (UniDic's BSD notice and NEologd's sources in the pack's NOTICE) |
+| `japanese-places` | Japan's prefectures, cities, towns, villages and town areas, for kana-kanji conversion | Japan Post's postal code data (`scripts/ja/build-japanese-places-words.py`) | No copyright claimed by Japan Post |
+| `japanese-variants` | Kanji variant forms (異体字: 髙 for 高, 﨑 for 崎, 澤 for 沢), offered after a phrase's words | Unicode Unihan (旧字体 and 新字体, other variants) and SKK-JISYO.itaiji (`scripts/ja/build-japanese-variants-pack.py`) | Unicode License V3; SKK-JISYO.itaiji public domain |
 | `japanese-lm` | Which words go together, for conversion to prefer them (neighbor pairs, and content words of one sentence) | Leipzig Corpora Collection, Japanese news crawl 2019 and Wikipedia 2021 | CC BY 4.0 |
 | `japanese-reranker` | A small language model of word pieces that checks the likeliest converted sentences as a whole and picks the one that reads best | Trained for TEKITO (`scripts/ja/train-japanese-wordlm.py`, `scripts/ja/build-japanese-reranker-pack.py`) on the zenz-v2.5 dataset's llm-jp-corpus-v3 part; holds weights and word pieces only, no sentences | TEKITO (see `LICENSE.md`); dataset ODC-BY 1.0 |
 | `japanese-slips` | What reads as Japanese kana (kana n-grams and a small kana LSTM), to find slips in typed keys before conversion | Computed for TEKITO (`scripts/ja/build-japanese-slips-pack.py`) from the zenz-v2.5 dataset's readings; holds statistics and weights only, no sentences | TEKITO (see `LICENSE.md`); dataset ODC-BY 1.0 |
@@ -88,7 +91,11 @@ from the Wiktionary extracts, both checked with KANJIDIC2), it also builds
 their own, for their license. Likewise `japanese-names` (from Wikidata, when
 `scripts\ja\build-japanese-names-words.py` has listed them) and
 `japanese-jmdict` (from JMdict and JMnedict, listed by
-`scripts\ja\build-japanese-jmdict-words.py`). Without japanese-core, Japanese input types kana
+`scripts\ja\build-japanese-jmdict-words.py`), `japanese-sudachi` (from SudachiDict's source
+lexicons, listed by `scripts\ja\build-japanese-sudachi-words.py`) and `japanese-places`
+(from Japan Post's `utf_ken_all.csv`, listed by `scripts\ja\build-japanese-places-words.py`).
+Each added pack's manifest says, as `ai_training`, whether its words may go into
+what trains TEKITO's AI model; the CC BY-SA ones may not. Without japanese-core, Japanese input types kana
 but cannot convert to kanji. The pack also carries `pos.tsv`, the part of
 speech each kind of word a user adds in Settings takes, and the one digits
 typed in Japanese take so counters join them (3こ -> 3個); a pack built before

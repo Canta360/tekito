@@ -49,6 +49,18 @@ foreach ($pack in @(@("names", "wikidata\names_words.tsv"), @("jmdict", "jmdict\
         $extra += @("--$($pack[0])-words", $words, "--$($pack[0])-out", (Join-Path (Split-Path $Output -Parent) "japanese-$($pack[0])"))
     }
 }
+# And japanese-sudachi (SudachiDict's nouns, its LEGAL and license beside
+# them) and japanese-places (Japan Post's place names), when listed
+# (scripts\ja\build-japanese-sudachi-words.py, build-japanese-places-words.py).
+$sudachi = Join-Path $repoRoot ".cache\tekito-data\sudachi"
+if (Test-Path (Join-Path $sudachi "sudachi_words.tsv")) {
+    $extra += @("--sudachi-words", (Join-Path $sudachi "sudachi_words.tsv"), "--sudachi-legal", (Join-Path $sudachi "LEGAL"),
+        "--sudachi-license", (Join-Path $sudachi "LICENSE-2.0.txt"), "--sudachi-out", (Join-Path (Split-Path $Output -Parent) "japanese-sudachi"))
+}
+$places = Join-Path $repoRoot ".cache\tekito-data\japanpost\places_words.tsv"
+if (Test-Path $places) {
+    $extra += @("--places-words", $places, "--places-out", (Join-Path (Split-Path $Output -Parent) "japanese-places"))
+}
 python (Join-Path $PSScriptRoot "build-japanese-packs.py") --mozc $mozc --commit $Commit --out $Output @extra
 if ($LASTEXITCODE -ne 0) { throw "build-japanese-packs.py failed with exit code $LASTEXITCODE" }
 Write-Host "Built $Output"

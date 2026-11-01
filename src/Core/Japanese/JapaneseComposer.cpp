@@ -542,6 +542,7 @@ void JapaneseComposer::StartPicking() {
     predictions_.clear();
     chosenPrediction_.reset();
     focus_ = phrases_.empty() ? 0 : phrases_.size() - 1;
+    AddVariantForms();
     AddTypedForms();
 }
 
@@ -1339,6 +1340,7 @@ void JapaneseComposer::BuildPhrasesFor(bool convert) {
     // An AI model chosen reads the sentence check's choices, with it on or off.
     if (convert && reranker_ && (sentenceCheck_ || aiJudge_) && !chunkJudge_ && !reconverted_) CheckSentence();
     if (convert) ApplyNumberStyle();
+    if (convert) AddVariantForms();
     if (convert) AddTypedForms();
 }
 
@@ -1550,6 +1552,35 @@ void JapaneseComposer::ApplyNumberStyle() {
         std::rotate(candidates.begin(), found, found + 1);
         phrase.selected = 0;
         phrase.form.reset();
+    }
+}
+
+void JapaneseComposer::AddVariantForms() {
+    // Variants of the first few words only, a few each: names are where
+    // they are wanted (髙橋, 山﨑, 澤田), and the list stays short.
+    constexpr std::size_t kWords = 3;
+    constexpr std::size_t kForms = 6;
+    if (!kanjiVariants_ || !kanjiSets_ || !kanjiSets_->HasVariants() || (chunkJudge_ && ChoseEnglish())) return;
+    for (auto& phrase : phrases_) {
+        auto& candidates = phrase.candidates;
+        std::vector<PhraseCandidate> added;
+        std::size_t words = 0;
+        for (const auto& candidate : candidates) {
+            if (words == kWords || added.size() == kForms) break;
+            if (candidate.kind != PhraseCandidate::Kind::Dictionary || !candidate.reading.empty()) continue;
+            ++words;
+            for (auto& form : kanjiSets_->VariantForms(candidate.text, kForms - added.size())) {
+                const auto same = [&](const PhraseCandidate& c) { return c.text == form; };
+                if (std::any_of(candidates.begin(), candidates.end(), same) || std::any_of(added.begin(), added.end(), same)) {
+                    continue;
+                }
+                PhraseCandidate variant = candidate;
+                variant.text = std::move(form);
+                variant.slip = false;
+                added.push_back(std::move(variant));
+            }
+        }
+        candidates.insert(candidates.end(), std::make_move_iterator(added.begin()), std::make_move_iterator(added.end()));
     }
 }
 

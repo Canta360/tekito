@@ -52,9 +52,10 @@ const JapaneseData* ProcessJapaneseData() {
         }
         // Words of Wikipedia article titles, a pack of their own (CC BY-SA).
         (void)loaded->dictionary.AddWords(ExternalLexiconProvider::PackDirectory(L"japanese-wikimedia") / L"dictionary.bin");
-        // Proper nouns from Wikidata (CC0), and set phrases and names from
-        // JMdict and JMnedict (CC BY-SA): packs of their own too.
-        for (const wchar_t* pack : {L"japanese-names", L"japanese-jmdict"}) {
+        // Proper nouns from Wikidata (CC0), set phrases and names from
+        // JMdict and JMnedict (CC BY-SA), SudachiDict's nouns (Apache-2.0)
+        // and Japan Post's place names: packs of their own too.
+        for (const wchar_t* pack : {L"japanese-names", L"japanese-jmdict", L"japanese-sudachi", L"japanese-places"}) {
             (void)loaded->dictionary.AddWords(ExternalLexiconProvider::PackDirectory(pack) / L"dictionary.bin");
         }
         loaded->converter = std::make_unique<JapaneseConverter>(loaded->dictionary, loaded->matrix);
@@ -73,6 +74,7 @@ const JapaneseData* ProcessJapaneseData() {
         (void)loaded->loanwords.Open(ExternalLexiconProvider::PackDirectory(L"japanese-loanwords"));
         (void)loaded->loanwords.OpenEnglish(ExternalLexiconProvider::PackDirectory(L"japanese-english"));
         (void)loaded->kanjiSets.Load(ExternalLexiconProvider::PackDirectory(L"kanji-sets") / L"kanji.tsv");
+        (void)loaded->kanjiSets.LoadVariants(ExternalLexiconProvider::PackDirectory(L"japanese-variants") / L"variants.tsv");
         loaded->userParts = UserPartsOfSpeech::Load(core / L"pos.tsv");
         if (const auto number = loaded->userParts.Number()) {
             loaded->converter->SetNumberWord(JapaneseConverter::NumberWord{number->left, number->right, number->cost});
@@ -183,7 +185,7 @@ void AttachJapaneseData(JapaneseComposer& composer) {
     composer.SetRunTogether(data ? data->chunks.get() : nullptr);
     composer.SetSentenceReranker(data && data->reranker.IsOpen() ? &data->reranker : nullptr);
     composer.SetKanaSlips(data && data->slips.IsOpen() ? &data->slips : nullptr);
-    composer.SetKanjiSets(data && !data->kanjiSets.Empty() ? &data->kanjiSets : nullptr);
+    composer.SetKanjiSets(data && (!data->kanjiSets.Empty() || data->kanjiSets.HasVariants()) ? &data->kanjiSets : nullptr);
 }
 
 void AttachMixedTyping(JapaneseComposer& composer, bool on) {

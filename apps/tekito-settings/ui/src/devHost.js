@@ -86,6 +86,7 @@ function initialState() {
       japaneseSlipAutoApply: true,
       japaneseFirstPageSymbol: true,
       japaneseTypedForms: true,
+      japaneseKanjiVariants: true,
       japaneseLiveRefine: true,
       japaneseKanaInput: false,
       japaneseKanaInputKey: true,

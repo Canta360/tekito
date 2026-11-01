@@ -165,6 +165,9 @@ struct UserSettings {
     // Each list ends with what was typed in every form (kana, half-width
     // katakana, the keys in both widths).
     bool japaneseTypedForms{true};
+    // The first words' kanji written another way (異体字: 髙橋, 山﨑) after
+    // a phrase's words.
+    bool japaneseKanjiVariants{true};
     // Live conversion converts the whole text again, as Enter would, once
     // typing pauses.
     bool japaneseLiveRefine{true};

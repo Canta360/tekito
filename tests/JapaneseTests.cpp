@@ -1556,6 +1556,27 @@ void TestComposerLearning(const RomajiTable& table, const MiniPack& pack) {
     Type(composer, L"kikaigatomaru");
     composer.Convert();
     RequireText(composer.Segments().front().text, first, "without learning the order is the converter's");
+
+    tekito::japanese::KanjiSets variants;
+    variants.AddVariants(U'機', U"机");
+    composer.SetKanjiSets(&variants);
+    composer.Clear();
+    Type(composer, L"kikai");
+    composer.Convert();
+    const auto has = [&](std::wstring_view text) {
+        const auto* list = composer.FocusedCandidates();
+        return list && std::any_of(list->begin(), list->end(), [&](const auto& c) { return c.text == text; });
+    };
+    Require(has(L"机械") && composer.FocusedCandidates()->front().text != L"机械",
+            "a word's kanji variants come in the list, after its words");
+    composer.Clear();
+    composer.SetKanjiVariants(false);
+    Type(composer, L"kikai");
+    composer.Convert();
+    Require(!has(L"机械"), "with variants off, none");
+    composer.SetKanjiVariants(true);
+    composer.SetKanjiSets(nullptr);
+    composer.Clear();
 }
 
 void TestKanjiSets() {
@@ -1581,6 +1602,15 @@ void TestKanjiSets() {
     Require(sets.Allows(L"本櫻", KanjiRange::Kyoiku, 1, true) && !sets.Allows(L"鬱", KanjiRange::Kyoiku, 6, true) &&
                 sets.Allows(L"鬱櫻", KanjiRange::Joyo, 6, true),
             "人名用 kanji added to 教育 or 常用");
+
+    sets.AddVariants(U'高', U"髙");
+    sets.AddVariants(U'崎', U"﨑嵜");
+    sets.AddVariants(U'吉', U"𠮷");
+    const auto forms = sets.VariantForms(L"高崎", 6);
+    Require(forms == std::vector<std::wstring>{L"髙崎", L"高﨑", L"高嵜"}, "one kanji written another way at a time");
+    Require(sets.VariantForms(L"高崎", 2).size() == 2, "at most as many as asked");
+    Require(sets.VariantForms(L"吉野", 6) == std::vector<std::wstring>{L"𠮷野"}, "variants outside the BMP");
+    Require(sets.VariantForms(L"たかはし", 6).empty(), "kana has none");
 }
 
 void TestMeanings() {

@@ -67,7 +67,9 @@ The data packs in `data/` (and in the installer, or the Japanese data it
 downloads) come from SCOWL, Wikipedia, the Leipzig Corpora Collection,
 WordNet, GeoNames, Wiktionary, the CMU Pronouncing Dictionary, Unicode CLDR,
 the Mozc OSS dictionary, symbol, emoji, emoticon and single-kanji tables (IPAdic, BSD 3-Clause), KANJIDIC2,
-JMdict and JMnedict (EDRDG), Wikidata (CC0) and the Japanese WordNet (NICT), plus data written for TEKITO. The model that checks whole Japanese
+JMdict and JMnedict (EDRDG), Wikidata (CC0), SudachiDict (Works Applications, Apache-2.0, with parts of
+UniDic and NEologd), Japan Post's postal code data, Unicode Unihan, the SKK dictionaries' itaiji list
+(public domain) and the Japanese WordNet (NICT), plus data written for TEKITO. The model that checks whole Japanese
 sentences was trained on the zenz-v2.5 dataset (llm-jp-corpus-v3 part, Open
 Data Commons Attribution License 1.0) and holds no text from it. The optional AI models (Liquid AI's
 LFM2.5, LFM Open License) and what runs them (llama.cpp, MIT; the Visual C++ runtime) are downloaded only

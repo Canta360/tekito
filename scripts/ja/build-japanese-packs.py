@@ -46,7 +46,11 @@ Usage:
 With --names-words / --names-out it also builds japanese-names (proper
 nouns from Wikidata, CC0), and with --jmdict-words / --jmdict-out
 japanese-jmdict (set phrases and names from JMdict and JMnedict, CC BY-SA
-4.0), each a pack of its own as japanese-wikimedia is.
+4.0), each a pack of its own as japanese-wikimedia is. Likewise
+--sudachi-words / --sudachi-out (with --sudachi-legal and
+--sudachi-license, SudachiDict's LEGAL and LICENSE-2.0.txt) build
+japanese-sudachi (SudachiDict's nouns, Apache-2.0), and --places-words /
+--places-out japanese-places (Japan Post's place names).
 With --wikimedia-words <words.tsv>... --wikimedia-out <dir> it also builds
 japanese-wikimedia: the words of Wikipedia article titles
 (build-japanese-wikipedia-words.py) and the set phrases of Wiktionary
@@ -447,12 +451,20 @@ def main() -> None:
                         help="set phrases and names from JMdict and JMnedict (build-japanese-jmdict-words.py) "
                              "for japanese-jmdict")
     parser.add_argument("--jmdict-out", type=Path, help="where to build the japanese-jmdict pack")
+    parser.add_argument("--sudachi-words", type=Path, nargs="+",
+                        help="SudachiDict's nouns (build-japanese-sudachi-words.py) for japanese-sudachi")
+    parser.add_argument("--sudachi-out", type=Path, help="where to build the japanese-sudachi pack")
+    parser.add_argument("--sudachi-legal", type=Path, help="SudachiDict's LEGAL, for the pack's NOTICE")
+    parser.add_argument("--sudachi-license", type=Path, help="SudachiDict's LICENSE-2.0.txt, for the pack's NOTICE")
+    parser.add_argument("--places-words", type=Path, nargs="+",
+                        help="Japan Post's place names (build-japanese-places-words.py) for japanese-places")
+    parser.add_argument("--places-out", type=Path, help="where to build the japanese-places pack")
     args = parser.parse_args()
 
     entries = read_entries(args.mozc)
     pos_names = read_pos_names(args.mozc)
     entries.extend(read_slang_entries(pos_names, entries))
-    for name in ("wikimedia", "names", "jmdict"):
+    for name in ("wikimedia", "names", "jmdict", "sudachi", "places"):
         if bool(getattr(args, f"{name}_words")) != bool(getattr(args, f"{name}_out")):
             parser.error(f"--{name}-words and --{name}-out go together")
     size, costs = read_matrix(args.mozc)
@@ -510,6 +522,16 @@ def main() -> None:
     if args.jmdict_words:
         report["jmdict"] = build_added_pack(args.jmdict_words, args.jmdict_out, pos_names, entries, unknown_id,
                                             JMDICT_PACK)
+    if args.sudachi_words:
+        if not args.sudachi_legal or not args.sudachi_license:
+            parser.error("--sudachi-words needs --sudachi-legal and --sudachi-license")
+        meta = dict(SUDACHI_PACK, notice=SUDACHI_PACK["notice"] + args.sudachi_legal.read_text(encoding="utf-8") +
+                    "\n\n" + args.sudachi_license.read_text(encoding="utf-8"))
+        report["sudachi"] = build_added_pack(args.sudachi_words, args.sudachi_out, pos_names, entries, unknown_id,
+                                             meta)
+    if args.places_words:
+        report["places"] = build_added_pack(args.places_words, args.places_out, pos_names, entries, unknown_id,
+                                            PLACES_PACK)
     print(json.dumps(report, indent=2))
 
 
@@ -520,6 +542,7 @@ WIKIMEDIA_PACK = {
     "display_name": "Japanese Words from Wikipedia and Wiktionary",
     "version": "jawiki-2026.10",
     "license": "CC-BY-SA-4.0",
+    "ai_training": False,
     "source": "https://dumps.wikimedia.org/jawiki/ (pages-articles, langlinks), "
               "https://kaikki.org/ (English and Japanese Wiktionary), KANJIDIC2",
     "notice": "japanese-wikimedia holds words of Japanese Wikipedia article titles and their readings, from "
@@ -536,6 +559,7 @@ NAMES_PACK = {
     "display_name": "Proper Nouns from Wikidata",
     "version": "wikidata-2026.10",
     "license": "CC0-1.0",
+    "ai_training": True,
     "source": "https://www.wikidata.org/ (Japanese labels, P1814 name in kana, P31, sitelinks), "
               "queried at https://qlever.dev/",
     "notice": "japanese-names holds proper nouns (places, people, organizations and works) and their "
@@ -547,6 +571,7 @@ JMDICT_PACK = {
     "display_name": "Set Phrases and Names from JMdict and JMnedict",
     "version": "jmdict-2026.10",
     "license": "CC-BY-SA-4.0",
+    "ai_training": False,
     "source": "http://ftp.edrdg.org/pub/Nihongo/JMdict_e.gz, http://ftp.edrdg.org/pub/Nihongo/JMnedict.xml.gz",
     "notice": "japanese-jmdict holds Japanese set phrases (四字熟語, idioms, proverbs) from JMdict, and "
               "place, station, company, organization and family names from JMnedict, with their readings. "
@@ -554,6 +579,32 @@ JMDICT_PACK = {
               "Group (https://www.edrdg.org/), used in conformance with the Group's licence "
               "(https://www.edrdg.org/edrdg/licence.html), under CC BY-SA 4.0 "
               "(https://creativecommons.org/licenses/by-sa/4.0/). This pack is shared under CC BY-SA 4.0.\n",
+}
+SUDACHI_PACK = {
+    "pack_id": "japanese-sudachi",
+    "display_name": "Japanese Nouns from SudachiDict",
+    "version": "sudachidict-20261015",
+    "license": "Apache-2.0",
+    "ai_training": True,
+    "source": "http://sudachi.s3-website-ap-northeast-1.amazonaws.com/sudachidict-raw/v1/20261015/ "
+              "(small_lex, core_lex, notcore_lex)",
+    # SudachiDict's LEGAL and its Apache License follow this.
+    "notice": "japanese-sudachi holds Japanese nouns and their readings from SudachiDict "
+              "(https://github.com/WorksApplications/SudachiDict) by Works Applications Co., Ltd., under the "
+              "Apache License, Version 2.0. TEKITO keeps the nouns its own dictionary lacks, as reading, "
+              "written form and kind. SudachiDict's legal notice and license follow.\n\n",
+}
+PLACES_PACK = {
+    "pack_id": "japanese-places",
+    "display_name": "Japanese Place Names from Japan Post",
+    "version": "japanpost-2026.09",
+    "license": "Japan Post postal code data (no copyright claimed)",
+    "ai_training": True,
+    "source": "https://www.post.japanpost.jp/zipcode/dl/utf-zip.html (utf_ken_all.csv)",
+    "notice": "japanese-places holds the names of Japan's prefectures, cities, towns, villages and town areas "
+              "and their readings, from Japan Post's postal code data "
+              "(https://www.post.japanpost.jp/zipcode/dl/readme.html), on which Japan Post Co., Ltd. claims "
+              "no copyright.\n",
 }
 
 
@@ -580,6 +631,8 @@ def build_added_pack(words: list[Path], out: Path, pos_names: list[str], core_en
         "entry_count": dictionary["words"],
         "sha256": {"file": sha256(out / "dictionary.bin")},
         "license": meta["license"],
+        # Whether the words may go into what trains TEKITO's AI model.
+        "ai_training": meta["ai_training"],
         "source": meta["source"],
         "notice_file": "NOTICE",
     }

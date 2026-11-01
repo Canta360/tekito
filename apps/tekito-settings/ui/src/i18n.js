@@ -144,6 +144,7 @@ const en = {
     sentenceCheck: { title: "Choose by the whole sentence", description: "Puts first the conversion that reads most naturally as a sentence." },
     firstPageSymbol: { title: "Symbols and emoji on the first page", description: "e.g. はーと → ♡" },
     typedForms: { title: "Typed forms at the end of the list", description: "Hiragana, katakana, half-width kana and letters at the end." },
+    kanjiVariants: { title: "Kanji variants", description: "Other forms of kanji, such as 髙 and 﨑, after the usual ones." },
     keys: {
       convert: "Convert, then next candidate",
       phrases: "Move between phrases",
@@ -466,6 +467,7 @@ const ja = {
     sentenceCheck: { title: "文全体で変換を選ぶ", description: "文として自然な変換を第1候補にします" },
     firstPageSymbol: { title: "記号・絵文字を1ページ目に表示", description: "例：はーと → ♡" },
     typedForms: { title: "入力した形を候補の末尾に表示", description: "ひらがな・カタカナ・半角カナ・英字を候補の末尾に表示します" },
+    kanjiVariants: { title: "異体字を表示", description: "髙・﨑などの異体字を、通常の漢字の後に表示します" },
     keys: {
       convert: "変換、次の候補",
       phrases: "文節を移動",
