@@ -192,7 +192,7 @@ if(TEKITO_BUILD_AI)
     set(FETCHCONTENT_BASE_DIR ${TEKITO_DEPS_DIR})
     FetchContent_Declare(ll
         GIT_REPOSITORY https://github.com/ggml-org/llama.cpp.git
-        GIT_TAG 74bca3950054eed1795f525cb9cf06bfe796492d
+        GIT_TAG d05706b4f32a545814856e98ca518292585443b9
     )
     # llama.cpp is C++17 (u8 literals as char), and its DLLs pass C++
     # objects to each other, so they share the DLL C runtime; TekitoAI only
