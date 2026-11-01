@@ -18,6 +18,8 @@ class JapaneseConverter;
 class KeyConverter;
 class Loanwords;
 class RomajiTable;
+class WrittenForms;
+class LetterOdds;
 
 // Mixed typing: Japanese and English typed in chunks, a Space after each.
 // Judges whether a chunk of keys is English or Japanese.
@@ -58,6 +60,13 @@ public:
     ChunkJudge(const RomajiTable& table, const JapaneseConverter& converter, const KeyConverter* slips,
                const IFrequencyProvider& english, const Loanwords* names) noexcept
         : ChunkJudge(table, converter, slips, english, names, Thresholds{}) {}
+
+    // How a word is written by its own name (ram: RAM, asrock: ASRock);
+    // nullptr: off.
+    void SetWrittenForms(const WrittenForms* forms) noexcept { forms_ = forms; }
+    // How English the letters are against romaji (cappuccino against
+    // kyouha), for English no list has; nullptr: off.
+    void SetLetterOdds(const LetterOdds* odds) noexcept { letterOdds_ = odds; }
 
     // `keys` may be the start of a common English word (meetin: meeting), so
     // Mix's live conversion leaves them as typed.
@@ -110,8 +119,10 @@ public:
                                                        const EnglishSpelling* spelling = nullptr) const;
 
 private:
-    // How English writes `word` (GitHub, Google, nice).
-    [[nodiscard]] std::wstring WrittenAs(std::wstring_view word) const;
+    // How English writes `word` (GitHub, Google, nice); `inJapanese`: in a
+    // Japanese sentence, where a word that is plain English too is written
+    // by its name (line: LINE).
+    [[nodiscard]] std::wstring WrittenAs(std::wstring_view word, bool inJapanese = true) const;
     // An English word run into Japanese after it, starting with a particle
     // (pcwotukau: pcを使う); not when the keys are an English word.
     [[nodiscard]] bool EnglishThenJapanese(std::wstring_view keys) const;
@@ -121,6 +132,8 @@ private:
     const KeyConverter* slips_;
     const IFrequencyProvider& english_;
     const Loanwords* names_;
+    const WrittenForms* forms_{nullptr};
+    const LetterOdds* letterOdds_{nullptr};
     Thresholds thresholds_;
 };
 

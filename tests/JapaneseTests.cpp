@@ -33,6 +33,10 @@
 #include <string>
 #include <string_view>
 
+#include "Core/ConversionEngine.h"
+#include "Core/EnglishSpelling.h"
+#include "Core/ExternalRankingProviders.h"
+#include "Core/Japanese/WrittenForms.h"
 #include "Core/Utf8.h"
 
 #if defined(_WIN32)
@@ -2133,6 +2137,225 @@ void TestKanaSlips(const RomajiTable& table, const MiniPack& pack) {
     composer.SetLiveConversion(false);
 }
 
+// English typed with a slip among Japanese (Mix): put right as English
+// Auto would, before a slip that makes Japanese of it, after English or
+// with letters romaji hardly uses.
+void TestMixEnglishSlips(const RomajiTable& table, const MiniPack& pack) {
+    tekito::PreloadDefaultEngineData();
+    const auto engine = tekito::CreateDefaultConversionEngine();
+    Require(engine != nullptr, "English Auto loads for the Mix slip tests");
+    const tekito::EnglishSpelling spelling(*engine);
+    const tekito::ExternalFrequencyProvider scores(tekito::ExternalFrequencyProvider::DefaultPath());
+    const tekito::japanese::JapaneseConverter converter(pack.dictionary, pack.matrix);
+    const tekito::japanese::KeyConverter keys(pack.dictionary, pack.matrix, converter, table);
+    const tekito::japanese::ChunkJudge judge(table, converter, &keys, scores, nullptr);
+    const auto channel = judge.Judge(L"chaannel", 0, true, &spelling);
+    Require(channel.english && channel.written == L"channel", "chaannel in Japanese is channel with a key typed twice");
+    const auto review = judge.Judge(L"reviw", 1, true, &spelling, L"code ");
+    Require(review.english && review.written == L"review", "after English, reviw is review");
+}
+
+// English among Japanese written by its own name (written-forms pack):
+// everywhere, or, for a word that is plain English too, only in Japanese.
+void TestWrittenForms(const RomajiTable& table, const MiniPack& pack) {
+    tekito::japanese::WrittenForms forms;
+    Require(forms.Open(tekito::ExternalLexiconProvider::PackDirectory(L"written-forms")), "the written-forms pack opens");
+    const auto nvidia = forms.Find(L"nvidia");
+    Require(nvidia && nvidia->written == L"NVIDIA" && !nvidia->japaneseOnly, "nvidia is NVIDIA everywhere");
+    const auto wifi = forms.Find(L"wifi");
+    Require(wifi && wifi->written == L"Wi-Fi", "a name with a hyphen is found by its letters (wifi: Wi-Fi)");
+    Require(!forms.Find(L"mini") && !forms.Find(L"nosuchword"), "a word not listed is not found");
+    struct NoScores final : tekito::IFrequencyProvider {
+        double Score(std::wstring_view) const noexcept override { return 0.0; }
+    } scores;
+    const tekito::japanese::JapaneseConverter converter(pack.dictionary, pack.matrix);
+    tekito::japanese::ChunkJudge judge(table, converter, nullptr, scores, nullptr);
+    judge.SetWrittenForms(&forms);
+    const auto asrock = judge.Judge(L"asrock", 0, true);
+    Require(asrock.english && asrock.written == L"ASRock", "asrock is ASRock");
+    const auto uefi = judge.Judge(L"uefi", 0, true);
+    Require(uefi.english && uefi.written == L"UEFI", "an acronym that reads as romaji is English (uefi: UEFI, not 上フィ)");
+    RequireText(judge.Judge(L"line", 0, true).written, L"LINE", "line in Japanese is LINE");
+    RequireText(judge.Judge(L"line", 2, false).written, L"line", "and line in an English sentence stays line");
+}
+
+// A loanword written in katakana as its romaji spells it (anime: アニメ)
+// is Japanese in Mix, unless Japanese text writes it in Latin letters
+// (amazon: Amazon). The counts come from a japanese-english pack written
+// here; the words from the mini dictionary (あにめをみた, あまぞんでかった).
+void TestOwnKatakana(const RomajiTable& table, const MiniPack& pack) {
+    const auto dir = std::filesystem::temp_directory_path() / L"tekito-test-japanese-english";
+    std::filesystem::create_directories(dir);
+    const auto write = [&](const wchar_t* name, const char* text) {
+        std::ofstream(dir / name, std::ios::binary) << text;
+    };
+    write(L"words.tsv", "\xE3\x81\x82\xE3\x81\xBE\xE3\x81\x9E\xE3\x82\x93\tAmazon\t\xE3\x82\xA2\xE3\x83\x9E\xE3\x82\xBE\xE3\x83\xB3\t7.00\n");
+    write(L"english.tsv",
+          "amazon\tAmazon\t\xE3\x82\xA2\xE3\x83\x9E\xE3\x82\xBE\xE3\x83\xB3\t7.00\n"
+          "anime\tanime\t\xE3\x82\xA2\xE3\x83\x8B\xE3\x83\xA1\t5.25\n");
+    write(L"latin.tsv", "amazon\t1.85\nanime\t0.98\n");
+    tekito::japanese::Loanwords names;
+    Require(names.OpenEnglish(dir), "a japanese-english pack written for the test opens");
+    struct WordScores final : tekito::IFrequencyProvider {
+        double Score(std::wstring_view word) const noexcept override {
+            return word == L"anime" || word == L"amazon" ? 4.5 : 0.0;
+        }
+    } scores;
+    const tekito::japanese::JapaneseConverter converter(pack.dictionary, pack.matrix);
+    const tekito::japanese::ChunkJudge judge(table, converter, nullptr, scores, &names);
+    const auto anime = judge.Judge(L"anime", 0, true);
+    Require(!anime.english, "anime, which Japanese writes アニメ, is Japanese in a Japanese sentence");
+    const auto amazon = judge.Judge(L"amazon", 0, true);
+    Require(amazon.english, "amazon, which Japanese text writes in Latin letters, is English");
+    const tekito::japanese::ChunkJudge noCounts(table, converter, nullptr, scores, nullptr);
+    Require(noCounts.Judge(L"anime", 0, true).english, "without the counts a katakana loanword is English, as before");
+    std::error_code ignored;
+    std::filesystem::remove_all(dir, ignored);
+}
+
+// UTF-8 the same where wchar_t is 16 bits (Windows) or 32 (Linux).
+void TestUtf8() {
+    namespace utf8 = tekito::utf8;
+    const std::string face = "\xF0\x9F\xAB\xA5";  // U+1FAE5, outside the BMP
+    const auto decoded = utf8::Decode(face);
+    Require(decoded && decoded->size() == (sizeof(wchar_t) == 2 ? 2u : 1u), "a character outside the BMP decodes");
+    Require(utf8::Encode(*decoded) == face, "and encodes back to the same bytes");
+    Require(utf8::Encode(L"かな") == "\xE3\x81\x8B\xE3\x81\xAA", "kana encode to UTF-8");
+    Require(!utf8::Decode("\xC3") && !utf8::Decode("\xED\xA0\x80") && !utf8::Decode("\xC0\xAF"),
+            "a cut-off sequence, a surrogate and an overlong form are not UTF-8");
+    RequireText(utf8::DecodeLenient("a\xFF" "b"), L"a\xFFFD" L"b", "a bad byte is read as U+FFFD, the rest kept");
+    std::vector<std::uint16_t> units;
+    utf8::ForEachUtf16(*decoded, [&](std::uint16_t unit) { units.push_back(unit); });
+    Require(units == std::vector<std::uint16_t>{0xD83E, 0xDEE5}, "it is two UTF-16 units however wchar_t is");
+    // The language model hashes UTF-16 units, as its builder does.
+    std::uint64_t hash = 0xCBF29CE484222325ULL;
+    for (const std::uint16_t unit : units) {
+        hash = (hash ^ (unit & 0xFF)) * 0x100000001B3ULL;
+        hash = (hash ^ (unit >> 8)) * 0x100000001B3ULL;
+    }
+    Require(tekito::japanese::LanguageModel::Hash(*decoded) == hash, "the model's hash is over UTF-16 units");
+}
+
+// Where candidates go in the list: the other language right after the
+// first, a slip undone after it, and katakana words typed with a vowel for
+// ー near the top.
+void TestCandidateOrder(const RomajiTable& table, const MiniPack& pack) {
+    {
+        // What the sentence check puts sentences together by: each choice's
+        // cost over the first, rising along the list; kana and the like,
+        // without a cost of their own, a fixed amount over the first.
+        using tekito::japanese::PhraseCandidate;
+        std::vector<PhraseCandidate> list{{L"機械", 5000, PhraseCandidate::Kind::Dictionary, false},
+                                          {L"機会", 5200, PhraseCandidate::Kind::Dictionary, false},
+                                          {L"奇怪", 5100, PhraseCandidate::Kind::Dictionary, false},
+                                          {L"きかい", 0, PhraseCandidate::Kind::Hiragana, false},
+                                          {L"器械", 9000, PhraseCandidate::Kind::Dictionary, false}};
+        const auto deltas = JapaneseComposer::CostDeltas(list, {0, 1, 2, 3, 4});
+        Require(deltas.size() == 5 && deltas[0] == 0 && deltas[1] == 200, "a choice costs what it costs over the first");
+        Require(deltas[2] == 200, "and never less than the one before it (the list's order kept)");
+        Require(deltas[3] == 3000 && deltas[4] == 4000, "kana take a fixed amount; later words their own cost");
+        Require(JapaneseComposer::CostDeltas(list, {1, 0}) == std::vector<std::int64_t>{0, 0},
+                "the first of the list given is the one counted from");
+    }
+    const tekito::japanese::JapaneseConverter converter(pack.dictionary, pack.matrix);
+    {
+        // nyuusu: ニュース, read as にゅーす; the particle after it kept.
+        JapaneseComposer composer(&table);
+        composer.SetConverter(&converter);
+        Type(composer, L"nyuusuwo");
+        composer.Convert();
+        bool found = false;
+        for (std::size_t f = 0; f < composer.Segments().size() && !found; ++f) {
+            composer.MoveFocus(-static_cast<int>(composer.Segments().size()));
+            composer.MoveFocus(static_cast<int>(f));
+            const auto* list = composer.FocusedCandidates();
+            for (std::size_t c = 0; list && c < std::min<std::size_t>(3, list->size()); ++c) {
+                found = found || (*list)[c].text.starts_with(L"ニュース");
+            }
+        }
+        Require(found, "a katakana word typed with a vowel for its long mark is among the first candidates");
+        composer.Clear();
+    }
+
+    struct WordScores final : tekito::IFrequencyProvider {
+        double Score(std::wstring_view word) const noexcept override {
+            for (const auto& [listed, score] : {std::pair<std::wstring_view, double>{L"sake", 4.0}, {L"push", 4.2}}) {
+                if (word == listed) return score;
+            }
+            return 0.0;
+        }
+    } scores;
+    const tekito::japanese::ChunkJudge judge(table, converter, nullptr, scores, nullptr);
+    const auto sake = judge.Judge(L"sake", 0);
+    Require(!sake.english && sake.either, "sake reads both ways and is taken as Japanese");
+    const tekito::japanese::KeyConverter keys(pack.dictionary, pack.matrix, converter, table);
+    {
+        JapaneseComposer composer(&table);
+        composer.SetConverter(&converter);
+        composer.SetKeyConverter(&keys);
+        composer.SetMixedTyping(&judge);
+        Type(composer, L"sake");
+        composer.Convert();
+        composer.ShowCandidates();
+        const auto* list = composer.FocusedCandidates();
+        Require(list && list->size() >= 2 && (*list)[1].otherLanguage &&
+                    (*list)[1].kind == tekito::japanese::PhraseCandidate::Kind::English,
+                "the English of a chunk that reads both ways is second, also with the list open");
+        // Where a slip undone goes (JapaneseComposer::SlipPosition).
+        using tekito::japanese::PhraseCandidate;
+        const auto make = [](std::initializer_list<std::pair<const wchar_t*, PhraseCandidate::Kind>> items) {
+            std::vector<PhraseCandidate> out;
+            for (const auto& [text, kind] : items) out.push_back({text, 0, kind, false});
+            return out;
+        };
+        constexpr auto kDict = PhraseCandidate::Kind::Dictionary;
+        constexpr auto kEnglish = PhraseCandidate::Kind::English;
+        auto plain = make({{L"立た", kDict}, {L"他", kDict}, {L"多", kDict}, {L"田", kDict}, {L"打", kDict}, {L"駄", kDict}});
+        Require(JapaneseComposer::SlipPosition(plain, true) == 1, "a likelier slip goes right after the first");
+        Require(JapaneseComposer::SlipPosition(plain, false) > 1, "another waits further down");
+        auto either = plain;
+        either.insert(either.begin() + 1, PhraseCandidate{L"Data", 0, kEnglish, false});
+        either[1].otherLanguage = true;
+        Require(JapaneseComposer::SlipPosition(either, true) > 1,
+                "a slip does not go before the chunk in the other language");
+        auto english = make({{L"Online", kEnglish}, {L"online", kEnglish}, {L"オンライン", kDict}, {L"x", kDict},
+                             {L"y", kDict}, {L"z", kDict}});
+        Require(JapaneseComposer::SlipPosition(english, true) > 1, "nor second in a chunk taken as English");
+        Require(JapaneseComposer::SlipPosition({}, true) == 0, "an empty list takes it first");
+        // Keys that spell a word in both languages are no likely slip:
+        // their own words come first (避け, Sake, 酒, 鮭, then かけ).
+        for (std::size_t c = 1; c < std::min<std::size_t>(4, list->size()); ++c) {
+            Require(!(*list)[c].slip, "a slip undone waits after a chunk's own words when it reads both ways");
+        }
+        composer.Clear();
+
+        // Japanese chunks are converted again as one on Enter, so a word
+        // reads on from those after it: sake wo nomu is 酒を飲む, as
+        // sakewonomu would be, whatever sake alone converts to.
+        composer.ForgetContext();
+        for (const auto* chunk : {L"sake", L"wo", L"nomu"}) {
+            Type(composer, chunk);
+            composer.Convert();
+        }
+        JapaneseComposer whole(&table);
+        whole.SetConverter(&converter);
+        Type(whole, L"sakewonomu");
+        whole.Convert();
+        const std::wstring together = whole.Commit();
+        RequireText(composer.Commit(), together, "Japanese chunks read as one sentence on Enter");
+        composer.ForgetContext();
+
+        Type(composer, L"push");
+        composer.Convert();
+        composer.ShowCandidates();
+        list = composer.FocusedCandidates();
+        Require(list && !list->empty() && list->front().kind == tekito::japanese::PhraseCandidate::Kind::English,
+                "push is English");
+        Require(list->size() < 2 || !(*list)[1].slip, "a chunk taken as English has no slip of Japanese second");
+        composer.Clear();
+    }
+}
+
 int main(int argc, char** argv) {
     const auto table = LoadTable();
     TestKanaText();
@@ -2166,6 +2389,11 @@ int main(int argc, char** argv) {
     TestSpecialConversions(*table, *pack);
     TestSentenceReranker(*table, *pack);
     TestKanaSlips(*table, *pack);
+    TestCandidateOrder(*table, *pack);
+    TestMixEnglishSlips(*table, *pack);
+    TestWrittenForms(*table, *pack);
+    TestOwnKatakana(*table, *pack);
+    TestUtf8();
     TestKanjiSets();
     TestMeanings();
     if (argc > 1 && std::string_view(argv[1]) == "--dump") DumpConversions(*pack);

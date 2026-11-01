@@ -4,6 +4,8 @@
 #include "Core/ExternalRankingProviders.h"
 #include "Core/Japanese/AiJudge.h"
 #include "Core/Japanese/ChunkJudge.h"
+#include "Core/Japanese/LetterOdds.h"
+#include "Core/Japanese/WrittenForms.h"
 #include "Core/Japanese/JapaneseComposer.h"
 #include "Core/Japanese/JapaneseConverter.h"
 #include "Core/Japanese/JapaneseDictionary.h"
@@ -40,6 +42,8 @@ struct JapaneseData {
     // Japanese after an English word reads on from.
     std::unique_ptr<ExternalFrequencyProvider> english;
     std::unique_ptr<ChunkJudge> chunks;
+    WrittenForms writtenForms;
+    LetterOdds letterOdds;
     std::uint16_t nounContext{0};
 };
 
@@ -85,6 +89,12 @@ const JapaneseData* ProcessJapaneseData() {
             loaded->chunks = std::make_unique<ChunkJudge>(*table, *loaded->converter, loaded->keys.get(),
                                                           *loaded->english,
                                                           loaded->loanwords.IsOpen() ? &loaded->loanwords : nullptr);
+            if (loaded->writtenForms.Open(ExternalLexiconProvider::PackDirectory(L"written-forms"))) {
+                loaded->chunks->SetWrittenForms(&loaded->writtenForms);
+            }
+            if (loaded->letterOdds.Open(ExternalLexiconProvider::PackDirectory(L"japanese-letter-odds"))) {
+                loaded->chunks->SetLetterOdds(&loaded->letterOdds);
+            }
         }
         return loaded;
     }();

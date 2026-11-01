@@ -19,6 +19,8 @@
 #include <string_view>
 #include <vector>
 
+#include "Core/Utf8.h"
+
 #if defined(_WIN32)
 #include <windows.h>
 #endif
@@ -34,7 +36,7 @@ std::wstring Widen(std::string_view utf8) {
     MultiByteToWideChar(CP_UTF8, 0, utf8.data(), static_cast<int>(utf8.size()), out.data(), length);
     return out;
 #else
-    return std::wstring(utf8.begin(), utf8.end());
+    return tekito::utf8::DecodeLenient(utf8);
 #endif
 }
 
@@ -46,7 +48,7 @@ std::string Narrow(std::wstring_view text) {
     WideCharToMultiByte(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), out.data(), length, nullptr, nullptr);
     return out;
 #else
-    return std::string(text.begin(), text.end());
+    return tekito::utf8::Encode(text);
 #endif
 }
 

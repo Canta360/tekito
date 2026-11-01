@@ -224,3 +224,7 @@ Okinawa dictionary is licensed as follows
 Public Domain Dataです。使用・変更・配布に関しては一切の制限をつけません。
 商品などに組み込むことも自由に行なってください。すでにいくつかの辞書には沖縄辞書が採用されています。
 勝手ながら、沖縄辞書に寄贈された辞書も in the Public Domain' 扱いとさせていただきます。
+
+== TEKITO Japanese slang additions ==
+
+The curated entries and original short definitions come from scripts/ja/japanese-slang-seeds.tsv and are covered by the TEKITO source license.

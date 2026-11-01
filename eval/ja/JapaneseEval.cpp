@@ -30,6 +30,9 @@
 
 #include "Core/ConversionEngine.h"
 #include "Core/EnglishSpelling.h"
+#include "Core/ExternalLexiconProvider.h"
+#include "Core/Japanese/LetterOdds.h"
+#include "Core/Japanese/WrittenForms.h"
 #include "Core/ExternalRankingProviders.h"
 #include "Core/Japanese/AiJudge.h"
 #include "Core/Japanese/ChunkJudge.h"
@@ -58,6 +61,7 @@
 #include <iomanip>
 #include <iostream>
 #include <map>
+#include <functional>
 #include <queue>
 #include <set>
 #include <sstream>
@@ -151,6 +155,63 @@ std::vector<std::wstring> SentencesByRank(const std::vector<std::vector<std::wst
     return sentences;
 }
 
+// The same, but by how much likelier the converter found each pick than the
+// phrase's first (its cost less the first's), so a second choice almost as
+// likely as the first comes before one far behind. `deltas` go with
+// `lists`, each list's rising (the place in the list kept).
+std::vector<std::wstring> SentencesByCost(const std::vector<std::vector<std::wstring>>& lists,
+                                          const std::vector<std::vector<std::int64_t>>& deltas, std::size_t count) {
+    std::vector<std::wstring> sentences;
+    if (lists.empty() || std::any_of(lists.begin(), lists.end(), [](const auto& l) { return l.empty(); })) {
+        return sentences;
+    }
+    using Picks = std::vector<std::size_t>;
+    const auto costOf = [&](const Picks& picks) {
+        std::int64_t sum = 0;
+        for (std::size_t i = 0; i < picks.size(); ++i) sum += deltas[i][picks[i]];
+        return sum;
+    };
+    using Entry = std::pair<std::int64_t, Picks>;
+    std::priority_queue<Entry, std::vector<Entry>, std::greater<Entry>> queue;
+    std::set<Picks> seen;
+    queue.push({0, Picks(lists.size(), 0)});
+    seen.insert(Picks(lists.size(), 0));
+    std::set<std::wstring> written;
+    while (!queue.empty() && sentences.size() < count) {
+        const Picks picks = queue.top().second;
+        queue.pop();
+        std::wstring text;
+        for (std::size_t i = 0; i < lists.size(); ++i) text += lists[i][picks[i]];
+        if (written.insert(text).second) sentences.push_back(std::move(text));
+        for (std::size_t i = 0; i < lists.size(); ++i) {
+            if (picks[i] + 1 >= lists[i].size()) continue;
+            Picks next = picks;
+            ++next[i];
+            if (seen.insert(next).second) queue.push({costOf(next), std::move(next)});
+        }
+    }
+    return sentences;
+}
+
+// TEKITO_EVAL_SENTENCE_ORDER=cost puts the whole sentences together by
+// SentencesByCost instead of by rank; TEKITO_EVAL_KANA_COST (default 3000)
+// is what a kana or other candidate without a cost of its own is taken to
+// cost over the phrase's first.
+bool SentencesByCostChosen() {
+    static const bool chosen = [] {
+        const char* order = std::getenv("TEKITO_EVAL_SENTENCE_ORDER");
+        return order && std::string_view(order) == "cost";
+    }();
+    return chosen;
+}
+std::int64_t KanaCost() {
+    static const std::int64_t cost = [] {
+        const char* value = std::getenv("TEKITO_EVAL_KANA_COST");
+        return value && *value ? std::stoll(value) : std::int64_t{3000};
+    }();
+    return cost;
+}
+
 // TEKITO_EVAL_OUTPUT=<path>: each row's text as committed (source, id, text),
 // in the layout the real-input benchmark writes, to be scored the same way.
 void WriteOutput(const std::string& source, const std::string& id, const std::wstring& text) {
@@ -233,6 +294,15 @@ int RunKeys(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary
     if (const char* style = std::getenv("TEKITO_EVAL_NUMBER_STYLE")) {
         composer.SetNumberStyle(static_cast<tekito::japanese::JapaneseComposer::NumberStyle>(std::strtol(style, nullptr, 10)));
     }
+    // TEKITO_EVAL_CHECK_ORDER=rank: the sentence check reads sentences put
+    // together by rank, as before it took the converter's costs.
+    if (const char* order = std::getenv("TEKITO_EVAL_CHECK_ORDER"); order && std::string_view(order) == "rank") {
+        composer.SetSentencesByCost(false);
+    }
+    // TEKITO_EVAL_MIX_SLIPS=0: Mix's Japanese chunks without the slips pack.
+    if (const char* mixSlips = std::getenv("TEKITO_EVAL_MIX_SLIPS"); mixSlips && *mixSlips == '0') {
+        composer.SetMixSlips(false);
+    }
     composer.SetKanaSlips(slips);
 
     // How many whole sentences are put together, and the counts reported.
@@ -277,6 +347,20 @@ int RunKeys(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary
     }
     std::string previousGroup;
     std::wstring previousText;
+    // TEKITO_EVAL_CONTEXTS=<readings file>: each row's text before it (the
+    // readings file's context column), as the app passes the text before the
+    // caret (SetPrecedingText).
+    std::map<std::pair<std::string, std::string>, std::wstring> rowContexts;
+    if (const char* contexts = std::getenv("TEKITO_EVAL_CONTEXTS"); contexts && *contexts) {
+        std::ifstream in(contexts, std::ios::binary);
+        for (std::string line; std::getline(in, line);) {
+            if (!line.empty() && line.back() == '\r') line.pop_back();
+            std::vector<std::string> fields;
+            std::stringstream parts(line);
+            for (std::string field; std::getline(parts, field, '\t');) fields.push_back(field);
+            if (fields.size() >= 3 && !fields[2].empty()) rowContexts[{fields[0], fields[1]}] = ja_eval::Widen(fields[2]);
+        }
+    }
     for (const auto& row : LoadCorpus(corpus)) {
         composer.Clear();
         if (!gContexts.empty() || gContextPrevious) {
@@ -285,6 +369,8 @@ int RunKeys(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary
             if (const auto found = gContexts.find(row.id); found != gContexts.end()) context = found->second;
             if (gContextPrevious && row.id.find('-') != std::string::npos && group == previousGroup) context = previousText;
             composer.SetRecentText(context);
+            // As the app passes it: to the AI and to conversion and the sentence check.
+            composer.SetPrecedingText(context);
             previousText = (group == previousGroup ? previousText : std::wstring()) +
                            (row.expected.empty() ? std::wstring() : row.expected.front());
             if (previousText.size() > 120) previousText.erase(0, previousText.size() - 120);
@@ -292,7 +378,10 @@ int RunKeys(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary
         }
         // Each row on its own: Enter (live) commits, which would lead the
         // next row on from it.
-        if (live) composer.ForgetContext();
+        if (live || !rowContexts.empty()) composer.ForgetContext();
+        if (const auto found = rowContexts.find({row.source, row.id}); found != rowContexts.end()) {
+            composer.SetPrecedingText(found->second);
+        }
         for (const wchar_t key : row.reading) {
             const auto keyStart = Clock::now();
             composer.Insert(key);
@@ -373,6 +462,7 @@ int RunKeys(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary
         std::size_t sentenceRank = SIZE_MAX;
         if (!byPhrase) {
             std::vector<std::vector<std::wstring>> lists;
+            std::vector<std::vector<std::int64_t>> deltas;
             std::vector<std::wstring> wholes;
             for (std::size_t f = 0; f < phraseCount; ++f) {
                 composer.MoveFocus(-static_cast<int>(phraseCount));
@@ -381,17 +471,30 @@ int RunKeys(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary
                 composer.PreviousCandidate();
                 const auto* candidates = composer.FocusedCandidates();
                 lists.emplace_back();
+                deltas.emplace_back();
+                std::int64_t first = 0;
                 for (std::size_t j = 0; candidates && j < candidates->size() && lists.back().size() < 20; ++j) {
+                    const auto& candidate = (*candidates)[j];
                     // A whole-input candidate is a sentence of its own.
-                    if (!(*candidates)[j].reading.empty()) {
-                        wholes.push_back((*candidates)[j].text);
-                    } else if (std::find(lists.back().begin(), lists.back().end(), (*candidates)[j].text) ==
+                    if (!candidate.reading.empty()) {
+                        wholes.push_back(candidate.text);
+                    } else if (std::find(lists.back().begin(), lists.back().end(), candidate.text) ==
                                lists.back().end()) {
-                        lists.back().push_back((*candidates)[j].text);
+                        // Kana, typed forms and the like have no cost of
+                        // their own: KanaCost over the first. The list's
+                        // order stays (each delta at least the one before).
+                        const bool costed = candidate.kind == tekito::japanese::PhraseCandidate::Kind::Dictionary &&
+                                            candidate.cost > 0 && candidate.cost < (std::int64_t{1} << 30);
+                        if (lists.back().empty()) first = costed ? candidate.cost : 0;
+                        std::int64_t delta = lists.back().empty() ? 0 : costed ? candidate.cost - first : KanaCost();
+                        if (!deltas.back().empty()) delta = std::max(delta, deltas.back().back());
+                        lists.back().push_back(candidate.text);
+                        deltas.back().push_back(delta);
                     }
                 }
             }
-            auto sentences = SentencesByRank(lists, kSentences);
+            auto sentences = SentencesByCostChosen() ? SentencesByCost(lists, deltas, kSentences)
+                                                     : SentencesByRank(lists, kSentences);
             for (auto& whole : wholes) {
                 if (std::find(sentences.begin(), sentences.end(), whole) == sentences.end()) sentences.push_back(whole);
             }
@@ -570,6 +673,14 @@ int RunChunks(const ConnectionMatrix& matrix, const JapaneseDictionary& dictiona
         return 1;
     }
     if (reranker.IsOpen()) composer.SetSentenceReranker(&reranker);
+    // TEKITO_EVAL_CHECK_ORDER=rank: the sentence check reads sentences put
+    // together by rank, as before it took the converter's costs.
+    if (const char* order = std::getenv("TEKITO_EVAL_CHECK_ORDER"); order && std::string_view(order) == "rank") {
+        composer.SetSentencesByCost(false);
+    }
+    if (const char* mixSlips = std::getenv("TEKITO_EVAL_MIX_SLIPS"); mixSlips && *mixSlips == '0') {
+        composer.SetMixSlips(false);
+    }
     tekito::japanese::KanaSlips kanaSlips;
     if (!options.slipsPack.empty() && !kanaSlips.Open(options.slipsPack)) {
         std::cerr << "could not open the slip finder at " << options.slipsPack.string() << "\n";
@@ -578,6 +689,17 @@ int RunChunks(const ConnectionMatrix& matrix, const JapaneseDictionary& dictiona
     if (kanaSlips.IsOpen()) composer.SetKanaSlips(&kanaSlips);
     const tekito::japanese::ChunkJudge judge(*table, converter, options.slips ? &keyConverter : nullptr, english, names,
                                              options.thresholds);
+    // The written-forms pack beside the English data (TEKITO_DATA_PACK_DIR).
+    tekito::japanese::WrittenForms writtenForms;
+    if (!std::getenv("TEKITO_EVAL_NO_WRITTEN_FORMS") &&
+        writtenForms.Open(tekito::ExternalLexiconProvider::PackDirectory(L"written-forms"))) {
+        const_cast<tekito::japanese::ChunkJudge&>(judge).SetWrittenForms(&writtenForms);
+    }
+    // japanese-letter-odds beside japanese-core (TEKITO_EVAL_NO_LETTER_ODDS=1: not).
+    tekito::japanese::LetterOdds letterOdds;
+    if (!std::getenv("TEKITO_EVAL_NO_LETTER_ODDS") && letterOdds.Open(options.pack.parent_path() / "japanese-letter-odds")) {
+        const_cast<tekito::japanese::ChunkJudge&>(judge).SetLetterOdds(&letterOdds);
+    }
     const auto parts = tekito::japanese::UserPartsOfSpeech::Load(options.pack / "pos.tsv");
     const auto noun = parts.For(tekito::japanese::UserWordKind::ProperNoun);
     if (!options.japaneseMode) composer.SetMixedTyping(&judge, noun ? noun->right : 0);
@@ -602,11 +724,27 @@ int RunChunks(const ConnectionMatrix& matrix, const JapaneseDictionary& dictiona
         std::size_t chunks{0}, english{0}, englishRight{0}, japanese{0}, japaneseRight{0};
         // Sentences whose every chunk was taken as the right language.
         std::size_t judgedRows{0};
+        // Without --hold: chunks whose list (first nine) has what the
+        // sentence needs there, how far down it is (the picks it takes),
+        // and sentences every chunk of which can be put right so.
+        std::size_t listedChunks{0}, reachedChunks{0}, picks{0}, reachedRows{0};
+        std::size_t rank[9]{};
     };
     std::map<std::string, ChunkTotals> totals;
     std::map<std::string, std::size_t> sentenceRows, sentenceRight;
     std::size_t shownMisses = 0, shownChunks = 0;
-    for (const auto& row : LoadCorpus(corpus)) {
+    for (auto row : LoadCorpus(corpus)) {
+        // An English word starting the sentence may take a capital, as Mix
+        // gives it one (Dataを for dataを): both are right.
+        for (std::size_t e = 0, n = row.expected.size(); e < n; ++e) {
+            std::wstring capital = row.expected[e];
+            if (!capital.empty() && capital.front() >= L'a' && capital.front() <= L'z') {
+                capital.front() = static_cast<wchar_t>(capital.front() - L'a' + L'A');
+                if (std::find(row.expected.begin(), row.expected.end(), capital) == row.expected.end()) {
+                    row.expected.push_back(std::move(capital));
+                }
+            }
+        }
         std::wstring output;
         std::size_t englishBefore = 0;
         std::wstring englishText;
@@ -616,6 +754,8 @@ int RunChunks(const ConnectionMatrix& matrix, const JapaneseDictionary& dictiona
         std::vector<std::pair<bool, bool>> judged;  // English meant, English said
         std::wistringstream words(row.reading);
         std::size_t chunkIndex = 0;
+        std::vector<std::optional<std::size_t>> chunkRanks;
+        std::wstring fixed;  // the output with each chunk put right where its list can
         for (std::wstring chunk; words >> chunk; ++chunkIndex) {
             const bool meant = chunk.back() == L'*';
             if (meant) chunk.pop_back();
@@ -640,8 +780,49 @@ int RunChunks(const ConnectionMatrix& matrix, const JapaneseDictionary& dictiona
             for (const wchar_t key : chunk) composer.Insert(key);
             composer.Convert();
             if (options.hold) continue;
-            const auto choices = written.is_open() ? OnePickAway(composer) : std::vector<std::wstring>{};
+            const auto choices = OnePickAway(composer);
+            // TEKITO_EVAL_DUMP_LISTS=1: each chunk's list as shown.
+            if (const char* dump = std::getenv("TEKITO_EVAL_DUMP_LISTS"); dump && *dump == '1') {
+                std::cout << "list " << row.source << ":" << row.id << " " << Narrow(chunk) << ":";
+                for (std::size_t c = 0; c < choices.size(); ++c) std::cout << " [" << c + 1 << "]" << Narrow(choices[c]);
+                std::cout << "\n";
+            }
+            // Where in this chunk's list the text the sentence goes on with
+            // is: the first choice that keeps the output a start of an
+            // acceptable text (spaces left out).
+            std::optional<std::size_t> at;
+            {
+                const auto squeeze = [](std::wstring text) {
+                    std::erase(text, L' ');
+                    return text;
+                };
+                for (std::size_t c = 0; c < choices.size() && !at; ++c) {
+                    std::wstring so = fixed + choices[c];
+                    so = squeeze(so);
+                    for (const auto& expected : row.expected) {
+                        if (squeeze(expected).starts_with(so)) {
+                            at = c;
+                            break;
+                        }
+                    }
+                }
+                chunkRanks.push_back(at);
+            }
+            // TEKITO_EVAL_PICK=1: the choice is picked before Enter, as the
+            // typist would, so the next chunks go on from it (top1 then counts
+            // what the picks make).
+            static const bool pick = [] {
+                const char* value = std::getenv("TEKITO_EVAL_PICK");
+                return value && *value == '1';
+            }();
+            const std::size_t segmentCount = composer.Segments().size();
+            if (pick && at && *at > 0 && *at < 9 && segmentCount > 0) {
+                composer.MoveFocus(-static_cast<int>(segmentCount));
+                composer.ShowCandidates();
+                composer.SelectCandidate(*at);
+            }
             const auto committed = composer.Commit();
+            fixed += at ? choices[*at] : committed;
             if (written.is_open()) {
                 written << row.source << '\t' << row.id << '\t' << chunkIndex << '\t' << Narrow(committed) << '\t';
                 for (std::size_t c = 0; c < choices.size(); ++c) {
@@ -697,6 +878,20 @@ int RunChunks(const ConnectionMatrix& matrix, const JapaneseDictionary& dictiona
             ++t->rows;
             if (distance == 0) ++t->exact;
             if (allJudged) ++t->judgedRows;
+            if (!options.hold) {
+                bool reached = true;
+                for (const auto& at : chunkRanks) {
+                    ++t->listedChunks;
+                    if (!at) {
+                        reached = false;
+                        continue;
+                    }
+                    ++t->reachedChunks;
+                    t->picks += *at;
+                    if (*at < std::size(t->rank)) ++t->rank[*at];
+                }
+                if (reached) ++t->reachedRows;
+            }
             t->errors += distance;
             t->characters += length;
             for (const auto& [meant, said] : judged) {
@@ -720,6 +915,12 @@ int RunChunks(const ConnectionMatrix& matrix, const JapaneseDictionary& dictiona
     for (const auto& [source, t] : totals) {
         std::cout << source << ": rows=" << t.rows << " top1=" << 100.0 * t.exact / t.rows << "%"
                   << " judged_rows=" << 100.0 * t.judgedRows / t.rows << "%"
+                  << (options.hold ? std::string{}
+                                   : " in_lists=" + std::to_string(100.0 * t.reachedRows / std::max<std::size_t>(t.rows, 1)) +
+                                         "% chunk_rank1/2/3=" + std::to_string(t.rank[0]) + "/" +
+                                         std::to_string(t.rank[1]) + "/" + std::to_string(t.rank[2]) +
+                                         " missing=" + std::to_string(t.listedChunks - t.reachedChunks) +
+                                         " picks=" + std::to_string(t.picks))
                   << " cer=" << (t.characters ? 100.0 * t.errors / t.characters : 0.0) << "%"
                   << " english_chunks=" << t.english << " judged_english="
                   << (t.english ? 100.0 * t.englishRight / t.english : 0.0) << "%"

@@ -2538,11 +2538,15 @@ RECT TextService::GetCandidateAnchor(ITfContext* context, TfEditCookie editCooki
 }
 
 void TextService::CheckJapaneseContext(ITfContext* context, TfEditCookie editCookie) {
+    const std::wstring before = ReadSelectionContext(context, editCookie);
     // Mix: English there starts with a capital when a sentence starts.
-    japanese_.SetSentenceStart(japanese::JapaneseComposer::EndsSentence(ReadSelectionContext(context, editCookie)));
-    if (lastJapaneseCommit_.empty() || !ReadSelectionContext(context, editCookie).ends_with(lastJapaneseCommit_)) {
+    japanese_.SetSentenceStart(japanese::JapaneseComposer::EndsSentence(before));
+    if (lastJapaneseCommit_.empty() || !before.ends_with(lastJapaneseCommit_)) {
         japanese_.ForgetContext();
     }
+    // The text before the caret, for conversion and the sentence check to
+    // read on from; kept in memory only, and not read in a private field.
+    if (!privateField_) japanese_.SetPrecedingText(before);
 }
 
 HRESULT TextService::PutEnglishPeriod(ITfContext* context, TfEditCookie editCookie) {

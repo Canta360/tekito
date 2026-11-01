@@ -235,8 +235,15 @@ std::vector<std::uint32_t> SentenceReranker::Pieces(std::wstring_view text) cons
     return ids;
 }
 
-SentenceReranker::State SentenceReranker::Start() const {
+SentenceReranker::State SentenceReranker::Start(std::wstring_view context) const {
     State state{std::vector<float>(hidden_, 0.0f), std::vector<float>(hidden_, 0.0f)};
+    // As trained: the context's last pieces, then the separator.
+    constexpr std::size_t kContextPieces = 24;
+    if (!context.empty()) {
+        const auto pieces = Pieces(context);
+        const std::size_t from = pieces.size() > kContextPieces ? pieces.size() - kContextPieces : 0;
+        for (std::size_t i = from; i < pieces.size(); ++i) state = Step(state, pieces[i]);
+    }
     return Step(state, separator_);
 }
 
@@ -290,7 +297,8 @@ void SentenceReranker::NextLogits(const State& state, std::vector<float>& logits
     }
     logSum = largest + std::log(SumExp(logits.data(), vocab_, largest));
 }
-std::vector<double> SentenceReranker::LogProbabilities(std::span<const std::wstring> sentences) const {
+std::vector<double> SentenceReranker::LogProbabilities(std::span<const std::wstring> sentences,
+                                                       std::wstring_view context) const {
     std::vector<double> result(sentences.size(), 0.0);
     if (!IsOpen() || sentences.empty()) return result;
     // The sentences' pieces as a tree: what they share at the start is
@@ -323,7 +331,7 @@ std::vector<double> SentenceReranker::LogProbabilities(std::span<const std::wstr
     std::vector<float> logits;
     // Depth first, each node's state passed down once.
     std::vector<std::pair<std::size_t, State>> stack;
-    stack.emplace_back(0, Start());
+    stack.emplace_back(0, Start(context));
     while (!stack.empty()) {
         auto [at, state] = std::move(stack.back());
         stack.pop_back();
@@ -339,13 +347,13 @@ std::vector<double> SentenceReranker::LogProbabilities(std::span<const std::wstr
 }
 
 std::size_t SentenceReranker::Choose(std::span<const std::wstring> sentences, std::size_t ranked,
-                                     double penalty) const {
+                                     double penalty, std::wstring_view context) const {
     ranked = std::min(ranked, sentences.size());
     const std::size_t count = std::min(ranked, prior_.size());
     if (!IsOpen() || count + (sentences.size() - ranked) < 2 || count == 0) return 0;
     std::vector<std::wstring> read(sentences.begin(), sentences.begin() + static_cast<std::ptrdiff_t>(count));
     read.insert(read.end(), sentences.begin() + static_cast<std::ptrdiff_t>(ranked), sentences.end());
-    const auto logProbabilities = LogProbabilities(read);
+    const auto logProbabilities = LogProbabilities(read, context);
     const double ramp = rampChars_ > 0 ? std::min(1.0, CodePoints(sentences[0]) / static_cast<double>(rampChars_)) : 1.0;
     std::size_t best = 0;
     std::vector<double> scores(read.size());

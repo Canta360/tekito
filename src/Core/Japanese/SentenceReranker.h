@@ -32,13 +32,17 @@ public:
     // UTF-8 bytes).
     [[nodiscard]] std::vector<std::uint32_t> Pieces(std::wstring_view text) const;
     // ln p of each sentence: its pieces and the end, after the start.
-    [[nodiscard]] std::vector<double> LogProbabilities(std::span<const std::wstring> sentences) const;
+    // `context`: the text just before them, as the model was trained with
+    // (its last pieces, then the separator); empty: none.
+    [[nodiscard]] std::vector<double> LogProbabilities(std::span<const std::wstring> sentences,
+                                                       std::wstring_view context = {}) const;
     // Which of `sentences` (likeliest first, as the converter ranks them)
     // to take: 0 keeps the first. Only the first Top() of the first
     // `ranked` are looked at; those after `ranked` (whole texts read with
-    // other phrase breaks) count as the last rank less `penalty`.
+    // other phrase breaks) count as the last rank less `penalty`. `context`:
+    // the text just before them.
     [[nodiscard]] std::size_t Choose(std::span<const std::wstring> sentences, std::size_t ranked = SIZE_MAX,
-                                     double penalty = 0.0) const;
+                                     double penalty = 0.0, std::wstring_view context = {}) const;
 
 private:
     struct Piece {
@@ -49,7 +53,7 @@ private:
         std::vector<float> h, c;
     };
 
-    [[nodiscard]] State Start() const;
+    [[nodiscard]] State Start(std::wstring_view context = {}) const;
     [[nodiscard]] State Step(const State& state, std::uint32_t piece) const;
     // ln p of every piece after `state`'s, as logits less their log-sum.
     void NextLogits(const State& state, std::vector<float>& logits, float& logSum) const;

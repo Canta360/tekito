@@ -148,6 +148,20 @@ public:
     // Once it came (the AI no longer Asking): converts again with it, if
     // nothing was changed since. Whether what is shown changed.
     bool TakeAiAnswer();
+    // The sentences it reads are put together by the converter's costs (on
+    // by default) or, off, by the sum of each phrase's rank.
+    void SetSentencesByCost(bool on) noexcept { sentencesByCost_ = on; }
+    // Mix: Japanese chunks have slips undone with the slips pack too (on by
+    // default), as in Japanese mode.
+    void SetMixSlips(bool on) noexcept { mixSlips_ = on; }
+    // How much more each candidate of `list` (indices into `candidates`,
+    // best first) costs than the first, rising.
+    [[nodiscard]] static std::vector<std::int64_t> CostDeltas(const std::vector<PhraseCandidate>& candidates,
+                                                              const std::vector<std::size_t>& list);
+    // Where in `candidates` the likeliest slip undone goes: right after the
+    // first when it is `likelier`, otherwise further down; never before the
+    // chunk in the other language, nor second in a chunk taken as English.
+    [[nodiscard]] static std::size_t SlipPosition(const std::vector<PhraseCandidate>& candidates, bool likelier) noexcept;
     // Space (and live refine) may undo typing slips in the keys and convert
     // the reading as meant. Off: convert as typed; slip candidates stay in
     // the list. On by default, as UserSettings::japaneseSlipAutoApply.
@@ -316,7 +330,12 @@ public:
     // that text.
     // The content words of what was committed lately (runs of kanji or
     // katakana) go on as the sentence's other words for the language model.
+    // The text just before the caret, as the app has it (not from a
+    // private field): the sentence check reads on from it. Kept in memory
+    // only; ForgetContext drops it. TEKITO's own commits add to it.
+    void SetPrecedingText(std::wstring_view text);
     void ForgetContext() noexcept {
+        precedingText_.clear();
         context_ = 0;
         contextWords_.clear();
         recentText_.clear();
@@ -479,6 +498,10 @@ private:
     void KeepKanjiInRange(PhraseState& phrase) const;
     // Whether every kanji of `text` is in SetKanjiRange's range.
     [[nodiscard]] bool InKanjiRange(std::wstring_view text) const;
+    // Mix on Enter: runs of Japanese chunks converted again as one reading,
+    // each chunk still its own phrases, so a word reads on from the ones
+    // after it (sake wo nomu: 酒を飲む, not 避けを飲む).
+    void ConvertJapaneseRuns();
     // The likeliest sentences the phrases' candidates make, checked as a
     // whole (SetSentenceReranker); the one taken is selected.
     void CheckSentence();
@@ -494,8 +517,11 @@ private:
     // `ai`: the AI model (SetAiJudge) has the last word; when it chooses a
     // writing of its own, that is put in `written` and the picks keep the
     // first. `wholes`: texts for the whole input read alongside (with
-    // `written`), put there when chosen.
+    // `written`), put there when chosen. `deltas` (CostDeltas for each
+    // part) puts the sentences it reads in order by the converter's costs;
+    // without, by the sum of the ranks.
     [[nodiscard]] std::vector<std::size_t> ReadBest(const std::vector<std::vector<std::wstring>>& parts,
+                                                    const std::vector<std::vector<std::int64_t>>* deltas = nullptr,
                                                     bool ai = false, std::wstring* written = nullptr,
                                                     std::span<const std::wstring> wholes = {}) const;
     // A writing of the whole input taken (the AI model's own, or a text
@@ -508,6 +534,10 @@ private:
     // Phrases whose choice is a number not written by the number style (a
     // dictionary word 二十, or a writing's 22) take the converter's number.
     void SelectStyledNumbers();
+    // A katakana word typed with a vowel for ー (にゅうす: ニュース), into the
+    // phrase's list.
+    void AddLongVowelWords(std::vector<PhraseCandidate>& candidates, std::wstring_view reading,
+                           bool overSlip = false) const;
     // The keys with their likeliest slips undone (SetKanaSlips), converted
     // in place of the phrases when that reads better; whether it did.
     bool FixSlips();
@@ -545,6 +575,8 @@ private:
     // `reading`: the phrase's kana, looked up too when the dictionary did
     // not know the word (ぐうぐるで: Googleで).
     void AddLoanwords(std::vector<PhraseCandidate>& candidates, std::wstring_view reading) const;
+    // A candidate written in the text before (precedingText_) goes first.
+    void PreferWordsWritten(std::vector<PhraseCandidate>& candidates) const;
     // Dates, number forms and symbols for a phrase read as `reading`.
     void AddSpecial(std::wstring_view reading, std::vector<PhraseCandidate>& candidates) const;
     // The sum for arithmetic ending in "=" ("1+2=" -> 3, 1+2=3), or nothing.
@@ -638,6 +670,9 @@ private:
         bool locked{false};     // picked from the list or typed with capitals
         bool picked{false};     // picked from the list, or Japanese taken as typed
         bool sentenceStart{false};  // it began a sentence (English capitalized)
+        bool either{false};     // it reads as either language (data, sake)
+        std::wstring reading;   // Japanese: the kana converted
+        std::uint16_t context{0};  // what conversion went on from
     };
     std::vector<SettledChunk> settled_;
     // English was committed just before the sentence, with its space after.
@@ -724,6 +759,8 @@ private:
     std::wstring aiKeys_;
     std::size_t aiFocus_{0};
     bool sentenceCheck_{true};
+    bool sentencesByCost_{true};
+    bool mixSlips_{true};
     bool slipAutoApply_{true};
     bool emojiOnFirstPage_{true};
     bool typedForms_{true};
@@ -768,6 +805,7 @@ private:
     std::uint16_t context_{0};
     std::vector<std::wstring> contextWords_;
     std::wstring recentText_;
+    std::wstring precedingText_;
     std::size_t focus_{0};
     bool listOpen_{false};
     bool live_{false};

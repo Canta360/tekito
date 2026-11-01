@@ -3,8 +3,11 @@
 #include "Core/EnglishSpelling.h"
 #include "Core/Japanese/JapaneseComposer.h"
 #include "Core/Japanese/JapaneseConverter.h"
+#include "Core/Japanese/KanaText.h"
 #include "Core/Japanese/KeyConverter.h"
+#include "Core/Japanese/LetterOdds.h"
 #include "Core/Japanese/Loanwords.h"
+#include "Core/Japanese/WrittenForms.h"
 #include "Core/RankingData.h"
 #include "Core/TypoModel.h"
 
@@ -41,9 +44,12 @@ std::wstring_view SlipOfParticle(std::wstring_view keys) {
 
 }  // namespace
 
-std::wstring ChunkJudge::WrittenAs(std::wstring_view word) const {
+std::wstring ChunkJudge::WrittenAs(std::wstring_view word, bool inJapanese) const {
     std::wstring lower(word);
     for (auto& c : lower) c = static_cast<wchar_t>(std::towlower(c));
+    if (forms_) {
+        if (const auto form = forms_->Find(lower); form && (inJapanese || !form->japaneseOnly)) return form->written;
+    }
     if (names_) {
         if (const auto written = names_->WrittenAs(lower)) return *written;
         for (const auto& spelling : names_->ForEnglish(lower, 1)) {
@@ -127,6 +133,24 @@ ChunkJudge::Judgement ChunkJudge::Judge(std::wstring_view keys, std::size_t engl
         if (const auto written = names_->WrittenAs(keys)) judgement.written = *written;
     }
 
+    // Its own name (ram: RAM, nvidia: NVIDIA), over how a name list or
+    // English writes it; a word that is plain English too (line, booth)
+    // only outside an English sentence. An acronym of three letters or more
+    // so named is English even when it reads as romaji (uefi, not 上フィ).
+    if (forms_) {
+        const bool englishSoFar = englishBefore >= 2 || (englishBefore > 0 && !japaneseInSentence);
+        if (const auto form = forms_->Find(keys); form && (!form->japaneseOnly || !englishSoFar)) {
+            judgement.written = form->written;
+            judgement.word = true;
+            name = true;
+            const bool acronym = std::none_of(form->written.begin(), form->written.end(),
+                                              [](wchar_t c) { return std::iswlower(c) != 0; });
+            if (acronym && keys.size() >= 3 && !form->japaneseOnly) {
+                judgement.english = true;
+                return judgement;
+            }
+        }
+    }
     // "i" alone is I: い alone is hardly ever meant.
     if (keys == L"i") {
         judgement.english = true;
@@ -167,6 +191,16 @@ ChunkJudge::Judgement ChunkJudge::Judge(std::wstring_view keys, std::size_t engl
         judgement.written = WrittenAs(result.word);
         return true;
     };
+    // English no list has, as its letters go (cappuccino, gibberellin:
+    // ln odds 15 and more; Japanese romaji below 0, arimasen 8): five
+    // letters or more, and no Japanese word. As English Auto spells it.
+    constexpr double kEnglishLetters = 12.0;
+    constexpr std::size_t kEnglishLetterKeys = 5;
+    // Not English run into Japanese, which is split off (meetingde:
+    // meetingで), nor English after a particle (pcwotukau).
+    const bool englishLetters = letterOdds_ && keys.size() >= kEnglishLetterKeys &&
+                                letterOdds_->Score(keys) >= kEnglishLetters && !converter_.IsWord(kana) &&
+                                !EnglishThenJapanese(keys) && !Split(keys);
     if (!readable) {
         // Japanese with a slip in it, unless it is an English word.
         const bool known = score >= thresholds_.listedWord || name;
@@ -183,8 +217,22 @@ ChunkJudge::Judgement ChunkJudge::Judge(std::wstring_view keys, std::size_t engl
             judgement.english = true;
             return judgement;
         }
-        // A slip correction makes Japanese of it: when in doubt, Japanese.
-        if (EnglishThenJapanese(keys) || slip) return judgement;
+        // English run into Japanese (pcwotukau) is Japanese. An English
+        // word with a slip in it (chaannel: channel), as English Auto puts it
+        // right to a word Japanese text writes in Latin letters, comes before
+        // a slip correction that makes Japanese of it, after English or with
+        // letters romaji hardly uses; otherwise, in Japanese, when in doubt
+        // Japanese (iktuo: 行くと, not into).
+        if (EnglishThenJapanese(keys)) return judgement;
+        const bool japaneseSoFar = japaneseInSentence && englishBefore == 0;
+        if ((!japaneseSoFar || ForeignLetters(keys, false)) && spelled()) return judgement;
+        if (englishLetters) {
+            // A name keeps how it is written (FeliCa); other keys as English
+            // Auto spells them.
+            if (name || !spelled()) judgement.english = true;
+            return judgement;
+        }
+        if (slip) return judgement;
         if (spelled()) return judgement;
         judgement.english = true;
         return judgement;
@@ -199,15 +247,23 @@ ChunkJudge::Judgement ChunkJudge::Judge(std::wstring_view keys, std::size_t engl
     const bool katakana = best && !best->text.empty() && std::all_of(best->text.begin(), best->text.end(), [](wchar_t c) {
         return (c >= L'\x30A1' && c <= L'\x30FA') || c == L'\x30FC' || c == L'\x30FB';
     });
-    const bool japaneseWord = !katakana && converter_.IsWord(kana);
-    const bool japaneseOdd = !japaneseWord &&
-                             (!best || kana.empty() || katakana ||
-                              best->cost >= thresholds_.costPerKana * static_cast<std::int64_t>(kana.size()));
     // Whether Japanese text writes it in Latin letters (API, Amazon), or
     // hardly ever (take, same). Without the counts, as if it does.
     const auto inJapanese = names_ ? names_->InJapaneseText(keys) : std::nullopt;
     const bool writtenInJapanese = !names_ || !names_->HasJapaneseTextCounts() ||
                                    (inJapanese && *inJapanese >= thresholds_.inJapaneseText);
+    // A loanword written in katakana just as the romaji spells it (anime:
+    // アニメ, yoga: ヨガ) is Japanese's own, unless Japanese text writes it
+    // in Latin letters (amazon: Amazon).
+    const bool ownKatakana = katakana && !writtenInJapanese && best->text == ToKatakana(kana);
+    const bool japaneseWord = (!katakana || ownKatakana) && converter_.IsWord(kana);
+    if (englishLetters && !japaneseWord) {
+        if (name || !spelled()) judgement.english = true;
+        return judgement;
+    }
+    const bool japaneseOdd = !japaneseWord &&
+                             (!best || kana.empty() || katakana ||
+                              best->cost >= thresholds_.costPerKana * static_cast<std::int64_t>(kana.size()));
     // Two English chunks or more with English grammar in them (is, the, a)
     // and no Japanese yet: the English sentence goes on in English (my name
     // is tanaka), unless the keys read as natural Japanese of more than one
@@ -468,6 +524,24 @@ std::vector<ChunkJudge::Judgement> ChunkJudge::JudgeSentence(const std::vector<s
                     return (c >= L'a' && c <= L'z') || (c >= L'0' && c <= L'9') || std::wstring_view(L"'-:;/").find(c) != std::wstring_view::npos;
                 });
                 if (!typed) return judged;
+                // A hyphen typed for ー (noho-mupe-jiwo: のホームページを) is
+                // Japanese: the keys read as kana throughout, and a part
+                // between hyphens is no English word (double-check is).
+                if (keys.find(L'-') != std::wstring_view::npos) {
+                    bool kanaThroughout = true;
+                    for (const auto& token : JapaneseComposer::ParseRomaji(table_, keys)) {
+                        kanaThroughout = kanaThroughout && !token.leftover;
+                    }
+                    bool allWords = true;
+                    for (std::size_t at = 0; at <= keys.size();) {
+                        std::size_t end = keys.find(L'-', at);
+                        if (end == std::wstring_view::npos) end = keys.size();
+                        const auto part = keys.substr(at, end - at);
+                        if (!part.empty() && english_.Score(part) < thresholds_.knownWord) allWords = false;
+                        at = end + 1;
+                    }
+                    if (kanaThroughout && !allWords) return judged;
+                }
                 all[i].english = true;
                 all[i].written = std::wstring(keys);
                 continue;
@@ -513,7 +587,7 @@ std::vector<ChunkJudge::Judgement> ChunkJudge::JudgeSentence(const std::vector<s
         if (spelling) {
             // All capitals (API) only for no English word (it: not IT).
             const auto asEnglish = [&](const std::wstring& word) {
-                const auto named = WrittenAs(word);
+                const auto named = WrittenAs(word, false);
                 const bool inside = named.size() > 1 && std::any_of(named.begin() + 1, named.end(),
                                                                     [](wchar_t c) { return std::iswupper(c) != 0; });
                 const bool allCapitals = std::none_of(named.begin(), named.end(), [](wchar_t c) { return std::iswlower(c) != 0; });
