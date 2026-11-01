@@ -33,6 +33,7 @@ Usage:
   python scripts/build-special-conversions.py --mozc-symbols <symbol.tsv> \\
       --mozc-emoji <emoji_data.tsv> --mozc-emoticons <emoticon.tsv> --mozc-single-kanji <single_kanji.tsv> \\
       --mozc-license <Mozc LICENSE> --mozc-commit <sha> \\
+      --cldr-annotations <cldr common/annotations/ja.xml> <cldr common/annotationsDerived/ja.xml> \\
       --emoji-frequency <https://www.unicode.org/emoji/frequency.html saved> \\
       --symbol-counts <character TAB count, from Japanese text>
 """
@@ -237,6 +238,31 @@ def mozc_single_kanji(path: Path) -> list[tuple[str, str]]:
     return rows
 
 
+def cldr_names(paths: list[Path], emoji: set[str]) -> list[tuple[str, str]]:
+    """(reading, value) from Unicode CLDR's Japanese annotations: names all in
+    kana (two or more) of the emoji Mozc's table has, and of symbols that are
+    no emoji (いこーる: =, こめんと: ※). Skin tones are left out, and emoji
+    Mozc lacks (newer ones may show as empty boxes)."""
+    rows: list[tuple[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+    for path in paths:
+        text = path.read_text(encoding="utf-8")
+        for value, names in re.findall(r'<annotation cp="([^"]+)"(?: type="tts")?>([^<]*)</annotation>', text):
+            value = html.unescape(value)
+            if re.search("[\U0001F3FB-\U0001F3FF]", value):
+                continue
+            plain = value.replace("\ufe0f", "")
+            if plain not in emoji and (len(plain) != 1 or plain.isalnum() or ord(plain) >= 0x1F000):
+                continue
+            value = emoji.get(plain, value)
+            for name in names.split("|"):
+                reading = "".join(chr(ord(c) - 0x60) if "\u30a1" <= c <= "\u30f6" else c for c in name.strip())
+                if len(reading) >= 2 and is_kana(reading) and (reading, value) not in seen:
+                    seen.add((reading, value))
+                    rows.append((reading, value))
+    return rows
+
+
 def emoji_ranks(path: Path) -> dict[str, int]:
     """Each emoji's place in Unicode's ranking by median frequency of use
     (the page's "Ranked Order by Median Frequency"), without U+FE0F."""
@@ -319,6 +345,8 @@ def main() -> None:
     parser.add_argument("--unicode-license", type=Path, required=True,
                         help="Unicode License V3 (Mozc builds its emoji table from Unicode data)")
     parser.add_argument("--mozc-commit", required=True, help="the Mozc commit both files are from")
+    parser.add_argument("--cldr-annotations", type=Path, nargs="*", default=[],
+                        help="Unicode CLDR common/annotations/ja.xml and common/annotationsDerived/ja.xml")
     parser.add_argument("--emoji-frequency", type=Path, required=True,
                         help="https://www.unicode.org/emoji/frequency.html, saved")
     parser.add_argument("--symbol-counts", type=Path, required=True,
@@ -339,8 +367,13 @@ def main() -> None:
     symbols = mozc_symbols(args.mozc_symbols)
     rows += [("symbol", "ja", reading, symbol) for reading, symbol in symbols]
     known = set(symbols)
-    rows += [("symbol", "ja", reading, emoji) for reading, emoji in mozc_emoji(args.mozc_emoji)
-             if (reading, emoji) not in known]
+    emoji = mozc_emoji(args.mozc_emoji)
+    rows += [("symbol", "ja", reading, value) for reading, value in emoji if (reading, value) not in known]
+    known |= set(emoji)
+    # More names by reading from CLDR, for the emoji and symbols Mozc has.
+    rows += [("symbol", "ja", reading, value)
+             for reading, value in cldr_names(args.cldr_annotations, {v.replace("\ufe0f", ""): v for _, v in emoji})
+             if (reading, value) not in known]
     rows += [("emoticon", "ja", reading, face) for reading, face in mozc_emoticons(args.mozc_emoticons)]
     rows += [("kanji", "ja", reading, kanji) for reading, kanji in mozc_single_kanji(args.mozc_single_kanji)]
     rows = rank_emoji(rows, emoji_ranks(args.emoji_frequency), symbol_counts(args.symbol_counts))
@@ -369,9 +402,11 @@ def main() -> None:
         "under the following license:\n\n"
         + license_text
         + "\n\nMozc builds its emoji table from Unicode's emoji data; for the emoji\n"
-        "and their names, and for the order of a reading's emoji (the Unicode\n"
-        "Consortium's emoji frequency ranking, https://www.unicode.org/emoji/frequency.html),\n"
-        "the Unicode License V3 also applies:\n\n"
+        "and their names, for more names of symbols and emoji by reading (Unicode\n"
+        "CLDR's Japanese annotations, https://github.com/unicode-org/cldr), and for\n"
+        "the order of a reading's emoji (the Unicode Consortium's emoji frequency\n"
+        "ranking, https://www.unicode.org/emoji/frequency.html), the Unicode\n"
+        "License V3 also applies:\n\n"
         + args.unicode_license.read_text(encoding="utf-8"),
         encoding="utf-8", newline="\n")
 
