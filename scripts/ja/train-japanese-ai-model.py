@@ -23,6 +23,10 @@ the model also converts without one. Only the text and <eos> are learned.
            typed with slips: none, one or two a sentence, a letter struck as
            its neighbour, left out, doubled or swapped with the next, or a
            word typed as another real word a slip away; the text as meant.
+  prepare-mix  Japanese and English mixed as Mix types it: lines whose
+           katakana words have an English form (a loanword, or a name from
+           Wikidata's labels, --names) put in English, typed in chunks, with
+           a slip in the Japanese, in an English word, both or neither.
   train    fine-tunes --base on them; writes the model to --out/model.
   prepare-rank  TEKITO's conversions of other sentences (tekito_ja_eval
            --write-sentences and TEKITO_EVAL_OUTPUT, in --lists) joined with
@@ -33,9 +37,10 @@ the model also converts without one. Only the text and <eos> are learned.
   train-japanese-ai-model.py prepare --out DIR --zenz FILE.jsonl [--every N] [--exclude-dir D] [--exclude-sha1 F]
   train-japanese-ai-model.py prepare-keys --out DIR --zenz FILE.jsonl --loanwords words.tsv [--every N] [...]
   train-japanese-ai-model.py prepare-english --out DIR --english sentences.txt --lexicon lexicon.txt [...]
-  train-japanese-ai-model.py train   --out DIR --base DIR [--examples N] [--lr 5e-5] [--gpu-share 0.8]
+  train-japanese-ai-model.py prepare-mix --out DIR --zenz FILE.jsonl --loanwords words.tsv [--names names.tsv] [...]
+  train-japanese-ai-model.py train   --out DIR --base DIR [--examples N] [--lr 5e-5] [--gpu-share 0.8] [--save-every 2000]
   train-japanese-ai-model.py prepare-rank --out DIR --gen rank.gen.tsv --lists DIR [--context rank.context40.tsv]
-  train-japanese-ai-model.py train-rank --out DIR --base DIR [--lr 2e-5] [--gpu-share 0.8]
+  train-japanese-ai-model.py train-rank --out DIR --base DIR [--lr 2e-5] [--gpu-share 0.8] [--save-every 2000]
 """
 
 from __future__ import annotations
@@ -44,6 +49,7 @@ import argparse
 import importlib.util
 import json
 import math
+import os
 import random
 import time
 from pathlib import Path
@@ -278,6 +284,181 @@ def prepare_keys(args) -> None:
 
 
 ENGLISH_MAX_CHARS = 160
+# How a Mix line is typed: a space after each chunk (particles, English);
+# English run into the Japanese around it (meetingde); or only the English
+# spaced off.
+MIX_TYPING = [("chunked", 0.5), ("joined", 0.3), ("spaced", 0.2)]
+MIX_REPLACE_SHARE = 0.8   # each katakana word with an English form put in English
+MIX_SLIPS = [("none", 0.35), ("japanese", 0.25), ("english", 0.3), ("both", 0.1)]
+MIX_TYPED_CAPITALS = 0.2  # names typed with their capitals (else lower case, as most type them)
+NAME_EDITIONS = 30        # Wikidata names in at least this many language editions
+MIX_JAPANESE_ONLY = 0.25  # lines with no English kept, as Japanese typed in Mix
+VOWEL_KANA = {"a": "あ", "i": "い", "u": "う", "e": "え", "o": "お"}
+
+
+def long_vowels(kana_module, reading: str) -> str:
+    """ー as the vowel it draws out (せんたー: せんたあ), as the loanwords
+    pack writes its readings."""
+    out: list[str] = []
+    for ch in reading:
+        if ch == "ー" and out:
+            keys = kana_module.to_keys(out[-1]) or ""
+            ch = VOWEL_KANA.get(keys[-1:], ch)
+        out.append(ch)
+    return "".join(out)
+
+
+def prepare_mix(args) -> None:
+    """Japanese and English mixed, as typed in Mix: lines that have English
+    in them already (GitHubにpush), lines whose katakana words have an
+    English form (a loanword: meeting; a name from Wikidata's labels:
+    Boston) put in English, and some lines with no English at all, so the
+    model does not mix everything; those always when a chunk spells an
+    English word too (same ga oyoida: 鮫). Typed in chunks, run together or
+    with only the English spaced off; a slip in the Japanese, in an English
+    word, both or neither."""
+    import re
+    kana = load_module("eval/ja/kana-to-keys.py", "kana_to_keys")
+    out = Path(args.out)
+    out.mkdir(parents=True, exist_ok=True)
+    left_out = excluded_test(args)
+    english: dict[str, tuple[str, float]] = {}
+    words: set[str] = set()
+    loanword_readings: set[str] = set()
+    for line in open(args.loanwords, encoding="utf-8"):
+        reading, word, score = (line.rstrip("\n").split("\t") + ["", "", "0"])[:3]
+        loanword_readings.add(reading)
+        if re.fullmatch(r"[a-z]{2,12}", word):
+            words.add(word)
+            if float(score) >= LOANWORD_SCORE and (reading not in english or english[reading][1] < float(score)):
+                english[reading] = (word, float(score))
+    # --names: katakana TAB English TAB language editions (Wikidata labels).
+    for path in args.names or []:
+        for line in open(path, encoding="utf-8"):
+            fields = [f.strip('"') for f in line.rstrip("\n").split("\t")]
+            if len(fields) < 3 or not fields[2].isdigit():
+                continue
+            reading = long_vowels(kana, hiragana(fields[0].replace("・", "").replace("＝", "")))
+            # Well-known names only, each word capitalized (not Rangifer
+            # tarandus), four kana or more (コレ is no Kore), and not a
+            # loanword's reading nor a common English word (ページ, Page);
+            # of two names, the one with more editions.
+            name, links = fields[1], 100.0 + int(fields[2])
+            if (int(fields[2]) < NAME_EDITIONS or len(reading) < 4 or reading in loanword_readings
+                    or name.lower() in words or not all(w[:1].isupper() for w in name.split(" "))):
+                continue
+            if reading not in english or english[reading][1] < links:
+                english[reading] = (name, links)
+    rng = random.Random(0)
+
+    def pick(table: list[tuple[str, float]]) -> str:
+        r = rng.random()
+        for name, share in table:
+            if r < share:
+                return name
+            r -= share
+        return table[-1][0]
+
+    counts = {"kept": 0, "dropped": 0, "untypable": 0, "had-english": 0, "put-in-english": 0,
+              "japanese-only": 0, "contrast": 0, "japanese-slips": 0, "english-slips": 0}
+    with open(out / "examples.jsonl", "w", encoding="utf-8", newline="\n") as f:
+        for number, line in enumerate(open(args.zenz, encoding="utf-8")):
+            if number % args.every:
+                continue
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            text, reading = (row.get("output") or "").strip(), hiragana((row.get("input") or "").strip())
+            if not text or not reading or len(text) > MAX_TEXT_CHARS or "\n" in text:
+                continue
+            if any(mark in text for mark in ("http", "www", "://", "@", ".com", ".jp")) or \
+                    sum(c.isascii() and c.isalnum() for c in text) > len(text) / 2:
+                counts["untypable"] += 1
+                continue
+            # English already there: a word in letters in both the reading
+            # and the text (iPhone, BSL).
+            pieces: list[tuple[str, bool]] = []
+            start = 0
+            for found in re.finditer(r"[A-Za-z][A-Za-z'-]*[A-Za-z]", reading):
+                if found.group() in text:
+                    pieces += [(reading[start:found.start()], False), (found.group(), True)]
+                    start = found.end()
+            pieces.append((reading[start:], False))
+            had = len(pieces) > 1
+            for run in re.findall(r"[ァ-ヴー・＝]{2,}", text):
+                found = english.get(long_vowels(kana, hiragana(run.replace("・", "").replace("＝", ""))))
+                if not found or rng.random() >= MIX_REPLACE_SHARE:
+                    continue
+                target = hiragana(run)
+                for k, (piece, is_english) in enumerate(pieces):
+                    at = piece.find(target) if not is_english else -1
+                    if at >= 0:
+                        pieces[k:k + 1] = [(piece[:at], False), (found[0], True), (piece[at + len(target):], False)]
+                        text = text.replace(run, found[0], 1)
+                        counts["put-in-english"] += 1
+                        break
+            mixed = any(is_english for _, is_english in pieces)
+            typing = pick(MIX_TYPING) if mixed else "chunked"
+            keys, japanese = "", []
+            for piece, is_english in pieces:
+                if not piece:
+                    continue
+                if is_english:
+                    typed = piece if rng.random() < MIX_TYPED_CAPITALS else piece.lower()
+                    if typing != "joined":
+                        typed = ("" if not keys or keys.endswith(" ") else " ") + typed + " "
+                else:
+                    if typing == "chunked":
+                        piece = "".join(c + (" " if c in PARTICLES and i + 1 < len(piece) and rng.random() < 0.6 else "")
+                                        for i, c in enumerate(piece))
+                    typed = type_reading(kana, piece)
+                    if typed is None:
+                        keys = None
+                        break
+                keys += typed
+                japanese += [not is_english] * len(typed)
+            if keys is None or not keys.strip():
+                counts["untypable"] += 1
+                continue
+            keys = keys.rstrip()
+            japanese = japanese[:len(keys)]
+            if not mixed:
+                # Japanese alone: some of it, and every line where a chunk
+                # spells an English word too.
+                contrast = any(chunk in words for chunk in keys.split(" "))
+                if not contrast and rng.random() >= MIX_JAPANESE_ONLY:
+                    continue
+                counts["contrast" if contrast else "japanese-only"] += 1
+            elif had:
+                counts["had-english"] += 1
+            if left_out(text):
+                counts["dropped"] += 1
+                continue
+            kind = pick(MIX_SLIPS) if mixed else pick([("none", 0.6), ("japanese", 0.4)])
+            if kind in ("english", "both"):
+                spans = [m.span() for m in re.finditer(r"[A-Za-z]{2,}", keys)
+                         if not any(japanese[i] for i in range(*m.span()))]
+                if spans:
+                    begin, end = rng.choice(spans)
+                    typed = english_slip(keys[begin:end], words, rng)
+                    if typed and typed.lower() != keys[begin:end].lower():
+                        keys = keys[:begin] + typed.lower() + keys[end:]
+                        japanese = japanese[:begin] + [False] * len(typed) + japanese[end:]
+                        counts["english-slips"] += 1
+            if kind in ("japanese", "both"):
+                slipped = slip(keys, japanese, rng)
+                if slipped:
+                    keys = slipped
+                    counts["japanese-slips"] += 1
+            context = (row.get("left_context") or "").replace("\n", "")
+            if rng.random() < NO_CONTEXT_SHARE:
+                context = ""
+            f.write(json.dumps({"prompt": prompt(context, keys), "text": text}, ensure_ascii=False) + "\n")
+            counts["kept"] += 1
+    print(counts)
+
+
 SLIPS_PER_SENTENCE = [(0, 0.35), (1, 0.45), (2, 0.20)]
 REAL_WORD_SHARE = 0.2  # of the slips, a real word typed for another
 
@@ -363,8 +544,8 @@ def train(args) -> None:
     # The GPU also draws the screen: at most --gpu-share of its memory, and
     # a pause after each step so it is busy about that share of the time.
     torch.cuda.set_per_process_memory_fraction(args.gpu_share)
-    tokenizer = AutoTokenizer.from_pretrained(args.base)
-    model = AutoModelForCausalLM.from_pretrained(args.base, torch_dtype=torch.bfloat16).cuda()
+    tokenizer = AutoTokenizer.from_pretrained(args.base, trust_remote_code=True)
+    model = AutoModelForCausalLM.from_pretrained(args.base, torch_dtype=torch.bfloat16, trust_remote_code=True).cuda()
     # Activations are worked out again in the backward pass rather than
     # kept: the memory goes to longer batches.
     model.gradient_checkpointing_enable()
@@ -397,13 +578,14 @@ def train(args) -> None:
     with open(path, encoding="utf-8") as f:
         total = sum(1 for _ in f)
     share = min(1.0, (args.examples + 2000) * 1.02 / total)
-    pick = random.Random(1)
+    # --seed: another sample of the same examples (training on from a run).
+    pick = random.Random(args.seed)
     with open(path, encoding="utf-8") as f:
         rows = [encode(json.loads(l)) for l in f if pick.random() < share]
-    random.Random(1).shuffle(rows)
+    random.Random(args.seed).shuffle(rows)
     check, rows = rows[:2000], rows[2000:2000 + args.examples]
 
-    def batches(encoded, tokens_per_batch):
+    def batches(encoded, tokens_per_batch, skip=0):
         order = sorted(range(len(encoded)), key=lambda i: len(encoded[i][0]))
         groups, group, longest = [], [], 0
         for i in order:
@@ -415,7 +597,7 @@ def train(args) -> None:
         if group:
             groups.append(group)
         random.Random(2).shuffle(groups)
-        for g in groups:
+        for g in groups[skip:]:
             width = max(len(encoded[i][0]) for i in g)
             ids = torch.full((len(g), width), eos, dtype=torch.long)
             labels = torch.full((len(g), width), -100, dtype=torch.long)
@@ -452,9 +634,25 @@ def train(args) -> None:
     warmup = max(1, steps // 50)
     schedule = torch.optim.lr_scheduler.LambdaLR(
         optimizer, lambda s: min(1.0, (s + 1) / warmup) * 0.5 * (1 + math.cos(math.pi * min(s, steps) / steps)))
-    print(f"{len(rows)} examples, {steps} steps; check loss {evaluate():.4f}", flush=True)
+    # --save-every: the trained weights and the optimizer are kept in
+    # resume/ now and then, and a run started again with the same arguments
+    # goes on from there (a stopped run is not lost).
+    resume = out / "resume"
+    trained = [(n, p) for n, p in model.named_parameters() if p.requires_grad]
+    first = 0
+    if (resume / "state.pt").exists():
+        state = torch.load(resume / "state.pt", weights_only=False)
+        with torch.no_grad():
+            for n, p in trained:
+                p.copy_(state["weights"][n])
+        optimizer.load_state_dict(state["optimizer"])
+        schedule.load_state_dict(state["schedule"])
+        first = state["step"] + 1
+        print(f"going on from step {first}", flush=True)
+    else:
+        print(f"{len(rows)} examples, {steps} steps; check loss {evaluate():.4f}", flush=True)
     start, seen = time.time(), 0
-    for step, (ids, labels, mask) in enumerate(batches(rows, args.batch_tokens)):
+    for step, (ids, labels, mask) in enumerate(batches(rows, args.batch_tokens, first), first):
         began = time.time()
         loss = loss_of(ids, labels, mask)
         loss.backward()
@@ -470,6 +668,12 @@ def train(args) -> None:
             print(f"step {step}/{steps} loss {loss.item():.4f} {rate:.0f} tok/s", flush=True)
         if step and step % args.check_every == 0:
             print(f"  check loss {evaluate():.4f}", flush=True)
+        if args.save_every and step and step % args.save_every == 0:
+            resume.mkdir(exist_ok=True)
+            torch.save({"step": step, "weights": {n: p.detach().cpu() for n, p in trained},
+                        "optimizer": optimizer.state_dict(), "schedule": schedule.state_dict()},
+                       resume / "state.tmp")
+            os.replace(resume / "state.tmp", resume / "state.pt")
     print(f"done; check loss {evaluate():.4f}, {time.time() - start:.0f} s", flush=True)
     if adapted is not None:
         model = adapted.merge_and_unload()
@@ -559,8 +763,8 @@ def train_rank(args) -> None:
 
     out = Path(args.out)
     torch.cuda.set_per_process_memory_fraction(args.gpu_share)
-    tokenizer = AutoTokenizer.from_pretrained(args.base)
-    model = AutoModelForCausalLM.from_pretrained(args.base, torch_dtype=torch.bfloat16).cuda()
+    tokenizer = AutoTokenizer.from_pretrained(args.base, trust_remote_code=True)
+    model = AutoModelForCausalLM.from_pretrained(args.base, torch_dtype=torch.bfloat16, trust_remote_code=True).cuda()
     model.gradient_checkpointing_enable()
     model.config.use_cache = False
     model.train()
@@ -672,7 +876,7 @@ def train_rank(args) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("step", choices=["prepare", "prepare-keys", "prepare-english", "train", "prepare-rank",
+    parser.add_argument("step", choices=["prepare", "prepare-keys", "prepare-english", "prepare-mix", "train", "prepare-rank",
                                          "train-rank"])
     parser.add_argument("--out", required=True)
     parser.add_argument("--zenz")
@@ -680,6 +884,8 @@ def main() -> int:
     parser.add_argument("--exclude-sha1", action="append", default=[])
     parser.add_argument("--every", type=int, default=1)
     parser.add_argument("--loanwords")
+    parser.add_argument("--names", action="append",
+                        help="prepare-mix: katakana TAB English name TAB language editions (Wikidata labels)")
     parser.add_argument("--english")
     parser.add_argument("--lexicon")
     parser.add_argument("--base")
@@ -687,7 +893,9 @@ def main() -> int:
     parser.add_argument("--lr", type=float, default=5e-5)
     parser.add_argument("--batch-tokens", type=int, default=4096)
     parser.add_argument("--check-every", type=int, default=2000)
+    parser.add_argument("--save-every", type=int, default=2000, help="train: steps between saves to go on from")
     parser.add_argument("--gpu-share", type=float, default=0.9)
+    parser.add_argument("--seed", type=int, default=1, help="train: which sample of the examples")
     parser.add_argument("--lora", type=int, default=0, help="train: low-rank adapters of this rank instead of all weights")
     parser.add_argument("--gen", help="prepare-rank: id, reading, meant text")
     parser.add_argument("--rehearse", type=Path,
@@ -698,7 +906,8 @@ def main() -> int:
     parser.add_argument("--context", help="prepare-rank: id, the text before it")
     parser.add_argument("--lists", help="prepare-rank: the folder of rank.sentences.*.tsv and rank.out.*.tsv")
     args = parser.parse_args()
-    {"prepare": prepare, "prepare-keys": prepare_keys, "prepare-english": prepare_english, "train": train,
+    {"prepare": prepare, "prepare-keys": prepare_keys, "prepare-english": prepare_english, "prepare-mix": prepare_mix,
+     "train": train,
      "prepare-rank": prepare_rank, "train-rank": train_rank}[args.step](args)
     return 0
 

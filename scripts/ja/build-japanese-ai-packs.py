@@ -6,11 +6,11 @@ llama.cpp), and a zip of each for Settings and the installer to download.
   build-japanese-ai-packs.py [--light DIR] [--strong DIR]
                              [--runtime DIR --llama-license FILE] --out DIR
 
---light: a train-japanese-ai-model.py run's folder (model-Q4_K_M.gguf, made
-from its model with llama.cpp's convert_hf_to_gguf.py --outtype f16 and
-llama-quantize Q4_K_M) with LFM2.5-350M-Base's LICENSE copied into it. --strong: a LiquidAI/LFM2.5-1.2B-JP-202606-GGUF
-download (LFM2.5-1.2B-JP-202606-Q8_0.gguf), used as published. Each needs
-the model's LICENSE next to it. Writes <out>/<pack>/ and <out>/TEKITO-<pack>.zip,
+--light, --strong: a train-japanese-ai-model.py run's folder (model-Q4_K_M.gguf
+for --light, model-Q8_0.gguf for --strong, made from its model with
+llama.cpp's convert_hf_to_gguf.py --outtype f16 and llama-quantize) with the
+base model's LICENSE copied into it (LFM2.5-350M-Base for --light,
+LFM2.5-1.2B-JP-202606 for --strong). Writes <out>/<pack>/ and <out>/TEKITO-<pack>.zip,
 and prints each zip's SHA-256 and size for apps/tekito-settings.
 --runtime: the build's Release folder (TekitoAI.exe and the llama.cpp DLLs
 next to it); --llama-license: llama.cpp's LICENSE; --crt: the Visual C++
@@ -49,12 +49,22 @@ Fine-tuned on:
     },
     "japanese-ai-strong": {
         "display_name": "Japanese AI model (strong)",
-        "file": "LFM2.5-1.2B-JP-202606-Q8_0.gguf",
-        "source": "LiquidAI/LFM2.5-1.2B-JP-202606-GGUF (https://huggingface.co/LiquidAI/LFM2.5-1.2B-JP-202606-GGUF)",
-        "notice": """LFM2.5-1.2B-JP-202606 by Liquid AI
-(https://huggingface.co/LiquidAI/LFM2.5-1.2B-JP-202606-GGUF), under the
-LFM Open License v1.0 (LICENSE): the Q8_0 GGUF file as Liquid AI
-publishes it, unchanged.
+        "file": "model-Q8_0.gguf",
+        "source": "LiquidAI/LFM2.5-1.2B-JP-202606 (https://huggingface.co/LiquidAI/LFM2.5-1.2B-JP-202606), "
+                  "fine-tuned by TEKITO (scripts/ja/train-japanese-ai-model.py, LoRA)",
+        "manifest": {"prompt": "tekito-reading-v1", "margin": 2.0},
+        "notice": """Based on LFM2.5-1.2B-JP-202606 by Liquid AI
+(https://huggingface.co/LiquidAI/LFM2.5-1.2B-JP-202606), under the LFM Open
+License v1.0 (LICENSE). Modified by TEKITO: fine-tuned with low-rank
+adapters (merged in) to convert readings into Japanese text, converted to
+GGUF with llama.cpp and quantized to Q8_0.
+
+Fine-tuned on:
+- the zenz-v2.5 dataset's llm-jp-corpus-v3 part
+  (https://huggingface.co/datasets/Miwa-Keita/zenz-v2.5-dataset), under
+  the Open Data Commons Attribution License (ODC-BY 1.0);
+- English sentences from the Leipzig Corpora Collection
+  (eng_news_2025_1M, https://wortschatz.uni-leipzig.de/), under CC BY 4.0.
 """,
     },
 }
