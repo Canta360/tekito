@@ -165,9 +165,28 @@ std::wstring JapaneseDictionary::Surface(const DictionaryWord& word, std::wstrin
     if (word.surfaceOffset >= surfaceUnits_) return std::wstring(reading);
     const std::uint16_t length = Read<std::uint16_t>(surfaces_ + 2ull * word.surfaceOffset);
     if (word.surfaceOffset + 1ull + length > surfaceUnits_) return std::wstring(reading);
-    std::wstring out(length, L'\0');
-    std::memcpy(out.data(), surfaces_ + 2ull * word.surfaceOffset + 2, 2ull * length);
-    return out;
+    const std::uint8_t* units = surfaces_ + 2ull * word.surfaceOffset + 2;
+    if constexpr (sizeof(wchar_t) == 2) {
+        std::wstring out(length, L'\0');
+        std::memcpy(out.data(), units, 2ull * length);
+        return out;
+    } else {
+        // The pack holds UTF-16; a wstring here holds code points.
+        std::wstring out;
+        out.reserve(length);
+        for (std::uint16_t i = 0; i < length; ++i) {
+            char32_t c = Read<std::uint16_t>(units + 2ull * i);
+            if (c >= 0xD800 && c <= 0xDBFF && i + 1 < length) {
+                const char32_t low = Read<std::uint16_t>(units + 2ull * (i + 1));
+                if (low >= 0xDC00 && low <= 0xDFFF) {
+                    c = 0x10000 + ((c - 0xD800) << 10) + (low - 0xDC00);
+                    ++i;
+                }
+            }
+            out.push_back(static_cast<wchar_t>(c));
+        }
+        return out;
+    }
 }
 
 std::size_t JapaneseDictionary::PoolSurfaceLength(const DictionaryWord& word) const noexcept {

@@ -73,8 +73,13 @@ public:
     };
 
     KeyConverter(const JapaneseDictionary& dictionary, const ConnectionMatrix& matrix,
-                 const JapaneseConverter& converter, const RomajiTable& table, Costs costs = {}) noexcept
+                 const JapaneseConverter& converter, const RomajiTable& table, Costs costs) noexcept
         : dictionary_(dictionary), matrix_(matrix), converter_(converter), table_(table), costs_(costs) {}
+    // With the default costs (not "= {}", which GCC and Clang reject for a
+    // nested struct with member initializers).
+    KeyConverter(const JapaneseDictionary& dictionary, const ConnectionMatrix& matrix,
+                 const JapaneseConverter& converter, const RomajiTable& table) noexcept
+        : KeyConverter(dictionary, matrix, converter, table, Costs{}) {}
 
     // The conversion when the likeliest reading has a corrected slip in it;
     // nothing when it is the keys as typed (the usual conversion handles

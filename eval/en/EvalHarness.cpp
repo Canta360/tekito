@@ -9,6 +9,7 @@
 #include "EnglishTypingStudy.h"
 
 #include <algorithm>
+#include <cmath>
 #include <chrono>
 #include <climits>
 #include <cstdint>

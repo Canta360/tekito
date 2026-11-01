@@ -1,7 +1,7 @@
 #pragma once
 
-#include "Core\LexiconProvider.h"
-#include "Core\UserDictionary.h"
+#include "Core/LexiconProvider.h"
+#include "Core/UserDictionary.h"
 
 #include <span>
 #include <string>

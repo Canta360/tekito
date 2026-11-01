@@ -1,5 +1,7 @@
 #include "Core/Japanese/LanguageModel.h"
 
+#include "Core/Utf8.h"
+
 #include <cmath>
 #include <cstring>
 #include <string>
@@ -61,11 +63,12 @@ bool LanguageModel::Open(const std::filesystem::path& packDirectory) noexcept {
 }
 
 std::uint64_t LanguageModel::Continue(std::uint64_t hash, std::wstring_view text) noexcept {
-    for (const wchar_t unit : text) {
-        const auto code = static_cast<std::uint16_t>(unit);
+    // Over UTF-16 code units, as the builder hashes, also where wchar_t is
+    // 32 bits.
+    utf8::ForEachUtf16(text, [&](std::uint16_t code) {
         hash = (hash ^ (code & 0xFF)) * kFnvPrime;
         hash = (hash ^ (code >> 8)) * kFnvPrime;
-    }
+    });
     return hash;
 }
 
