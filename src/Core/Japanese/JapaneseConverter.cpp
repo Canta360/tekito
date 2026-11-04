@@ -1,5 +1,8 @@
 #include "Core/Japanese/JapaneseConverter.h"
 
+#include "Core/Japanese/EdgeScorer.h"
+
+#include "Core/Japanese/Compounds.h"
 #include "Core/Japanese/JapaneseDictionary.h"
 #include "Core/Japanese/JapaneseUserDictionary.h"
 #include "Core/Japanese/KanaText.h"
@@ -7,6 +10,7 @@
 #include "Core/Japanese/TopicVectors.h"
 
 #include <algorithm>
+#include <cstdlib>
 #include <cmath>
 #include <limits>
 #include <map>
@@ -64,10 +68,19 @@ struct Node {
     std::optional<double> logCount;
     std::uint64_t pairStart{0};
     std::wstring surface;
+    // For compounds put together: a single kanji's compounds it ends and
+    // starts (japanese-compounds), and whether a longer word ends or starts
+    // in kanji.
+    std::uint32_t compoundEnds{0};
+    std::uint32_t compoundStarts{0};
+    bool kanjiLast{false};
+    bool kanjiFirst{false};
 };
 
 struct Lattice {
     std::vector<Node> nodes;
+    // JapaneseConverter::SetCompounds's costPerNat; 0: off.
+    std::int64_t compoundCost{0};
     std::vector<std::vector<int>> beginningAt;
     std::vector<std::vector<int>> endingAt;
 };
@@ -223,12 +236,45 @@ std::vector<Counted> CountedNumber(std::wstring_view reading) {
     return found;
 }
 
+// Letters by their names in kana, as Japanese reads them out (ぴー: P,
+// えいち and えっち: H, だぶりゅー: W).
+constexpr std::pair<std::wstring_view, wchar_t> kLetterNames[] = {
+    {L"えー", L'A'}, {L"えい", L'A'}, {L"びー", L'B'}, {L"しー", L'C'}, {L"でぃー", L'D'}, {L"でー", L'D'},
+    {L"いー", L'E'}, {L"えふ", L'F'}, {L"じー", L'G'}, {L"えいち", L'H'}, {L"えっち", L'H'}, {L"えーち", L'H'},
+    {L"あい", L'I'}, {L"じぇー", L'J'}, {L"じぇい", L'J'}, {L"けー", L'K'}, {L"けい", L'K'}, {L"える", L'L'},
+    {L"えむ", L'M'}, {L"えぬ", L'N'}, {L"おー", L'O'}, {L"ぴー", L'P'}, {L"きゅー", L'Q'}, {L"あーる", L'R'},
+    {L"えす", L'S'}, {L"てぃー", L'T'}, {L"ゆー", L'U'}, {L"ぶい", L'V'}, {L"ぶいー", L'V'}, {L"だぶりゅー", L'W'},
+    {L"だぶる", L'W'}, {L"えっくす", L'X'}, {L"わい", L'Y'}, {L"ぜっと", L'Z'}, {L"ずぃー", L'Z'},
+};
+// Two letters or more read by their names from the start of `reading`:
+// each length that ends after a letter, and the letters (ぴーしー: 4, PC).
+std::vector<std::pair<std::size_t, std::wstring>> LetterWords(std::wstring_view reading) {
+    constexpr std::size_t kMostLetters = 8;
+    std::vector<std::pair<std::size_t, std::wstring>> found;
+    std::vector<std::pair<std::size_t, std::wstring>> open{{0, L""}};
+    while (!open.empty()) {
+        auto [at, letters] = std::move(open.back());
+        open.pop_back();
+        if (letters.size() >= 2) found.push_back({at, letters});
+        if (letters.size() >= kMostLetters) continue;
+        for (const auto& [name, letter] : kLetterNames) {
+            if (reading.substr(at).starts_with(name)) open.push_back({at + name.size(), letters + letter});
+        }
+    }
+    std::sort(found.begin(), found.end());
+    found.erase(std::unique(found.begin(), found.end(), [](const auto& a, const auto& b) { return a.first == b.first; }),
+                found.end());
+    return found;
+}
+
 Lattice BuildLattice(const JapaneseDictionary& dictionary, const ReadingCodes& codes,
                      const std::vector<bool>& fixedBoundary, std::wstring_view reading,
                      const LanguageModel* model, const JapaneseUserDictionary* user,
-                     const JapaneseConverter::NumberWord* number) {
+                     const JapaneseConverter::NumberWord* number, const JapaneseConverter::NumberWord* letters,
+                     const Compounds* compounds, std::int64_t compoundCost) {
     const std::size_t n = codes.size();
     Lattice lattice;
+    if (compounds && compoundCost > 0) lattice.compoundCost = compoundCost;
     lattice.beginningAt.resize(n + 1);
     lattice.endingAt.resize(n + 1);
     const auto crosses = [&](std::size_t begin, std::size_t end) {
@@ -250,8 +296,6 @@ Lattice BuildLattice(const JapaneseDictionary& dictionary, const ReadingCodes& c
     // And numbers of one part before a counter, costing more (一番, 一度
     // stay words).
     std::vector<std::vector<Counted>> counted(n);
-    // Where the dictionary has such a number and counter in kanji.
-    std::vector<std::vector<std::size_t>> numeralWords(n);
     if (number) {
         std::size_t covered = 0;
         for (std::size_t i = 0; i < n; ++i) {
@@ -291,12 +335,24 @@ Lattice BuildLattice(const JapaneseDictionary& dictionary, const ReadingCodes& c
                     if (numberLength + counterLength == length && (surface.starts_with(kanji) || surface.starts_with(digits))) {
                         node.numberValue = value;
                         node.numberPrefix = surface.starts_with(kanji) ? kanji.size() : digits.size();
-                        numeralWords[i].push_back(length);
                     } else if (numberLength == length &&
                                (surface == kanji || surface == std::to_wstring(value) ||
                                 (number && word.left == number->left && surface == part))) {
                         node.numberValue = value;
                         node.numberPrefix = surface.size();
+                    }
+                }
+                if (lattice.compoundCost > 0 && !word.spellingCorrection) {
+                    const auto part = reading.substr(i, length);
+                    const auto surface = dictionary.Surface(word, part);
+                    const auto kanji = [](wchar_t c) { return (c >= 0x4E00 && c <= 0x9FFF) || c == 0x3005; };
+                    if (surface.size() == 1 && kanji(surface.front())) {
+                        const auto counts = compounds->Find(surface, part);
+                        node.compoundEnds = counts.ends;
+                        node.compoundStarts = counts.starts;
+                    } else if (surface.size() >= 2) {
+                        node.kanjiLast = kanji(surface.back());
+                        node.kanjiFirst = kanji(surface.front());
                     }
                 }
                 if (model) {
@@ -346,15 +402,28 @@ Lattice BuildLattice(const JapaneseDictionary& dictionary, const ReadingCodes& c
             digits.cost = number->cost;
             add(std::move(digits));
         }
+        // Letters read by their names (ぴーしー: PC), a word of their own.
+        if (letters) {
+            for (const auto& [length, text] : LetterWords(reading.substr(i))) {
+                if (crosses(i, i + length)) continue;
+                Node word;
+                word.begin = static_cast<std::uint32_t>(i);
+                word.end = static_cast<std::uint32_t>(i + length);
+                word.left = letters->left;
+                word.right = letters->right;
+                word.cost = letters->cost;
+                word.user = true;
+                word.text = text;
+                add(std::move(word));
+            }
+        }
         // A number read in kana, written in digits as a number word
         // (にせんごねん: 2005年); the number style is the composer's.
         if (number) {
             for (const auto& [length, value, counterLength] : counted[i]) {
                 if (crosses(i, i + length)) continue;
-                // The dictionary's word (三時) is the number then.
-                if (std::find(numeralWords[i].begin(), numeralWords[i].end(), length + counterLength) != numeralWords[i].end()) {
-                    continue;
-                }
+                // Also where the dictionary has the number and counter in
+                // kanji: that word may be another one (十時, a surname).
                 // A word read the same with no number in it (ごえん: ご縁,
                 // ごかい: 誤解, にじ: 虹): the number costs more, the words
                 // around decide.
@@ -463,6 +532,25 @@ std::int64_t PairBonus(const LanguageModel* model, const JapaneseConverter::Mode
     return std::llround(pmi * static_cast<double>(pmi >= 0 ? weights.costPerNat : weights.penaltyPerNat));
 }
 
+// What a compound put together takes off for `right` following `left`: a
+// word ending in kanji and a kanji that often ends compounds (燃焼 筒), a
+// kanji that often starts them and a word starting in kanji (再 利用), or
+// two such kanji (皇 妃).
+std::int64_t CompoundBonus(const Lattice& lattice, const Node& left, const Node& right) {
+    if (lattice.compoundCost <= 0) return 0;
+    std::uint32_t count = 0;
+    if (right.compoundEnds > 0 && left.kanjiLast) count = right.compoundEnds;
+    if (left.compoundStarts > 0 && right.kanjiFirst) count = std::max(count, left.compoundStarts);
+    if (left.compoundStarts > 0 && right.compoundEnds > 0) count = std::max(count, std::min(left.compoundStarts, right.compoundEnds));
+    if (count == 0) return 0;
+    // Only where the dictionary has no word for the two together (礼服
+    // stays, not 霊 服).
+    for (const int k : lattice.beginningAt[left.begin]) {
+        if (lattice.nodes[k].end == right.end && lattice.nodes[k].known) return 0;
+    }
+    return count == 0 ? 0 : std::llround(std::log1p(static_cast<double>(count)) * static_cast<double>(lattice.compoundCost));
+}
+
 // The likeliest path through `lattice` for a reading of `n` characters
 // after `context`, and its cost.
 struct Searched {
@@ -484,7 +572,7 @@ Searched SearchPath(const Lattice& lattice, std::size_t n, std::uint16_t context
             for (const int p : lattice.endingAt[i]) {
                 if (best[p] >= kInfinity) continue;
                 const std::int64_t cost = best[p] + matrix.Cost(nodes[p].right, node.left) + node.cost -
-                                          PairBonus(model, weights, nodes[p], node);
+                                          PairBonus(model, weights, nodes[p], node) - CompoundBonus(lattice, nodes[p], node);
                 if (cost < best[k]) {
                     best[k] = cost;
                     previous[k] = p;
@@ -523,6 +611,62 @@ std::wstring NodeText(const JapaneseDictionary& dictionary, const Node& node, st
     return node.user ? node.text : node.known ? dictionary.Surface(node.word, part) : std::wstring(part);
 }
 
+// The edge scorer's scores taken off the costs of the words on a path within
+// `margin` of the cheapest (as the scorer was trained on them).
+void ScoreEdges(Lattice& lattice, std::wstring_view reading, std::uint16_t context, const JapaneseDictionary& dictionary,
+                const ConnectionMatrix& matrix, const LanguageModel* model, const JapaneseConverter::ModelWeights& weights,
+                const EdgeScorer& scorer, std::wstring_view before, std::int64_t margin, float weight) {
+    const std::size_t n = reading.size();
+    auto& nodes = lattice.nodes;
+    const auto searched = SearchPath(lattice, n, context, matrix, model, weights);
+    if (searched.path.empty()) return;
+    std::wstring draft;
+    for (const int k : searched.path) draft += NodeText(dictionary, nodes[k], reading);
+    const auto link = [&](int p, int k) {
+        return matrix.Cost(nodes[p].right, nodes[k].left) - PairBonus(model, weights, nodes[p], nodes[k]) -
+               CompoundBonus(lattice, nodes[p], nodes[k]);
+    };
+    std::vector<std::int64_t> to(nodes.size(), kInfinity), from(nodes.size(), kInfinity);
+    for (std::size_t i = 0; i < n; ++i) {
+        for (const int k : lattice.beginningAt[i]) {
+            if (i == 0) {
+                to[k] = nodes[k].cost + matrix.Cost(context, nodes[k].left);
+                continue;
+            }
+            for (const int p : lattice.endingAt[i]) {
+                if (to[p] < kInfinity) to[k] = std::min(to[k], to[p] + link(p, k) + nodes[k].cost);
+            }
+        }
+    }
+    for (std::size_t i = n + 1; i-- > 1;) {
+        for (const int k : lattice.endingAt[i]) {
+            if (i == n) {
+                from[k] = matrix.Cost(nodes[k].right, 0);
+                continue;
+            }
+            for (const int r : lattice.beginningAt[i]) {
+                if (from[r] < kInfinity) from[k] = std::min(from[k], link(k, r) + nodes[r].cost + from[r]);
+            }
+        }
+    }
+    std::vector<int> kept;
+    std::vector<std::wstring> texts;
+    std::vector<EdgeScorer::Word> words;
+    for (int k = 0; k < static_cast<int>(nodes.size()); ++k) {
+        if (to[k] < kInfinity && from[k] < kInfinity && to[k] + from[k] <= searched.cost + margin) kept.push_back(k);
+    }
+    texts.reserve(kept.size());
+    for (const int k : kept) texts.push_back(NodeText(dictionary, nodes[k], reading));
+    for (std::size_t j = 0; j < kept.size(); ++j) {
+        const Node& node = nodes[kept[j]];
+        words.push_back({node.begin, node.end, node.left, node.right, node.cost, node.known, texts[j]});
+    }
+    const auto scores = scorer.Score(before, reading, draft, words);
+    const float scale = scorer.CostScale();
+    if (scale <= 0) return;
+    for (std::size_t j = 0; j < kept.size(); ++j) nodes[kept[j]].cost -= std::llround(weight * scores[j] / scale);
+}
+
 }  // namespace
 
 std::vector<Phrase> JapaneseConverter::Convert(std::wstring_view reading,
@@ -546,8 +690,11 @@ std::vector<Phrase> JapaneseConverter::Convert(std::wstring_view reading,
         if (at > 0 && at < n) fixedBoundary[at] = true;
     }
     const bool pairs = model_ && (weights_.costPerNat > 0 || weights_.penaltyPerNat > 0);
-    const Lattice lattice = BuildLattice(dictionary_, codes, fixedBoundary, reading, pairs ? model_ : nullptr, user,
-                                         number_ ? &*number_ : nullptr);
+    Lattice lattice = BuildLattice(dictionary_, codes, fixedBoundary, reading, pairs ? model_ : nullptr, user,
+                                         number_ ? &*number_ : nullptr, letters_ ? &*letters_ : nullptr, compounds_, compoundCost_);
+    if (edgeScorer_) {
+        ScoreEdges(lattice, reading, context, dictionary_, matrix_, model_, weights_, *edgeScorer_, edgeContext_, edgeMargin_, edgeWeight_);
+    }
     const auto& nodes = lattice.nodes;
 
     // The most likely words for the whole reading.
@@ -607,7 +754,8 @@ std::vector<Phrase> JapaneseConverter::Convert(std::wstring_view reading,
                     for (const int p : lattice.endingAt[i]) {
                         if (nodes[p].begin < begin) continue;
                         const std::int64_t connection =
-                            matrix_.Cost(nodes[p].right, node.left) - PairBonus(model_, weights_, nodes[p], node);
+                            matrix_.Cost(nodes[p].right, node.left) - PairBonus(model_, weights_, nodes[p], node) -
+                            CompoundBonus(lattice, nodes[p], node);
                         for (std::size_t r = 0; r < entries[p].size(); ++r) {
                             list.push_back({entries[p][r].cost + connection + node.cost, p,
                                             static_cast<int>(r)});
@@ -705,6 +853,49 @@ std::vector<Phrase> JapaneseConverter::Convert(std::wstring_view reading,
                 if (!has(word.text)) {
                     heads.push_back(topics && LanguageModel::IsContentWord(word.text) ? word.text : std::wstring{});
                     phrase.candidates.push_back(std::move(word));
+                }
+            }
+        }
+
+        // A word and the kana after it (こうそうが): every word read like
+        // that word, with the same kana, after the ways found (紅藻が, which
+        // they leave out for 構想画 and the like).
+        if (headWords_ && end - first >= 2 && phrase.candidates.size() < kMaxCandidates) {
+            const Node& head = nodes[path[first]];
+            std::wstring tailText;
+            std::int64_t tailCost = matrix_.Cost(nodes[path[end - 1]].right, rightContext);
+            for (std::size_t k = first + 1; k < end; ++k) {
+                const Node& node = nodes[path[k]];
+                tailText += textOf(node);
+                tailCost += node.cost;
+                if (k > first + 1) tailCost += matrix_.Cost(nodes[path[k - 1]].right, node.left);
+            }
+            const bool kanaTail = std::all_of(tailText.begin(), tailText.end(), [](wchar_t c) { return c >= 0x3041 && c <= 0x3096; });
+            const auto headReading = reading.substr(head.begin, head.end - head.begin);
+            const auto record = head.known && !head.numeral && head.numberPrefix == 0 && kanaTail
+                                    ? dictionary_.Find(ReadingCodesView(codes).substr(head.begin, head.end - head.begin))
+                                    : std::nullopt;
+            if (record) {
+                const std::uint16_t tailLeft = nodes[path[first + 1]].left;
+                std::vector<PhraseCandidate> words;
+                dictionary_.ForEachWord(*record, [&](const DictionaryWord& word) {
+                    if (word.spellingCorrection) return;
+                    const std::int64_t cost = matrix_.Cost(leftContext, word.left) + word.cost +
+                                              matrix_.Cost(word.right, tailLeft) + tailCost;
+                    PhraseCandidate candidate{dictionary_.Surface(word, headReading) + tailText, cost,
+                                              PhraseCandidate::Kind::Dictionary, false};
+                    candidate.rightId = nodes[path[end - 1]].right;
+                    words.push_back(std::move(candidate));
+                });
+                std::stable_sort(words.begin(), words.end(),
+                                 [](const PhraseCandidate& a, const PhraseCandidate& b) { return a.cost < b.cost; });
+                for (auto& word : words) {
+                    if (phrase.candidates.size() >= kMaxCandidates) break;
+                    if (!has(word.text)) {
+                        const auto stem = word.text.substr(0, word.text.size() - tailText.size());
+                        heads.push_back(topics && LanguageModel::IsContentWord(stem) ? stem : std::wstring{});
+                        phrase.candidates.push_back(std::move(word));
+                    }
                 }
             }
         }
@@ -820,8 +1011,11 @@ std::vector<SentenceGuess> JapaneseConverter::BestSentences(std::wstring_view re
     const ReadingCodes codes = dictionary_.Encode(reading);
     const std::vector<bool> noBoundary(n + 1, false);
     const bool pairs = model_ && (weights_.costPerNat > 0 || weights_.penaltyPerNat > 0);
-    const Lattice lattice = BuildLattice(dictionary_, codes, noBoundary, reading, pairs ? model_ : nullptr, user,
-                                         number_ ? &*number_ : nullptr);
+    Lattice lattice = BuildLattice(dictionary_, codes, noBoundary, reading, pairs ? model_ : nullptr, user,
+                                         number_ ? &*number_ : nullptr, letters_ ? &*letters_ : nullptr, compounds_, compoundCost_);
+    if (edgeScorer_) {
+        ScoreEdges(lattice, reading, context, dictionary_, matrix_, model_, weights_, *edgeScorer_, edgeContext_, edgeMargin_, edgeWeight_);
+    }
     const auto& nodes = lattice.nodes;
     // The cheapest few ways to reach each word, as Convert finds a phrase's.
     std::vector<std::vector<PathEntry>> entries(nodes.size());
@@ -834,7 +1028,8 @@ std::vector<SentenceGuess> JapaneseConverter::BestSentences(std::wstring_view re
             } else {
                 for (const int p : lattice.endingAt[i]) {
                     const std::int64_t connection =
-                        matrix_.Cost(nodes[p].right, node.left) - PairBonus(model_, weights_, nodes[p], node);
+                        matrix_.Cost(nodes[p].right, node.left) - PairBonus(model_, weights_, nodes[p], node) -
+                            CompoundBonus(lattice, nodes[p], node);
                     for (std::size_t r = 0; r < entries[p].size(); ++r) {
                         list.push_back({entries[p][r].cost + connection + node.cost, p, static_cast<int>(r)});
                     }
@@ -906,10 +1101,39 @@ std::optional<std::int64_t> JapaneseConverter::Cost(std::wstring_view reading, s
     const std::vector<bool> noBoundary(n + 1, false);
     const bool pairs = model_ && (weights_.costPerNat > 0 || weights_.penaltyPerNat > 0);
     const Lattice lattice = BuildLattice(dictionary_, codes, noBoundary, reading, pairs ? model_ : nullptr, user,
-                                         number_ ? &*number_ : nullptr);
+                                         number_ ? &*number_ : nullptr, letters_ ? &*letters_ : nullptr, compounds_, compoundCost_);
     const auto searched = SearchPath(lattice, n, context, matrix_, model_, weights_);
     if (searched.path.empty()) return std::nullopt;
     return searched.cost;
+}
+
+JapaneseConverter::LatticeExport JapaneseConverter::ExportLattice(std::wstring_view reading, std::uint16_t context) const {
+    LatticeExport exported;
+    const std::size_t n = reading.size();
+    if (n == 0) return exported;
+    const ReadingCodes codes = dictionary_.Encode(reading);
+    const std::vector<bool> noBoundary(n + 1, false);
+    const bool pairs = model_ && (weights_.costPerNat > 0 || weights_.penaltyPerNat > 0);
+    const Lattice lattice = BuildLattice(dictionary_, codes, noBoundary, reading, pairs ? model_ : nullptr, nullptr,
+                                         number_ ? &*number_ : nullptr, letters_ ? &*letters_ : nullptr, compounds_, compoundCost_);
+    exported.words.reserve(lattice.nodes.size());
+    for (const Node& node : lattice.nodes) {
+        exported.words.push_back({node.begin, node.end, node.left, node.right, node.cost, node.known,
+                                  NodeText(dictionary_, node, reading)});
+    }
+    for (std::size_t i = 1; i < n; ++i) {
+        for (const int k : lattice.beginningAt[i]) {
+            for (const int p : lattice.endingAt[i]) {
+                const std::int64_t cost = -PairBonus(pairs ? model_ : nullptr, weights_, lattice.nodes[p], lattice.nodes[k]) -
+                                          CompoundBonus(lattice, lattice.nodes[p], lattice.nodes[k]);
+                if (cost != 0) exported.joins.push_back({p, k, cost});
+            }
+        }
+    }
+    auto searched = SearchPath(lattice, n, context, matrix_, pairs ? model_ : nullptr, weights_);
+    exported.best = std::move(searched.path);
+    exported.bestCost = searched.cost;
+    return exported;
 }
 
 std::optional<PhraseCandidate> JapaneseConverter::Best(std::wstring_view reading, std::uint16_t context,
@@ -920,7 +1144,7 @@ std::optional<PhraseCandidate> JapaneseConverter::Best(std::wstring_view reading
     const std::vector<bool> noBoundary(n + 1, false);
     // Quick on purpose: the language model is left out.
     const Lattice lattice = BuildLattice(dictionary_, codes, noBoundary, reading, nullptr, user,
-                                         number_ ? &*number_ : nullptr);
+                                         number_ ? &*number_ : nullptr, letters_ ? &*letters_ : nullptr, compounds_, compoundCost_);
     const auto& nodes = lattice.nodes;
     std::vector<std::int64_t> best(nodes.size(), kInfinity);
     std::vector<int> previous(nodes.size(), -1);

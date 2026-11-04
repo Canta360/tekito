@@ -32,10 +32,13 @@
 #include "Core/EnglishSpelling.h"
 #include "Core/ExternalLexiconProvider.h"
 #include "Core/Japanese/LetterOdds.h"
+#include "Core/Japanese/EdgeScorer.h"
 #include "Core/Japanese/WrittenForms.h"
+#include "Core/SpecialConversions.h"
 #include "Core/ExternalRankingProviders.h"
 #include "Core/Japanese/AiJudge.h"
 #include "Core/Japanese/ChunkJudge.h"
+#include "Core/Japanese/Compounds.h"
 #include "Core/ExternalLexiconProvider.h"
 #include "Core/Japanese/KanjiSets.h"
 #include "Core/Japanese/JapaneseData.h"
@@ -67,6 +70,7 @@
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <limits>
 #include <vector>
 
 #if defined(_WIN32)
@@ -82,6 +86,42 @@ void SetNumberWord(tekito::japanese::JapaneseConverter& converter, const std::fi
     if (const auto number = parts.Number()) {
         converter.SetNumberWord(tekito::japanese::JapaneseConverter::NumberWord{number->left, number->right, number->cost});
     }
+    // Letters read by their names (ぴーしー: PC), as JapaneseData sets them up
+    // (2000 over a proper noun); TEKITO_EVAL_LETTER_COST: another cost, or
+    // "off".
+    if (const auto noun = parts.For(tekito::japanese::UserWordKind::ProperNoun)) {
+        const char* cost = std::getenv("TEKITO_EVAL_LETTER_COST");
+        if (!cost || std::string_view(cost) != "off") {
+            const std::int32_t over = cost && *cost ? static_cast<std::int32_t>(std::strtol(cost, nullptr, 10)) : 2000;
+            converter.SetLetterWord(tekito::japanese::JapaneseConverter::NumberWord{noun->left, noun->right, noun->cost + over});
+        }
+    }
+    // TEKITO_EVAL_HEAD_WORDS=0: a phrase's candidates without the words read
+    // like its first word (紅藻が for こうそうが).
+    if (const char* heads = std::getenv("TEKITO_EVAL_HEAD_WORDS"); heads && *heads == '0') converter.SetHeadWords(false);
+    // TEKITO_EVAL_EDGES=<directory>: the edge scorer (edges.bin, chars.txt)
+    // takes its scores off the words' costs; TEKITO_EVAL_EDGE_MARGIN: for
+    // the words within this of the cheapest path (5000);
+    // TEKITO_EVAL_EDGE_WEIGHT: the scores times this (1).
+    static tekito::japanese::EdgeScorer edges;
+    if (const char* directory = std::getenv("TEKITO_EVAL_EDGES"); directory && *directory) {
+        if (edges.IsOpen() || edges.Open(directory)) {
+            const char* margin = std::getenv("TEKITO_EVAL_EDGE_MARGIN");
+            const char* weight = std::getenv("TEKITO_EVAL_EDGE_WEIGHT");
+            converter.SetEdgeScorer(&edges, margin && *margin ? std::strtoll(margin, nullptr, 10) : 5000,
+                                    weight && *weight ? std::strtof(weight, nullptr) : 1.0f);
+        } else {
+            std::cerr << "could not open the edge scorer at " << directory << "\n";
+        }
+    }
+    // TEKITO_EVAL_COMPOUNDS=<pack directory>: compounds put together from
+    // kanji that join readily, at TEKITO_EVAL_COMPOUND_COST per nat (200).
+    static tekito::japanese::Compounds compounds;
+    if (const char* directory = std::getenv("TEKITO_EVAL_COMPOUNDS");
+        directory && *directory && (compounds.IsOpen() || compounds.Open(directory))) {
+        const char* cost = std::getenv("TEKITO_EVAL_COMPOUND_COST");
+        converter.SetCompounds(&compounds, cost && *cost ? std::strtoll(cost, nullptr, 10) : 200);
+    }
 }
 
 using tekito::japanese::ConnectionMatrix;
@@ -94,6 +134,7 @@ using ja_eval::LoadCorpus;
 using ja_eval::Narrow;
 using ja_eval::Percentile;
 using ja_eval::Row;
+using ja_eval::Widen;
 
 // Whether an acceptable text can be put together from each phrase's first
 // `within` candidates (the same split as the first conversion).
@@ -246,6 +287,115 @@ struct Totals {
 // --ai light|strong: the AI model asked after the sentence check
 // (TekitoAI.exe next to this program, the model installed).
 const tekito::japanese::AiJudge* gAiJudge = nullptr;
+// --ai probe: no model; the sentences an AI model would read (its Top() of
+// the sentence check's, then the whole texts) are kept for each row, to see
+// how often what was meant is among them. Nothing is answered.
+class ProbeJudge final : public tekito::japanese::AiJudge {
+public:
+    [[nodiscard]] std::size_t Top() const noexcept override { return 10; }
+    [[nodiscard]] double Margin() const noexcept override { return 1e9; }
+    [[nodiscard]] std::optional<tekito::japanese::AiConversion> Convert(std::wstring_view,
+                                                                       std::span<const std::wstring> sentences,
+                                                                       std::wstring_view) const override {
+        asked.emplace_back(sentences.begin(), sentences.end());
+        return std::nullopt;
+    }
+    mutable std::vector<std::vector<std::wstring>> asked;
+};
+ProbeJudge gProbe;
+
+// TEKITO_EVAL_ASKED=<path>: with --ai probe, those sentences in the layout
+// --write-sentences writes (source, id, rank, meant 1/0, text).
+void WriteAsked(const std::string& source, const std::string& id, const std::vector<std::wstring>& asked,
+                std::size_t meant) {
+    static std::ofstream out = [] {
+        const char* path = std::getenv("TEKITO_EVAL_ASKED");
+        return path && *path ? std::ofstream(path, std::ios::binary) : std::ofstream();
+    }();
+    if (!out.is_open()) return;
+    for (std::size_t k = 0; k < asked.size(); ++k) {
+        out << source << "\t" << id << "\t" << k << "\t" << (k == meant ? 1 : 0) << "\t" << Narrow(asked[k]) << "\n";
+    }
+}
+// TEKITO_EVAL_CHECKED=<path>: with --ai probe, for a row converted at once,
+// the sentences the sentence check chose among (source, id, k, whole 1/0,
+// meant 1/0, chosen 1/0, text as shown, text as read).
+void WriteChecked(const std::string& source, const std::string& id,
+                  const tekito::japanese::JapaneseComposer::CheckedSentences& checked,
+                  const std::vector<std::wstring>& expected) {
+    static std::ofstream out = [] {
+        const char* path = std::getenv("TEKITO_EVAL_CHECKED");
+        return path && *path ? std::ofstream(path, std::ios::binary) : std::ofstream();
+    }();
+    if (!out.is_open()) return;
+    for (std::size_t k = 0; k < checked.shown.size(); ++k) {
+        const bool meant = std::find(expected.begin(), expected.end(), checked.shown[k]) != expected.end();
+        out << source << "\t" << id << "\t" << k << "\t" << (k >= checked.ranked ? 1 : 0) << "\t" << (meant ? 1 : 0) << "\t"
+            << (k == checked.chosen ? 1 : 0) << "\t" << Narrow(checked.shown[k]) << "\t" << Narrow(checked.read[k]) << "\n";
+    }
+}
+// Why what was meant is not among the sentences the AI reads, best first:
+// its phrases are those the check read and each piece among the candidates
+// it read (only the combination was not reached), among all the phrase's
+// candidates (left out of the check's), or one the dictionary writes for
+// the phrase's reading but not a candidate; or the reading has to break
+// elsewhere; or the dictionary does not write it at all.
+enum class Miss { Combination, Listed, Writable, Breaks, Dictionary };
+const char* const kMissNames[] = {"combination", "listed", "writable", "breaks", "dictionary"};
+
+Miss WhyMissed(const tekito::japanese::JapaneseConverter& converter, std::wstring_view reading,
+               const std::vector<tekito::japanese::JapaneseComposer::CheckedPhrase>& phrases, std::wstring_view meant) {
+    if (!converter.CanWrite(reading, meant)) return Miss::Dictionary;
+    // best[i][j]: the best level (3 read, 2 listed, 1 writable) at which
+    // the first i phrases write meant's first j characters.
+    const std::size_t m = meant.size();
+    std::vector<std::vector<int>> best(phrases.size() + 1, std::vector<int>(m + 1, 0));
+    best[0][0] = 3;
+    for (std::size_t i = 0; i < phrases.size(); ++i) {
+        const auto& phrase = phrases[i];
+        const std::size_t longest = phrase.reading.size() * 2 + 2;
+        for (std::size_t j = 0; j < m; ++j) {
+            if (best[i][j] == 0) continue;
+            for (std::size_t k = j + 1; k <= m && k - j <= longest; ++k) {
+                const auto piece = std::wstring(meant.substr(j, k - j));
+                int level = 0;
+                if (std::find(phrase.read.begin(), phrase.read.end(), piece) != phrase.read.end()) level = 3;
+                else if (std::find(phrase.all.begin(), phrase.all.end(), piece) != phrase.all.end()) level = 2;
+                else if (converter.CanWrite(phrase.reading, piece)) level = 1;
+                best[i + 1][k] = std::max(best[i + 1][k], std::min(best[i][j], level));
+            }
+        }
+    }
+    switch (best[phrases.size()][m]) {
+    case 3: return Miss::Combination;
+    case 2: return Miss::Listed;
+    case 1: return Miss::Writable;
+    default: return Miss::Breaks;
+    }
+}
+
+// TEKITO_EVAL_MISSES=<path>: with --ai probe, each row whose meaning is not
+// among the AI's sentences (source, id, why, reading, meant, written).
+void WriteMiss(const std::string& source, const std::string& id, Miss why, const std::wstring& reading,
+               const std::wstring& meant, const std::wstring& output,
+               const std::vector<tekito::japanese::JapaneseComposer::CheckedPhrase>& phrases) {
+    static std::ofstream out = [] {
+        const char* path = std::getenv("TEKITO_EVAL_MISSES");
+        return path && *path ? std::ofstream(path, std::ios::binary) : std::ofstream();
+    }();
+    if (out.is_open()) {
+        out << source << "\t" << id << "\t" << kMissNames[static_cast<int>(why)] << "\t" << Narrow(reading) << "\t"
+            << Narrow(meant) << "\t" << Narrow(output) << "\t";
+        // Each phrase: its reading, how many candidates it read and had, and those it had.
+        for (const auto& phrase : phrases) {
+            out << Narrow(phrase.reading) << ":" << phrase.read.size() << "/" << phrase.all.size();
+            for (std::size_t c = 0; c < phrase.all.size(); ++c) out << (c ? "," : "=") << Narrow(phrase.all[c]);
+            out << " | ";
+        }
+        out << "\n";
+    }
+}
+
 // --context FILE (id, text written before it) and --context-previous (the
 // rows before in the same group, 1-0 then 1-1): what each row follows,
 // given to the composer as if just committed.
@@ -298,6 +448,19 @@ int RunKeys(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary
     // together by rank, as before it took the converter's costs.
     if (const char* order = std::getenv("TEKITO_EVAL_CHECK_ORDER"); order && std::string_view(order) == "rank") {
         composer.SetSentencesByCost(false);
+    }
+    // TEKITO_EVAL_BEAM=width[,cost per nat[,margin[,whole cost]]]: the
+    // sentence check searches phrase by phrase (SetSentenceBeam).
+    if (const char* beam = std::getenv("TEKITO_EVAL_BEAM"); beam && *beam) {
+        double values[4] = {0, 1000, 0, 0};
+        const char* at = beam;
+        for (double& value : values) {
+            char* end = nullptr;
+            value = std::strtod(at, &end);
+            if (end == at || *end != ',') break;
+            at = end + 1;
+        }
+        composer.SetSentenceBeam(static_cast<std::size_t>(values[0]), values[1], values[2], values[3]);
     }
     // TEKITO_EVAL_MIX_SLIPS=0: Mix's Japanese chunks without the slips pack.
     if (const char* mixSlips = std::getenv("TEKITO_EVAL_MIX_SLIPS"); mixSlips && *mixSlips == '0') {
@@ -361,8 +524,18 @@ int RunKeys(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary
             if (fields.size() >= 3 && !fields[2].empty()) rowContexts[{fields[0], fields[1]}] = ja_eval::Widen(fields[2]);
         }
     }
+    // --ai probe: per source, rows converted at once, and how often what was
+    // meant is among the AI's first 1, 3, 5, 10 sentences and all it reads.
+    constexpr std::size_t kProbeTops[] = {1, 3, 5, 10, SIZE_MAX};
+    struct ProbeTotals {
+        std::size_t rows{0}, once{0};
+        std::size_t in[std::size(kProbeTops)]{};
+        std::size_t missed[std::size(kMissNames)]{};
+    };
+    std::map<std::string, ProbeTotals> probeTotals;
     for (const auto& row : LoadCorpus(corpus)) {
         composer.Clear();
+        gProbe.asked.clear();
         if (!gContexts.empty() || gContextPrevious) {
             const std::string group = row.id.substr(0, row.id.rfind('-'));
             std::wstring context;
@@ -414,6 +587,35 @@ int RunKeys(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary
             }
         }
         WriteOutput(row.source, row.id, output);
+        if (gAiJudge == &gProbe && gProbe.asked.size() == 1) WriteChecked(row.source, row.id, composer.LastCheckedSentences(), row.expected);
+        if (gAiJudge == &gProbe) {
+            for (auto* t : {&probeTotals[row.source], &probeTotals["all"]}) {
+                ++t->rows;
+                // Only a row converted at once: its sentences are the whole row's.
+                if (gProbe.asked.size() != 1) continue;
+                ++t->once;
+                const auto& asked = gProbe.asked.front();
+                std::size_t at = SIZE_MAX;
+                for (std::size_t k = 0; k < asked.size() && at == SIZE_MAX; ++k) {
+                    if (std::find(row.expected.begin(), row.expected.end(), asked[k]) != row.expected.end()) at = k;
+                }
+                if (t == &probeTotals["all"]) WriteAsked(row.source, row.id, asked, at);
+                if (at == SIZE_MAX && !row.expected.empty()) {
+                    // The likeliest reason among the ways it may be written.
+                    std::wstring reading;
+                    for (const auto& phrase : composer.LastChecked()) reading += phrase.reading;
+                    Miss why = Miss::Dictionary;
+                    for (const auto& meant : row.expected) {
+                        why = std::min(why, WhyMissed(converter, reading, composer.LastChecked(), meant));
+                    }
+                    ++t->missed[static_cast<int>(why)];
+                    if (t == &probeTotals["all"]) WriteMiss(row.source, row.id, why, reading, row.expected.front(), output, composer.LastChecked());
+                }
+                for (std::size_t n = 0; n < std::size(kProbeTops); ++n) {
+                    if (at != SIZE_MAX && at < kProbeTops[n]) ++t->in[n];
+                }
+            }
+        }
         std::size_t distance = SIZE_MAX, length = 0;
         for (const auto& expected : row.expected) {
             const std::size_t d = EditDistance(output, expected);
@@ -575,6 +777,17 @@ int RunKeys(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary
                   << " p95=" << Percentile(t.listMicroseconds, 0.95)
                   << " max=" << Percentile(t.listMicroseconds, 1.0) << "\n";
     }
+    for (const auto& [source, t] : probeTotals) {
+        std::cout << "probe " << source << ": rows=" << t.rows << " once=" << t.once;
+        for (std::size_t n = 0; n < std::size(kProbeTops); ++n) {
+            std::cout << (kProbeTops[n] == SIZE_MAX ? std::string(" in_all=") : " in" + std::to_string(kProbeTops[n]) + "=")
+                      << (t.once ? 100.0 * t.in[n] / t.once : 0.0) << "%";
+        }
+        for (std::size_t n = 0; n < std::size(kMissNames); ++n) {
+            std::cout << " " << kMissNames[n] << "=" << (t.once ? 100.0 * t.missed[n] / t.once : 0.0) << "%";
+        }
+        std::cout << "\n";
+    }
     if (live) {
         std::cout << "live keys: us_p50=" << Percentile(keyMicroseconds, 0.5) << " p95=" << Percentile(keyMicroseconds, 0.95)
                   << " p99=" << Percentile(keyMicroseconds, 0.99) << " max=" << Percentile(keyMicroseconds, 1.0) << "\n";
@@ -704,6 +917,13 @@ int RunChunks(const ConnectionMatrix& matrix, const JapaneseDictionary& dictiona
     const auto noun = parts.For(tekito::japanese::UserWordKind::ProperNoun);
     if (!options.japaneseMode) composer.SetMixedTyping(&judge, noun ? noun->right : 0);
     if (options.runTogether) composer.SetRunTogether(&judge);
+    // TEKITO_EVAL_SPECIAL=1: dates, symbols and emoji by their readings, as
+    // the text service offers them (the special-conversions pack beside the
+    // English data), the first symbol on the first page.
+    if (const char* special = std::getenv("TEKITO_EVAL_SPECIAL"); special && *special == '1') {
+        composer.SetSpecialConversions(&tekito::SpecialConversions::Installed());
+        composer.SetEmojiOnFirstPage(true);
+    }
     std::unique_ptr<tekito::IConversionEngine> englishEngine;
     std::unique_ptr<tekito::EnglishSpelling> spelling;
     if (options.englishEngine) {
@@ -933,6 +1153,226 @@ int RunChunks(const ConnectionMatrix& matrix, const JapaneseDictionary& dictiona
     return 0;
 }
 
+// --dump-lattices <gen.tsv> --dump-out <path> [--dump-shard i/n]: for training
+// a model that scores the converter's words (scripts/ja/train-japanese-edges.py),
+// each line's words, the costs of the words next to each other beyond the
+// connection matrix, the cheapest path, and the cheapest path that writes
+// the meant text (none when no path does: a dictionary gap). gen.tsv: id,
+// reading, meant text. Lines out: id, reading, meant, found (0/1), the
+// cheapest path's cost, the meant path's cost, words (begin,end,left,right,
+// cost,known,text split by U+001F), joins (left,right,cost by spaces), the
+// cheapest path and the meant one (word numbers by spaces). Only words on
+// a path within `margin` of the cheapest are kept (--dump-margin, 5000),
+// and the meant path's.
+int RunDumpLattices(const ConnectionMatrix& matrix, const JapaneseConverter& converter, const std::filesystem::path& lines,
+                    const std::filesystem::path& outPath, std::size_t shard, std::size_t shards, std::int64_t margin) {
+    std::ifstream in(lines, std::ios::binary);
+    std::ofstream out(outPath, std::ios::binary);
+    if (!in || !out) {
+        std::cerr << "could not open " << lines.string() << " or " << outPath.string() << "\n";
+        return 1;
+    }
+    constexpr std::int64_t kInfinite = std::numeric_limits<std::int64_t>::max() / 4;
+    std::size_t count = 0, found = 0, cheapest = 0, keptWords = 0;
+    std::string line;
+    for (std::size_t number = 0; std::getline(in, line); ++number) {
+        if (number % shards != shard) continue;
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+        const auto tab = line.find('\t');
+        const auto tab2 = tab == std::string::npos ? std::string::npos : line.find('\t', tab + 1);
+        if (tab2 == std::string::npos) continue;
+        const std::string id = line.substr(0, tab);
+        const std::wstring reading = Widen(std::string_view(line).substr(tab + 1, tab2 - tab - 1));
+        std::string meantField = line.substr(tab2 + 1);
+        if (const auto more = meantField.find('\t'); more != std::string::npos) meantField.resize(more);
+        // Full-width letters, digits and marks as half-width on both sides
+        // (２つ目 meant, 2つ目 written): the same text.
+        const auto fold = [](std::wstring text) {
+            for (auto& c : text) {
+                if (c >= 0xFF01 && c <= 0xFF5E) c = static_cast<wchar_t>(c - 0xFEE0);
+                else if (c == 0x3000) c = L' ';
+            }
+            return text;
+        };
+        const std::wstring meantText = Widen(meantField);
+        const std::wstring meant = fold(meantText);
+        if (reading.empty() || meant.empty()) continue;
+        const auto lattice = converter.ExportLattice(reading);
+        const auto& words = lattice.words;
+        std::vector<std::wstring> folded;
+        folded.reserve(words.size());
+        for (const auto& word : words) folded.push_back(fold(word.text));
+        // What joins cost beyond the matrix, by the pair.
+        std::map<std::pair<int, int>, std::int64_t> joins;
+        for (const auto& join : lattice.joins) joins[{join.left, join.right}] = join.cost;
+        const auto link = [&](int left, int right) -> std::int64_t {
+            const auto extra = joins.find({left, right});
+            return matrix.Cost(words[left].right, words[right].left) + (extra == joins.end() ? 0 : extra->second);
+        };
+        // The cheapest path through words whose texts write the meant text
+        // in order: by word and the place in the meant text it starts at.
+        using State = std::pair<int, std::size_t>;
+        std::vector<std::vector<int>> starting(reading.size() + 1);
+        for (int k = 0; k < static_cast<int>(words.size()); ++k) starting[words[k].begin].push_back(k);
+        std::map<State, std::pair<std::int64_t, State>> reached;
+        std::vector<std::vector<State>> endingAt(reading.size() + 1);
+        for (const int k : starting[0]) {
+            const auto& text = folded[k];
+            if (text.empty() || meant.compare(0, text.size(), text) != 0) continue;
+            reached[{k, 0}] = {words[k].cost + matrix.Cost(0, words[k].left), {-1, 0}};
+            endingAt[words[k].end].push_back({k, 0});
+        }
+        for (std::size_t i = 1; i < reading.size(); ++i) {
+            for (const auto& state : endingAt[i]) {
+                const auto [p, from] = state;
+                const std::int64_t before = reached[state].first;
+                const std::size_t at = from + folded[p].size();
+                if (at >= meant.size()) continue;
+                for (const int k : starting[i]) {
+                    const auto& text = folded[k];
+                    if (text.empty() || meant.compare(at, text.size(), text) != 0) continue;
+                    const std::int64_t cost = before + link(p, k) + words[k].cost;
+                    auto [it, added] = reached.try_emplace(State{k, at}, kInfinite, State{-1, 0});
+                    if (cost < it->second.first) it->second = {cost, state};
+                    if (added) endingAt[words[k].end].push_back({k, at});
+                }
+            }
+        }
+        std::int64_t goldCost = kInfinite;
+        State goldEnd{-1, 0};
+        for (const auto& state : endingAt[reading.size()]) {
+            if (state.second + folded[state.first].size() != meant.size()) continue;
+            const std::int64_t cost = reached[state].first + matrix.Cost(words[state.first].right, 0);
+            if (cost < goldCost) {
+                goldCost = cost;
+                goldEnd = state;
+            }
+        }
+        std::vector<int> gold;
+        for (State at = goldEnd; at.first >= 0; at = reached[at].second) gold.push_back(at.first);
+        std::reverse(gold.begin(), gold.end());
+        // The cheapest path through each word: to its end, and from there on.
+        const std::size_t n = reading.size();
+        std::vector<std::vector<int>> ending(n + 1);
+        for (int k = 0; k < static_cast<int>(words.size()); ++k) ending[words[k].end].push_back(k);
+        std::vector<std::int64_t> to(words.size(), kInfinite), from(words.size(), kInfinite);
+        for (std::size_t i = 0; i < n; ++i) {
+            for (const int k : starting[i]) {
+                if (i == 0) {
+                    to[k] = words[k].cost + matrix.Cost(0, words[k].left);
+                    continue;
+                }
+                for (const int q : ending[i]) {
+                    if (to[q] < kInfinite) to[k] = std::min(to[k], to[q] + link(q, k) + words[k].cost);
+                }
+            }
+        }
+        for (std::size_t i = n + 1; i-- > 1;) {
+            for (const int k : ending[i]) {
+                if (i == n) {
+                    from[k] = matrix.Cost(words[k].right, 0);
+                    continue;
+                }
+                for (const int r : starting[i]) {
+                    if (from[r] < kInfinite) from[k] = std::min(from[k], link(k, r) + words[r].cost + from[r]);
+                }
+            }
+        }
+        std::vector<int> renumbered(words.size(), -1);
+        std::vector<int> kept;
+        std::vector<bool> onGold(words.size(), false);
+        for (const int k : gold) onGold[k] = true;
+        for (const int k : lattice.best) onGold[k] = true;
+        for (int k = 0; k < static_cast<int>(words.size()); ++k) {
+            const bool withinMargin = to[k] < kInfinite && from[k] < kInfinite && to[k] + from[k] <= lattice.bestCost + margin;
+            if (withinMargin || onGold[k]) {
+                renumbered[k] = static_cast<int>(kept.size());
+                kept.push_back(k);
+            }
+        }
+        ++count;
+        if (!gold.empty()) ++found;
+        if (!gold.empty() && gold == lattice.best) ++cheapest;
+        keptWords += kept.size();
+        out << id << '\t' << Narrow(reading) << '\t' << Narrow(meantText) << '\t' << (gold.empty() ? 0 : 1) << '\t'
+            << lattice.bestCost << '\t' << (gold.empty() ? 0 : goldCost) << '\t';
+        for (std::size_t j = 0; j < kept.size(); ++j) {
+            const auto& w = words[kept[j]];
+            if (j) out << '\x1f';
+            out << w.begin << ',' << w.end << ',' << w.left << ',' << w.right << ',' << w.cost << ',' << (w.known ? 1 : 0)
+                << ',' << Narrow(w.text);
+        }
+        out << '\t';
+        bool first = true;
+        for (const auto& join : lattice.joins) {
+            if (renumbered[join.left] < 0 || renumbered[join.right] < 0) continue;
+            out << (first ? "" : " ") << renumbered[join.left] << ',' << renumbered[join.right] << ',' << join.cost;
+            first = false;
+        }
+        out << '\t';
+        for (std::size_t j = 0; j < lattice.best.size(); ++j) out << (j ? " " : "") << renumbered[lattice.best[j]];
+        out << '\t';
+        for (std::size_t j = 0; j < gold.size(); ++j) out << (j ? " " : "") << renumbered[gold[j]];
+        out << '\n';
+    }
+    std::cout << "lattices=" << count << " meant_path=" << 100.0 * found / std::max<std::size_t>(count, 1)
+              << "% meant_is_cheapest=" << 100.0 * cheapest / std::max<std::size_t>(count, 1)
+              << "% words_kept=" << static_cast<double>(keptWords) / std::max<std::size_t>(count, 1) << "\n";
+    return 0;
+}
+
+// --edge-check <dir>: the C++ edge scorer against the scores the script
+// wrote for a few lines (<dir>/test.tsv, export --data): the largest
+// difference.
+int RunEdgeCheck(const std::filesystem::path& dir) {
+    tekito::japanese::EdgeScorer scorer;
+    if (!scorer.Open(dir)) {
+        std::cerr << "could not open the edge scorer at " << dir.string() << "\n";
+        return 1;
+    }
+    std::ifstream in(dir / "test.tsv", std::ios::binary);
+    std::string line;
+    double largest = 0;
+    std::size_t count = 0;
+    while (std::getline(in, line)) {
+        std::vector<std::string> fields;
+        std::stringstream parts(line);
+        for (std::string field; std::getline(parts, field, '\t');) fields.push_back(field);
+        if (fields.size() < 4) continue;
+        std::vector<std::wstring> texts;
+        std::vector<tekito::japanese::EdgeScorer::Word> words;
+        std::vector<double> expected;
+        texts.reserve(fields.size());
+        for (std::size_t i = 3; i < fields.size(); ++i) {
+            std::stringstream word(fields[i]);
+            std::string b, e, l, r, c, k, v, t;
+            std::getline(word, b, ',');
+            std::getline(word, e, ',');
+            std::getline(word, l, ',');
+            std::getline(word, r, ',');
+            std::getline(word, c, ',');
+            std::getline(word, k, ',');
+            std::getline(word, v, ',');
+            std::getline(word, t);
+            texts.push_back(Widen(t));
+            words.push_back({static_cast<std::uint32_t>(std::stoul(b)), static_cast<std::uint32_t>(std::stoul(e)),
+                             static_cast<std::uint16_t>(std::stoul(l)), static_cast<std::uint16_t>(std::stoul(r)),
+                             std::stoll(c), k == "1", {}});
+            expected.push_back(std::stod(v));
+        }
+        for (std::size_t i = 0; i < words.size(); ++i) words[i].text = texts[i];
+        const auto scores = scorer.Score(Widen(fields[0]), Widen(fields[1]), Widen(fields[2]), words);
+        for (std::size_t i = 0; i < scores.size(); ++i) {
+            largest = std::max(largest, std::abs(scores[i] - expected[i]));
+            ++count;
+        }
+    }
+    std::cout << "words=" << count << " largest_difference=" << largest << " cost_scale=1/" << 1.0 / scorer.CostScale()
+              << "\n";
+    // The linear layers run in int8: a few hundredths of a nat apart.
+    return largest < 0.1 ? 0 : 1;
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -948,6 +1388,10 @@ int main(int argc, char** argv) {
     TypingStudyOptions study;
     ChunkOptions chunks;
     std::filesystem::path chunkCorpus;
+    std::filesystem::path dumpLattices, dumpOut;
+    std::filesystem::path edgeCheck;
+    std::size_t dumpShard = 0, dumpShards = 1;
+    std::int64_t dumpMargin = 5000;
     // English for katakana candidates: the japanese-loanwords and
     // japanese-english packs.
     std::filesystem::path loanwordPack, japaneseEnglishPack;
@@ -988,6 +1432,10 @@ int main(int argc, char** argv) {
                 const auto tab = line.find('\t');
                 if (tab != std::string::npos) gContexts[line.substr(0, tab)] = ja_eval::Widen(line.substr(tab + 1));
             }
+        }
+        else if (arg == "--ai" && i + 1 < argc && std::string_view(argv[i + 1]) == "probe") {
+            ++i;
+            gAiJudge = &gProbe;
         }
         else if (arg == "--ai" && i + 1 < argc) {
             const std::string_view which = argv[++i];
@@ -1041,6 +1489,16 @@ int main(int argc, char** argv) {
         else if (arg == "--sentence-judge") chunks.sentenceJudge = true;
         else if (arg == "--hold") chunks.hold = true;
         else if (arg == "--write-chunks" && i + 1 < argc) chunks.writeChunks = argv[++i];
+        else if (arg == "--dump-lattices" && i + 1 < argc) dumpLattices = argv[++i];
+        else if (arg == "--edge-check" && i + 1 < argc) edgeCheck = argv[++i];
+        else if (arg == "--dump-out" && i + 1 < argc) dumpOut = argv[++i];
+        else if (arg == "--dump-margin" && i + 1 < argc) dumpMargin = std::stoll(argv[++i]);
+        else if (arg == "--dump-shard" && i + 1 < argc) {
+            const std::string value = argv[++i];
+            const auto slash = value.find('/');
+            dumpShard = std::stoul(value.substr(0, slash));
+            dumpShards = slash == std::string::npos ? 1 : std::stoul(value.substr(slash + 1));
+        }
     }
     tekito::japanese::LanguageModel model;
     if (!modelPack.empty() && !model.Open(modelPack)) {
@@ -1051,6 +1509,21 @@ int main(int argc, char** argv) {
     if (!topicPack.empty() && !topicVectors.Open(topicPack)) {
         std::cerr << "could not open the topic vectors at " << topicPack.string() << "\n";
         return 1;
+    }
+    if (!edgeCheck.empty()) return RunEdgeCheck(edgeCheck);
+    if (!pack.empty() && !dumpLattices.empty()) {
+        JapaneseDictionary dictionary;
+        ConnectionMatrix matrix;
+        if (!dictionary.Open(pack / "dictionary.bin") || !matrix.Open(pack / "connection.bin")) {
+            std::cerr << "could not open the japanese-core pack at " << pack.string() << "\n";
+            return 1;
+        }
+        if (!wikimedia.empty()) (void)dictionary.AddWords(wikimedia / "dictionary.bin");
+        for (const auto& more : gAddedPacks) (void)dictionary.AddWords(more / "dictionary.bin");
+        JapaneseConverter converter(dictionary, matrix);
+        if (model.IsOpen()) converter.SetLanguageModel(&model, weights);
+        SetNumberWord(converter, pack);
+        return RunDumpLattices(matrix, converter, dumpLattices, dumpOut, dumpShard, dumpShards, dumpMargin);
     }
     if (!pack.empty() && !keysCorpus.empty() && !chunkCorpus.empty()) keysCorpus.clear();
     if (!pack.empty() && !chunkCorpus.empty()) {

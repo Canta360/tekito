@@ -454,6 +454,12 @@ std::vector<std::wstring> SpecialConversions::Numbers(std::wstring_view text) co
     if (!digits) return {};
     std::vector<std::wstring> out;
     AddUnique(out, *digits);
+    // A round number in 万 or 億 right after its digits (100000: 10万), as
+    // people write it.
+    constexpr std::size_t kRoundZeros = 4;
+    if (digits->size() > kRoundZeros && digits->front() != L'0' && digits->ends_with(L"0000")) {
+        AddUnique(out, Official(*digits));
+    }
     AddUnique(out, japanese::ToFullWidthAscii(*digits));
     // "0120" is a code, not a number: it changes width, or is written a
     // digit at a time (〇〇七), none dropped.

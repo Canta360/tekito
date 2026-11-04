@@ -1022,6 +1022,13 @@ void TestMixedTyping(const RomajiTable& table, const MiniPack& pack) {
             "English run into Japanese without a space is split off");
     Require(!judge.Split(L"pushin"), "two keys after it that are no particle are not Japanese");
     {
+        const auto sentence = judge.Judge(L"ipushtohome", 0);
+        Require(sentence.english && sentence.written == L"I push to home",
+                "an English sentence typed without spaces gets its spaces");
+        Require(judge.Judge(L"ipushtohome", 0, true, nullptr, {}, false).written != L"I push to home",
+                "not with the setting off");
+    }
+    {
         JapaneseComposer brackets(&table);
         const auto pair = brackets.BracketPair(L'[');
         Require(pair && pair->first == L"「" && pair->second == L"」", "[ opens 「 and is closed by 」");
@@ -1806,17 +1813,28 @@ void TestSpecialConversions(const RomajiTable& table, const MiniPack& pack) {
     Require(arrows && std::any_of(arrows->begin(), arrows->end(), [](const auto& c) { return c.text == L"→"; }),
             "やじるし's candidates have the arrows");
     {
-        // The reading's first symbol on the first page; the others after
-        // the words.
+        // The reading's first symbol on the first page; its next ones start
+        // the second when the words fill the first.
         const auto arrow = std::find_if(arrows->begin(), arrows->end(), [](const auto& c) { return c.text == L"→"; });
         Require(arrow - arrows->begin() <= 3, "the symbol a reading names is on the first page");
-        const auto leftArrow = std::find_if(arrows->begin(), arrows->end(), [](const auto& c) { return c.text == L"←"; });
-        Require(leftArrow != arrows->end() &&
-                    std::none_of(leftArrow, arrows->end(),
-                                 [](const auto& c) { return c.kind == tekito::japanese::PhraseCandidate::Kind::Dictionary; }),
-                "the other symbols come after the words");
     }
     composer.Clear();
+    {
+        // With pages of five, the first has the words and one symbol, the
+        // second starts with the next three.
+        composer.SetPageSize(5);
+        Type(composer, L"yajirusi");
+        composer.Convert();
+        const auto* paged = composer.FocusedCandidates();
+        const auto special = [](const auto& c) { return c.kind == tekito::japanese::PhraseCandidate::Kind::Special; };
+        const auto words = std::count_if(paged->begin(), paged->end(), [&](const auto& c) { return !special(c); });
+        Require(words >= 6, "the test reading has words for more than a page");
+        Require(std::count_if(paged->begin(), paged->begin() + 5, special) == 1, "one symbol on the first page");
+        Require(std::all_of(paged->begin() + 5, paged->begin() + 8, special) && !special((*paged)[8]),
+                "three symbols start the second page");
+        composer.SetPageSize(9);
+        composer.Clear();
+    }
 
     // Digits: half-width when asked, decimal points and commas between them,
     // and read as a number with its part of speech, so counters join them.
@@ -1890,6 +1908,19 @@ void TestSpecialConversions(const RomajiTable& table, const MiniPack& pack) {
         Require(kana && std::any_of(kana->begin(), kana->end(), [](const auto& c) { return c.text == L"\x2169\x2164"; }) &&
                     std::any_of(kana->begin(), kana->end(), [](const auto& c) { return c.text == L"\x246E"; }),
                 "a number read in kana has its Roman and circled forms");
+    }
+    {
+        // Letters read by their names are offered as the letters.
+        auto lettered = converter;
+        lettered.SetLetterWord(tekito::japanese::JapaneseConverter::NumberWord{1, 1, 3000});
+        const auto phrases = lettered.Convert(L"ぴーしー");
+        Require(!phrases.empty() && std::any_of(phrases[0].candidates.begin(), phrases[0].candidates.end(),
+                                                [](const auto& c) { return c.text == L"PC"; }),
+                "ぴーしー offers PC");
+        const auto plain = converter.Convert(L"ぴーしー");
+        Require(plain.empty() || std::none_of(plain[0].candidates.begin(), plain[0].candidates.end(),
+                                              [](const auto& c) { return c.text == L"PC"; }),
+                "not without the letter word");
     }
 
     // After digits, a phrase is learned apart: こ learned as 子 on its own

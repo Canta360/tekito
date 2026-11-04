@@ -737,6 +737,8 @@ void RefreshEnglishCandidates(Testbed& bed) {
     request.options.socialExpressionRange = settings.socialExpressionRange;
     request.options.nextWordPrediction = settings.nextWordPrediction;
     request.options.doubledWords = settings.doubledWordCheck;
+    request.options.spacelessEnglish = settings.spacelessEnglish;
+    request.options.spacelessEnglishAlways = settings.spacelessEnglishAlways;
     request.options.special = SpecialOptions(bed);
     auto result = en.engine->Convert(request);
     en.state.BeginOrUpdate(en.rawText, std::move(result.candidates));
@@ -1295,6 +1297,8 @@ int RunScript(Testbed& bed, const std::filesystem::path& script, const std::file
                 {L"spacing", &tekito::userdata::UserSettings::japaneseEnglishSpacing},
                 {L"mixlive", &tekito::userdata::UserSettings::mixLiveConversion},
                 {L"mixcorrection", &tekito::userdata::UserSettings::mixCorrection},
+                {L"spaceless", &tekito::userdata::UserSettings::spacelessEnglish},
+                {L"spacelessalways", &tekito::userdata::UserSettings::spacelessEnglishAlways},
                 {L"mixprediction", &tekito::userdata::UserSettings::mixPredictionEnabled},
                 {L"marker", &tekito::userdata::UserSettings::mixSettledMarker},
                 {L"vowelkana", &tekito::userdata::UserSettings::mixSingleVowelKana},

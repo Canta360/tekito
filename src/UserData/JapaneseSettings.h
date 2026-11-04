@@ -43,6 +43,7 @@ namespace tekito::userdata {
 inline void ApplyModeSettings(japanese::JapaneseComposer& composer, const UserSettings& settings, bool mixed) {
     composer.SetPredictionEnabled(mixed ? settings.mixPredictionEnabled : settings.japanesePredictionEnabled);
     composer.SetEmojiOnFirstPage(mixed ? settings.mixFirstPageSymbol : settings.japaneseFirstPageSymbol);
+    composer.SetPageSize(JapanesePageSize(settings));
 }
 
 // The user's settings on `composer`; `learning` is used only while learning
@@ -72,6 +73,7 @@ inline void ApplyJapaneseSettings(japanese::JapaneseComposer& composer, const Us
     composer.SetKanjiVariants(settings.japaneseKanjiVariants);
     composer.SetSingleVowelKana(settings.mixSingleVowelKana);
     composer.SetEnglishCorrection(settings.mixCorrection);
+    composer.SetSpacelessEnglish(settings.spacelessEnglish);
     composer.SetLiveRefine(settings.japaneseLiveRefine);
     composer.SetMixLiveConversion(settings.mixLiveConversion);
     composer.SetSpecialConversions(&SpecialConversions::Installed(), SpecialOptionsFor(settings));

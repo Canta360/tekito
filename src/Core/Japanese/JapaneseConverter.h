@@ -12,6 +12,8 @@ namespace tekito::japanese {
 
 class TopicVectors;
 
+class Compounds;
+class EdgeScorer;
 class ConnectionMatrix;
 class JapaneseDictionary;
 class LanguageModel;
@@ -125,6 +127,34 @@ public:
     [[nodiscard]] std::optional<std::int64_t> Cost(std::wstring_view reading, std::uint16_t context = 0,
                                                    const JapaneseUserDictionary* user = nullptr) const;
 
+    // The words Convert chooses from for the whole reading, for training a
+    // model that scores them (scripts/ja/train-japanese-edges.py): each
+    // word's span, parts of speech, cost and text; what two words next to
+    // each other cost beyond the connection matrix (the language model's
+    // pairs, compounds), where it is not 0; and the cheapest path, as
+    // indexes into `words`.
+    struct LatticeWord {
+        std::uint32_t begin{0};
+        std::uint32_t end{0};
+        std::uint16_t left{0};
+        std::uint16_t right{0};
+        std::int64_t cost{0};
+        bool known{false};
+        std::wstring text;
+    };
+    struct LatticeJoin {
+        int left{0};
+        int right{0};
+        std::int64_t cost{0};
+    };
+    struct LatticeExport {
+        std::vector<LatticeWord> words;
+        std::vector<LatticeJoin> joins;
+        std::vector<int> best;
+        std::int64_t bestCost{0};
+    };
+    [[nodiscard]] LatticeExport ExportLattice(std::wstring_view reading, std::uint16_t context = 0) const;
+
     // The likeliest reading of written `text` (kanji and kana), from the
     // words it is made of; nothing when a kanji is in no word. Looks
     // through the whole dictionary, so it is for a key press, not typing.
@@ -181,6 +211,20 @@ public:
         std::int64_t cost{0};
     };
     void SetNumberWord(std::optional<NumberWord> number) noexcept { number_ = number; }
+    // Letters read by their names (ぴーしー: PC, でぃーえぬえー: DNA) as a word
+    // of these parts of speech (a proper noun), offered beside the katakana.
+    void SetLetterWord(std::optional<NumberWord> letters) noexcept { letters_ = letters; }
+    // The edge scorer's score taken off each word's cost before the paths
+    // are searched (Convert, BestSentences), for words on a path within
+    // `margin` of the cheapest, times `weight`; nullptr: off.
+    // `SetEdgeContext`: the text before the caret it reads, set before
+    // converting.
+    void SetEdgeScorer(const EdgeScorer* scorer, std::int64_t margin = 5000, float weight = 1.0f) noexcept {
+        edgeScorer_ = scorer;
+        edgeMargin_ = margin;
+        edgeWeight_ = weight;
+    }
+    void SetEdgeContext(std::wstring_view context) const { edgeContext_ = std::wstring(context); }
 
     // nullptr turns the model off.
     void SetLanguageModel(const LanguageModel* model, ModelWeights weights) noexcept {
@@ -189,6 +233,17 @@ public:
     }
     // The topic vectors (ModelWeights::costPerVector); nullptr: off.
     void SetTopicVectors(const TopicVectors* vectors) noexcept { vectors_ = vectors; }
+    // A phrase of a word and kana after it (こうそうが) also offers every
+    // word read like that word, with the same kana (紅藻が).
+    void SetHeadWords(bool on) noexcept { headWords_ = on; }
+    // How readily kanji join into compounds (japanese-compounds): a word
+    // and a kanji that often ends compounds (燃焼 筒), or a kanji that often
+    // starts them and a word (再 利用), cost less by costPerNat times ln(1 +
+    // the compounds counted); nullptr: off.
+    void SetCompounds(const Compounds* compounds, std::int64_t costPerNat) noexcept {
+        compounds_ = compounds;
+        compoundCost_ = costPerNat;
+    }
     // With the default weights (not "= {}", which GCC and Clang reject for
     // a nested struct with member initializers).
     void SetLanguageModel(const LanguageModel* model) noexcept { SetLanguageModel(model, ModelWeights{}); }
@@ -198,8 +253,16 @@ private:
     const ConnectionMatrix& matrix_;
     const LanguageModel* model_{nullptr};
     const TopicVectors* vectors_{nullptr};
+    bool headWords_{true};
+    const Compounds* compounds_{nullptr};
+    std::int64_t compoundCost_{0};
     ModelWeights weights_;
     std::optional<NumberWord> number_;
+    std::optional<NumberWord> letters_;
+    const EdgeScorer* edgeScorer_{nullptr};
+    std::int64_t edgeMargin_{5000};
+    float edgeWeight_{1.0f};
+    mutable std::wstring edgeContext_;
 };
 
 }  // namespace tekito::japanese

@@ -111,6 +111,9 @@ public:
     void SetEnglishSpelling(const EnglishSpelling* spelling) noexcept { englishSpelling_ = spelling; }
     // Mix: Space puts a slip in an English word right (UserSettings::mixCorrection).
     void SetEnglishCorrection(bool on) noexcept { englishCorrection_ = on; }
+    // An English sentence typed without spaces (seeyouonmonday) is written
+    // as English with its spaces (UserSettings::spacelessEnglish).
+    void SetSpacelessEnglish(bool on) noexcept { spacelessEnglish_ = on; }
     // English words typed into Japanese without spaces (reflectsareta:
     // reflectされた), found with `splitter` in Japanese mode too: first when
     // the keys make no kana, otherwise the next choice. nullptr: off.
@@ -151,6 +154,18 @@ public:
     // The sentences it reads are put together by the converter's costs (on
     // by default) or, off, by the sum of each phrase's rank.
     void SetSentencesByCost(bool on) noexcept { sentencesByCost_ = on; }
+    // The sentence check searches phrase by phrase instead (0: off, the
+    // default): the `width` likeliest starts are kept after each phrase,
+    // each read by the sentence model less its converter cost over the
+    // first choices' at `costPerNat`; a sentence replaces the first choices
+    // when it reads `margin` nats better. Whole texts with other phrase
+    // breaks count `wholeCost` over the first choices.
+    void SetSentenceBeam(std::size_t width, double costPerNat, double margin, double wholeCost) noexcept {
+        beamWidth_ = width;
+        beamCostPerNat_ = costPerNat;
+        beamMargin_ = margin;
+        beamWholeCost_ = wholeCost;
+    }
     // Mix: Japanese chunks have slips undone with the slips pack too (on by
     // default), as in Japanese mode.
     void SetMixSlips(bool on) noexcept { mixSlips_ = on; }
@@ -170,6 +185,9 @@ public:
     // The first emoji for a reading shown on the first page of its list
     // (off: with the other symbols, last).
     void SetEmojiOnFirstPage(bool on) noexcept { emojiOnFirstPage_ = on; }
+    // Candidates a page of the list shows, for what goes on the second
+    // (UserSettings::candidateRows).
+    void SetPageSize(std::size_t size) noexcept { pageSize_ = size; }
     // The list ends with what was typed in every form (AddTypedForms).
     void SetTypedForms(bool on) noexcept { typedForms_ = on; }
     // The first words' kanji written another way (異体字: 髙橋, 﨑) come
@@ -396,6 +414,24 @@ public:
     // The keys each phrase was read from (empty for a phrase that starts or
     // ends inside a romaji unit).
     [[nodiscard]] std::vector<std::wstring> PhraseKeys() const;
+    // The phrases the sentence check last read, for the evaluation: each
+    // one's reading, the candidates it read and all it had.
+    struct CheckedPhrase {
+        std::wstring reading;
+        std::vector<std::wstring> read;
+        std::vector<std::wstring> all;
+    };
+    [[nodiscard]] const std::vector<CheckedPhrase>& LastChecked() const noexcept { return lastChecked_; }
+    // The sentences the sentence check last chose among, for the
+    // evaluation and its training lists: as shown, as the model read them
+    // (numbers in kanji), and how many came by rank before the whole texts.
+    struct CheckedSentences {
+        std::vector<std::wstring> shown;
+        std::vector<std::wstring> read;
+        std::size_t ranked{0};
+        std::size_t chosen{0};
+    };
+    [[nodiscard]] const CheckedSentences& LastCheckedSentences() const noexcept { return lastCheckedSentences_; }
     [[nodiscard]] bool IsCandidateListOpen() const noexcept { return listOpen_ && IsConverted(); }
 
     // Predictions for what is typed (empty once converted), and which one
@@ -655,6 +691,7 @@ private:
     const ChunkJudge* chunkJudge_{nullptr};
     const EnglishSpelling* englishSpelling_{nullptr};
     bool englishCorrection_{true};
+    bool spacelessEnglish_{true};
     const ChunkJudge* splitter_{nullptr};
     // Mixed typing: the sentence's chunks before the one being typed, each
     // as English and as Japanese, shown as the whole sentence judges it.
@@ -719,6 +756,8 @@ private:
     [[nodiscard]] std::optional<std::wstring> TypedWithCapitals(std::wstring_view keys) const;
     // The chunk judge's judgement of `keys`, with SetSingleVowelKana.
     [[nodiscard]] ChunkJudge::Judgement JudgeChunk(std::wstring_view keys) const;
+    // Gives the converter the text before the caret, for its edge scorer.
+    void SyncEdgeContext() const;
     // Phrases that are only digits: the form SetNumberStyle asks for first.
     void ApplyNumberStyle();
     // A run of 。 typed as ... is one phrase, … first.
@@ -741,6 +780,7 @@ private:
     bool dropSpaceBefore_{false};
     const JapaneseUserDictionary* userDictionary_{nullptr};
     const SpecialConversions* special_{nullptr};
+    std::size_t pageSize_{9};
     const PostalCodes* postalCodes_{nullptr};
     SpecialConversionOptions specialOptions_;
     JapaneseLearningStore* learning_{nullptr};
@@ -760,6 +800,8 @@ private:
     std::size_t aiFocus_{0};
     bool sentenceCheck_{true};
     bool sentencesByCost_{true};
+    std::size_t beamWidth_{0};
+    double beamCostPerNat_{1000.0}, beamMargin_{0.0}, beamWholeCost_{0.0};
     bool mixSlips_{true};
     bool slipAutoApply_{true};
     bool emojiOnFirstPage_{true};
@@ -799,6 +841,8 @@ private:
     // corrected one after a romaji correction (Esc still goes back to what
     // was typed).
     std::wstring conversionReading_;
+    std::vector<CheckedPhrase> lastChecked_;
+    mutable CheckedSentences lastCheckedSentences_;
     // For each position in conversionReading_ (and its end), the key it
     // was read from, or npos inside a word or unit.
     std::vector<std::size_t> readingKeys_;

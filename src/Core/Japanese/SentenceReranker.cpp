@@ -366,4 +366,54 @@ std::size_t SentenceReranker::Choose(std::span<const std::wstring> sentences, st
     return best < count ? best : ranked + (best - count);
 }
 
+SentenceReranker::Reader::Reader(const SentenceReranker& model, std::wstring_view context) : model_(model) {
+    auto& root = nodes_.emplace_back();
+    if (model_.IsOpen()) root.state = model_.Start(context);
+}
+
+const SentenceReranker::State& SentenceReranker::Reader::StateOf(std::size_t node) {
+    // The nearest node with its state, then down from there.
+    std::vector<std::size_t> path;
+    for (std::size_t at = node; !nodes_[at].state; at = nodes_[at].parent) path.push_back(at);
+    for (auto it = path.rbegin(); it != path.rend(); ++it) {
+        nodes_[*it].state = model_.Step(*nodes_[nodes_[*it].parent].state, nodes_[*it].piece);
+    }
+    return *nodes_[node].state;
+}
+
+double SentenceReranker::Reader::LogProbability(std::wstring_view text, bool end) {
+    if (!model_.IsOpen()) return 0.0;
+    auto pieces = model_.Pieces(text);
+    if (end) pieces.push_back(model_.end_);
+    std::size_t at = 0;
+    for (const std::uint32_t piece : pieces) {
+        std::size_t next = 0;
+        for (const std::size_t child : nodes_[at].children) {
+            if (nodes_[child].piece == piece) next = child;
+        }
+        if (next == 0) {
+            if (nodes_[at].logits.empty()) {
+                const State& state = StateOf(at);
+                model_.NextLogits(state, nodes_[at].logits, nodes_[at].logSum);
+            }
+            next = nodes_.size();
+            Node child;
+            child.piece = piece;
+            child.parent = at;
+            child.logProbability = nodes_[at].logProbability + nodes_[at].logits[piece] - nodes_[at].logSum;
+            nodes_[at].children.push_back(next);
+            nodes_.push_back(std::move(child));
+        }
+        at = next;
+    }
+    return nodes_[at].logProbability;
+}
+
+void SentenceReranker::Reader::Forget() noexcept {
+    for (auto& node : nodes_) {
+        node.logits.clear();
+        node.logits.shrink_to_fit();
+    }
+}
+
 }  // namespace tekito::japanese

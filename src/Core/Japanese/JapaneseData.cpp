@@ -26,6 +26,10 @@
 namespace tekito::japanese {
 namespace {
 
+// Letters read by their names (ぴーしー: PC) cost this much over a proper
+// noun: offered beside the katakana (ピーシー), not over it.
+constexpr std::int32_t kLetterWordCost = 2000;
+
 struct JapaneseData {
     JapaneseDictionary dictionary;
     ConnectionMatrix matrix;
@@ -83,7 +87,10 @@ const JapaneseData* ProcessJapaneseData() {
         if (const auto number = loaded->userParts.Number()) {
             loaded->converter->SetNumberWord(JapaneseConverter::NumberWord{number->left, number->right, number->cost});
         }
-        if (const auto noun = loaded->userParts.For(UserWordKind::ProperNoun)) loaded->nounContext = noun->right;
+        if (const auto noun = loaded->userParts.For(UserWordKind::ProperNoun)) {
+            loaded->nounContext = noun->right;
+            loaded->converter->SetLetterWord(JapaneseConverter::NumberWord{noun->left, noun->right, noun->cost + kLetterWordCost});
+        }
         loaded->english = std::make_unique<ExternalFrequencyProvider>(ExternalFrequencyProvider::DefaultPath());
         if (const auto* table = ProcessRomajiTable(); table && loaded->english->IsLoaded()) {
             loaded->chunks = std::make_unique<ChunkJudge>(*table, *loaded->converter, loaded->keys.get(),

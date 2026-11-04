@@ -474,6 +474,7 @@ std::vector<Phrase> JapaneseComposer::ConvertReading(const std::wstring& reading
         if (ascii[begin]) {
             out.push_back({begin, piece.size(), AsciiCandidates(piece)});
         } else {
+            SyncEdgeContext();
             auto phrases = converter_->Convert(piece, {}, begin == from ? context : 0, words, userDictionary_);
             // Every part of the reading has a phrase, or it would drop out of
             // the text: a piece nothing reads stays as typed.
@@ -1314,7 +1315,7 @@ void JapaneseComposer::BuildPhrasesFor(bool convert) {
             return !unit.ascii && LeftoverLetters(ToFullWidthAscii(unit.kana)) > 0;
         });
         if (letters && (leftover || ChunkJudge::ForeignLetters(keys, false))) {
-            const auto judged = splitter_->Judge(keys, 0);
+            const auto judged = splitter_->Judge(keys, 0, true, nullptr, {}, spacelessEnglish_);
             auto& candidates = phrases_.front().candidates;
             if (judged.english && judged.word && !judged.written.empty()) {
                 std::erase_if(candidates, [&](const PhraseCandidate& c) { return c.text == judged.written; });
@@ -1836,6 +1837,8 @@ void JapaneseComposer::JoinEllipsis() {
 }
 
 void JapaneseComposer::CheckSentence() {
+    lastChecked_.clear();
+    lastCheckedSentences_ = {};
     if (phrases_.empty() || (!phrases_.front().candidates.empty() && !phrases_.front().candidates.front().reading.empty())) {
         return;  // the whole input read another way (English run in) stays first
     }
@@ -1918,11 +1921,18 @@ void JapaneseComposer::CheckSentence() {
     std::vector<SentenceGuess> guesses;
     const bool learned = std::any_of(phrases_.begin(), phrases_.end(), [](const PhraseState& p) { return p.learned; });
     if (converter_ && wholeSentences_ > 0 && !learned) {
+        SyncEdgeContext();
         guesses = converter_->BestSentences(conversionReading_, wholeSentences_, context_, userDictionary_);
     }
     std::vector<std::wstring> wholes;
     for (const auto& guess : guesses) {
         if (InKanjiRange(guess.text)) wholes.push_back(guess.text);
+    }
+    for (std::size_t i = 0; i < parts.size(); ++i) {
+        auto& checked = lastChecked_.emplace_back();
+        checked.reading = conversionReading_.substr(std::min(phrases_[i].begin, conversionReading_.size()), phrases_[i].length);
+        checked.read = parts[i];
+        for (const auto& candidate : phrases_[i].candidates) checked.all.push_back(candidate.text);
     }
     std::wstring written;
     const auto picks = ReadBest(parts, sentencesByCost_ ? &deltas : nullptr, true, &written, wholes);
@@ -1945,6 +1955,7 @@ void JapaneseComposer::TakeWritten(const std::wstring& text, std::span<const std
     // Else the reading split where the text's phrases break, when that
     // makes it.
     if (!breaks.empty() && converter_) {
+        SyncEdgeContext();
         auto rebuilt = converter_->Convert(conversionReading_, {}, context_, contextWords_, userDictionary_, breaks);
         // Numbers as the number style writes them, as the first conversion's.
         for (auto& phrase : rebuilt) StyleKanaNumbers(phrase.candidates);
@@ -2143,10 +2154,34 @@ std::vector<std::size_t> JapaneseComposer::ReadBest(const std::vector<std::vecto
         }
         return sentences.size() < std::max(reranker_->Top(), judge ? judge->Top() : 0);
     }, deltas);
+    // With the costs and an AI model: the first by rank too, those the
+    // costs left out after them, for the AI alone (it more often finds what
+    // was meant among both).
+    const std::size_t byCost = sentences.size();
+    const auto among = [](const auto& texts, std::size_t from, std::size_t to, const std::wstring& text) {
+        return std::find(texts.begin() + static_cast<std::ptrdiff_t>(from),
+                         texts.begin() + static_cast<std::ptrdiff_t>(to), text) != texts.begin() + static_cast<std::ptrdiff_t>(to);
+    };
+    if (deltas && judge) {
+        // Not one of the whole texts: those stay where the sentence check reads them.
+        std::vector<std::wstring> ranked;
+        ForPicksByRank(sizes, [&](const std::vector<std::size_t>& picks) {
+            std::wstring text;
+            for (std::size_t i = 0; i < parts.size(); ++i) text += parts[i][picks[i]];
+            if (among(ranked, 0, ranked.size(), text)) return true;
+            ranked.push_back(text);
+            const bool whole = written && std::find(wholes.begin(), wholes.end(), text) != wholes.end();
+            if (!whole && !among(sentences, 0, sentences.size(), text)) {
+                sentences.push_back(std::move(text));
+                picked.push_back(picks);
+            }
+            return ranked.size() < judge->Top();
+        });
+    }
     // Then the whole texts read with other phrase breaks, taken as written.
-    const std::size_t combined = sentences.size();
+    std::size_t combined = sentences.size();
     for (const auto& whole : wholes) {
-        if (written && std::find(sentences.begin(), sentences.end(), whole) == sentences.end()) {
+        if (written && !among(sentences, 0, byCost, whole) && !among(sentences, combined, sentences.size(), whole)) {
             sentences.push_back(whole);
         }
     }
@@ -2159,13 +2194,93 @@ std::vector<std::size_t> JapaneseComposer::ReadBest(const std::vector<std::vecto
         }
         text = KanaNumberText(text, NumberStyle::Kanji);
     }
-    std::size_t chosen = reranker_->Choose(read, combined, wholePenalty_, precedingText_);
+    // The sentence check reads those by cost and the whole ones.
+    std::vector<std::wstring> checked(read.begin(), read.begin() + static_cast<std::ptrdiff_t>(byCost));
+    checked.insert(checked.end(), read.begin() + static_cast<std::ptrdiff_t>(combined), read.end());
+    std::size_t chosen = reranker_->Choose(checked, byCost, wholePenalty_, precedingText_);
+    lastCheckedSentences_.shown.assign(sentences.begin(), sentences.begin() + static_cast<std::ptrdiff_t>(byCost));
+    lastCheckedSentences_.shown.insert(lastCheckedSentences_.shown.end(), sentences.begin() + static_cast<std::ptrdiff_t>(combined),
+                                       sentences.end());
+    lastCheckedSentences_.read = checked;
+    lastCheckedSentences_.ranked = byCost;
+    lastCheckedSentences_.chosen = chosen;
+    if (chosen >= byCost) chosen += combined - byCost;
+    if (beamWidth_ > 0 && deltas && reranker_->IsOpen()) {
+        // Phrase by phrase: each start read once, the likeliest kept.
+        SentenceReranker::Reader reader(*reranker_, precedingText_);
+        const auto asRead = [](std::wstring text) {
+            for (auto& ch : text) {
+                if (ch >= 0xFF10 && ch <= 0xFF19) ch = static_cast<wchar_t>(ch - 0xFEE0);
+            }
+            return KanaNumberText(text, NumberStyle::Kanji);
+        };
+        struct Start {
+            std::vector<std::size_t> picks;
+            std::wstring text;
+            std::int64_t cost{0};
+            double score{0};
+        };
+        std::vector<Start> beam(1);
+        for (std::size_t i = 0; i < parts.size(); ++i) {
+            const bool last = i + 1 == parts.size();
+            std::vector<Start> next;
+            for (const auto& start : beam) {
+                for (std::size_t k = 0; k < parts[i].size(); ++k) {
+                    Start longer{start.picks, start.text + parts[i][k], start.cost + (*deltas)[i][k], 0};
+                    longer.picks.push_back(k);
+                    longer.score = reader.LogProbability(asRead(longer.text), last) -
+                                   static_cast<double>(longer.cost) / beamCostPerNat_;
+                    const auto same = std::find_if(next.begin(), next.end(),
+                                                   [&](const Start& other) { return other.text == longer.text; });
+                    if (same == next.end()) next.push_back(std::move(longer));
+                    else if (longer.score > same->score) *same = std::move(longer);
+                }
+            }
+            std::stable_sort(next.begin(), next.end(), [](const Start& a, const Start& b) { return a.score > b.score; });
+            if (next.size() > beamWidth_) next.resize(beamWidth_);
+            beam = std::move(next);
+            reader.Forget();
+        }
+        std::wstring first;
+        for (const auto& part : parts) first += part.front();
+        const double firstScore = reader.LogProbability(asRead(first), true);
+        double bestScore = firstScore + beamMargin_;
+        std::optional<std::wstring> best;
+        std::vector<std::size_t> bestPicks;
+        if (!beam.empty() && beam.front().score > bestScore) {
+            bestScore = beam.front().score;
+            best = beam.front().text;
+            bestPicks = beam.front().picks;
+        }
+        if (written) {
+            for (std::size_t i = combined; i < sentences.size(); ++i) {
+                const double score = reader.LogProbability(read[i], true) - beamWholeCost_ / beamCostPerNat_;
+                if (score > bestScore) {
+                    bestScore = score;
+                    best = sentences[i];
+                    bestPicks.clear();
+                }
+            }
+        }
+        chosen = 0;
+        if (best && *best != first) {
+            const auto at = std::find(sentences.begin(), sentences.end(), *best);
+            if (at != sentences.end() && (static_cast<std::size_t>(at - sentences.begin()) >= combined || !bestPicks.empty())) {
+                chosen = static_cast<std::size_t>(at - sentences.begin());
+                if (chosen < combined && !bestPicks.empty()) picked[chosen] = bestPicks;
+            } else if (!bestPicks.empty()) {
+                sentences.insert(sentences.begin() + static_cast<std::ptrdiff_t>(combined), *best);
+                picked.push_back(bestPicks);
+                chosen = combined++;
+            }
+        }
+    }
     if (judge && !sentences.empty()) {
-        // The AI reads the first few of the phrases' sentences and all the
-        // whole ones.
+        // The AI reads the first few of the phrases' sentences, those by
+        // rank, and all the whole ones.
         std::vector<std::size_t> order;
         for (std::size_t i = 0; i < sentences.size(); ++i) {
-            if (i < std::min(combined, judge->Top()) || i >= combined) order.push_back(i);
+            if (i < std::min(byCost, judge->Top()) || i >= byCost) order.push_back(i);
         }
         if (order.size() > aihelper::kMaxSentences) order.resize(aihelper::kMaxSentences);
         // Numbers read in kana in half-width digits, as the model's text
@@ -2666,6 +2781,26 @@ void JapaneseComposer::AddSpecial(std::wstring_view reading, std::vector<PhraseC
             }
         }
     }
+    // A unit read in kana (みり after 3, きろぐらむ): its symbol too, right
+    // after its katakana (ミリ, mm). Not きろ alone, which is km or kg, nor
+    // ぎが and めが.
+    if (specialOptions_.numbers) {
+        static constexpr std::pair<std::wstring_view, std::wstring_view> kUnits[] = {
+            {L"みり", L"mm"}, {L"みりめーとる", L"mm"}, {L"せんち", L"cm"}, {L"せんちめーとる", L"cm"},
+            {L"めーとる", L"m"}, {L"きろめーとる", L"km"}, {L"みりぐらむ", L"mg"}, {L"ぐらむ", L"g"},
+            {L"きろぐらむ", L"kg"}, {L"みりりっとる", L"mL"}, {L"りっとる", L"L"}, {L"てらばいと", L"TB"},
+            {L"ぎがばいと", L"GB"}, {L"めがばいと", L"MB"}, {L"きろばいと", L"KB"}, {L"へるつ", L"Hz"},
+            {L"きろわっと", L"kW"}, {L"わっと", L"W"}, {L"ぼると", L"V"},
+        };
+        const auto unit = std::find_if(std::begin(kUnits), std::end(kUnits), [&](const auto& u) { return u.first == reading; });
+        if (unit != std::end(kUnits)) {
+            const std::wstring katakana = ToKatakana(std::wstring(reading));
+            const auto at = std::find_if(candidates.begin(), candidates.end(),
+                                         [&](const PhraseCandidate& c) { return c.text == katakana; });
+            insert(at == candidates.end() ? 1 : static_cast<std::size_t>(at - candidates.begin()) + 1,
+                   {std::wstring(unit->second)}, {});
+        }
+    }
     // A date or time word, and what follows it in the phrase as long as the
     // first candidate ends with it too ("きょうは": 今日は, 2026/09/29は).
     if (specialOptions_.dates) {
@@ -2700,6 +2835,16 @@ void JapaneseComposer::AddSpecial(std::wstring_view reading, std::vector<PhraseC
             const auto symbol = candidates.begin() + static_cast<std::ptrdiff_t>(symbolsFrom);
             const auto at = candidates.begin() + static_cast<std::ptrdiff_t>(std::min(kSymbolAt, symbolsFrom));
             std::rotate(at, symbol, symbol + 1);
+            // Its next most used ones start the second page, when the words
+            // fill the first (ほし: ★ ※ ✩ after ☆).
+            constexpr std::size_t kSecondPage = 3;
+            const std::size_t from = symbolsFrom + 1;
+            const std::size_t count = std::min(kSecondPage, candidates.size() - from);
+            if (count > 0 && pageSize_ > kSymbolAt + 1 && from > pageSize_) {
+                const auto first = candidates.begin() + static_cast<std::ptrdiff_t>(from);
+                std::rotate(candidates.begin() + static_cast<std::ptrdiff_t>(pageSize_), first,
+                            first + static_cast<std::ptrdiff_t>(count));
+            }
         }
     }
 }
@@ -2924,6 +3069,7 @@ void JapaneseComposer::AddSlipCandidatesFor(PhraseState& phrase) const {
             // Converted as a sentence that breaks there; the first phrase
             // the one the sentence model reads best (い: 胃, not 位).
             const std::size_t breaks[] = {split};
+            SyncEdgeContext();
             const auto parts = converter_->Convert(reading, {}, context_, contextWords_, userDictionary_, breaks);
             if (parts.empty() || parts.front().length != split || parts.front().candidates.empty()) continue;
             std::wstring rest;
@@ -2989,6 +3135,7 @@ void JapaneseComposer::AddSlipCandidatesFor(PhraseState& phrase) const {
                 continue;
             }
             const std::size_t whole[] = {found[i].second.size()};
+            SyncEdgeContext();
             const auto phrases = converter_->Convert(found[i].second, whole, 0, {}, userDictionary_);
             std::size_t spellings = 0;
             for (std::size_t c = 0; phrases.size() == 1 && c < phrases.front().candidates.size() &&
@@ -3062,6 +3209,7 @@ bool JapaneseComposer::SamePhrasing(const std::wstring& reading, const std::vect
         ++suffix;
     }
     std::vector<std::size_t> correctedStarts;
+    SyncEdgeContext();
     for (const auto& phrase : converter_->Convert(corrected, {}, 0, {}, userDictionary_)) correctedStarts.push_back(phrase.begin);
     // Phrase starts outside the difference, in the reading's positions; one
     // inside it is phrased differently.
@@ -3164,6 +3312,7 @@ void JapaneseComposer::ResizeFocus(int delta) {
     std::vector<PhraseState> kept(phrases_.begin(), phrases_.begin() + static_cast<long long>(focus_));
 
     phrases_.clear();
+    SyncEdgeContext();
     AddPhrases(converter_->Convert(reading, fixed, context_, contextWords_, userDictionary_), reading);
     if (phrases_.size() <= focus_) {
         BuildPhrases(true);
@@ -3626,6 +3775,7 @@ void JapaneseComposer::ConvertJapaneseRuns() {
             first = end;
             continue;
         }
+        SyncEdgeContext();
         const auto phrases =
             converter_->Convert(reading, {}, settled_[first].context, contextWords_, userDictionary_, breaks);
         // Each chunk's phrases, as the breaks keep them.
@@ -3813,7 +3963,7 @@ void JapaneseComposer::JudgeWholeSentence(std::optional<ChunkJudge::Judgement>& 
         at.push_back(i);
     }
     keys.emplace_back(currentKeys);
-    const auto whole = chunkJudge_->JudgeSentence(keys, englishCorrection_ ? englishSpelling_ : nullptr);
+    const auto whole = chunkJudge_->JudgeSentence(keys, englishCorrection_ ? englishSpelling_ : nullptr, spacelessEnglish_);
     // A vowel typed alone stays kana (SetSingleVowelKana) unless an English
     // word other than such a vowel is beside it: i ga itai is い, i think so
     // is I, a i u e o stays kana.
@@ -3885,7 +4035,8 @@ bool JapaneseComposer::SingleVowelKana(std::wstring_view keys) const noexcept {
 }
 
 ChunkJudge::Judgement JapaneseComposer::JudgeChunk(std::wstring_view keys) const {
-    auto judged = chunkJudge_->Judge(keys, englishRun_, japaneseInSentence_, englishCorrection_ ? englishSpelling_ : nullptr, englishText_);
+    auto judged = chunkJudge_->Judge(keys, englishRun_, japaneseInSentence_, englishCorrection_ ? englishSpelling_ : nullptr, englishText_,
+                                     spacelessEnglish_);
     if (judged.english && SingleVowelKana(keys)) {
         // The letter is the next choice (either).
         judged.english = false;
@@ -4185,6 +4336,11 @@ void JapaneseComposer::SetPrecedingText(std::wstring_view text) {
         contextWords_.erase(contextWords_.begin(),
                             contextWords_.end() - static_cast<std::ptrdiff_t>(kContextWords));
     }
+}
+
+void JapaneseComposer::SyncEdgeContext() const {
+    // The text before the caret the converter's edge scorer reads.
+    if (converter_) converter_->SetEdgeContext(precedingText_.empty() ? recentText_ : precedingText_);
 }
 
 void JapaneseComposer::RememberWords(std::wstring_view text) {

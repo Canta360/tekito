@@ -2420,6 +2420,8 @@ void TextService::RefreshCandidates(ITfContext* context, TfEditCookie editCookie
     request.options.socialExpressionRange = userSettings_.socialExpressionRange;
     request.options.nextWordPrediction = userSettings_.nextWordPrediction;
     request.options.doubledWords = userSettings_.doubledWordCheck;
+    request.options.spacelessEnglish = userSettings_.spacelessEnglish;
+    request.options.spacelessEnglishAlways = userSettings_.spacelessEnglishAlways;
     request.options.spelling = static_cast<EnglishVariety>(std::clamp(userSettings_.englishSpelling, 0, 2));
     request.options.special = SpecialOptions();
     {

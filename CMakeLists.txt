@@ -55,6 +55,8 @@ add_library(tekito_core STATIC
     src/Core/Japanese/KanaSlips.cpp
     src/Core/Japanese/KeyConverter.cpp
     src/Core/Japanese/LanguageModel.cpp
+    src/Core/Japanese/Compounds.cpp
+    src/Core/Japanese/EdgeScorer.cpp
     src/Core/Japanese/LetterOdds.cpp
     src/Core/Japanese/Loanwords.cpp
     src/Core/Japanese/MappedFile.cpp

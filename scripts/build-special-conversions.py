@@ -263,6 +263,44 @@ def cldr_names(paths: list[Path], emoji: set[str]) -> list[tuple[str, str]]:
     return rows
 
 
+MOST_OWN = 3
+
+# The Greek letters by their names: the small letter first (らむだ: λ, Λ),
+# but not for a unit (おーむ: Ω).
+GREEK_NAMES = set("""あるふぁ べーた がんま がんまー でるた いぷしろん ぜーた つぇーた じーた いーた えーた しーた てーた
+いおた かっぱ らむだ みゅー にゅー くさい くしい くしー ぐざい おみくろん ぱい ろー しぐま たう ゆぷしろん うぷしろん
+ふぁい かい ぷさい ぷしー おめが""".split())
+
+
+def own_names(symbol_path: Path, cldr_paths: list[Path]) -> set[tuple[str, str]]:
+    """(reading, value) where the reading is the value's own name: the first
+    reading Mozc's symbol table gives it (☆: ほし, not ※), or its name to read
+    out in Unicode CLDR when that is all kana (✨: きらきら, not 💖). Values
+    without U+FE0F."""
+    names: set[tuple[str, str]] = set()
+    for line in symbol_path.read_text(encoding="utf-8").splitlines()[1:]:
+        fields = line.split("\t")
+        if len(fields) >= 3 and fields[1] and not fields[0].startswith("#") and fields[2].split(" ")[0]:
+            names.add((fields[2].split(" ")[0], fields[1].replace("\ufe0f", "")))
+    for path in cldr_paths:
+        text = path.read_text(encoding="utf-8")
+        for value, name in re.findall(r'<annotation cp="([^"]+)" type="tts">([^<]*)</annotation>', text):
+            reading = "".join(chr(ord(c) - 0x60) if "\u30a1" <= c <= "\u30f6" else c for c in name.strip())
+            if len(reading) >= 2 and is_kana(reading):
+                names.add((reading, html.unescape(value).replace("\ufe0f", "")))
+    # A reading that names many is the name of a group (\u3064\u3046\u304b, \u304d\u3054\u3046,
+    # \u3059\u3046\u304c\u304f): none of them is its own.
+    per_reading: dict[str, int] = {}
+    for reading, _ in names:
+        per_reading[reading] = per_reading.get(reading, 0) + 1
+    return {(reading, value) for reading, value in names if per_reading[reading] <= MOST_OWN}
+
+
+# Marks Japanese text hardly uses, after the others of their reading (¡ for
+# びっくりまーく, ¿ and ؟ for はてな).
+FOREIGN_MARKS = set("¡¿؟،")
+
+
 def emoji_ranks(path: Path) -> dict[str, int]:
     """Each emoji's place in Unicode's ranking by median frequency of use
     (the page's "Ranked Order by Median Frequency"), without U+FE0F."""
@@ -307,10 +345,12 @@ def common_symbol(value: str) -> bool:
 
 
 def rank_emoji(rows: list[tuple[str, str, str, str]], ranks: dict[str, int],
-               counts: dict[str, int]) -> list[tuple[str, str, str, str]]:
+               counts: dict[str, int], names: set[tuple[str, str]] = frozenset()) -> list[tuple[str, str, str, str]]:
     """Each Japanese reading's symbols by use, then its emoji, the most used
     first (those Unicode does not rank keep their order after them); the
-    emoji first when no symbol of the reading is in common use."""
+    emoji first when no symbol of the reading is in common use. Those the
+    reading is the own name of come first in each (`names`: ほし ☆, きらきら
+    ✨), a small Greek letter before its capital by its name (らむだ: λ, Λ)."""
     groups: dict[tuple[str, str, str], list[int]] = {}
     for index, (section, language, key, _) in enumerate(rows):
         if section == "symbol" and language == "ja":
@@ -321,10 +361,22 @@ def rank_emoji(rows: list[tuple[str, str, str, str]], ranks: dict[str, int],
         symbols = [row for row in values if not is_emoji(row[3], ranks)]
         emoji = [row for row in values if is_emoji(row[3], ranks)]
         unranked = len(ranks)
-        emoji.sort(key=lambda row: ranks.get(row[3].replace("\ufe0f", ""), unranked))
-        symbols.sort(key=lambda row: (row[3] in TYPED_MARKS, -counts.get(row[3], 0), not common_symbol(row[3])))
-        first = next((row for row in symbols if row[3] not in TYPED_MARKS), None)
-        used = first is not None and (counts.get(first[3], 0) > 0 or common_symbol(first[3]))
+        def own(row):
+            # Not squared or circled katakana and words (\u3301 for \u3042\u308b\u3075\u3041, \u33cd for
+            # \u304b\u3076\u3057\u304d\u304c\u3044\u3057\u3083): the letter or \u3231 comes first.
+            if any("\u3280" <= c <= "\u33ff" for c in row[3]):
+                return False
+            return (row[2], row[3].replace("\ufe0f", "")) in names
+
+        def greek_capital(value):
+            return len(value) == 1 and "\u0391" <= value <= "\u03a9"
+
+        emoji.sort(key=lambda row: (not own(row), ranks.get(row[3].replace("\ufe0f", ""), unranked)))
+        symbols.sort(key=lambda row: (row[3] in TYPED_MARKS, row[3] in FOREIGN_MARKS, not own(row),
+                                      row[2] in GREEK_NAMES and greek_capital(row[3]), -counts.get(row[3], 0),
+                                      not common_symbol(row[3])))
+        used = any(counts.get(row[3], 0) > 0 or common_symbol(row[3]) for row in symbols
+                   if row[3] not in TYPED_MARKS and row[3] not in FOREIGN_MARKS)
         for i, row in zip(indices, symbols + emoji if used or not emoji else emoji + symbols):
             out[i] = row
     return out
@@ -376,7 +428,8 @@ def main() -> None:
              if (reading, value) not in known]
     rows += [("emoticon", "ja", reading, face) for reading, face in mozc_emoticons(args.mozc_emoticons)]
     rows += [("kanji", "ja", reading, kanji) for reading, kanji in mozc_single_kanji(args.mozc_single_kanji)]
-    rows = rank_emoji(rows, emoji_ranks(args.emoji_frequency), symbol_counts(args.symbol_counts))
+    rows = rank_emoji(rows, emoji_ranks(args.emoji_frequency), symbol_counts(args.symbol_counts),
+                      own_names(args.mozc_symbols, args.cldr_annotations))
     for row in rows:
         if any("\t" in field or "\n" in field or not field for field in row):
             raise ValueError(f"bad row: {row!r}")

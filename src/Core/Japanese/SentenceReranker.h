@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -44,6 +45,10 @@ public:
     [[nodiscard]] std::size_t Choose(std::span<const std::wstring> sentences, std::size_t ranked = SIZE_MAX,
                                      double penalty = 0.0, std::wstring_view context = {}) const;
 
+    // Reads many texts that start alike, as a search phrase by phrase makes
+    // them: what they share is read once.
+    class Reader;
+
 private:
     struct Piece {
         std::uint32_t id;
@@ -76,6 +81,32 @@ private:
     std::size_t longestPiece_{0};
     std::uint32_t bytePiece_[256]{};
     std::uint32_t separator_{3}, end_{2};
+};
+
+class SentenceReranker::Reader final {
+public:
+    // `context`: the text just before them.
+    Reader(const SentenceReranker& model, std::wstring_view context = {});
+    // ln p of `text`'s pieces after the start, and of the end with `end`.
+    [[nodiscard]] double LogProbability(std::wstring_view text, bool end);
+    // Lets go of what was worked out for the pieces after each read so far
+    // (the most memory); it is worked out again when needed.
+    void Forget() noexcept;
+
+private:
+    struct Node {
+        std::uint32_t piece{0};
+        std::size_t parent{0};
+        std::vector<std::size_t> children;
+        double logProbability{0};
+        std::optional<State> state;
+        std::vector<float> logits;
+        float logSum{0};
+    };
+    const State& StateOf(std::size_t node);
+
+    const SentenceReranker& model_;
+    std::vector<Node> nodes_;
 };
 
 }  // namespace tekito::japanese
