@@ -8,6 +8,7 @@
 #include "Core/MisspellingProvider.h"
 #include "Core/LexiconProvider.h"
 #include "Core/PolicyEngine.h"
+#include "Core/RunTogether.h"
 #include "Core/SpaceBoundaryPolicy.h"
 #include "Core/SpellingVariants.h"
 #include "Core/UserDictionary.h"
@@ -83,6 +84,22 @@ std::vector<tekito::Candidate> MakeCandidates(std::size_t count) {
                           i == 2});
     }
     return result;
+}
+
+void TestRunTogether() {
+    const auto score = [](std::wstring_view word) -> double {
+        for (const auto& [listed, value] : {std::pair<std::wstring_view, double>{L"see", 5.1}, {L"you", 5.8}, {L"on", 6.3},
+                                            {L"monday", 4.8}, {L"mon", 2.6}, {L"day", 5.0}, {L"so", 5.5}}) {
+            if (word == listed) return value;
+        }
+        return 0.0;
+    };
+    const auto known = [&](std::wstring_view word) { return score(word) >= 2.5; };
+    const auto words = tekito::SplitRunTogether(L"seeyouonmonday", known, score);
+    Require(words && *words == std::vector<std::wstring>{L"see", L"you", L"on", L"monday"},
+            "the fewest words make up English typed without spaces (monday, not mon day)");
+    Require(!tekito::SplitRunTogether(L"seeyouxonday", known, score), "nothing when a part is no word");
+    Require(!tekito::SplitRunTogether(L"See", known, score), "only lower-case letters");
 }
 
 void TestFirstSpaceAndLiveCycle() {
@@ -2220,6 +2237,8 @@ void TestSqliteUserSettingsRepository() {
     source.japaneseNumberStyle = 4;
     source.japaneseNumpadDirect = false;
     source.mixCorrection = false;
+    source.spacelessEnglish = false;
+    source.spacelessEnglishAlways = true;
     source.mixSettledMarker = false;
     source.learningEnabled = false;
     source.correctionEnabled = false;
@@ -2277,7 +2296,7 @@ void TestSqliteUserSettingsRepository() {
                 loaded.switchOrder == 3142,
             "settings repository restores all input mode settings");
     Require(loaded.japaneseKanjiRange == 3 && loaded.japaneseKanjiGrade == 4 && loaded.japaneseKanjiNames &&
-                loaded.japaneseNumberStyle == 4 && !loaded.japaneseNumpadDirect && !loaded.mixCorrection &&
+                loaded.japaneseNumberStyle == 4 && !loaded.japaneseNumpadDirect && !loaded.mixCorrection && !loaded.spacelessEnglish && loaded.spacelessEnglishAlways &&
                 !loaded.mixSettledMarker,
             "settings repository restores kanji, numbers, the keypad and Mix correction");
     {
@@ -2455,6 +2474,7 @@ void TestRuntimeModeState() {
 }  // namespace
 
 int main() {
+    TestRunTogether();
     TestFirstSpaceAndLiveCycle();
     TestSpaceBoundaryAndAutoApplyPolicy();
     TestSentenceBoundaryAndCapitalizationProvenance();

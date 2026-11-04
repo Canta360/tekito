@@ -4,6 +4,7 @@
 # Written for TEKITO from general knowledge of product, service and computing names; no corpus is copied.
 AirPods	always
 AliExpress	always
+Amazon	always
 AMD	always
 Android	always
 API	always
@@ -13,15 +14,18 @@ ASRock	always
 ASUS	always
 ATX	always
 AWS	always
+Backlog	japanese
 BGM	always
 BIOS	always
 Bluetooth	always
 BOOTH	always
 BTW	always
+Canva	always
 ChatGPT	always
 Chrome	japanese
 Claude	japanese
 CMOS	always
+Confluence	japanese
 Copilot	japanese
 CPU	always
 CSS	always
@@ -42,7 +46,10 @@ Galaxy	japanese
 Gemini	japanese
 GIGABYTE	always
 GitHub	always
+GitHub Actions	always
 GitLab	always
+Gmail	always
+Google	always
 GPU	always
 GUI	always
 HDD	always
@@ -52,6 +59,7 @@ HTTP	always
 HTTPS	always
 iMac	always
 IME	always
+Instagram	always
 Intel	japanese
 iOS	always
 iPad	always
@@ -60,9 +68,12 @@ iPod	always
 IPv	always
 IT	japanese
 JavaScript	always
+Jira	always
 JPEG	always
 JSON	always
 KDDI	always
+Kotlin	always
+Kubernetes	always
 LAN	always
 LED	always
 LINE	japanese
@@ -72,6 +83,7 @@ LTE	always
 Mac mini	always
 MacBook	always
 macOS	always
+Miro	always
 MSI	always
 NAS	always
 Netflix	always
@@ -84,6 +96,7 @@ NVMe	always
 OCR	always
 OK	always
 OpenAI	always
+Outlook	japanese
 PayPal	always
 PayPay	always
 PCIe	always
@@ -93,12 +106,15 @@ PlayStation	always
 PNG	always
 PowerPoint	always
 Python	japanese
+Qiita	always
 RAID	always
 RAM	japanese
 RGB	always
 ROM	always
 RPG	always
 RSS	always
+Ruby	japanese
+Rust	japanese
 SATA	always
 SIM	japanese
 Slack	japanese
@@ -111,8 +127,12 @@ SSD	always
 SSH	always
 Steam	japanese
 Suica	always
+Swift	japanese
+Teams	japanese
 Thunderbolt	always
 TikTok	always
+Trello	always
+Twitter	always
 TypeScript	always
 Ubuntu	always
 UEFI	always
@@ -123,6 +143,7 @@ USB	always
 VLAN	always
 VPN	always
 VRChat	always
+VS Code	always
 WAN	always
 WhatsApp	always
 Wi-Fi	always
@@ -132,4 +153,5 @@ Xbox	always
 XML	always
 Xperia	always
 YouTube	always
+Zenn	always
 Zoom	japanese

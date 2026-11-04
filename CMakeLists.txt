@@ -70,6 +70,7 @@ add_library(tekito_core STATIC
     src/Core/LexiconProvider.cpp
     src/Core/MisspellingProvider.cpp
     src/Core/PolicyEngine.cpp
+    src/Core/RunTogether.cpp
     src/Core/SpaceBoundaryPolicy.cpp
     src/Core/SpecialConversions.cpp
     src/Core/SpellingVariants.cpp

@@ -50,6 +50,12 @@ struct ConversionOptions {
     // A word typed twice in a row ("the the") is taken out; one that may be
     // meant twice ("that that") only offers it.
     bool doubledWords{true};
+    // English typed without spaces (seeyouonmonday) is offered with its
+    // spaces, and Space puts them in when every word is common
+    // (UserSettings::spacelessEnglish); `spacelessEnglishAlways`: whenever
+    // the words make it up.
+    bool spacelessEnglish{true};
+    bool spacelessEnglishAlways{false};
     // American or British spelling: a word typed in the other is put right,
     // and words are offered in this one (UserSettings::englishSpelling).
     EnglishVariety spelling{EnglishVariety::Either};

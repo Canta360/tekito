@@ -90,9 +90,12 @@ public:
     // take keys that are no word as the English word with a slip in it
     // (rveiew: review), with `before` the English typed before them;
     // keys a slip correction makes Japanese of stay Japanese.
+    // `englishSentences`: an English sentence typed without spaces
+    // (seeyouonmonday) is English with its spaces (UserSettings::
+    // spacelessEnglish).
     [[nodiscard]] Judgement Judge(std::wstring_view keys, std::size_t englishBefore,
                                   bool japaneseInSentence = true, const EnglishSpelling* spelling = nullptr,
-                                  std::wstring_view before = {}) const;
+                                  std::wstring_view before = {}, bool englishSentences = true) const;
 
     // Japanese with English words typed into it without spaces
     // (reflectsareta: reflect + sareta, kyouhameetinggaarimasu: kyouha +
@@ -116,7 +119,8 @@ public:
     // chunk again with the English and Japanese on both sides of it (my
     // name is tanaka, ここに急に English wo).
     [[nodiscard]] std::vector<Judgement> JudgeSentence(const std::vector<std::wstring>& chunks,
-                                                       const EnglishSpelling* spelling = nullptr) const;
+                                                       const EnglishSpelling* spelling = nullptr,
+                                                       bool englishSentences = true) const;
 
 private:
     // How English writes `word` (GitHub, Google, nice); `inJapanese`: in a
@@ -126,6 +130,10 @@ private:
     // An English word run into Japanese after it, starting with a particle
     // (pcwotukau: pcを使う); not when the keys are an English word.
     [[nodiscard]] bool EnglishThenJapanese(std::wstring_view keys) const;
+    // English typed without spaces (seeyouonmonday): the fewest known words
+    // that make up all the keys, as English writes them (See, you, on,
+    // Monday); nothing when no such words do.
+    [[nodiscard]] std::optional<std::vector<std::wstring>> EnglishWords(std::wstring_view keys) const;
 
     const RomajiTable& table_;
     const JapaneseConverter& converter_;

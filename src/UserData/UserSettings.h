@@ -186,6 +186,12 @@ struct UserSettings {
     // Mix: Space puts a slip in an English word right (teh: the), as Auto
     // does.
     bool mixCorrection{true};
+    // Mix, Japanese and Auto: an English sentence typed without spaces
+    // (seeyouonmonday) is written with its spaces (See you on Monday).
+    bool spacelessEnglish{true};
+    // Auto too: Space puts the spaces in whenever known words make it up,
+    // not only common ones (which it offers otherwise).
+    bool spacelessEnglishAlways{false};
     // Mix: the sentence held until Enter has a marker in Mix's orange; off,
     // it is underlined as converted text.
     bool mixSettledMarker{true};

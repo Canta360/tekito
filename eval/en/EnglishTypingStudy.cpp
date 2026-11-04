@@ -156,6 +156,8 @@ tekito::ConversionRequest RequestFor(std::wstring_view sentence, const Word& wor
     request.context.precedingText = std::wstring(sentence.substr(from, word.begin - from));
     request.context.sentenceStart = tekito::IsSentenceStart(sentence.substr(0, word.begin));
     request.rawText = std::wstring(typed);
+    // TEKITO_EVAL_NO_SPACELESS=1: English typed without spaces is not split.
+    if (const char* off = std::getenv("TEKITO_EVAL_NO_SPACELESS"); off && *off == '1') request.options.spacelessEnglish = false;
     // At a sentence start TEKITO capitalized the letter typed in lower case.
     const bool engineCapital = request.context.sentenceStart && std::iswupper(typed.front()) &&
                                (typed.size() == 1 || !std::iswupper(typed[1]));

@@ -268,6 +268,8 @@ int main(int argc, char** argv) {
         }
         tekito::ConversionRequest request;
         request.rawText = row.rawToken;
+        // TEKITO_EVAL_NO_SPACELESS=1: English typed without spaces is not split.
+        if (const char* off = std::getenv("TEKITO_EVAL_NO_SPACELESS"); off && *off == '1') request.options.spacelessEnglish = false;
         request.context.precedingText = row.leftContext;
         request.context.followingText = row.rightContext;
 

@@ -36,6 +36,8 @@ const initialSettings = {
   mixPredictionEnabled: true,
   mixFirstPageSymbol: true,
   mixCorrection: true,
+  spacelessEnglish: true,
+  spacelessEnglishAlways: false,
   mixSettledMarker: true,
   japaneseEnabled: true,
   modeIndicatorEnabled: true,
@@ -355,10 +357,11 @@ function searchIndex(t, pages, japaneseInstalled) {
     ["japanese", j.sentenceCheck.title, true], ["japanese", j.firstPageSymbol.title, true], ["japanese", j.typedForms.title, true],
     ["japanese", j.kanjiVariants.title, true],
     ["mixed", m.live.title], ["mixed", m.prediction.title], ["mixed", m.singleVowel.title], ["mixed", m.correction.title],
-    ["mixed", m.firstPageSymbol.title, true], ["mixed", m.marker.title, true],
+    ["mixed", m.firstPageSymbol.title, true], ["mixed", m.marker.title, true], ["mixed", m.spaceless.title, true],
     ["auto", a.correction.title], ["auto", a.spelling.title], ["auto", a.completion.title], ["auto", a.next.title], ["auto", a.casual.title],
     ["auto", a.doubled.title, true], ["auto", a.recheck.title, true], ["auto", a.phonetic.title, true], ["auto", a.period.title, true],
-    ["auto", a.doubleSpace.title, true], ["auto", a.smart.title, true],
+    ["auto", a.doubleSpace.title, true], ["auto", a.smart.title, true], ["auto", a.spaceless.title, true],
+    ["auto", a.spacelessAlways.title, true],
     ["ai", t.ai.title], ["ai", t.ai.device.title],
     ["dictionary", d.japaneseWords.title], ["dictionary", d.englishWords.title], ["dictionary", d.files.title],
     ["dictionary", d.learn.title], ["dictionary", d.learned.title], ["dictionary", d.secret.title], ["dictionary", d.private.title],
@@ -913,7 +916,7 @@ function AiModelRow({ settings, setSetting, runAction, setConfirm, aiModels }) {
       return;
     }
     setConfirm({
-      title: a.dialogTitle,
+      title: a.dialogTitle(a.names[value]),
       message: a.dialogBody(downloadSize((aiModels[keys[value]]?.bytes || 0) +
         (aiModels.runtime?.installed ? 0 : aiModels.runtime?.bytes || 0)), a.memory[value]),
       confirmLabel: a.download,
@@ -934,8 +937,7 @@ function AiModelRow({ settings, setSetting, runAction, setConfirm, aiModels }) {
           <Button variant="quiet" onClick={() => runAction("aiModel.remove", { model: current }, a.removed)}>{a.remove}</Button>
         </div>
       )}>
-      {/* One model for now (the light one); the larger one comes back once it is trained for TEKITO. */}
-      <Segmented label={a.title} value={Math.min(downloading || current, 1)} options={[[0, a.off], [1, a.on]]}
+      <Segmented label={a.title} value={downloading || current} options={[[0, a.off], [1, a.names[1]], [2, a.names[2]]]}
         onChange={choose} />
     </Row>
     {current > 0 && (
@@ -1073,6 +1075,9 @@ function MixedPage({ settings, setSetting }) {
           <Row icon="ink_highlighter" title={m.marker.title} description={m.marker.description}>
             <Toggle label={m.marker.title} checked={settings.mixSettledMarker} onChange={(value) => setSetting("mixSettledMarker", value)} />
           </Row>
+          <Row icon="space_bar" title={m.spaceless.title} description={m.spaceless.description}>
+            <Toggle label={m.spaceless.title} checked={settings.spacelessEnglish} onChange={(value) => setSetting("spacelessEnglish", value)} />
+          </Row>
         </Card>
         <Card label={m.shared.title}>
           <Row icon="tune" title={m.shared.title} description={m.shared.description} />
@@ -1121,6 +1126,13 @@ function AutoPage({ settings, setSetting, showKeys }) {
           </Row>
           <Row icon="match_case" title={a.capitalized.title} description={a.capitalized.description}>
             <Toggle label={a.capitalized.title} checked={settings.capitalizedCorrection} onChange={(value) => setSetting("capitalizedCorrection", value)} />
+          </Row>
+          <Row icon="space_bar" title={a.spaceless.title} description={a.spaceless.description}>
+            <Toggle label={a.spaceless.title} checked={settings.spacelessEnglish} onChange={(value) => setSetting("spacelessEnglish", value)} />
+          </Row>
+          <Row icon="space_bar" title={a.spacelessAlways.title} description={a.spacelessAlways.description}>
+            <Toggle label={a.spacelessAlways.title} checked={settings.spacelessEnglishAlways} disabled={!settings.spacelessEnglish}
+              onChange={(value) => setSetting("spacelessEnglishAlways", value)} />
           </Row>
         </Card>
         <Card label={a.candidates}>

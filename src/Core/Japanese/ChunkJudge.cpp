@@ -9,6 +9,7 @@
 #include "Core/Japanese/Loanwords.h"
 #include "Core/Japanese/WrittenForms.h"
 #include "Core/RankingData.h"
+#include "Core/RunTogether.h"
 #include "Core/TypoModel.h"
 
 #include <algorithm>
@@ -63,7 +64,7 @@ std::wstring ChunkJudge::WrittenAs(std::wstring_view word, bool inJapanese) cons
 
 ChunkJudge::Judgement ChunkJudge::Judge(std::wstring_view keys, std::size_t englishBefore,
                                         bool japaneseInSentence, const EnglishSpelling* spelling,
-                                        std::wstring_view before) const {
+                                        std::wstring_view before, bool englishSentences) const {
     Judgement judgement;
     judgement.written = std::wstring(keys);
     // A word with a number after it (iphone15, gpt4): as the word is, with
@@ -71,7 +72,7 @@ ChunkJudge::Judgement ChunkJudge::Judge(std::wstring_view keys, std::size_t engl
     std::size_t digits = keys.size();
     while (digits > 0 && keys[digits - 1] >= L'0' && keys[digits - 1] <= L'9') --digits;
     if (digits > 0 && digits < keys.size()) {
-        auto word = Judge(keys.substr(0, digits), englishBefore, japaneseInSentence, spelling, before);
+        auto word = Judge(keys.substr(0, digits), englishBefore, japaneseInSentence, spelling, before, englishSentences);
         word.written += keys.substr(digits);
         return word;
     }
@@ -95,7 +96,7 @@ ChunkJudge::Judgement ChunkJudge::Judge(std::wstring_view keys, std::size_t engl
     // A first letter typed twice (bbug): no Japanese starts with っ, so the
     // English word, when the rest is one.
     if (keys.size() >= 4 && keys[0] == keys[1] && std::wstring_view(L"aiueon").find(keys[0]) == std::wstring_view::npos) {
-        auto rest = Judge(keys.substr(1), englishBefore, japaneseInSentence, spelling, before);
+        auto rest = Judge(keys.substr(1), englishBefore, japaneseInSentence, spelling, before, englishSentences);
         if (rest.english && rest.word) return rest;
     }
 
@@ -147,6 +148,31 @@ ChunkJudge::Judgement ChunkJudge::Judge(std::wstring_view keys, std::size_t engl
                                               [](wchar_t c) { return std::iswlower(c) != 0; });
             if (acronym && keys.size() >= 3 && !form->japaneseOnly) {
                 judgement.english = true;
+                return judgement;
+            }
+        }
+    }
+    // An English sentence typed without spaces (seeyouonmonday,
+    // pleasecheckthegithubpage): known words make up all of it, two or
+    // more when romaji cannot read it, three or more when it reads as
+    // Japanese only unnaturally; a sentence, so with a capital. Not a word
+    // the list has (therapist is not the rapist). Japanese that
+    // reads naturally stays, and so do English words run into Japanese
+    // (meetingde, fixshitanode), which are split.
+    constexpr std::size_t kSentenceLetters = 8;
+    if (englishSentences && keys.size() >= kSentenceLetters && score < thresholds_.listedWord) {
+        if (const auto words = EnglishWords(keys); words && words->size() >= (readable ? 3U : 2U) && !Split(keys)) {
+            bool natural = false;
+            if (readable && !kana.empty()) {
+                const auto cost = converter_.Cost(kana);
+                natural = cost && *cost < thresholds_.costPerKana * static_cast<std::int64_t>(kana.size());
+            }
+            if (!natural) {
+                judgement.english = true;
+                judgement.word = true;
+                judgement.written.clear();
+                for (const auto& word : *words) judgement.written += (judgement.written.empty() ? L"" : L" ") + word;
+                judgement.written[0] = static_cast<wchar_t>(std::towupper(judgement.written[0]));
                 return judgement;
             }
         }
@@ -305,6 +331,30 @@ ChunkJudge::Judgement ChunkJudge::Judge(std::wstring_view keys, std::size_t engl
     return judgement;
 }
 
+std::optional<std::vector<std::wstring>> ChunkJudge::EnglishWords(std::wstring_view keys) const {
+    // Words of three letters or more this well known in English, and
+    // shorter ones common (a, to, on).
+    constexpr std::size_t kShortWord = 2;
+    // Not a particle (no, de): those make it Japanese with English in it.
+    // Nor a name or an acronym (Kara, NIH) unless common, but a product
+    // written with a capital inside (GitHub).
+    const auto known = [&](std::wstring_view word) {
+        if (std::find(std::begin(kParticles), std::end(kParticles), word) != std::end(kParticles)) return false;
+        const double score = english_.Score(word);
+        if (word.size() <= kShortWord || score >= thresholds_.commonWord) return score >= thresholds_.commonWord;
+        if (score < thresholds_.knownWord) return false;
+        const std::wstring written = WrittenAs(word, false);
+        const bool lower = std::none_of(written.begin(), written.end(), [](wchar_t c) { return std::iswupper(c) != 0; });
+        const bool inside = std::any_of(written.begin() + 1, written.end(), [](wchar_t c) { return std::iswupper(c) != 0; }) &&
+                            std::any_of(written.begin(), written.end(), [](wchar_t c) { return std::iswlower(c) != 0; });
+        return lower || inside;
+    };
+    auto words = SplitRunTogether(keys, known, [&](std::wstring_view word) { return english_.Score(word); });
+    if (!words) return std::nullopt;
+    for (auto& word : *words) word = WrittenAs(word, false);
+    return words;
+}
+
 bool ChunkJudge::ForeignLetters(std::wstring_view word, bool lastConsonant) noexcept {
     for (std::size_t i = 0; i < word.size(); ++i) {
         const wchar_t c = word[i];
@@ -316,9 +366,12 @@ bool ChunkJudge::ForeignLetters(std::wstring_view word, bool lastConsonant) noex
 }
 
 std::optional<std::vector<ChunkJudge::Piece>> ChunkJudge::Split(std::wstring_view keys) const {
-    // An English word costs this many kana of ordinary Japanese; shorter
-    // than this many letters only names written with capitals (API).
+    // An English word costs this many kana of ordinary Japanese, a common
+    // one or a name written by its own name (page, Figma) this many tenths;
+    // shorter than this many letters
+    // only names written with capitals (API).
     constexpr std::int64_t kEnglishKana = 2;
+    constexpr std::int64_t kCommonEnglishTenths = 15;
     constexpr std::size_t kShortestWord = 4;
     constexpr std::size_t kMostWords = 24;
     constexpr std::size_t kLongestKeys = 80;
@@ -373,6 +426,8 @@ std::optional<std::vector<ChunkJudge::Piece>> ChunkJudge::Split(std::wstring_vie
             const bool foreign = ForeignLetters(word, false);
             bool known = (length >= kShortestWord && english_.Score(word) >= thresholds_.knownWord) ||
                          (foreign && english_.Score(word) >= thresholds_.knownWord - kForeignBy);
+            // A name written by its own name (Figma, Qiita, JSON).
+            if (!known && forms_ && word.size() >= 3 && forms_->Find(std::wstring(word))) known = true;
             if (!known && names_) {
                 for (const auto& spelling : names_->ForEnglish(word, 1)) {
                     const bool capitals = std::any_of(spelling.english.begin() + 1, spelling.english.end(),
@@ -384,11 +439,17 @@ std::optional<std::vector<ChunkJudge::Piece>> ChunkJudge::Split(std::wstring_vie
         }
     }
     const std::int64_t wordCost = thresholds_.costPerKana * kEnglishKana;
+    const auto costOf = [&](const Word& w) {
+        const auto word = keys.substr(w.begin, w.end - w.begin);
+        const bool common = english_.Score(word) >= thresholds_.commonWord || (forms_ && forms_->Find(std::wstring(word)));
+        return common ? thresholds_.costPerKana * kCommonEnglishTenths / 10 : wordCost;
+    };
     std::optional<std::int64_t> best;
     std::vector<Word> chosen;
     // One word, or two apart, with natural Japanese around them.
     const auto tryWords = [&](const std::vector<Word>& pick) {
-        std::int64_t cost = wordCost * static_cast<std::int64_t>(pick.size());
+        std::int64_t cost = 0;
+        for (const auto& w : pick) cost += costOf(w);
         std::size_t at = 0;
         bool japanese = false;
         for (const auto& word : pick) {
@@ -417,7 +478,7 @@ std::optional<std::vector<ChunkJudge::Piece>> ChunkJudge::Split(std::wstring_vie
         }
     }
     // Better than the keys as Japanese by this many kana of it.
-    constexpr std::int64_t kBetterByKana = 2;
+    constexpr std::int64_t kBetterByKana = 1;
     if (!best || (whole && *best + thresholds_.costPerKana * kBetterByKana >= *whole)) return std::nullopt;
     // Nor than the keys read as Japanese with a slip undone, at a slip's
     // cost (KeyConverter::Costs::typo): Japanese typed with a slip is not
@@ -446,7 +507,8 @@ std::optional<std::vector<ChunkJudge::Piece>> ChunkJudge::Split(std::wstring_vie
 }
 
 std::vector<ChunkJudge::Judgement> ChunkJudge::JudgeSentence(const std::vector<std::wstring>& chunks,
-                                                             const EnglishSpelling* spelling) const {
+                                                             const EnglishSpelling* spelling,
+                                                             bool englishSentences) const {
     std::vector<Judgement> judged;
     judged.reserve(chunks.size());
     // As typed: left to right.
@@ -454,7 +516,7 @@ std::vector<ChunkJudge::Judgement> ChunkJudge::JudgeSentence(const std::vector<s
     bool japanese = false;
     std::wstring englishText;
     for (const auto& keys : chunks) {
-        auto judgement = Judge(keys, run, japanese, spelling, englishText);
+        auto judgement = Judge(keys, run, japanese, spelling, englishText, englishSentences);
         if (judgement.english) {
             ++run;
             englishText += judgement.written + L" ";
@@ -489,7 +551,7 @@ std::vector<ChunkJudge::Judgement> ChunkJudge::JudgeSentence(const std::vector<s
             // word it does (node version up sitai).
             constexpr std::size_t kParticleLength = 2;
             if (otherJapanese && chunks[i].size() <= kParticleLength) around = std::min<std::size_t>(around, 1);
-            auto again = Judge(chunks[i], around, otherJapanese, spelling, others);
+            auto again = Judge(chunks[i], around, otherJapanese, spelling, others, englishSentences);
             if (again.english != judged[i].english) changed = true;
             judged[i] = std::move(again);
         }
@@ -546,7 +608,7 @@ std::vector<ChunkJudge::Judgement> ChunkJudge::JudgeSentence(const std::vector<s
                 all[i].written = std::wstring(keys);
                 continue;
             }
-            auto again = Judge(keys, kSentenceChunks, false, spelling, text);
+            auto again = Judge(keys, kSentenceChunks, false, spelling, text, englishSentences);
             std::wstring kana;
             bool readable = true;
             for (const auto& token : JapaneseComposer::ParseRomaji(table_, keys)) {

@@ -944,6 +944,8 @@ private:
         text += L"Mix: " + std::wstring(onOff(s.mixedTypingEnabled)) + L"\n";
         text += L"Mix live conversion: " + std::wstring(onOff(s.mixLiveConversion)) + L"\n";
         text += L"Mix English correction: " + std::wstring(onOff(s.mixCorrection)) + L"\n";
+        text += L"English without spaces: " + std::wstring(onOff(s.spacelessEnglish)) + L"\n";
+        text += L"English without spaces, always: " + std::wstring(onOff(s.spacelessEnglishAlways)) + L"\n";
         text += L"Kana input: " + std::wstring(onOff(s.japaneseKanaInput)) + L"\n";
         text += L"Keyboard: " + std::wstring(keyboards[std::clamp(s.keyboardType, 0, 2)]) + L"\n";
         text += L"Digits: " + std::wstring(digits[std::clamp(s.japaneseDigitWidth, 0, 2)]) + L"\n";
@@ -1070,6 +1072,10 @@ private:
         json += settings_.mixSettledMarker ? L"true" : L"false";
         json += L",\"mixCorrection\":";
         json += settings_.mixCorrection ? L"true" : L"false";
+        json += L",\"spacelessEnglish\":";
+        json += settings_.spacelessEnglish ? L"true" : L"false";
+        json += L",\"spacelessEnglishAlways\":";
+        json += settings_.spacelessEnglishAlways ? L"true" : L"false";
         json += L",\"correctionEnabled\":";
         json += settings_.correctionEnabled ? L"true" : L"false";
         json += L",\"commonMisspellingsEnabled\":";
@@ -1315,6 +1321,8 @@ private:
             }
             else if (key == L"japaneseKanjiNames") settings_.japaneseKanjiNames = value;
             else if (key == L"mixCorrection") settings_.mixCorrection = value;
+            else if (key == L"spacelessEnglish") settings_.spacelessEnglish = value;
+            else if (key == L"spacelessEnglishAlways") settings_.spacelessEnglishAlways = value;
             else if (key == L"mixSettledMarker") settings_.mixSettledMarker = value;
             else if (key == L"correctionEnabled") settings_.correctionEnabled = value;
             else if (key == L"commonMisspellingsEnabled") settings_.commonMisspellingsEnabled = value;

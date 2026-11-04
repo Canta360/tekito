@@ -27,6 +27,8 @@ function initialState() {
       switchOrder: 1234,
       japaneseKanjiNames: false,
       mixCorrection: true,
+      spacelessEnglish: true,
+      spacelessEnglishAlways: false,
       mixSettledMarker: true,
       correctionEnabled: true,
       commonMisspellingsEnabled: true,

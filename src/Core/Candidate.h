@@ -56,6 +56,8 @@ enum CandidateSourceFlags : std::uint32_t {
     CandidateSourcePrediction = 1u << 20,
     // A word typed twice in a row: the candidate is empty, taking it out.
     CandidateSourceDoubledWord = 1u << 21,
+    // English typed without spaces, with its spaces (seeyouonmonday).
+    CandidateSourceRunTogether = 1u << 22,
 };
 
 enum SocialRangeTier : std::uint8_t {

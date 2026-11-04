@@ -29,6 +29,8 @@ EnglishSpelling::Result EnglishSpelling::Spell(std::wstring_view typed, std::wst
     request.context.precedingText = std::wstring(before);
     request.capitalization.origin = CapitalizationOrigin::UserTyped;
     request.options.spelling = variety_;
+    // Mix finds English typed without spaces itself (ChunkJudge).
+    request.options.spacelessEnglish = false;
     auto candidates = engine_.Convert(request).candidates;
     for (const auto& candidate : candidates) {
         if (candidate.text.empty() || SameIgnoringCase(candidate.text, typed)) continue;

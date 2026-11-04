@@ -1,10 +1,12 @@
 #include "Core/CandidateEngine.h"
 
+#include "Core/AutoApplyPolicy.h"
 #include "Core/BuiltinLexicon.h"
 #include "Core/ExternalLexiconProvider.h"
 #include "Core/ExternalRankingProviders.h"
 #include "Core/ExternalSlangProvider.h"
 #include "Core/MisspellingProvider.h"
+#include "Core/RunTogether.h"
 #include "Core/SpecialConversions.h"
 #include "Core/UserDictionary.h"
 #include "Core/UserLearning.h"
@@ -171,6 +173,7 @@ ConversionResult CandidateEngine::Convert(const ConversionRequest& request) cons
     auto candidates = generator_->Generate(rawText, request.context.precedingText,
                                            request.context.followingText,
                                            request.options);
+    if (request.options.spacelessEnglish) AddRunTogether(rawText, request.options, candidates);
     if (engineCapitalized) {
         for (auto& candidate : candidates) {
             if (!candidate.text.empty() && !candidate.isProtected &&
@@ -199,6 +202,77 @@ std::optional<std::wstring> CandidateEngine::Revise(std::wstring_view typed, std
                                                     std::wstring_view followingText) const {
     if (!generator_) return std::nullopt;
     return generator_->Revise(typed, applied, precedingText, followingText);
+}
+
+void CandidateEngine::AddRunTogether(std::wstring_view rawText, const ConversionOptions& options,
+                                     std::vector<Candidate>& candidates) const {
+    // Long enough to be words; not a word the list has (therapist is not
+    // the rapist). Words of three letters or more this well known, shorter
+    // ones common; Space puts the spaces in when every word is this well
+    // known (tomorrow, not github).
+    constexpr std::size_t kShortest = 8;
+    constexpr std::size_t kShortWord = 2;
+    constexpr double kListed = 0.9;
+    constexpr double kKnown = 2.5;
+    constexpr double kCommon = 4.0;
+    constexpr double kApply = 3.5;
+    if (rawText.size() < kShortest || !std::all_of(rawText.begin(), rawText.end(), [](wchar_t c) { return c >= L'a' && c <= L'z'; })) {
+        return;
+    }
+    const auto& frequency = providers_->shared->frequencyProvider;
+    if (frequency.Score(rawText) >= kListed) return;
+    const auto score = [&](std::wstring_view word) { return frequency.Score(word); };
+    // One letter only a and i (engineerss is not engineers s).
+    const auto known = [&](std::wstring_view word) {
+        if (word.size() == 1) return word == L"a" || word == L"i";
+        return score(word) >= (word.size() <= kShortWord ? kCommon : kKnown);
+    };
+    const auto words = SplitRunTogether(rawText, known, score);
+    if (!words || words->size() < 2) return;
+    // Two words are only offered (apartmet: apart met is a slip as likely).
+    constexpr std::size_t kApplyWords = 3;
+    const bool common = words->size() >= kApplyWords &&
+                        std::all_of(words->begin(), words->end(), [&](const std::wstring& word) { return score(word) >= kApply; });
+    // Each word as Space writes it alone (Monday, I).
+    std::wstring text;
+    for (const auto& word : *words) {
+        std::wstring written = word;
+        for (const auto& candidate : generator_->Generate(word)) {
+            const auto& t = candidate.text;
+            bool same = t.size() == word.size() && t != word && (candidate.policyFlags & CandidatePolicyNormalize) != 0;
+            for (std::size_t i = 0; i < t.size() && same; ++i) same = std::towlower(t[i]) == word[i];
+            if (same) {
+                written = t;
+                break;
+            }
+        }
+        text += (text.empty() ? L"" : L" ") + written;
+    }
+    Candidate candidate;
+    candidate.text = std::move(text);
+    candidate.label = SemanticLabel::Suggestion;
+    candidate.sourceFlags = CandidateSourceRunTogether;
+    // A typo one edit away comes first (apartmet: apartment, staright:
+    // straight, not st a right), unless the spaces are always put in.
+    constexpr std::uint32_t kOneEdit = CandidateSourceSingleEdit | CandidateSourceRepeatedKey | CandidateSourceTransposition |
+                                       CandidateSourceMissingCharacter | CandidateSourceExtraCharacter;
+    const bool corrected = AutoApplyPolicy().SelectForBoundary(rawText, candidates).has_value() ||
+                           std::any_of(candidates.begin(), candidates.end(), [&](const Candidate& c) {
+                               return !c.isOriginal && (c.policyFlags & CandidatePolicyCorrect) != 0 && (c.sourceFlags & kOneEdit) != 0;
+                           });
+    const bool apply = options.spacelessEnglishAlways || (common && !corrected);
+    candidate.policyFlags = apply ? CandidatePolicyNormalize : CandidatePolicySuggestOnly;
+    if (apply) {
+        // Space puts this in: the other choices are only offered.
+        for (auto& other : candidates) {
+            if (!other.isOriginal) other.policyFlags |= CandidatePolicySuggestOnly;
+        }
+        candidates.insert(candidates.begin(), std::move(candidate));
+        return;
+    }
+    const auto original = std::find_if(candidates.begin(), candidates.end(),
+                                       [](const Candidate& c) { return c.isOriginal; });
+    candidates.insert(original == candidates.end() ? candidates.end() : original + 1, std::move(candidate));
 }
 
 void CandidateEngine::AddDates(std::wstring_view rawText, std::vector<Candidate>& candidates) {

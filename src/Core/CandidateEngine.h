@@ -44,6 +44,9 @@ private:
     static void AddSymbols(std::wstring_view rawText, std::vector<Candidate>& candidates);
     // A number word in its other forms (three: 3, ３, 三, Ⅲ, ③), after its emoji.
     static void AddNumbers(std::wstring_view rawText, std::vector<Candidate>& candidates);
+    // English typed without spaces, with its spaces (ConversionOptions::spacelessEnglish).
+    void AddRunTogether(std::wstring_view rawText, const ConversionOptions& options,
+                        std::vector<Candidate>& candidates) const;
 
     CandidateEngine(const UserDictionary* dictionary,
                     const IUserLearningProvider& learningProvider,
