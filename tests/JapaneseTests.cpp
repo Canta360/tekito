@@ -1018,6 +1018,9 @@ void TestMixedTyping(const RomajiTable& table, const MiniPack& pack) {
                 "an English sentence is English throughout (to, home: not と, 褒め)");
         const auto mixed = judge.JudgeSentence({L"kikai", L"to", L"push", L"home"});
         Require(!mixed.front().english, "a chunk that is only Japanese keeps the sentence as judged");
+        const auto before = judge.JudgeSentence({L"take", L"wo", L"kau"});
+        Require(before.size() == 3 && before[0].english && !before[1].english,
+                "a chunk that reads both ways before a chunk that starts with a particle is English (take | wo)");
         const auto words = judge.JudgeSentence({L"take", L"home", L"take"});
         Require(std::all_of(words.begin(), words.end(), [](const auto& j) { return j.english; }),
                 "three chunks that are all English words, each romaji too, are an English sentence");
@@ -1049,6 +1052,11 @@ void TestMixedTyping(const RomajiTable& table, const MiniPack& pack) {
     composer.ForgetContext();
     composer.SetSentenceStart(false);
     Type(composer, L"Kikai");
+    {
+        std::wstring shown;
+        for (const auto& segment : composer.Segments()) shown += segment.text;
+        RequireText(shown, L"Kikai", "and its letters show while it is typed, not kana");
+    }
     composer.Convert();
     RequireText(composer.Commit(), L"Kikai", "a capital typed in a chunk makes it English, as typed");
     Type(composer, L"push.");
@@ -2530,16 +2538,17 @@ void TestCandidateOrder(const RomajiTable& table, const MiniPack& pack) {
         composer.Clear();
 
         // Japanese chunks are converted again as one on Enter, so a word
-        // reads on from those after it: sake wo nomu is 酒を飲む, as
-        // sakewonomu would be, whatever sake alone converts to.
+        // reads on from those after it: kami wo kiru is 紙を切る, as
+        // kamiwokiru would be, whatever kami alone converts to. (A chunk that
+        // is an English word too before a particle is English: sake wo.)
         composer.ForgetContext();
-        for (const auto* chunk : {L"sake", L"wo", L"nomu"}) {
+        for (const auto* chunk : {L"kami", L"wo", L"kiru"}) {
             Type(composer, chunk);
             composer.Convert();
         }
         JapaneseComposer whole(&table);
         whole.SetConverter(&converter);
-        Type(whole, L"sakewonomu");
+        Type(whole, L"kamiwokiru");
         whole.Convert();
         const std::wstring together = whole.Commit();
         RequireText(composer.Commit(), together, "Japanese chunks read as one sentence on Enter");

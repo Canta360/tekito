@@ -17,9 +17,12 @@ bluetooth	Bluetooth	always	en-US	TEKITO-owned
 booth	BOOTH	always	en-US	TEKITO-owned
 btw	BTW	always	en-US	TEKITO-owned
 canva	Canva	always	en-US	TEKITO-owned
+ceo	CEO	always	en-US	TEKITO-owned
 chatgpt	ChatGPT	always	en-US	TEKITO-owned
 chrome	Chrome	japanese	en-US	TEKITO-owned
+ci	CI	always	en-US	TEKITO-owned
 claude	Claude	japanese	en-US	TEKITO-owned
+cm	CM	japanese	en-US	TEKITO-owned
 cmos	CMOS	always	en-US	TEKITO-owned
 confluence	Confluence	japanese	en-US	TEKITO-owned
 copilot	Copilot	japanese	en-US	TEKITO-owned
@@ -53,6 +56,7 @@ hdmi	HDMI	always	en-US	TEKITO-owned
 html	HTML	always	en-US	TEKITO-owned
 http	HTTP	always	en-US	TEKITO-owned
 https	HTTPS	always	en-US	TEKITO-owned
+id	ID	always	en-US	TEKITO-owned
 imac	iMac	always	en-US	TEKITO-owned
 ime	IME	always	en-US	TEKITO-owned
 instagram	Instagram	always	en-US	TEKITO-owned
@@ -66,6 +70,7 @@ it	IT	japanese	en-US	TEKITO-owned
 javascript	JavaScript	always	en-US	TEKITO-owned
 jira	Jira	always	en-US	TEKITO-owned
 jpeg	JPEG	always	en-US	TEKITO-owned
+jr	JR	always	en-US	TEKITO-owned
 json	JSON	always	en-US	TEKITO-owned
 kddi	KDDI	always	en-US	TEKITO-owned
 kotlin	Kotlin	always	en-US	TEKITO-owned
@@ -83,6 +88,7 @@ miro	Miro	always	en-US	TEKITO-owned
 msi	MSI	always	en-US	TEKITO-owned
 nas	NAS	always	en-US	TEKITO-owned
 netflix	Netflix	always	en-US	TEKITO-owned
+ng	NG	always	en-US	TEKITO-owned
 nintendo	Nintendo	always	en-US	TEKITO-owned
 nodejs	Node.js	always	en-US	TEKITO-owned
 notion	Notion	japanese	en-US	TEKITO-owned
@@ -95,12 +101,14 @@ openai	OpenAI	always	en-US	TEKITO-owned
 outlook	Outlook	japanese	en-US	TEKITO-owned
 paypal	PayPal	always	en-US	TEKITO-owned
 paypay	PayPay	always	en-US	TEKITO-owned
+pc	PC	always	en-US	TEKITO-owned
 pcie	PCIe	always	en-US	TEKITO-owned
 pdf	PDF	always	en-US	TEKITO-owned
 pixel	Pixel	japanese	en-US	TEKITO-owned
 playstation	PlayStation	always	en-US	TEKITO-owned
 png	PNG	always	en-US	TEKITO-owned
 powerpoint	PowerPoint	always	en-US	TEKITO-owned
+pr	PR	always	en-US	TEKITO-owned
 python	Python	japanese	en-US	TEKITO-owned
 qiita	Qiita	always	en-US	TEKITO-owned
 raid	RAID	always	en-US	TEKITO-owned
@@ -128,6 +136,7 @@ teams	Teams	japanese	en-US	TEKITO-owned
 thunderbolt	Thunderbolt	always	en-US	TEKITO-owned
 tiktok	TikTok	always	en-US	TEKITO-owned
 trello	Trello	always	en-US	TEKITO-owned
+tv	TV	always	en-US	TEKITO-owned
 twitter	Twitter	always	en-US	TEKITO-owned
 typescript	TypeScript	always	en-US	TEKITO-owned
 ubuntu	Ubuntu	always	en-US	TEKITO-owned

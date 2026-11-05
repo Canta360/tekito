@@ -1197,8 +1197,9 @@ void JapaneseComposer::BuildPhrasesFor(bool convert) {
                     return;
                 }
             }
-            // Keys that are no word may be Japanese run into one (korehagithub).
-            if (chunk->english && !chunk->word && word == keys.size()) {
+            // Keys that are no word may be Japanese run into one (korehagithub),
+            // with punctuation after it too (bugwofixshita.).
+            if (chunk->english && !chunk->word) {
                 if (const auto split = RunTogetherEnglish()) {
                     std::vector<PhraseCandidate> candidates{{*split, 0, PhraseCandidate::Kind::Dictionary, false}};
                     candidates.push_back({keys, 0, PhraseCandidate::Kind::English, false});
@@ -1228,6 +1229,7 @@ void JapaneseComposer::BuildPhrasesFor(bool convert) {
     }
     // A slip in the keys was undone: English typed into it comes second.
     bool slipUndone = false;
+    slipUndone_ = false;
     // Keys that end in letters romaji left as they were (おk, っk) are meant
     // so: no slip is undone to drop or change them.
     const bool endsInLetters = !units_.empty() && !units_.back().ascii &&
@@ -1254,6 +1256,8 @@ void JapaneseComposer::BuildPhrasesFor(bool convert) {
         if (slipAutoApply_ && slips_ && table_ && japaneseChunk && !HasAscii() && !KanaTyped() && !reconverted_ &&
             !endsInLetters && !phrases_.empty() && FixSlips()) {
             slipUndone = true;
+            // Put right in the kana, not in its reading: Enter keeps it.
+            slipUndone_ = true;
         }
         // A slip undone: the keys as typed stay a choice, after what was
         // meant (konpyu-ra-: コンピューラー after コンピューター), for a short input
@@ -3706,9 +3710,14 @@ void JapaneseComposer::SettleChunk() {
         chunk.english = marks;
     }
     if (converter_ && word > 0) {
-        chunk.reading = ApplyTypingStyle(Reading());
+        // The reading as converted: with a slip undone (hirzite: ひらいて),
+        // so that Enter reads the chunk again as it was put right.
+        const std::wstring typedReading = ApplyTypingStyle(Reading());
+        const bool slipUndone = IsConverted() && !conversionReading_.empty() && conversionReading_ != typedReading &&
+                                conversionReading_.size() + 2 >= typedReading.size();
+        chunk.reading = slipUndone ? conversionReading_ : typedReading;
         chunk.context = context_;
-        const auto phrases = ConvertReading(ApplyTypingStyle(Reading()), 0, context_, contextWords_);
+        const auto phrases = ConvertReading(chunk.reading, 0, context_, contextWords_);
         for (const auto& phrase : phrases) {
             if (!phrase.candidates.empty()) chunk.japanese += phrase.candidates.front().text;
         }
@@ -3730,6 +3739,9 @@ void JapaneseComposer::SettleChunk() {
     lastChunkEnglish_ = false;
     // Japanese settled as typed (Enter) stays as typed.
     if (asTyped && !chunk.isEnglish) chunk.locked = chunk.picked = true;
+    // A slip put right in its kana: Enter, which reads the chunk's reading
+    // again, would take it back.
+    if (!chunk.isEnglish && !asTyped && slipUndone_) chunk.locked = true;
     // English run into the Japanese (meetingde: meetingで) was split off
     // as it is: the sentence check and the run converted again on Enter,
     // which read only kana, leave it.
@@ -3744,6 +3756,7 @@ void JapaneseComposer::SettleChunk() {
     const auto taken = std::find(chunk.japaneseChoices.begin(), chunk.japaneseChoices.end(), chunk.japanese);
     if (taken != chunk.japaneseChoices.end()) chunk.japaneseChoices.erase(taken);
     chunk.japaneseChoices.insert(chunk.japaneseChoices.begin(), chunk.japanese);
+    chunk.ownEnglish = chunk.english;
     lastCommit_.reset();
     settled_.push_back(std::move(chunk));
 }
@@ -3769,9 +3782,14 @@ std::optional<std::wstring> JapaneseComposer::TypedLetters() const {
         }
         return chunkJudge_->MayStartEnglishWord(keys) || JudgeChunk(keys).english;
     };
-    if (!englishSoFar && !leftover && !foreignWord()) return std::nullopt;
     const std::wstring keys = Keys(true);
-    if (typedCaseKept_ && typedCase_.size() == keys.size()) return typedCase_;
+    // A capital typed in it makes it English as typed (Kikai, GitHub): its
+    // letters from the start, not kana that Space turns into them.
+    const bool asTyped = typedCaseKept_ && typedCase_.size() == keys.size();
+    const bool capital = asTyped && std::any_of(typedCase_.begin(), typedCase_.end(),
+                                                [](wchar_t c) { return c >= L'A' && c <= L'Z'; });
+    if (!capital && !englishSoFar && !leftover && !foreignWord()) return std::nullopt;
+    if (asTyped) return typedCase_;
     return keys;
 }
 
@@ -4096,6 +4114,8 @@ std::wstring JapaneseComposer::SettledKeys() const {
 }
 
 std::wstring JapaneseComposer::CommitSentence() {
+    // As the chunks were shown when each settled, before Enter judges them again.
+    lastShown_ = SettledText();
     ConvertJapaneseRuns();
     if (reranker_ && sentenceCheck_) CheckMixedSentence();
     if (keepMixed_ > 0) {
@@ -4164,6 +4184,12 @@ void JapaneseComposer::JudgeWholeSentence(std::optional<ChunkJudge::Judgement>& 
     // (to, home, morning.; not と, 褒め, morning。).
     const bool englishSentence =
         std::all_of(whole.begin(), whole.end(), [](const ChunkJudge::Judgement& j) { return j.english; });
+    // No English sentence (any more): each chunk's English as it was taken.
+    if (!englishSentence) {
+        for (auto& chunk : settled_) {
+            if (!chunk.ownEnglish.empty()) chunk.english = chunk.ownEnglish;
+        }
+    }
     const auto typedMarks = [](const std::wstring& typed) {
         std::size_t end = typed.size();
         while (end > 0 && std::wstring_view(L".,!?").find(typed[end - 1]) != std::wstring_view::npos) --end;

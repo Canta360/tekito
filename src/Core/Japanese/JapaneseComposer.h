@@ -381,6 +381,7 @@ public:
         contextWords_.clear();
         recentText_.clear();
         mixContext_.clear();
+        lastShown_.clear();
         englishRun_ = 0;
         englishText_.clear();
         spaceAfterEnglish_ = false;
@@ -462,6 +463,9 @@ public:
     void SetKeepMixedSentences(std::size_t count) noexcept { keepMixed_ = count; }
     [[nodiscard]] const std::vector<std::wstring>& LastMixedSentences() const noexcept { return lastMixed_; }
     [[nodiscard]] const std::wstring& LastMixedKeys() const noexcept { return lastMixedKeys_; }
+    // Mixed typing: the sentence last committed as its chunks were shown
+    // when each settled, before Enter judged them again.
+    [[nodiscard]] const std::wstring& LastShownSentence() const noexcept { return lastShown_; }
     [[nodiscard]] bool IsCandidateListOpen() const noexcept { return listOpen_ && IsConverted(); }
 
     // Predictions for what is typed (empty once converted), and which one
@@ -731,6 +735,10 @@ private:
         std::wstring typed;     // the keys as typed (capitals, punctuation)
         std::wstring keys;      // lower case, without the punctuation after
         std::wstring english;   // as English
+        // As English when it settled, before an English sentence wrote it
+        // its own way (Api for API), so that it comes back once the
+        // sentence is no English one.
+        std::wstring ownEnglish;
         std::wstring japanese;  // as Japanese
         // Its other conversions, for the sentence check (japanese first).
         std::vector<std::wstring> japaneseChoices;
@@ -887,6 +895,9 @@ private:
     std::size_t keepMixed_{0};
     std::vector<std::wstring> lastMixed_;
     std::wstring lastMixedKeys_;
+    std::wstring lastShown_;
+    // The chunk converted last had a slip put right in its kana (FixSlips).
+    bool slipUndone_{false};
     bool mixAi_{false};
     double mixAiMargin_{4.0};
     bool mixAiKeepNotation_{true};

@@ -77,6 +77,9 @@ public:
     // chunks or more that are all English words is English (take the same
     // road). On by default.
     void SetEnglishAround(bool on) noexcept { englishAround_ = on; }
+    // A chunk that reads both ways is English when the next chunk starts
+    // with a particle (note | ninikki). On by default.
+    void SetParticleAfter(bool on) noexcept { particleAfter_ = on; }
 
     // `keys` may be the start of a common English word (meetin: meeting), so
     // Mix's live conversion leaves them as typed.
@@ -138,6 +141,9 @@ private:
     // How English writes `word` (GitHub, Google, nice); `inJapanese`: in a
     // Japanese sentence, where a word that is plain English too is written
     // by its name (line: LINE).
+    // A word split off as English, written by its own name, but a common
+    // word not as a name list's acronym (is, not IS).
+    [[nodiscard]] std::wstring WordAsWritten(std::wstring_view word, bool inJapanese) const;
     [[nodiscard]] std::wstring WrittenAs(std::wstring_view word, bool inJapanese = true) const;
     // An English word run into Japanese after it, starting with a particle
     // (pcwotukau: pcを使う); not when the keys are an English word.
@@ -155,6 +161,7 @@ private:
     const WrittenForms* forms_{nullptr};
     const LetterOdds* letterOdds_{nullptr};
     bool englishAround_{true};
+    bool particleAfter_{true};
     Thresholds thresholds_;
 };
 
