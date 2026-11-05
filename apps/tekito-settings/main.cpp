@@ -94,7 +94,7 @@ struct AiModelInfo {
 };
 constexpr AiModelInfo kAiModels[] = {
     {L"japanese-ai-light", L"https://github.com/Canta360/tekito/releases/download/ai-models/TEKITO-japanese-ai-light.zip",
-     "4BD6A328D684405C4C5813CA76B5D4B98BA2B7624979268D3B422E5A84B8E78D", 229322365ull},
+     "C5CEB8A2669F98DC35DCCEFC10EF59ABF90A831793BB164F42A89CD0DB1C7185", 229323012ull},
     {L"japanese-ai-strong", L"https://github.com/Canta360/tekito/releases/download/ai-models/TEKITO-japanese-ai-strong.zip",
      "9C80701006F9E60F1837E6C0CB7E586C8897793E4D00E968B106A8E025E9906B", 1246265200ull},
 };
