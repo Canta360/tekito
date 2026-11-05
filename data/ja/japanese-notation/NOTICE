@@ -1,0 +1,8 @@
+TEKITO Japanese Notation
+
+Which words are written in kanji or in kana at each level. The rows were
+written for TEKITO after 公用文における漢字使用等について (平成22年内閣訓令第1号)
+and 公用文作成の考え方 (令和4年), which are not subject to copyright
+(Copyright Act of Japan, Article 13). The parts of speech and words they
+are matched against come from Mozc (BSD-3-Clause, Copyright 2010-2018
+Google Inc.).

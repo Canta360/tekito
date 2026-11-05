@@ -13,6 +13,7 @@ namespace tekito::japanese {
 class TopicVectors;
 
 class Compounds;
+class Notation;
 class EdgeScorer;
 class ConnectionMatrix;
 class JapaneseDictionary;
@@ -244,6 +245,15 @@ public:
         compounds_ = compounds;
         compoundCost_ = costPerNat;
     }
+    // How words are written, kanji or kana (japanese-notation), at a level
+    // from 1 (more kanji) to 5 (more kana): a word in the form the level
+    // does not want costs `cost` more; nullptr: off. `SetNotationLevel`:
+    // the user's level, set before converting.
+    void SetNotation(const Notation* notation, std::int64_t cost = 3000) noexcept {
+        notation_ = notation;
+        notationCost_ = cost;
+    }
+    void SetNotationLevel(int level) const noexcept { notationLevel_ = level; }
     // With the default weights (not "= {}", which GCC and Clang reject for
     // a nested struct with member initializers).
     void SetLanguageModel(const LanguageModel* model) noexcept { SetLanguageModel(model, ModelWeights{}); }
@@ -263,6 +273,9 @@ private:
     std::int64_t edgeMargin_{5000};
     float edgeWeight_{1.0f};
     mutable std::wstring edgeContext_;
+    const Notation* notation_{nullptr};
+    std::int64_t notationCost_{3000};
+    mutable int notationLevel_{3};
 };
 
 }  // namespace tekito::japanese

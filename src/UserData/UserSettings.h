@@ -168,6 +168,9 @@ struct UserSettings {
     // The first words' kanji written another way (異体字: 髙橋, 山﨑) after
     // a phrase's words.
     bool japaneseKanjiVariants{true};
+    // How words are written, 1 (more kanji) to 5 (more kana); 3: as official
+    // writing does (ください, こと, また).
+    int japaneseNotationLevel{3};
     // Live conversion converts the whole text again, as Enter would, once
     // typing pauses.
     bool japaneseLiveRefine{true};

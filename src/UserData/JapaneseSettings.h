@@ -71,6 +71,7 @@ inline void ApplyJapaneseSettings(japanese::JapaneseComposer& composer, const Us
     composer.SetSlipAutoApply(settings.japaneseSlipAutoApply);
     composer.SetTypedForms(settings.japaneseTypedForms);
     composer.SetKanjiVariants(settings.japaneseKanjiVariants);
+    composer.SetNotationLevel(std::clamp(settings.japaneseNotationLevel, 1, 5));
     composer.SetSingleVowelKana(settings.mixSingleVowelKana);
     composer.SetEnglishCorrection(settings.mixCorrection);
     composer.SetSpacelessEnglish(settings.spacelessEnglish);

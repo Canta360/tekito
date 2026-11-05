@@ -80,7 +80,10 @@ public:
     explicit JapaneseComposer(const RomajiTable* table = nullptr) noexcept : table_(table) {}
 
     void SetTable(const RomajiTable* table) noexcept;
-    void SetConverter(const JapaneseConverter* converter) noexcept { converter_ = converter; }
+    void SetConverter(const JapaneseConverter* converter) noexcept {
+        converter_ = converter;
+        if (converter_) converter_->SetNotationLevel(notationLevel_);
+    }
     // Converts the keys as typed, correcting slips in them (tried first on
     // Space; nullptr leaves conversion to the kana as typed).
     void SetKeyConverter(const KeyConverter* keyConverter) noexcept { keyConverter_ = keyConverter; }
@@ -193,6 +196,13 @@ public:
     // The first words' kanji written another way (異体字: 髙橋, 﨑) come
     // after a phrase's words, before the typed forms (AddVariantForms).
     void SetKanjiVariants(bool on) noexcept { kanjiVariants_ = on; }
+    // How words are written, from 1 (more kanji: 下さい, 事) to 5 (more kana:
+    // かわいい, おいしい); 3 as official writing does (ください, こと). The
+    // converter is shared, so the level is the process's.
+    void SetNotationLevel(int level) noexcept {
+        notationLevel_ = level;
+        if (converter_) converter_->SetNotationLevel(level);
+    }
     // Mixed typing: a vowel typed alone (i, a) with no English just before
     // is kana (い) rather than the letter (I); the other comes next.
     void SetSingleVowelKana(bool on) noexcept { singleVowelKana_ = on; }
@@ -686,6 +696,7 @@ private:
 
     const RomajiTable* table_{nullptr};
     const JapaneseConverter* converter_{nullptr};
+    int notationLevel_{3};
     const KeyConverter* keyConverter_{nullptr};
     const Loanwords* loanwords_{nullptr};
     const ChunkJudge* chunkJudge_{nullptr};

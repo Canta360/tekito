@@ -60,6 +60,7 @@ add_library(tekito_core STATIC
     src/Core/Japanese/LetterOdds.cpp
     src/Core/Japanese/Loanwords.cpp
     src/Core/Japanese/MappedFile.cpp
+    src/Core/Japanese/Notation.cpp
     src/Core/Japanese/NeuralMath.cpp
     src/Core/Japanese/PostalCodes.cpp
     src/Core/Japanese/Meanings.cpp

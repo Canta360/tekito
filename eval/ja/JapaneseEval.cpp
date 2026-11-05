@@ -33,6 +33,7 @@
 #include "Core/ExternalLexiconProvider.h"
 #include "Core/Japanese/LetterOdds.h"
 #include "Core/Japanese/EdgeScorer.h"
+#include "Core/Japanese/Notation.h"
 #include "Core/Japanese/WrittenForms.h"
 #include "Core/SpecialConversions.h"
 #include "Core/ExternalRankingProviders.h"
@@ -79,6 +80,12 @@
 
 namespace {
 
+// TEKITO_EVAL_NOTATION_LEVEL: how words are written, 1-5 (3, the default).
+int NotationLevel() {
+    const char* level = std::getenv("TEKITO_EVAL_NOTATION_LEVEL");
+    return level && *level ? std::clamp(static_cast<int>(std::strtol(level, nullptr, 10)), 1, 5) : 3;
+}
+
 // Digits and numbers read in kana as one number word, as the text service
 // sets it up (JapaneseData: japanese-core/pos.tsv, "number").
 void SetNumberWord(tekito::japanese::JapaneseConverter& converter, const std::filesystem::path& pack) {
@@ -99,6 +106,16 @@ void SetNumberWord(tekito::japanese::JapaneseConverter& converter, const std::fi
     // TEKITO_EVAL_HEAD_WORDS=0: a phrase's candidates without the words read
     // like its first word (紅藻が for こうそうが).
     if (const char* heads = std::getenv("TEKITO_EVAL_HEAD_WORDS"); heads && *heads == '0') converter.SetHeadWords(false);
+    // TEKITO_EVAL_NOTATION=<directory>: how words are written by level
+    // (japanese-notation, as JapaneseData loads it); TEKITO_EVAL_NOTATION_COST:
+    // what the unwanted form costs more (3000); the level is NotationLevel's.
+    static tekito::japanese::Notation notation;
+    if (const char* directory = std::getenv("TEKITO_EVAL_NOTATION"); directory && *directory) {
+        if (notation.IsOpen() || notation.Open(directory)) {
+            const char* cost = std::getenv("TEKITO_EVAL_NOTATION_COST");
+            converter.SetNotation(&notation, cost && *cost ? std::strtoll(cost, nullptr, 10) : 3000);
+        }
+    }
     // TEKITO_EVAL_EDGES=<directory>: the edge scorer (edges.bin, chars.txt)
     // takes its scores off the words' costs; TEKITO_EVAL_EDGE_MARGIN: for
     // the words within this of the cheapest path (5000);
@@ -421,6 +438,7 @@ int RunKeys(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary
     const tekito::japanese::KeyConverter keyConverter(dictionary, matrix, converter, *table, costs);
     tekito::japanese::JapaneseComposer composer(table.get());
     composer.SetConverter(&converter);
+    composer.SetNotationLevel(NotationLevel());
     composer.SetKeyConverter(&keyConverter);
     if (loanwords) composer.SetLoanwords(loanwords);
     composer.SetSentenceReranker(reranker);
@@ -878,6 +896,7 @@ int RunChunks(const ConnectionMatrix& matrix, const JapaneseDictionary& dictiona
     const tekito::japanese::KeyConverter keyConverter(dictionary, matrix, converter, *table, costs);
     tekito::japanese::JapaneseComposer composer(table.get());
     composer.SetConverter(&converter);
+    composer.SetNotationLevel(NotationLevel());
     if (options.slips) composer.SetKeyConverter(&keyConverter);
     if (names) composer.SetLoanwords(names);
     tekito::japanese::SentenceReranker reranker;

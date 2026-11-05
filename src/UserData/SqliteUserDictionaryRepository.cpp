@@ -391,6 +391,8 @@ bool SqliteUserDictionaryRepository::LoadSettings(UserSettings& settings) const 
             loaded.japaneseTypedForms = value != 0;
         } else if (std::strcmp(key, "japanese_kanji_variants") == 0) {
             loaded.japaneseKanjiVariants = value != 0;
+        } else if (std::strcmp(key, "japanese_notation_level") == 0) {
+            loaded.japaneseNotationLevel = std::clamp(static_cast<int>(value), 1, 5);
         } else if (std::strcmp(key, "japanese_live_refine") == 0) {
             loaded.japaneseLiveRefine = value != 0;
         } else if (std::strcmp(key, "japanese_kana_input") == 0) {
@@ -539,6 +541,7 @@ bool SqliteUserDictionaryRepository::SaveSettings(const UserSettings& settings) 
     saveValue("japanese_first_page_symbol", settings.japaneseFirstPageSymbol ? 1 : 0);
     saveValue("japanese_typed_forms", settings.japaneseTypedForms ? 1 : 0);
     saveValue("japanese_kanji_variants", settings.japaneseKanjiVariants ? 1 : 0);
+    saveValue("japanese_notation_level", std::clamp(settings.japaneseNotationLevel, 1, 5));
     saveValue("japanese_live_refine", settings.japaneseLiveRefine ? 1 : 0);
     saveValue("japanese_kana_input", settings.japaneseKanaInput ? 1 : 0);
     saveValue("japanese_kana_input_key", settings.japaneseKanaInputKey ? 1 : 0);

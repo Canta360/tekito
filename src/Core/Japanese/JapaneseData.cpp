@@ -13,6 +13,7 @@
 #include "Core/Japanese/KanaSlips.h"
 #include "Core/Japanese/KeyConverter.h"
 #include "Core/Japanese/LanguageModel.h"
+#include "Core/Japanese/Notation.h"
 #include "Core/Japanese/Loanwords.h"
 #include "Core/Japanese/Meanings.h"
 #include "Core/Japanese/PostalCodes.h"
@@ -39,6 +40,7 @@ struct JapaneseData {
     KanaSlips slips;
     Loanwords loanwords;
     KanjiSets kanjiSets;
+    Notation notation;
     UserPartsOfSpeech userParts;
     std::unique_ptr<JapaneseConverter> converter;
     std::unique_ptr<KeyConverter> keys;
@@ -83,6 +85,9 @@ const JapaneseData* ProcessJapaneseData() {
         (void)loaded->loanwords.OpenEnglish(ExternalLexiconProvider::PackDirectory(L"japanese-english"));
         (void)loaded->kanjiSets.Load(ExternalLexiconProvider::PackDirectory(L"kanji-sets") / L"kanji.tsv");
         (void)loaded->kanjiSets.LoadVariants(ExternalLexiconProvider::PackDirectory(L"japanese-variants") / L"variants.tsv");
+        if (loaded->notation.Open(ExternalLexiconProvider::PackDirectory(L"japanese-notation"))) {
+            loaded->converter->SetNotation(&loaded->notation);
+        }
         loaded->userParts = UserPartsOfSpeech::Load(core / L"pos.tsv");
         if (const auto number = loaded->userParts.Number()) {
             loaded->converter->SetNumberWord(JapaneseConverter::NumberWord{number->left, number->right, number->cost});

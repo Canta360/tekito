@@ -1,5 +1,6 @@
 #include "Core/DataPackPath.h"
 #include "Core/ExternalLexiconProvider.h"
+#include "Core/Japanese/Notation.h"
 #include "Core/Japanese/JapaneseComposer.h"
 #include "Core/Japanese/JapaneseConverter.h"
 #include "Core/Japanese/JapaneseKeys.h"
@@ -2245,6 +2246,32 @@ void TestOwnKatakana(const RomajiTable& table, const MiniPack& pack) {
 }
 
 // UTF-8 the same where wchar_t is 16 bits (Windows) or 32 (Linux).
+// How the notation level writes a word: the kanji form costs more at and
+// above its level, the kana form below it only where the level asks for more
+// kanji than the default.
+void TestNotation() {
+    const auto directory = std::filesystem::temp_directory_path() / L"tekito-test-notation";
+    std::filesystem::create_directories(directory);
+    {
+        std::ofstream out(directory / L"notation.tsv", std::ios::binary);
+        // 下さい, ください, 可愛い (UTF-8)
+        out << "1724\t\xE4\xB8\x8B\xE3\x81\x95\xE3\x81\x84\t3\tK\n"
+               "1716\t\xE3\x81\x8F\xE3\x81\xA0\xE3\x81\x95\xE3\x81\x84\t3\tk\n"
+               "100\t\xE5\x8F\xAF\xE6\x84\x9B\xE3\x81\x84\t5\tK\n";
+    }
+    tekito::japanese::Notation notation;
+    Require(notation.Open(directory), "the notation pack opens");
+    Require(notation.Has(1724) && !notation.Has(1725), "it knows which parts of speech it has");
+    Require(notation.Cost(1724, L"下さい", 3, 3000) == 3000, "at level 3 the kanji 下さい costs more");
+    Require(notation.Cost(1716, L"ください", 3, 3000) == 0, "and ください does not");
+    Require(notation.Cost(1724, L"下さい", 2, 3000) == 0 && notation.Cost(1716, L"ください", 2, 3000) == 3000,
+            "at level 2 it is the other way");
+    Require(notation.Cost(100, L"可愛い", 3, 3000) == 0 && notation.Cost(100, L"可愛い", 5, 3000) == 3000,
+            "可愛い is left alone at 3 and written in kana at 5");
+    Require(notation.Cost(1724, L"ください", 5, 3000) == 0, "a word under another part of speech is not touched");
+    std::filesystem::remove_all(directory);
+}
+
 void TestUtf8() {
     namespace utf8 = tekito::utf8;
     const std::string face = "\xF0\x9F\xAB\xA5";  // U+1FAE5, outside the BMP
@@ -2425,6 +2452,7 @@ int main(int argc, char** argv) {
     TestWrittenForms(*table, *pack);
     TestOwnKatakana(*table, *pack);
     TestUtf8();
+    TestNotation();
     TestKanjiSets();
     TestMeanings();
     if (argc > 1 && std::string_view(argv[1]) == "--dump") DumpConversions(*pack);

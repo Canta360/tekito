@@ -1,0 +1,18 @@
+{
+  "pack_id": "japanese-notation",
+  "display_name": "Japanese Notation",
+  "schema_version": 1,
+  "version": "2026.11",
+  "language": "ja-JP",
+  "type": "japanese-notation",
+  "format": "tsv",
+  "file": "notation.tsv",
+  "entry_count": 5732,
+  "sha256": {
+    "file": "3932287BD448E9F975139D118D7630F393D375947E242AD3797A55F8229EF7A3"
+  },
+  "license": "TEKITO-OWNED + BSD-3-Clause (Mozc)",
+  "ai_training": true,
+  "source": "scripts/ja/build-japanese-notation.py, scripts/ja/notation-rules.tsv; parts of speech and words from https://github.com/google/mozc",
+  "notice_file": "NOTICE"
+}

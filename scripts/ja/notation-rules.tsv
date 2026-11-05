@@ -1,0 +1,77 @@
+# How words are written, kanji or kana, by level (the japanese-notation pack,
+# scripts/ja/build-japanese-notation.py). A row: the part written in kanji,
+# the same part in kana, and the lowest level (1-5) at which the kana form is
+# preferred; below 3 the kanji form is preferred under that level. Every
+# dictionary word that differs only by that part, with the same reading and
+# part of speech, takes the row (出来 でき: 出来る, 出来た, 出来ない).
+# Level 3 follows 公用文における漢字使用等について (平成22年内閣訓令第1号);
+# 4 the plainer writing 公用文作成の考え方 (令和4年) allows for 解説・広報;
+# 5 the kana people often prefer in casual writing.
+# Auxiliary verbs and formal nouns (動詞,非自立 / 名詞,非自立: 下さい, 頂く,
+# 事, 物) are found by their part of speech at level 3, less the ones below.
+#
+# kanji	kana	level
+# 2: auxiliaries and particles
+無い	ない	2
+為	ため	2
+迄	まで	2
+程	ほど	2
+位	くらい	2
+位	ぐらい	2
+丈	だけ	2
+様だ	ようだ	2
+様な	ような	2
+様に	ように	2
+# 3: as the 2010 directive writes them
+出来	でき	3
+有る	ある	3
+有り	あり	3
+居る	いる	3
+居ます	います	3
+成る	なる	3
+又	また	3
+尚	なお	3
+但し	ただし	3
+従って	したがって	3
+且つ	かつ	3
+故に	ゆえに	3
+所が	ところが	3
+所で	ところで	3
+可也	かなり	3
+矢張り	やはり	3
+矢張	やはり	3
+余程	よほど	3
+致し	いたし	3
+致す	いたす	3
+貰	もら	3
+嬉し	うれし	5
+綺麗	きれい	4
+凄	すご	3
+殆ど	ほとんど	3
+予め	あらかじめ	4
+宜し	よろし	3
+一寸	ちょっと	2
+流石	さすが	3
+迄に	までに	3
+# 4: plainer, as for explanations and public notices
+既に	すでに	4
+全て	すべて	4
+更に	さらに	3
+沢山	たくさん	3
+様々	さまざま	5
+色々	いろいろ	4
+丁度	ちょうど	3
+是非	ぜひ	4
+例え	たとえ	4
+殊に	ことに	4
+甚だ	はなはだ	4
+大いに	おおいに	4
+概ね	おおむね	4
+# 5: kana often preferred in casual writing
+可愛	かわい	5
+美味し	おいし	5
+面白	おもしろ	5
+素晴らし	すばらし	5
+有難	ありがた	2
+有り難	ありがた	2
+子供	子ども	5

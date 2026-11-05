@@ -44,6 +44,7 @@ LANGUAGE = {
     "japanese-sudachi": "ja",
     "japanese-places": "ja",
     "japanese-variants": "ja",
+    "japanese-notation": "ja",
     "japanese-wiktionary": "ja",
     "japanese-wordnet": "ja",
     "japanese-zipcode": "ja",
