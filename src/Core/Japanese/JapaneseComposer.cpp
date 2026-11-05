@@ -1477,6 +1477,68 @@ void JapaneseComposer::StyleKanaNumbers(std::vector<PhraseCandidate>& candidates
     }
 }
 
+void JapaneseComposer::WidenDigits(PhraseState& phrase, std::wstring_view reading) const {
+    if (phrase.form || phrase.selected >= phrase.candidates.size()) return;
+    // Digits typed stay digits (5安打, not 五安打): the first candidate that
+    // keeps them, when the one shown does not.
+    const auto digitsOf = [](std::wstring_view text) {
+        std::wstring digits;
+        for (const wchar_t c : text) {
+            if (c >= L'0' && c <= L'9') digits += c;
+            else if (c >= L'\xFF10' && c <= L'\xFF19') digits += static_cast<wchar_t>(c - 0xFEE0);
+        }
+        return digits;
+    };
+    const std::wstring typed = digitsOf(reading);
+    if (!typed.empty() && digitsOf(phrase.candidates[phrase.selected].text) != typed) {
+        const auto keeps = std::find_if(phrase.candidates.begin(), phrase.candidates.end(), [&](const PhraseCandidate& c) {
+            return c.reading.empty() && digitsOf(c.text) == typed;
+        });
+        if (keeps != phrase.candidates.end()) {
+            phrase.selected = static_cast<std::size_t>(keeps - phrase.candidates.begin());
+        }
+    }
+    const auto widened = [&](const std::wstring& text) {
+        std::wstring out = text;
+        for (std::size_t i = 0; i < out.size();) {
+            const auto digit = [&](std::size_t at) {
+                return at < out.size() && ((out[at] >= L'0' && out[at] <= L'9') || (out[at] >= L'\xFF10' && out[at] <= L'\xFF19'));
+            };
+            if (!digit(i)) {
+                ++i;
+                continue;
+            }
+            std::size_t end = i;
+            while (digit(end)) ++end;
+            bool half = true;
+            switch (numberStyle_) {
+            case NumberStyle::AsTyped: half = halfWidthDigits_ && !(singleDigitFull_ && end - i == 1); break;
+            case NumberStyle::FullWidth: half = false; break;
+            case NumberStyle::Mixed: half = end - i > 1; break;
+            default: half = true; break;
+            }
+            for (std::size_t k = i; k < end; ++k) {
+                const wchar_t c = out[k];
+                if (half && c >= L'\xFF10') out[k] = static_cast<wchar_t>(c - 0xFEE0);
+                if (!half && c <= L'9') out[k] = static_cast<wchar_t>(c + 0xFEE0);
+            }
+            i = end;
+        }
+        return out;
+    };
+    auto& shown = phrase.candidates[phrase.selected];
+    const std::wstring wanted = widened(shown.text);
+    if (wanted == shown.text) return;
+    // The form already listed is taken; otherwise the one shown is written so.
+    const auto listed = std::find_if(phrase.candidates.begin(), phrase.candidates.end(),
+                                     [&](const PhraseCandidate& c) { return c.text == wanted; });
+    if (listed != phrase.candidates.end()) {
+        phrase.selected = static_cast<std::size_t>(listed - phrase.candidates.begin());
+    } else {
+        shown.text = wanted;
+    }
+}
+
 void JapaneseComposer::ApplyNumberStyle() {
     // A rough number is part of a word and written in kanji: 数十人, 十数人,
     // 十余年, 二、三日.
@@ -1511,8 +1573,15 @@ void JapaneseComposer::ApplyNumberStyle() {
                 if (candidate.kanaNumber) std::erase(candidate.text, L',');
             }
         }
-        if (!IsDigits(reading)) continue;
-        const bool rough = roughKanji_ && ((!before.empty() && kRoughBefore.find(before.back()) != std::wstring_view::npos) ||
+        if (!IsDigits(reading)) {
+            // Digits in a phrase with other words (5安打): the width the
+            // number style asks for, as a phrase of digits alone gets.
+            if (std::any_of(reading.begin(), reading.end(), IsDigit)) WidenDigits(phrase, reading);
+            continue;
+        }
+        // 数 as a word of its own before it (数十人), not the end of one
+        // (打数5安打).
+        const bool rough = roughKanji_ && ((before.size() == 1 && kRoughBefore.find(before.back()) != std::wstring_view::npos) ||
                                            (!after.empty() && kRoughAfter.find(after.front()) != std::wstring_view::npos));
         std::wstring half(reading);
         for (auto& c : half) {
@@ -1884,6 +1953,10 @@ void JapaneseComposer::CheckSentence() {
         for (std::size_t c = 0; c < phrase.candidates.size() && list.size() < kListed; ++c) {
             const auto& candidate = phrase.candidates[c];
             if (!candidate.reading.empty()) continue;
+            // Dates, symbols and emoji by their readings are offered as
+            // they are, not read as the sentence's words: they would take
+            // the place of the words the check reads.
+            if (candidate.kind == PhraseCandidate::Kind::Special && c != phrase.selected) continue;
             if (!numberShape.empty() && c != phrase.selected) {
                 // The number another way: in kanji (三時), or left as read
                 // (く月, に月: the kana the reading starts with, then the rest).

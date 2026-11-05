@@ -796,6 +796,9 @@ private:
     void ApplyLearnedLanguage(ChunkJudge::Judgement& judged, std::wstring_view keys) const;
     // Gives the converter the text before the caret, for its edge scorer.
     void SyncEdgeContext() const;
+    // Digits in a phrase with other words: the width the number style asks
+    // for, in the candidate shown.
+    void WidenDigits(PhraseState& phrase, std::wstring_view reading) const;
     // Phrases that are only digits: the form SetNumberStyle asks for first.
     void ApplyNumberStyle();
     // A run of 。 typed as ... is one phrase, … first.
