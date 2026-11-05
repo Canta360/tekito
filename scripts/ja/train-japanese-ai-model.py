@@ -564,8 +564,25 @@ def train(args) -> None:
     eos = tokenizer.eos_token_id
     bos = tokenizer.bos_token_id
 
+    pieces = {}
+
+    def prompt_ids(text):
+        if not args.per_char_reading:
+            return tokenizer(text, add_special_tokens=False)["input_ids"]
+        # --per-char-reading: the reading one character a token (each
+        # character tokenized on its own), so that no token runs across the
+        # reading's word boundaries; the context is tokenized as text.
+        head, _, rest = text.rpartition(INPUT_TAG)
+        reading = rest[:-len(OUTPUT_TAG)] if rest.endswith(OUTPUT_TAG) else rest
+        ids = tokenizer(head + INPUT_TAG, add_special_tokens=False)["input_ids"]
+        for c in reading + OUTPUT_TAG:
+            if c not in pieces:
+                pieces[c] = tokenizer(c, add_special_tokens=False)["input_ids"]
+            ids += pieces[c]
+        return ids
+
     def encode(row):
-        p = tokenizer(row["prompt"], add_special_tokens=False)["input_ids"]
+        p = prompt_ids(row["prompt"])
         t = tokenizer(row["text"], add_special_tokens=False)["input_ids"] + [eos]
         ids = ([bos] if bos is not None else []) + p + t
         # Held as int32 arrays: ten million examples as Python lists would
@@ -896,6 +913,8 @@ def main() -> int:
     parser.add_argument("--save-every", type=int, default=2000, help="train: steps between saves to go on from")
     parser.add_argument("--gpu-share", type=float, default=0.9)
     parser.add_argument("--seed", type=int, default=1, help="train: which sample of the examples")
+    parser.add_argument("--per-char-reading", action="store_true",
+                        help="train: the reading one character a token (a model to run with per-character readings)")
     parser.add_argument("--lora", type=int, default=0, help="train: low-rank adapters of this rank instead of all weights")
     parser.add_argument("--gen", help="prepare-rank: id, reading, meant text")
     parser.add_argument("--rehearse", type=Path,
