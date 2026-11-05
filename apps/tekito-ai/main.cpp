@@ -158,7 +158,8 @@ public:
         prompt += kInputTag + asked.reading + kOutputTag;
         auto scores = ScoreAfter(prompt, asked.sentences);
         if (!scores) return std::nullopt;
-        AiConversion answer{std::move(*scores), Write(prompt, asked.reading.size())};
+        AiConversion answer{std::move(*scores), {}};
+        if (asked.request != aihelper::Request::Score) answer.written = Write(prompt, asked.reading.size());
         return answer;
     }
 

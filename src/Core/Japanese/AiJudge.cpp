@@ -190,10 +190,11 @@ AiHelperClient::AiHelperClient(AiModel model, AiDevice device, std::chrono::mill
       asking_(std::make_shared<AiAsking>()) {}
 
 std::optional<AiConversion> AiHelperClient::Convert(std::wstring_view reading, std::span<const std::wstring> sentences,
-                                                    std::wstring_view context) const {
+                                                    std::wstring_view context, bool write) const {
     if (sentences.size() > aihelper::kMaxSentences || reading.size() > aihelper::kMaxCharacters) return std::nullopt;
     if (context.size() > aihelper::kMaxCharacters) context = context.substr(context.size() - aihelper::kMaxCharacters);
-    aihelper::Asked asked{aihelper::Request::Convert, model_, device_, std::wstring(context), std::wstring(reading),
+    aihelper::Asked asked{write ? aihelper::Request::Convert : aihelper::Request::Score, model_, device_,
+                          std::wstring(context), std::wstring(reading),
                           std::vector<std::wstring>(sentences.begin(), sentences.end())};
     const auto reply = Exchange(aihelper::EncodeRequest(asked), Clock::now() + wait_);
     if (!reply) return std::nullopt;
@@ -236,10 +237,11 @@ void CALLBACK AskInBackground(PTP_CALLBACK_INSTANCE, void* context) {
 }  // namespace
 
 std::optional<AiConversion> AiHelperClient::Ask(std::wstring_view reading, std::span<const std::wstring> sentences,
-                                                std::wstring_view context) const {
+                                                std::wstring_view context, bool write) const {
     if (sentences.size() > aihelper::kMaxSentences || reading.size() > aihelper::kMaxCharacters) return std::nullopt;
     if (context.size() > aihelper::kMaxCharacters) context = context.substr(context.size() - aihelper::kMaxCharacters);
-    aihelper::Asked asked{aihelper::Request::Convert, model_, device_, std::wstring(context), std::wstring(reading),
+    aihelper::Asked asked{write ? aihelper::Request::Convert : aihelper::Request::Score, model_, device_,
+                          std::wstring(context), std::wstring(reading),
                           std::vector<std::wstring>(sentences.begin(), sentences.end())};
     auto request = aihelper::EncodeRequest(asked);
     std::lock_guard lock(asking_->mutex);
@@ -385,7 +387,7 @@ std::optional<Asked> DecodeRequest(std::span<const std::uint8_t> message) {
         !Take(message, at, count)) {
         return std::nullopt;
     }
-    if (request > static_cast<std::uint32_t>(Request::Stop) || model < 1 ||
+    if (request > static_cast<std::uint32_t>(Request::Score) || model < 1 ||
         model > static_cast<std::uint32_t>(AiModel::Strong) || device > static_cast<std::uint32_t>(AiDevice::Gpu) ||
         count > kMaxSentences) {
         return std::nullopt;

@@ -3644,7 +3644,12 @@ void JapaneseComposer::SettleChunk() {
         if (reranker_ && sentenceCheck_) chunk.japaneseChoices = TopConversions(phrases, kChoices);
     }
     if (chunk.japanese.empty()) chunk.japanese = ApplyTypingStyle(Reading());
-    if (settled_.empty()) spaceBeforeSentence_ = spaceAfterEnglish_;
+    if (settled_.empty()) {
+        spaceBeforeSentence_ = spaceAfterEnglish_;
+        // What was written before the sentence: its chunks are added to the
+        // recent text as they settle.
+        mixContext_ = recentText_;
+    }
     const bool asTyped = !IsConverted();
     auto text = CommitChunk();
     while (!text.empty() && text.back() == L' ') text.pop_back();
@@ -3914,9 +3919,117 @@ void JapaneseComposer::CheckMixedSentence() {
     }
 }
 
+std::vector<std::vector<JapaneseComposer::MixedOption>> JapaneseComposer::MixedOptions() const {
+    std::vector<std::vector<MixedOption>> options;
+    for (const auto& chunk : settled_) {
+        std::vector<MixedOption> own{{chunk.isEnglish, chunk.isEnglish ? chunk.english : chunk.japanese}};
+        const auto add = [&](bool english, const std::wstring& text) {
+            if (text.empty()) return;
+            const bool listed = std::any_of(own.begin(), own.end(),
+                                            [&](const MixedOption& o) { return o.english == english && o.text == text; });
+            if (!listed) own.push_back({english, text});
+        };
+        if (!chunk.marksOnly && !chunk.locked) {
+            if (chunk.either && !chunk.isEnglish) add(true, chunk.english);
+            for (const auto& choice : chunk.japaneseChoices) add(false, choice);
+            if (chunk.either && chunk.isEnglish) add(false, chunk.japanese);
+        }
+        options.push_back(std::move(own));
+    }
+    return options;
+}
+
+std::vector<std::wstring> JapaneseComposer::MixedSentences(std::size_t count,
+                                                           std::vector<std::vector<std::size_t>>* picks) const {
+    std::vector<std::wstring> texts;
+    if (settled_.empty() || count == 0) return texts;
+    const auto options = MixedOptions();
+    std::vector<std::size_t> sizes;
+    for (const auto& own : options) sizes.push_back(own.size());
+    ForPicksByRank(sizes, [&](const std::vector<std::size_t>& chosen) {
+        auto chunks = settled_;
+        for (std::size_t i = 0; i < chunks.size(); ++i) {
+            const auto& option = options[i][chosen[i]];
+            chunks[i].isEnglish = option.english && !chunks[i].marksOnly;
+            (option.english ? chunks[i].english : chunks[i].japanese) = option.text;
+        }
+        auto text = JoinChunks(chunks);
+        if (std::find(texts.begin(), texts.end(), text) == texts.end()) {
+            texts.push_back(std::move(text));
+            if (picks) picks->push_back(chosen);
+        }
+        return texts.size() < count;
+    });
+    return texts;
+}
+
+namespace {
+
+// Whether one text has an English word where the other has Japanese (Take
+// and たけ): another word, not another way to write it.
+bool LanguageDiffers(std::wstring_view a, std::wstring_view b) {
+    const auto letters = [](std::wstring_view text) {
+        std::wstring kept;
+        for (const wchar_t c : text) {
+            if ((c >= L'a' && c <= L'z') || (c >= L'A' && c <= L'Z')) kept.push_back(static_cast<wchar_t>(std::towlower(c)));
+        }
+        return kept;
+    };
+    return letters(a) != letters(b);
+}
+
+}  // namespace
+
+void JapaneseComposer::CheckMixedByAi() {
+    if (!aiJudge_ || !mixAi_ || !aiJudge_->Writes() || settled_.empty()) return;
+    std::vector<std::vector<std::size_t>> picks;
+    const auto texts = MixedSentences(std::min(mixAiCount_, aihelper::kMaxSentences), &picks);
+    if (texts.size() < 2) return;
+    const std::wstring keys = SettledKeys();
+    if (keys.size() > aihelper::kMaxCharacters) return;
+    // As the model writes the text: no space after the last English word.
+    std::vector<std::wstring> asked;
+    for (auto text : texts) {
+        while (!text.empty() && text.back() == L' ') text.pop_back();
+        asked.push_back(std::move(text));
+    }
+    // Only the scores: the model's own writings are not offered here. Enter
+    // waits for them, as an answer after the text is committed is too late.
+    const auto answer = aiJudge_->Convert(keys, asked, mixContext_, false);
+    if (!answer || answer->scores.size() != asked.size()) return;
+    std::size_t best = 0;
+    for (std::size_t i = 1; i < asked.size(); ++i) {
+        if (mixAiKeepNotation_ && OnlyNotationDiffers(asked[0], asked[i]) && !LanguageDiffers(asked[0], asked[i])) continue;
+        if (answer->scores[i] > answer->scores[best]) best = i;
+    }
+    if (best == 0 || answer->scores[best] - answer->scores[0] <= mixAiMargin_) return;
+    const auto options = MixedOptions();
+    for (std::size_t i = 0; i < settled_.size(); ++i) {
+        auto& chunk = settled_[i];
+        if (chunk.marksOnly) continue;
+        const auto& option = options[i][picks[best][i]];
+        chunk.isEnglish = option.english;
+        (option.english ? chunk.english : chunk.japanese) = option.text;
+    }
+}
+
+std::wstring JapaneseComposer::SettledKeys() const {
+    std::wstring keys;
+    for (const auto& chunk : settled_) {
+        if (!keys.empty() && !chunk.marksOnly) keys.push_back(L' ');
+        keys += chunk.typed;
+    }
+    return keys;
+}
+
 std::wstring JapaneseComposer::CommitSentence() {
     ConvertJapaneseRuns();
     if (reranker_ && sentenceCheck_) CheckMixedSentence();
+    if (keepMixed_ > 0) {
+        lastMixed_ = MixedSentences(keepMixed_);
+        lastMixedKeys_ = SettledKeys();
+    }
+    CheckMixedByAi();
     std::wstring text = SettledText();
     const bool firstJapanese = !settled_.front().marksOnly && !settled_.front().isEnglish;
     bool lastEnglish = false;

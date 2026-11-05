@@ -147,6 +147,19 @@ public:
         aiJudge_ = judge;
         aiWaits_ = waits;
     }
+    // Mix: on Enter, a model trained for conversion reads the sentence's
+    // texts with other choices of its chunks (MixedSentences) as ways to
+    // write the keys typed, and takes the one that reads better by more
+    // than `margin` nats. `keepNotation`: not one that only writes the
+    // chosen text otherwise. Enter waits for the answer (about 0.1 s on a
+    // GPU, 0.4 s on a processor) up to the judge's own wait. `count`: how
+    // many texts it reads (fewer answer sooner).
+    void SetMixAi(bool on, double margin = 4.0, bool keepNotation = true, std::size_t count = 16) noexcept {
+        mixAi_ = on;
+        mixAiMargin_ = margin;
+        mixAiKeepNotation_ = keepNotation;
+        mixAiCount_ = count;
+    }
     // The AI's answer to the conversion shown is still to come.
     [[nodiscard]] bool WaitsForAi();
     // The answer WaitsForAi waits for came (or the AI gave none).
@@ -367,6 +380,7 @@ public:
         context_ = 0;
         contextWords_.clear();
         recentText_.clear();
+        mixContext_.clear();
         englishRun_ = 0;
         englishText_.clear();
         spaceAfterEnglish_ = false;
@@ -442,6 +456,12 @@ public:
         std::size_t chosen{0};
     };
     [[nodiscard]] const CheckedSentences& LastCheckedSentences() const noexcept { return lastCheckedSentences_; }
+    // Mixed typing, for evaluation: on Enter, up to `count` texts of the
+    // sentence with other choices of its chunks (MixedSentences), the first
+    // as committed, and the keys typed.
+    void SetKeepMixedSentences(std::size_t count) noexcept { keepMixed_ = count; }
+    [[nodiscard]] const std::vector<std::wstring>& LastMixedSentences() const noexcept { return lastMixed_; }
+    [[nodiscard]] const std::wstring& LastMixedKeys() const noexcept { return lastMixedKeys_; }
     [[nodiscard]] bool IsCandidateListOpen() const noexcept { return listOpen_ && IsConverted(); }
 
     // Predictions for what is typed (empty once converted), and which one
@@ -861,6 +881,30 @@ private:
     std::wstring conversionReading_;
     std::vector<CheckedPhrase> lastChecked_;
     mutable CheckedSentences lastCheckedSentences_;
+    std::size_t keepMixed_{0};
+    std::vector<std::wstring> lastMixed_;
+    std::wstring lastMixedKeys_;
+    bool mixAi_{false};
+    double mixAiMargin_{4.0};
+    bool mixAiKeepNotation_{true};
+    std::size_t mixAiCount_{16};
+    // The recent text when the sentence's first chunk settled.
+    std::wstring mixContext_;
+    // Mixed typing: the settled chunks' texts with other choices of theirs
+    // (a Japanese chunk's other conversions, a chunk that reads both ways
+    // in the other language), by the sum of their ranks, each text once;
+    // the first as they stand. With `picks`, which choice of each chunk.
+    struct MixedOption {
+        bool english;
+        std::wstring text;
+    };
+    [[nodiscard]] std::vector<std::vector<MixedOption>> MixedOptions() const;
+    [[nodiscard]] std::vector<std::wstring> MixedSentences(std::size_t count,
+                                                           std::vector<std::vector<std::size_t>>* picks = nullptr) const;
+    // Mix on Enter: the AI's choice among MixedSentences (SetMixAi).
+    void CheckMixedByAi();
+    // The keys of the settled chunks as typed, a space between chunks.
+    [[nodiscard]] std::wstring SettledKeys() const;
     // For each position in conversionReading_ (and its end), the key it
     // was read from, or npos inside a word or unit.
     std::vector<std::size_t> readingKeys_;

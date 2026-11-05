@@ -309,11 +309,18 @@ const tekito::japanese::AiJudge* gAiJudge = nullptr;
 // how often what was meant is among them. Nothing is answered.
 class ProbeJudge final : public tekito::japanese::AiJudge {
 public:
-    [[nodiscard]] std::size_t Top() const noexcept override { return 10; }
+    // TEKITO_EVAL_PROBE_TOP=N: how many of the sentence check's (10).
+    [[nodiscard]] std::size_t Top() const noexcept override {
+        static const std::size_t top = [] {
+            const char* value = std::getenv("TEKITO_EVAL_PROBE_TOP");
+            return value && *value ? std::strtoul(value, nullptr, 10) : 10ul;
+        }();
+        return top;
+    }
     [[nodiscard]] double Margin() const noexcept override { return 1e9; }
     [[nodiscard]] std::optional<tekito::japanese::AiConversion> Convert(std::wstring_view,
                                                                        std::span<const std::wstring> sentences,
-                                                                       std::wstring_view) const override {
+                                                                       std::wstring_view, bool) const override {
         asked.emplace_back(sentences.begin(), sentences.end());
         return std::nullopt;
     }
@@ -677,6 +684,26 @@ int RunKeys(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary
                 inList = std::find(row.expected.begin(), row.expected.end(), text) != row.expected.end();
             }
         }
+        // TEKITO_EVAL_LIST_DUMP=1: for a row not on the lists' first pages,
+        // where in the first phrase's whole list what was meant is (or -1).
+        if (const char* dump = std::getenv("TEKITO_EVAL_LIST_DUMP"); dump && *dump == '1' && !inList && phraseCount) {
+            composer.MoveFocus(-static_cast<int>(phraseCount));
+            composer.NextCandidate();
+            composer.PreviousCandidate();
+            const auto* candidates = composer.FocusedCandidates();
+            int at = -1;
+            std::wstring all;
+            for (std::size_t j = 0; candidates && j < candidates->size(); ++j) {
+                if (std::find(row.expected.begin(), row.expected.end(), (*candidates)[j].text) != row.expected.end() &&
+                    at < 0) {
+                    at = static_cast<int>(j);
+                }
+                if (j < 30) all += (j ? L" " : L"") + (*candidates)[j].text;
+            }
+            std::cout << "list " << row.source << ":" << row.id << " at=" << at << " size="
+                      << (candidates ? candidates->size() : 0) << " phrases=" << phraseCount << "  " << Narrow(all)
+                      << "\n";
+        }
         // Whole sentences from the phrases' lists, likeliest first: where
         // what was meant is among them (for choosing again with a model).
         std::size_t sentenceRank = SIZE_MAX;
@@ -899,12 +926,25 @@ int RunChunks(const ConnectionMatrix& matrix, const JapaneseDictionary& dictiona
     composer.SetNotationLevel(NotationLevel());
     if (options.slips) composer.SetKeyConverter(&keyConverter);
     if (names) composer.SetLoanwords(names);
+    if (const char* mixed = std::getenv("TEKITO_EVAL_MIXED"); mixed && *mixed) composer.SetKeepMixedSentences(256);
     tekito::japanese::SentenceReranker reranker;
     if (!options.rerankerPack.empty() && !reranker.Open(options.rerankerPack)) {
         std::cerr << "could not open the reranker at " << options.rerankerPack.string() << "\n";
         return 1;
     }
     if (reranker.IsOpen()) composer.SetSentenceReranker(&reranker);
+    // --ai: the model chooses among the sentence's texts on Enter (--hold);
+    // TEKITO_EVAL_MIX_AI_MARGIN=nats, TEKITO_EVAL_MIX_AI_NOTATION=0 lets it
+    // take a text that only writes the first otherwise; TEKITO_EVAL_MIX_AI_COUNT=N
+    // texts read (16).
+    if (gAiJudge) {
+        composer.SetAiJudge(gAiJudge, true);
+        const char* margin = std::getenv("TEKITO_EVAL_MIX_AI_MARGIN");
+        const char* notation = std::getenv("TEKITO_EVAL_MIX_AI_NOTATION");
+        const char* count = std::getenv("TEKITO_EVAL_MIX_AI_COUNT");
+        composer.SetMixAi(true, margin && *margin ? std::strtod(margin, nullptr) : 4.0, !(notation && *notation == '0'),
+                          count && *count ? std::strtoul(count, nullptr, 10) : 16);
+    }
     // TEKITO_EVAL_CHECK_ORDER=rank: the sentence check reads sentences put
     // together by rank, as before it took the converter's costs.
     if (const char* order = std::getenv("TEKITO_EVAL_CHECK_ORDER"); order && std::string_view(order) == "rank") {
@@ -1086,6 +1126,34 @@ int RunChunks(const ConnectionMatrix& matrix, const JapaneseDictionary& dictiona
         if (options.hold) {
             WriteShown(row.source, row.id, composer);
             output = composer.Commit();
+            // TEKITO_EVAL_MIXED=<prefix>[:N]: the sentence's texts with other
+            // choices of its chunks (<prefix>.sentences.tsv: source, id, k,
+            // meant 1/0, text) and the keys typed (<prefix>.keys.tsv: id,
+            // keys), for an AI model to choose among offline.
+            static std::ofstream mixedOut, mixedKeys;
+            static const std::size_t mixedCount = [&] {
+                const char* value = std::getenv("TEKITO_EVAL_MIXED");
+                if (!value || !*value) return std::size_t{0};
+                std::string prefix = value;
+                std::size_t count = 24;
+                if (const auto colon = prefix.rfind(':'); colon != std::string::npos && colon > 1) {
+                    count = std::stoul(prefix.substr(colon + 1));
+                    prefix.resize(colon);
+                }
+                mixedOut.open(prefix + ".sentences.tsv", std::ios::binary);
+                mixedKeys.open(prefix + ".keys.tsv", std::ios::binary);
+                return count;
+            }();
+            if (mixedCount > 0) {
+                const auto& texts = composer.LastMixedSentences();
+                for (std::size_t k = 0; k < std::min(texts.size(), mixedCount); ++k) {
+                    auto text = texts[k];
+                    while (!text.empty() && text.back() == L' ') text.pop_back();
+                    const bool meant = std::find(row.expected.begin(), row.expected.end(), text) != row.expected.end();
+                    mixedOut << row.source << '\t' << row.id << '\t' << k << '\t' << (meant ? 1 : 0) << '\t' << Narrow(text) << '\n';
+                }
+                mixedKeys << row.id << '\t' << Narrow(composer.LastMixedKeys()) << '\n';
+            }
         }
         // English last leaves its space after it.
         while (!output.empty() && output.back() == L' ') output.pop_back();

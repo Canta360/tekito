@@ -10,6 +10,7 @@
 #include "Core/Japanese/KeyConverter.h"
 #include "Core/Japanese/LanguageModel.h"
 #include "Core/Japanese/Loanwords.h"
+#include "Core/Japanese/AiJudge.h"
 #include "Core/Japanese/ChunkJudge.h"
 #include "Core/RankingData.h"
 #include "Core/Japanese/KanaText.h"
@@ -1071,6 +1072,51 @@ void TestMixedTyping(const RomajiTable& table, const MiniPack& pack) {
     const auto sentence = composer.Commit();
     Require(sentence.starts_with(L"Push") && sentence.size() > 4 && sentence[4] >= 0x3000,
             "Enter commits the whole sentence, Japanese right after English");
+    {
+        // Mix AI: on Enter, a model trained for conversion chooses among the
+        // sentence's texts, reading the keys and only what came before it.
+        struct PickSecond final : tekito::japanese::AiJudge {
+            std::size_t Top() const noexcept override { return 10; }
+            double Margin() const noexcept override { return 2.0; }
+            bool Writes() const noexcept override { return true; }
+            std::optional<tekito::japanese::AiConversion> Convert(std::wstring_view reading,
+                                                                 std::span<const std::wstring> sentences,
+                                                                 std::wstring_view context, bool write) const override {
+                keys = reading;
+                before = context;
+                asked.assign(sentences.begin(), sentences.end());
+                wrote = write;
+                tekito::japanese::AiConversion answer;
+                for (std::size_t i = 0; i < sentences.size(); ++i) answer.scores.push_back(i == 1 ? 0.0 : -10.0);
+                return answer;
+            }
+            mutable std::wstring keys, before;
+            mutable std::vector<std::wstring> asked;
+            mutable bool wrote{true};
+        } picker;
+        JapaneseComposer mixed(&table);
+        mixed.SetConverter(&converter);
+        mixed.SetMixedTyping(&judge);
+        mixed.SetRecentText(L"前の文。");
+        mixed.SetAiJudge(&picker, false);
+        mixed.SetMixAi(true, 2.0);
+        Type(mixed, L"take");
+        mixed.Convert();
+        Type(mixed, L"wo");
+        mixed.Convert();
+        const auto chosen = mixed.Commit();
+        Require(picker.asked.size() >= 2 && chosen == picker.asked[1], "Mix commits the text the model chose on Enter");
+        Require(picker.before == L"前の文。", "the model reads what came before the sentence, not its own chunks");
+        Require(picker.keys == L"take wo" && !picker.wrote, "it reads the keys typed and is asked only for scores");
+        mixed.SetMixAi(false);
+        picker.asked.clear();
+        Type(mixed, L"take");
+        mixed.Convert();
+        Type(mixed, L"wo");
+        mixed.Convert();
+        (void)mixed.Commit();
+        Require(picker.asked.empty(), "with the setting off the model is not asked");
+    }
     composer.ForgetContext();
     composer.SetSentenceStart(false);
     Type(composer, L"github");

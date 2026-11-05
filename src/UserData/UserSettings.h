@@ -181,6 +181,9 @@ struct UserSettings {
     // Live conversion in Mix, apart from Japanese mode's: the chunk being
     // typed shows converted while it is clearly Japanese.
     bool mixLiveConversion{false};
+    // Mix with an AI model chosen (japaneseSentenceModel): on Enter, the
+    // model chooses among the sentence's ways to be written.
+    bool mixAi{true};
     // Mix's own choices of what Japanese mode also has.
     bool mixPredictionEnabled{true};
     bool mixFirstPageSymbol{true};

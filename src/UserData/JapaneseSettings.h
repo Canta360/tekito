@@ -77,6 +77,7 @@ inline void ApplyJapaneseSettings(japanese::JapaneseComposer& composer, const Us
     composer.SetSpacelessEnglish(settings.spacelessEnglish);
     composer.SetLiveRefine(settings.japaneseLiveRefine);
     composer.SetMixLiveConversion(settings.mixLiveConversion);
+    composer.SetMixAi(settings.mixAi, 2.0);
     composer.SetSpecialConversions(&SpecialConversions::Installed(), SpecialOptionsFor(settings));
     ApplyModeSettings(composer, settings, mixed);
 }

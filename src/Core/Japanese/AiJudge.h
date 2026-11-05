@@ -44,17 +44,18 @@ public:
     // `sentences` as ways to write `reading` (hiragana) after `context`
     // (what was written just before, maybe nothing); nothing when the
     // helper is not there or late. A model that does not read readings
-    // scores the sentences alone.
+    // scores the sentences alone. `write`: also the model's own writings
+    // (without them the answer comes sooner).
     [[nodiscard]] virtual std::optional<AiConversion> Convert(std::wstring_view reading,
                                                               std::span<const std::wstring> sentences,
-                                                              std::wstring_view context) const = 0;
+                                                              std::wstring_view context, bool write = true) const = 0;
     // Convert without waiting: the answer when this same question was the
     // last answered, else nothing, and it is asked in the background (a
     // newer question replaces one still waiting to be sent).
     [[nodiscard]] virtual std::optional<AiConversion> Ask(std::wstring_view reading,
                                                           std::span<const std::wstring> sentences,
-                                                          std::wstring_view context) const {
-        return Convert(reading, sentences, context);
+                                                          std::wstring_view context, bool write = true) const {
+        return Convert(reading, sentences, context, write);
     }
     // Whether a question Ask sent is still being answered.
     [[nodiscard]] virtual bool Asking() const { return false; }
@@ -90,9 +91,9 @@ public:
     [[nodiscard]] double Margin() const noexcept override { return kind_.margin; }
     [[nodiscard]] bool Writes() const noexcept override { return kind_.writes; }
     [[nodiscard]] std::optional<AiConversion> Convert(std::wstring_view reading, std::span<const std::wstring> sentences,
-                                                      std::wstring_view context) const override;
+                                                      std::wstring_view context, bool write = true) const override;
     [[nodiscard]] std::optional<AiConversion> Ask(std::wstring_view reading, std::span<const std::wstring> sentences,
-                                                  std::wstring_view context) const override;
+                                                  std::wstring_view context, bool write = true) const override;
     [[nodiscard]] bool Asking() const override;
     // Starts the helper and has it load the model, so the next conversion
     // need not wait for it.
@@ -125,7 +126,8 @@ constexpr std::wstring_view kRuntimePack = L"ai-runtime";
 [[nodiscard]] std::wstring HelperPath();
 
 constexpr std::uint32_t kMagic = 0x3241'4B54;  // "TKA2"
-enum class Request : std::uint32_t { Convert = 0, Warm = 1, Stop = 2 };
+// Score: Convert without the model's own writings.
+enum class Request : std::uint32_t { Convert = 0, Warm = 1, Stop = 2, Score = 3 };
 enum class Status : std::uint32_t { Ok = 0, NoModel = 1, TooLong = 2, Failed = 3 };
 constexpr std::size_t kMaxSentences = 32;
 constexpr std::size_t kMaxCharacters = 512;
