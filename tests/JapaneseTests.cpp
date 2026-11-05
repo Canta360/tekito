@@ -1017,6 +1017,9 @@ void TestMixedTyping(const RomajiTable& table, const MiniPack& pack) {
                 "an English sentence is English throughout (to, home: not と, 褒め)");
         const auto mixed = judge.JudgeSentence({L"kikai", L"to", L"push", L"home"});
         Require(!mixed.front().english, "a chunk that is only Japanese keeps the sentence as judged");
+        const auto words = judge.JudgeSentence({L"take", L"home", L"take"});
+        Require(std::all_of(words.begin(), words.end(), [](const auto& j) { return j.english; }),
+                "three chunks that are all English words, each romaji too, are an English sentence");
     }
     const auto pieces = judge.Split(L"pushsimasita");
     Require(pieces && pieces->size() == 2 && (*pieces)[0].english && (*pieces)[0].text == L"push" && !(*pieces)[1].english,
@@ -1112,6 +1115,31 @@ void TestMixedTyping(const RomajiTable& table, const MiniPack& pack) {
         Require(!live.empty() && live.front() >= 0x4E00 && english == englishOff && off == L"きかい",
                 "Mix live conversion shows Japanese converted, English as typed, and is off by default");
     }
+    {
+        // Clear drops the chunks held for Enter (the text service clears a
+        // composition that ended); Escape still drops only the chunk typed.
+        const auto alone = [&] {
+            composer.ForgetContext();
+            composer.SetSentenceStart(false);
+            Type(composer, L"kikai");
+            composer.Convert();
+            return composer.Commit();
+        };
+        const std::wstring expected = alone();
+        composer.ForgetContext();
+        composer.SetSentenceStart(false);
+        Type(composer, L"watasiha");
+        composer.Convert();
+        Type(composer, L"kikai");
+        composer.Cancel();
+        Require(composer.IsComposing() && !composer.Segments().empty() && composer.Segments().front().settled,
+                "Escape on a chunk typed keeps the chunks held before it");
+        Type(composer, L"kikai");
+        composer.Convert();
+        composer.Clear();
+        Require(!composer.IsComposing() && composer.Segments().empty(), "Clear drops the chunks held for Enter");
+        RequireText(alone(), expected, "what is typed after Clear is committed without the chunks dropped");
+    }
 
     {
         // A vowel typed alone stays kana when the sentence is read again,
@@ -1145,6 +1173,57 @@ void TestMixedTyping(const RomajiTable& table, const MiniPack& pack) {
     RequireText(JapaneseComposer::SpacedEnglish(L"", L"3\u6642\u3001iPhone15\u3092"), L"3\u6642\u3001iPhone15 \u3092",
                 "not by digits alone or punctuation");
     RequireText(JapaneseComposer::SpacedEnglish(L"", L"I want to go"), L"I want to go", "English stays");
+    {
+        // A chunk that reads both ways, Japanese in a Japanese sentence
+        // (kikai, here an English word too): the English picked once is
+        // first the next time, and Japanese again once that is picked.
+        struct BothWays final : tekito::IFrequencyProvider {
+            double Score(std::wstring_view word) const noexcept override { return word == L"kikai" ? 3.0 : 0.0; }
+        } both;
+        const tekito::japanese::ChunkJudge bothJudge(table, converter, nullptr, both, nullptr);
+        tekito::japanese::JapaneseLearningStore learning;
+        JapaneseComposer learner(&table);
+        learner.SetConverter(&converter);
+        learner.SetMixedTyping(&bothJudge);
+        learner.SetLearning(&learning);
+        const auto typed = [&] {
+            learner.ForgetContext();
+            learner.SetSentenceStart(false);
+            Type(learner, L"watasiha");
+            learner.Convert();
+            Type(learner, L"kikai");
+            learner.Convert();
+            std::wstring text;
+            for (const auto& s : learner.Segments()) text += s.text;
+            return text;
+        };
+        const auto first = typed();
+        Require(first.find(L"kikai") == std::wstring::npos, "the second kikai is Japanese at first");
+        bool picked = false;
+        for (int i = 0; i < 12 && !picked; ++i) {
+            learner.NextCandidate();
+            std::wstring text;
+            for (const auto& s : learner.Segments()) text += s.text;
+            picked = text.find(L"kikai") != std::wstring::npos;
+        }
+        Require(picked, "and its English is among the choices");
+        learner.Commit();
+        Require(typed().find(L"kikai") != std::wstring::npos, "once picked, the English comes first");
+        learner.Clear();
+        for (int round = 0; round < 2; ++round) {
+            const bool english = typed().find(L"kikai") != std::wstring::npos;
+            bool japanese = !english;
+            for (int i = 0; i < 12 && !japanese; ++i) {
+                learner.NextCandidate();
+                std::wstring text;
+                for (const auto& s : learner.Segments()) text += s.text;
+                japanese = text.find(L"kikai") == std::wstring::npos;
+            }
+            learner.Commit();
+        }
+        Require(typed().find(L"kikai") == std::wstring::npos, "and Japanese again once Japanese is picked over it");
+        learner.Clear();
+    }
     composer.SetMixedTyping(nullptr);
     Type(composer, L"push");
     composer.Convert();

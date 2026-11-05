@@ -932,6 +932,11 @@ int RunChunks(const ConnectionMatrix& matrix, const JapaneseDictionary& dictiona
     if (!std::getenv("TEKITO_EVAL_NO_LETTER_ODDS") && letterOdds.Open(options.pack.parent_path() / "japanese-letter-odds")) {
         const_cast<tekito::japanese::ChunkJudge&>(judge).SetLetterOdds(&letterOdds);
     }
+    // TEKITO_EVAL_ENGLISH_AROUND=0: chunks that read both ways not judged
+    // by the English around them (ChunkJudge::SetEnglishAround).
+    if (const char* around = std::getenv("TEKITO_EVAL_ENGLISH_AROUND"); around && *around == '0') {
+        const_cast<tekito::japanese::ChunkJudge&>(judge).SetEnglishAround(false);
+    }
     const auto parts = tekito::japanese::UserPartsOfSpeech::Load(options.pack / "pos.tsv");
     const auto noun = parts.For(tekito::japanese::UserWordKind::ProperNoun);
     if (!options.japaneseMode) composer.SetMixedTyping(&judge, noun ? noun->right : 0);
@@ -1103,6 +1108,14 @@ int RunChunks(const ConnectionMatrix& matrix, const JapaneseDictionary& dictiona
                 // Punctuation alone is as before.
                 if (keys[i].empty()) continue;
                 right = right && whole[i].english == meant[i];
+            }
+            // TEKITO_EVAL_WHOLE_CHUNKS=1: each chunk as the whole sentence
+            // judges it (as the chunk lines show the left-to-right calls).
+            if (const char* each = std::getenv("TEKITO_EVAL_WHOLE_CHUNKS"); each && *each == '1') {
+                for (std::size_t i = 0; i < whole.size(); ++i) {
+                    std::cout << "whole " << Narrow(keys[i]) << (meant[i] ? " E" : " J")
+                              << " said=" << (whole[i].english ? "E" : "J") << (whole[i].either ? " either" : "") << "\n";
+                }
             }
             for (const auto* name : {row.source.c_str(), "all"}) {
                 ++sentenceRows[name];

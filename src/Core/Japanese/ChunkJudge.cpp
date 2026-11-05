@@ -321,11 +321,21 @@ ChunkJudge::Judgement ChunkJudge::Judge(std::wstring_view keys, std::size_t engl
     }
     // Reads both ways (kara, take, amazon): as the sentence goes.
     // In an English sentence English (my name, come here); otherwise
-    // English when Japanese text writes it so and it is no Japanese word.
+    // English when Japanese text writes it so and it is no Japanese word,
+    // or when the sentence has other English in it and the romaji is no
+    // everyday Japanese (merge to deploy no data: data; push site: して).
     if (name || score >= thresholds_.knownWord) {
         judgement.either = true;
+        const bool everyday = best && !kana.empty() &&
+                              best->cost < thresholds_.everydayPerKana * static_cast<std::int64_t>(kana.size());
         judgement.english = englishSentence ||
                             (!japaneseWord && inJapanese && *inJapanese >= thresholds_.inJapaneseText);
+        // Only a word Japanese text writes in Latin letters at all (not
+        // mou: もう).
+        if (!judgement.english && englishAround_ && !before.empty() && !everyday && inJapanese) {
+            judgement.english = true;
+            judgement.byEnglishAround = true;
+        }
     }
     if (!judgement.english) judgement.written = std::wstring(keys);
     return judgement;
@@ -563,9 +573,14 @@ std::vector<ChunkJudge::Judgement> ChunkJudge::JudgeSentence(const std::vector<s
     // English. One chunk that is only Japanese (kyouha, suru) keeps the
     // chunks as judged.
     constexpr std::size_t kSentenceChunks = 3;
-    const auto english = static_cast<std::size_t>(
-        std::count_if(judged.begin(), judged.end(), [](const Judgement& j) { return j.english; }));
-    if (chunks.size() >= kSentenceChunks && english * 2 >= chunks.size()) {
+    // English only for the English around it does not make the sentence
+    // English (game no server gaomoi).
+    const auto english = static_cast<std::size_t>(std::count_if(
+        judged.begin(), judged.end(), [](const Judgement& j) { return j.english && !j.byEnglishAround; }));
+    // Or every chunk an English word, though each reads as romaji too
+    // (take the same road, i made it home).
+    const bool allWords = std::all_of(judged.begin(), judged.end(), [](const Judgement& j) { return j.english || j.either; });
+    if (chunks.size() >= kSentenceChunks && (english * 2 >= chunks.size() || (englishAround_ && allWords))) {
         std::wstring text;
         for (const auto& j : judged) {
             if (j.english) text += j.written + L" ";

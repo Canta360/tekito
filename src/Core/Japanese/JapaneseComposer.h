@@ -462,6 +462,7 @@ public:
     // The text to commit (pending keys are resolved first, and a chosen
     // prediction replaces what is typed); clears the composition.
     [[nodiscard]] std::wstring Commit();
+    // Drops the whole composition, Mix chunks held for Enter included.
     void Clear() noexcept;
     // Ctrl+Backspace right after committing: the text committed last comes
     // back as it was before Enter (the caller takes it out of the
@@ -730,6 +731,8 @@ private:
     bool spaceOwed_{false};
     // The chunk CommitChunk took last was English.
     bool lastChunkEnglish_{false};
+    // Drops the chunk being typed; the settled ones stay.
+    void ClearChunk() noexcept;
     // The chunk being typed (not the settled ones).
     [[nodiscard]] bool Typing() const noexcept { return !units_.empty() || !pending_.empty(); }
     // Mixed typing: the chunk being typed shown as its letters rather than
@@ -767,6 +770,10 @@ private:
     [[nodiscard]] std::optional<std::wstring> TypedWithCapitals(std::wstring_view keys) const;
     // The chunk judge's judgement of `keys`, with SetSingleVowelKana.
     [[nodiscard]] ChunkJudge::Judgement JudgeChunk(std::wstring_view keys) const;
+    // A chunk that reads both ways takes the language the user chose for
+    // it before (learning: game picked as English over げめ, or 褒め over
+    // home), when that was learned.
+    void ApplyLearnedLanguage(ChunkJudge::Judgement& judged, std::wstring_view keys) const;
     // Gives the converter the text before the caret, for its edge scorer.
     void SyncEdgeContext() const;
     // Phrases that are only digits: the form SetNumberStyle asks for first.

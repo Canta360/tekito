@@ -48,6 +48,10 @@ public:
         // per million sentences) is English in Japanese too (API, Amazon);
         // one seen less (take, same) is Japanese there.
         double inJapaneseText{1.6};
+        // Romaji that reads as Japanese this cheaply per kana (して, まで,
+        // でも) stays Japanese beside other English; dearer (data: だた,
+        // game: げめ) is the English.
+        std::int64_t everydayPerKana{2000};
     };
 
     ChunkJudge(const RomajiTable& table, const JapaneseConverter& converter, const KeyConverter* slips,
@@ -67,6 +71,12 @@ public:
     // How English the letters are against romaji (cappuccino against
     // kyouha), for English no list has; nullptr: off.
     void SetLetterOdds(const LetterOdds* odds) noexcept { letterOdds_ = odds; }
+    // A chunk that reads both ways is English when the sentence has other
+    // English in it (`before` in Judge) and its romaji is no everyday
+    // Japanese (Thresholds::everydayPerKana); and a sentence of three
+    // chunks or more that are all English words is English (take the same
+    // road). On by default.
+    void SetEnglishAround(bool on) noexcept { englishAround_ = on; }
 
     // `keys` may be the start of a common English word (meetin: meeting), so
     // Mix's live conversion leaves them as typed.
@@ -77,6 +87,8 @@ public:
         std::wstring written;
         // It reads as either language: the other one is as likely.
         bool either{false};
+        // English only for the other English in the sentence (SetEnglishAround).
+        bool byEnglishAround{false};
         // A known English word or name (not just keys that make no kana).
         bool word{false};
         // Japanese: the keys as meant, when they are a slip of a particle
@@ -142,6 +154,7 @@ private:
     const Loanwords* names_;
     const WrittenForms* forms_{nullptr};
     const LetterOdds* letterOdds_{nullptr};
+    bool englishAround_{true};
     Thresholds thresholds_;
 };
 

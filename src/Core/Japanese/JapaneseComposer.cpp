@@ -14,6 +14,7 @@
 #include "Core/EnglishSpelling.h"
 
 #include <algorithm>
+#include <cmath>
 #include <functional>
 #include <regex>
 #include <map>
@@ -315,7 +316,7 @@ std::wstring EnglishForModel(std::wstring_view english) {
 
 void JapaneseComposer::SetTable(const RomajiTable* table) noexcept {
     table_ = table;
-    Clear();
+    ClearChunk();
 }
 
 void JapaneseComposer::SetInputForm(KanaForm form) noexcept {
@@ -994,7 +995,7 @@ void JapaneseComposer::Cancel() {
         }
         return;
     }
-    Clear();
+    ClearChunk();
 }
 
 std::wstring JapaneseComposer::ReportReading() const {
@@ -3963,7 +3964,8 @@ void JapaneseComposer::JudgeWholeSentence(std::optional<ChunkJudge::Judgement>& 
         at.push_back(i);
     }
     keys.emplace_back(currentKeys);
-    const auto whole = chunkJudge_->JudgeSentence(keys, englishCorrection_ ? englishSpelling_ : nullptr, spacelessEnglish_);
+    auto whole = chunkJudge_->JudgeSentence(keys, englishCorrection_ ? englishSpelling_ : nullptr, spacelessEnglish_);
+    for (std::size_t k = 0; k < whole.size(); ++k) ApplyLearnedLanguage(whole[k], keys[k]);
     // A vowel typed alone stays kana (SetSingleVowelKana) unless an English
     // word other than such a vowel is beside it: i ga itai is い, i think so
     // is I, a i u e o stays kana.
@@ -4045,7 +4047,36 @@ ChunkJudge::Judgement JapaneseComposer::JudgeChunk(std::wstring_view keys) const
         judged.written = std::wstring(keys);
         judged.written[0] = static_cast<wchar_t>(std::towupper(judged.written[0]));
     }
+    ApplyLearnedLanguage(judged, keys);
     return judged;
+}
+
+void JapaneseComposer::ApplyLearnedLanguage(ChunkJudge::Judgement& judged, std::wstring_view keys) const {
+    if (!learning_ || !judged.either || !table_ || keys.empty()) return;
+    std::wstring kana;
+    for (const auto& token : ParseRomaji(*table_, keys)) {
+        if (token.leftover) return;
+        kana += token.kana;
+    }
+    const std::wstring reading = ApplyTypingStyle(std::move(kana));
+    // The English as it was committed: as written, as typed, or with a
+    // capital at the start of a sentence.
+    std::wstring lower(keys);
+    for (auto& c : lower) c = static_cast<wchar_t>(std::towlower(c));
+    std::wstring capital = lower;
+    capital[0] = static_cast<wchar_t>(std::towupper(capital[0]));
+    double preference = 0.0;
+    for (const auto& text : {judged.written, lower, capital}) {
+        const double p = learning_->Preference(reading, text);
+        if (std::abs(p) > std::abs(preference)) preference = p;
+    }
+    if (preference > 0.0 && !judged.english) {
+        judged.english = true;
+        judged.written = lower;
+    } else if (preference < 0.0 && judged.english) {
+        judged.english = false;
+        judged.written = std::wstring(keys);
+    }
 }
 
 std::wstring JapaneseComposer::CommitChunk() {
@@ -4103,7 +4134,7 @@ std::wstring JapaneseComposer::CommitChunk() {
             dropSpaceBefore_ = spaceAfterEnglish_ && !marks.empty() && marks.find_first_not_of(L".,!?。、．，！？") == std::wstring_view::npos;
             spaceAfterEnglish_ = !japaneseMark;
             SetSentenceStart(EndsSentence(text));
-            Clear();
+            ClearChunk();
             lastCommit_.reset();
             return text;
         }
@@ -4126,7 +4157,7 @@ std::wstring JapaneseComposer::CommitChunk() {
         // A prediction's part of speech is not known here.
         context_ = 0;
         RememberWords(prediction.text);
-        Clear();
+        ClearChunk();
         keep(prediction.text);
         return prediction.text;
     }
@@ -4136,7 +4167,7 @@ std::wstring JapaneseComposer::CommitChunk() {
         context_ = ContextAfter(text, whole->rightId);
         SetSentenceStart(EndsSentence(text));
         RememberWords(text);
-        Clear();
+        ClearChunk();
         keep(text);
         return text;
     }
@@ -4162,7 +4193,7 @@ std::wstring JapaneseComposer::CommitChunk() {
     context_ = ContextAfter(text, last);
     if (!text.empty()) SetSentenceStart(EndsSentence(text));
     RememberWords(text);
-    Clear();
+    ClearChunk();
     keep(text);
     return text;
 }
@@ -4171,7 +4202,7 @@ bool JapaneseComposer::Reconvert(std::wstring_view text) {
     if (!converter_ || text.empty() || IsComposing()) return false;
     const auto guess = converter_->ReadingOf(text);
     if (!guess || guess->reading.empty()) return false;
-    Clear();
+    ClearChunk();
     lastCommit_.reset();
     // Units as if typed: two kana together where the table has them (きょ).
     const std::wstring& reading = guess->reading;
@@ -4197,7 +4228,7 @@ bool JapaneseComposer::Reconvert(std::wstring_view text) {
     BuildPhrases(true);
     keyConverter_ = slips;
     if (phrases_.empty()) {
-        Clear();
+        ClearChunk();
         return false;
     }
     // Where each word ends, in the reading and in the text: a phrase that
@@ -4408,7 +4439,7 @@ std::uint16_t JapaneseComposer::ContextAfter(std::wstring_view text, std::uint16
     return rightId;
 }
 
-void JapaneseComposer::Clear() noexcept {
+void JapaneseComposer::ClearChunk() noexcept {
     predictions_.clear();
     chosenPrediction_.reset();
     units_.clear();
@@ -4423,6 +4454,18 @@ void JapaneseComposer::Clear() noexcept {
     capitals_ = 0;
     reconverted_ = false;
     ResetLive();
+}
+
+void JapaneseComposer::Clear() noexcept {
+    ClearChunk();
+    // Mixed typing: the chunks held for Enter go too, so they do not come
+    // back with what is typed next.
+    if (!settled_.empty()) {
+        settled_.clear();
+        RecountSentence();
+    }
+    spaceBeforeSentence_ = false;
+    lastChunkEnglish_ = false;
 }
 
 }  // namespace tekito::japanese
