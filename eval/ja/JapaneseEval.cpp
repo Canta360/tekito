@@ -1004,6 +1004,13 @@ int RunChunks(const ConnectionMatrix& matrix, const JapaneseDictionary& dictiona
     }
     // TEKITO_EVAL_ENGLISH_AROUND=0: chunks that read both ways not judged
     // by the English around them (ChunkJudge::SetEnglishAround).
+    // TEKITO_EVAL_MIX_LIVE=1: Mix live conversion on, each key's display timed.
+    const bool mixLive = [] {
+        const char* value = std::getenv("TEKITO_EVAL_MIX_LIVE");
+        return value && *value == '1';
+    }();
+    if (mixLive) composer.SetMixLiveConversion(true);
+    std::vector<double> keyMicroseconds;
     if (const char* around = std::getenv("TEKITO_EVAL_ENGLISH_AROUND"); around && *around == '0') {
         const_cast<tekito::japanese::ChunkJudge&>(judge).SetEnglishAround(false);
     }
@@ -1095,7 +1102,14 @@ int RunChunks(const ConnectionMatrix& matrix, const JapaneseDictionary& dictiona
                           << " in_japanese=" << (names && names->InJapaneseText(chunk) ? *names->InJapaneseText(chunk) : -9.0)
                           << (meant != said ? "  WRONG" : "") << "\n";
             }
-            for (const wchar_t key : chunk) composer.Insert(key);
+            for (const wchar_t key : chunk) {
+                const auto keyStart = std::chrono::steady_clock::now();
+                composer.Insert(key);
+                if (mixLive) {
+                    (void)composer.Segments();
+                    keyMicroseconds.push_back(std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - keyStart).count());
+                }
+            }
             composer.Convert();
             if (options.hold) continue;
             const auto choices = OnePickAway(composer);
@@ -1302,6 +1316,11 @@ int RunChunks(const ConnectionMatrix& matrix, const JapaneseDictionary& dictiona
     }
     for (const auto& [source, rows] : sentenceRows) {
         std::cout << source << ": sentence_judged_rows=" << 100.0 * sentenceRight[source] / rows << "%\n";
+    }
+    if (!keyMicroseconds.empty()) {
+        std::cout << "mix live keys=" << keyMicroseconds.size() << " p50_ms=" << Percentile(keyMicroseconds, 0.5) / 1000
+                  << " p95_ms=" << Percentile(keyMicroseconds, 0.95) / 1000
+                  << " max_ms=" << Percentile(keyMicroseconds, 1.0) / 1000 << "\n";
     }
     return 0;
 }
