@@ -44,7 +44,11 @@ Fine-tuned on:
   (https://huggingface.co/datasets/Miwa-Keita/zenz-v2.5-dataset), under
   the Open Data Commons Attribution License (ODC-BY 1.0);
 - English sentences from the Leipzig Corpora Collection
-  (eng_news_2025_1M, https://wortschatz.uni-leipzig.de/), under CC BY 4.0.
+  (eng_news_2025_1M, https://wortschatz.uni-leipzig.de/), under CC BY 4.0;
+- Japanese and English mixed, made from those Japanese lines with their
+  katakana words put in English: loanwords from the CMU Pronouncing
+  Dictionary (BSD-style licence) ranked by the Leipzig frequencies, and
+  names from Wikidata's labels (https://www.wikidata.org/, CC0 1.0).
 """,
     },
     "japanese-ai-strong": {
