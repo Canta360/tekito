@@ -3,6 +3,7 @@
 // What tekito_ja_eval's parts share: the corpus rows, text conversion and
 // the measures.
 
+#include <cstdlib>
 #include <algorithm>
 #include <cstddef>
 #include <filesystem>
@@ -81,6 +82,28 @@ inline std::vector<Row> LoadCorpus(const std::filesystem::path& path) {
         if (fields.size() < text + 2) continue;
         Row row{fields[0], fields[1], Widen(fields[text]), {}};
         for (std::size_t i = text + 1; i < fields.size(); ++i) row.expected.push_back(Widen(fields[i]));
+        // TEKITO_EVAL_FOLD_WIDTH=1: digits and Latin letters right in either
+        // width (2 or ２, PC or ＰＣ), as the settings choose the width.
+        static const bool fold = [] {
+            const char* value = std::getenv("TEKITO_EVAL_FOLD_WIDTH");
+            return value && *value == '1';
+        }();
+        if (fold) {
+            const auto alnum = [](wchar_t c) { return (c >= L'0' && c <= L'9') || (c >= L'A' && c <= L'Z') || (c >= L'a' && c <= L'z'); };
+            const std::size_t given = row.expected.size();
+            for (std::size_t i = 0; i < given; ++i) {
+                std::wstring half = row.expected[i], full = row.expected[i];
+                for (auto& c : half) {
+                    if (c >= 0xFF01 && c <= 0xFF5E && alnum(static_cast<wchar_t>(c - 0xFEE0))) c = static_cast<wchar_t>(c - 0xFEE0);
+                }
+                for (auto& c : full) {
+                    if (alnum(c)) c = static_cast<wchar_t>(c + 0xFEE0);
+                }
+                for (auto* form : {&half, &full}) {
+                    if (std::find(row.expected.begin(), row.expected.end(), *form) == row.expected.end()) row.expected.push_back(*form);
+                }
+            }
+        }
         rows.push_back(std::move(row));
     }
     return rows;

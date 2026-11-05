@@ -34,6 +34,7 @@
 #include "Core/Japanese/LetterOdds.h"
 #include "Core/Japanese/EdgeScorer.h"
 #include "Core/Japanese/Notation.h"
+#include "UserData/JapaneseSettings.h"
 #include "Core/Japanese/WrittenForms.h"
 #include "Core/SpecialConversions.h"
 #include "Core/ExternalRankingProviders.h"
@@ -292,6 +293,21 @@ void WriteShown(const std::string& source, const std::string& id, const tekito::
     if (out.is_open()) out << source << "\t" << id << "\t" << Narrow(text) << "\n";
 }
 
+// TEKITO_EVAL_PRODUCT_OFF=special,digits,numbers,letters,predict,correction: those of
+// TEKITO_EVAL_PRODUCT's settings back as the evaluation had them.
+void UndoProductSettings(tekito::japanese::JapaneseComposer& composer) {
+    const char* off = std::getenv("TEKITO_EVAL_PRODUCT_OFF");
+    if (!off || !*off) return;
+    const std::string_view list(off);
+    const auto has = [&](std::string_view name) { return list.find(name) != std::string_view::npos; };
+    if (has("special")) composer.SetSpecialConversions(nullptr);
+    if (has("digits")) composer.SetHalfWidthDigits(false);
+    if (has("numbers")) composer.SetNumberStyle(tekito::japanese::JapaneseComposer::NumberStyle::AsTyped);
+    if (has("letters")) composer.SetHalfWidthLetters(false);
+    if (has("predict")) composer.SetPredictionEnabled(false);
+    if (has("correction")) composer.SetEnglishCorrection(false);
+}
+
 struct Totals {
     std::size_t rows{0};
     std::size_t exact{0};
@@ -445,6 +461,13 @@ int RunKeys(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary
     const tekito::japanese::KeyConverter keyConverter(dictionary, matrix, converter, *table, costs);
     tekito::japanese::JapaneseComposer composer(table.get());
     composer.SetConverter(&converter);
+    // TEKITO_EVAL_PRODUCT=1: the settings the input method starts with
+    // (UserSettings's defaults: digit and letter widths, number style,
+    // special conversions), learning and the AI aside.
+    if (const char* product = std::getenv("TEKITO_EVAL_PRODUCT"); product && *product == '1') {
+        tekito::userdata::ApplyJapaneseSettings(composer, tekito::userdata::UserSettings{}, nullptr, false);
+        UndoProductSettings(composer);
+    }
     composer.SetNotationLevel(NotationLevel());
     composer.SetKeyConverter(&keyConverter);
     if (loanwords) composer.SetLoanwords(loanwords);
@@ -923,6 +946,13 @@ int RunChunks(const ConnectionMatrix& matrix, const JapaneseDictionary& dictiona
     const tekito::japanese::KeyConverter keyConverter(dictionary, matrix, converter, *table, costs);
     tekito::japanese::JapaneseComposer composer(table.get());
     composer.SetConverter(&converter);
+    // TEKITO_EVAL_PRODUCT=1: the settings the input method starts with
+    // (UserSettings's defaults: digit and letter widths, number style,
+    // special conversions), learning and the AI aside.
+    if (const char* product = std::getenv("TEKITO_EVAL_PRODUCT"); product && *product == '1') {
+        tekito::userdata::ApplyJapaneseSettings(composer, tekito::userdata::UserSettings{}, nullptr, !options.japaneseMode);
+        UndoProductSettings(composer);
+    }
     composer.SetNotationLevel(NotationLevel());
     if (options.slips) composer.SetKeyConverter(&keyConverter);
     if (names) composer.SetLoanwords(names);
@@ -976,6 +1006,10 @@ int RunChunks(const ConnectionMatrix& matrix, const JapaneseDictionary& dictiona
     // by the English around them (ChunkJudge::SetEnglishAround).
     if (const char* around = std::getenv("TEKITO_EVAL_ENGLISH_AROUND"); around && *around == '0') {
         const_cast<tekito::japanese::ChunkJudge&>(judge).SetEnglishAround(false);
+    }
+    // TEKITO_EVAL_PARTICLE_AFTER=0: ChunkJudge::SetParticleAfter(false).
+    if (const char* after = std::getenv("TEKITO_EVAL_PARTICLE_AFTER"); after && *after == '0') {
+        const_cast<tekito::japanese::ChunkJudge&>(judge).SetParticleAfter(false);
     }
     const auto parts = tekito::japanese::UserPartsOfSpeech::Load(options.pack / "pos.tsv");
     const auto noun = parts.For(tekito::japanese::UserWordKind::ProperNoun);
@@ -1126,6 +1160,25 @@ int RunChunks(const ConnectionMatrix& matrix, const JapaneseDictionary& dictiona
         if (options.hold) {
             WriteShown(row.source, row.id, composer);
             output = composer.Commit();
+            // TEKITO_EVAL_SETTLED=<path>: the sentence as its chunks were
+            // shown when each settled against what Enter made of it (source,
+            // id, shown right 1/0, committed right 1/0, shown, committed).
+            static std::ofstream settledOut = [] {
+                const char* path = std::getenv("TEKITO_EVAL_SETTLED");
+                return path && *path ? std::ofstream(path, std::ios::binary) : std::ofstream();
+            }();
+            if (settledOut.is_open()) {
+                const auto trimmed = [](std::wstring text) {
+                    while (!text.empty() && text.back() == L' ') text.pop_back();
+                    return text;
+                };
+                const auto right = [&](const std::wstring& text) {
+                    return std::find(row.expected.begin(), row.expected.end(), text) != row.expected.end();
+                };
+                const auto shown = trimmed(composer.LastShownSentence()), committed = trimmed(output);
+                settledOut << row.source << '\t' << row.id << '\t' << right(shown) << '\t' << right(committed) << '\t'
+                           << Narrow(shown) << '\t' << Narrow(committed) << '\n';
+            }
             // TEKITO_EVAL_MIXED=<prefix>[:N]: the sentence's texts with other
             // choices of its chunks (<prefix>.sentences.tsv: source, id, k,
             // meant 1/0, text) and the keys typed (<prefix>.keys.tsv: id,
