@@ -1947,6 +1947,23 @@ void TestSpecialConversions(const RomajiTable& table, const MiniPack& pack) {
                 "the counter is learned apart from こ alone");
     }
 
+    // A word with a number in kanji but not a counter after it is not a
+    // number: いっさい is 一切, never 1切 (1歳 is).
+    {
+        auto numbered = converter;
+        const auto parts = tekito::japanese::UserPartsOfSpeech::Load(std::filesystem::path(TEKITO_TEST_DATA_DIR) /
+                                                                     L"japanese-mini" / L"pos.tsv");
+        numbered.SetNumberWord(tekito::japanese::JapaneseConverter::NumberWord{parts.Number()->left, parts.Number()->right,
+                                                                              parts.Number()->cost});
+        const auto phrases = numbered.Convert(L"いっさいしない");
+        Require(!phrases.empty() && std::none_of(phrases[0].candidates.begin(), phrases[0].candidates.end(),
+                                                 [](const auto& c) { return c.text.starts_with(L"1切"); }),
+                "一切 is not written 1切");
+        Require(!phrases.empty() && std::any_of(phrases[0].candidates.begin(), phrases[0].candidates.end(),
+                                                [](const auto& c) { return c.text.starts_with(L"一切"); }),
+                "一切 is offered");
+    }
+
     // Postal codes: the addresses they cover, from the japanese-zipcode pack.
     {
         using tekito::japanese::PostalCodeDigits;

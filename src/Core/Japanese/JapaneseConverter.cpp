@@ -237,6 +237,29 @@ std::vector<Counted> CountedNumber(std::wstring_view reading) {
     return found;
 }
 
+// Whether `written` is how the counter read `kana` is written (さい: 歳 or
+// 才, not the 切 of 一切).
+bool WritesCounter(std::wstring_view kana, std::wstring_view written) {
+    struct Written {
+        std::wstring_view kana;
+        std::initializer_list<std::wstring_view> forms;
+    };
+    static const Written kWritten[] = {
+        {L"じかん", {L"時間"}}, {L"じ", {L"時"}}, {L"ふん", {L"分"}}, {L"ぷん", {L"分"}}, {L"びょう", {L"秒"}},
+        {L"がつ", {L"月"}}, {L"かげつ", {L"ヶ月", L"か月", L"カ月", L"ヵ月", L"箇月", L"ケ月"}}, {L"ねん", {L"年"}},
+        {L"にち", {L"日"}}, {L"しゅうかん", {L"週間"}}, {L"にん", {L"人"}}, {L"めい", {L"名"}},
+        {L"こ", {L"個", L"箇", L"コ"}}, {L"かい", {L"回", L"階"}}, {L"えん", {L"円"}}, {L"てん", {L"点", L"店"}},
+        {L"さい", {L"歳", L"才"}}, {L"きろ", {L"キロ", L"㌔"}}, {L"めーとる", {L"メートル", L"米"}},
+        {L"せんち", {L"センチ"}}, {L"ぱーせんと", {L"パーセント", L"%", L"％"}}, {L"まい", {L"枚"}},
+        {L"ほん", {L"本"}}, {L"ぼん", {L"本"}}, {L"ぽん", {L"本"}}, {L"さつ", {L"冊"}}, {L"だい", {L"台", L"代"}},
+        {L"ばい", {L"倍"}}, {L"ぺーじ", {L"ページ", L"頁"}}, {L"ぱい", {L"杯"}}, {L"ど", {L"度"}},
+    };
+    for (const auto& [counter, forms] : kWritten) {
+        if (counter == kana) return std::find(forms.begin(), forms.end(), written) != forms.end();
+    }
+    return false;
+}
+
 // Letters by their names in kana, as Japanese reads them out (ぴー: P,
 // えいち and えっち: H, だぶりゅー: W).
 constexpr std::pair<std::wstring_view, wchar_t> kLetterNames[] = {
@@ -332,7 +355,8 @@ Lattice BuildLattice(const JapaneseDictionary& dictionary, const ReadingCodes& c
                 node.known = true;
                 node.word = word;
                 // A number and its counter the dictionary writes in kanji
-                // (三時): its number, for the number style.
+                // (三時, not 一切 for いっさい): its number, for the number
+                // style.
                 // So too its number alone before the counter (三 then 時; に,
                 // a number the dictionary leaves in kana, then 歳).
                 for (const auto& [numberLength, value, counterLength] : counted[i]) {
@@ -341,9 +365,11 @@ Lattice BuildLattice(const JapaneseDictionary& dictionary, const ReadingCodes& c
                     const auto kanji = SmallKanji(value);
                     if (kanji.empty()) continue;
                     const auto digits = std::to_wstring(value);
-                    if (numberLength + counterLength == length && (surface.starts_with(kanji) || surface.starts_with(digits))) {
+                    const std::size_t prefix = surface.starts_with(kanji) ? kanji.size() : surface.starts_with(digits) ? digits.size() : 0;
+                    if (numberLength + counterLength == length && prefix > 0 &&
+                        WritesCounter(reading.substr(i + numberLength, counterLength), std::wstring_view(surface).substr(prefix))) {
                         node.numberValue = value;
-                        node.numberPrefix = surface.starts_with(kanji) ? kanji.size() : digits.size();
+                        node.numberPrefix = prefix;
                     } else if (numberLength == length &&
                                (surface == kanji || surface == std::to_wstring(value) ||
                                 (number && word.left == number->left && surface == part))) {
@@ -435,15 +461,21 @@ Lattice BuildLattice(const JapaneseDictionary& dictionary, const ReadingCodes& c
                 // kanji: that word may be another one (十時, a surname).
                 // A word read the same with no number in it (ごえん: ご縁,
                 // ごかい: 誤解, にじ: 虹): the number costs more, the words
-                // around decide.
+                // around decide; also one with a number but not this counter
+                // after it (いっさい: 一切).
                 bool homophone = false;
                 if (const auto record = dictionary.Find(ReadingCodesView(codes).substr(i, length + counterLength))) {
                     const auto part = reading.substr(i, length + counterLength);
+                    const auto counterKana = reading.substr(i + length, counterLength);
                     dictionary.ForEachWord(*record, [&](const DictionaryWord& word) {
-                        const auto surface = dictionary.Surface(word, part);
-                        homophone = homophone || std::none_of(surface.begin(), surface.end(), [](wchar_t c) {
-                            return IsDigit(c) || std::wstring_view(L"〇一二三四五六七八九十百千万").find(c) != std::wstring_view::npos;
+                        const std::wstring surface = dictionary.Surface(word, part);
+                        const auto numberEnd = std::find_if(surface.begin(), surface.end(), [](wchar_t c) {
+                            return !IsDigit(c) && std::wstring_view(L"〇一二三四五六七八九十百千万").find(c) == std::wstring_view::npos;
                         });
+                        const auto digits = static_cast<std::size_t>(numberEnd - surface.begin());
+                        const bool numbered =
+                            digits > 0 && WritesCounter(counterKana, std::wstring_view(surface).substr(digits));
+                        homophone = homophone || !numbered;
                     });
                 }
                 Node numeral;
