@@ -3793,11 +3793,67 @@ std::optional<std::wstring> JapaneseComposer::TypedLetters() const {
     return keys;
 }
 
+std::optional<std::wstring> JapaneseComposer::MixLiveSplit() const {
+    // Typed with a capital, or an English word still being typed (meetin):
+    // the letters.
+    std::wstring keys = Keys(true);
+    if (TypedWithCapitals(keys)) return std::nullopt;
+    for (auto& c : keys) c = static_cast<wchar_t>(std::towlower(c));
+    if (keys.empty() || chunkJudge_->MayStartEnglishWord(keys)) return std::nullopt;
+    // The letters of a syllable still being typed stay as typed.
+    const std::wstring reading = Reading();
+    std::size_t pending = 0;
+    while (pending < reading.size() && pending < keys.size()) {
+        const wchar_t c = reading[reading.size() - 1 - pending];
+        if (!((c >= L'a' && c <= L'z') || (c >= L'A' && c <= L'Z'))) break;
+        ++pending;
+    }
+    std::wstring core = keys.substr(0, keys.size() - pending);
+    std::wstring marks;
+    while (!core.empty() && std::wstring_view(L".,!?").find(core.back()) != std::wstring_view::npos) {
+        marks.insert(marks.begin(), core.back());
+        core.pop_back();
+    }
+    if (core.empty()) return std::nullopt;
+    if (core != liveSplitKeys_) {
+        liveSplitKeys_ = core;
+        liveSplitText_.reset();
+        // English run into Japanese, as Space splits it (meetinghananiji:
+        // meetingは何時).
+        if (const auto pieces = chunkJudge_->Split(core)) {
+            std::wstring text;
+            bool english = false, japanese = false, ok = true;
+            for (std::size_t i = 0; i < pieces->size() && ok; ++i) {
+                const auto& piece = (*pieces)[i];
+                if (piece.english) {
+                    english = true;
+                    text += i == 0 ? EnglishAsWritten(piece.text) : piece.text;
+                    continue;
+                }
+                japanese = true;
+                for (const auto& phrase : ConvertReading(ApplyTypingStyle(piece.text), 0, i == 0 ? context_ : 0, contextWords_)) {
+                    if (phrase.candidates.empty()) {
+                        ok = false;
+                        break;
+                    }
+                    text += phrase.candidates.front().text;
+                }
+            }
+            if (ok && english && japanese) liveSplitText_ = std::move(text);
+        }
+    }
+    if (!liveSplitText_) return std::nullopt;
+    return *liveSplitText_ + MarksAfterEnglish(marks) + reading.substr(reading.size() - pending);
+}
+
 std::optional<std::wstring> JapaneseComposer::MixLiveText() const {
     if (!mixLive_ || !chunkJudge_ || !converter_ || !Typing() || IsConverted() || caret_ != units_.size() ||
-        HasAscii() || KanaTyped() || TypedLetters()) {
+        HasAscii() || KanaTyped()) {
         return std::nullopt;
     }
+    // English run into Japanese shows as Space will split it.
+    if (const auto split = MixLiveSplit()) return split;
+    if (TypedLetters()) return std::nullopt;
     // The letters of a syllable still being typed (kyouhas) stay as typed.
     const std::wstring reading = Reading();
     std::size_t end = reading.size();

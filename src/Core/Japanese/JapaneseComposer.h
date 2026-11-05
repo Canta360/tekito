@@ -896,6 +896,11 @@ private:
     std::vector<std::wstring> lastMixed_;
     std::wstring lastMixedKeys_;
     std::wstring lastShown_;
+    // Mix live conversion: English run into Japanese as Space splits it
+    // (meetingは何), for the keys it was worked out for.
+    [[nodiscard]] std::optional<std::wstring> MixLiveSplit() const;
+    mutable std::wstring liveSplitKeys_;
+    mutable std::optional<std::wstring> liveSplitText_;
     // The chunk converted last had a slip put right in its kana (FixSlips).
     bool slipUndone_{false};
     bool mixAi_{false};

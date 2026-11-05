@@ -1030,6 +1030,18 @@ void TestMixedTyping(const RomajiTable& table, const MiniPack& pack) {
             "English run into Japanese without a space is split off");
     Require(!judge.Split(L"pushin"), "two keys after it that are no particle are not Japanese");
     {
+        // Mix live conversion shows English run into Japanese as Space splits it.
+        JapaneseComposer live(&table);
+        live.SetConverter(&converter);
+        live.SetMixedTyping(&judge);
+        live.SetMixLiveConversion(true);
+        Type(live, L"pushsimasita");
+        std::wstring shown;
+        for (const auto& segment : live.Segments()) shown += segment.text;
+        Require((shown.starts_with(L"push") || shown.starts_with(L"Push")) && shown.size() < std::wstring(L"pushsimasita").size(),
+                "live conversion shows the English word and the Japanese after it converted, not all letters");
+    }
+    {
         const auto sentence = judge.Judge(L"ipushtohome", 0);
         Require(sentence.english && sentence.written == L"I push to home",
                 "an English sentence typed without spaces gets its spaces");
