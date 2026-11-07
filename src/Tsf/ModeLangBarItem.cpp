@@ -139,11 +139,27 @@ void ModeLangBarItem::ShowContextMenu(POINT point) {
     AppendMenuW(menu, MF_STRING | (Secret() ? MF_CHECKED : 0), kMenuSecret, Text(L"Secret mode", L"シークレットモード"));
     AppendMenuW(menu, MF_STRING, kMenuSettings, Text(L"Settings...", L"設定..."));
 
-    const HWND owner = GetForegroundWindow();
+    // The menu's owner must be a window of this thread: TrackPopupMenu
+    // fails with another thread's window, as in apps whose text input runs
+    // apart from their window (Windows 11's Notepad). A hidden window of our
+    // own then.
+    HWND owner = GetForegroundWindow();
+    HWND ownWindow = nullptr;
+    if (!owner || GetWindowThreadProcessId(owner, nullptr) != GetCurrentThreadId()) {
+        ownWindow = CreateWindowExW(WS_EX_TOOLWINDOW, L"STATIC", L"", WS_POPUP, point.x, point.y, 0, 0, nullptr,
+                                    nullptr, GetModuleHandleW(nullptr), nullptr);
+        owner = ownWindow;
+    }
     if (owner) SetForegroundWindow(owner);
     const UINT id = TrackPopupMenu(menu, TPM_LEFTALIGN | TPM_TOPALIGN | TPM_RETURNCMD,
                                    point.x, point.y, 0, owner, nullptr);
+    if (id == 0) Trace((L"ModeLangBarItem menu closed or failed: " + std::to_wstring(GetLastError())).c_str());
     DestroyMenu(menu);
+    if (ownWindow) {
+        // So that the menu goes away when clicked off it.
+        PostMessageW(ownWindow, WM_NULL, 0, 0);
+        DestroyWindow(ownWindow);
+    }
     if (id != 0) OnMenuSelect(id);
 }
 
