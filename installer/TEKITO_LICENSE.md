@@ -1,6 +1,6 @@
 # TEKITO License Agreement
 
-Version 0.1 (preview) · Effective September 26, 2026
+Version 0.2 (preview) · Effective November 9, 2026
 
 This agreement is between you and Capitata (capitata.dev), the trade name under which the owner of the GitHub account Canta360 makes and distributes TEKITO. It covers TEKITO for Windows: the input method, TEKITO Settings, the setup program, the language data that comes with them (including the Japanese data the setup program downloads), their documentation, and updates we provide for this version. By installing or using TEKITO you accept this agreement. If you do not accept it, do not install or use TEKITO.
 
