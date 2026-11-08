@@ -221,7 +221,7 @@ public:
         // penaltyPerNat when negative. Pairs only somewhat likelier than
         // chance (under `threshold` nats) are left to the parts of speech,
         // which already expect them.
-        std::int64_t costPerNat{200};
+        std::int64_t costPerNat{250};
         std::int64_t penaltyPerNat{200};
         double threshold{1.0};
         // A phrase's candidates are put in order again by how well their
