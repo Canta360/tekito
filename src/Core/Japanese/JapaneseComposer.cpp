@@ -2747,7 +2747,8 @@ void JapaneseComposer::AddLongerWords(std::size_t i) {
     constexpr std::size_t kLongerWords = 4;
     constexpr std::size_t kPhrasesAhead = 3;
     constexpr std::size_t kAfter = 3;
-    // A word this costly is too rare to offer this way.
+    // A word this costly is too rare to offer this way, unless it is all
+    // that was typed (といろ: 十色).
     constexpr std::int64_t kRareWord = 7000;
     const std::wstring& reading = conversionReading_;
     if (!converter_ || i + 1 >= phrases_.size()) return;
@@ -2761,13 +2762,18 @@ void JapaneseComposer::AddLongerWords(std::size_t i) {
         const std::size_t end = phrases_[j].begin + phrases_[j].length;
         if (end > reading.size() || end <= phrase.begin) break;
         for (auto& word : converter_->Words(std::wstring_view(reading).substr(phrase.begin, end - phrase.begin))) {
-            if (word.cost > kRareWord) continue;
+            if (word.cost > kRareWord && (phrase.begin != 0 || end != reading.size())) continue;
             word.length = end - phrase.begin;
             longer.push_back(std::move(word));
         }
     }
-    std::stable_sort(longer.begin(), longer.end(),
-                     [](const PhraseCandidate& a, const PhraseCandidate& b) { return a.cost < b.cost; });
+    // A word for all that was typed first (なないろ: 七色 before なな's 7 and
+    // 奈々), then by cost.
+    const auto whole = [&](const PhraseCandidate& c) { return phrase.begin == 0 && phrase.begin + c.length == reading.size(); };
+    std::stable_sort(longer.begin(), longer.end(), [&](const PhraseCandidate& a, const PhraseCandidate& b) {
+        if (whole(a) != whole(b)) return whole(a);
+        return a.cost < b.cost;
+    });
     std::size_t at = std::min(kAfter, phrase.candidates.size());
     std::size_t added = 0;
     for (auto& word : longer) {
