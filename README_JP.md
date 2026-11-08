@@ -206,7 +206,7 @@ cmake --build --preset windows-x64-debug
 
 ## ライセンス
 
-ソースコードは [Functional Source License 1.1](LICENSE.md)（FSL-1.1-ALv2）で公開しています。競合する商用製品に使うこと以外なら、使用・改変・共有は自由です。各リリースは公開から 2 年後に Apache 2.0 になります。配布するインストーラーには [TEKITO 使用許諾契約](installer/TEKITO_LICENSE.md)が、言語データにはそれぞれの出典のライセンスが適用されます。日本語では Mozc の辞書（IPAdic と BSD 3-Clause）、Leipzig Corpora Collection（CC BY 4.0）、Wiktionary（CC BY-SA 4.0）、日本語 WordNet を使用しています。任意の AI モデルは Liquid AI の LFM2.5（LFM Open License）です。詳しくは[ライセンスについて](LICENSING.md)と[サードパーティー通知](THIRD_PARTY_NOTICES.md)を参照してください。
+ソースコードには [Functional Source License 1.1](LICENSE.md)（FSL-1.1-ALv2）、配布するインストーラーには [TEKITO 使用許諾契約](installer/TEKITO_LICENSE.md)、言語データにはそれぞれの出典のライセンスが適用されます。正式な内容は、英語の各文書と[ライセンスについて](LICENSING.md)、[サードパーティー通知](THIRD_PARTY_NOTICES.md)を参照してください。
 
 TEKITO は [Capitata](https://capitata.dev) が開発しています。
 
