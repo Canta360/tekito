@@ -279,8 +279,8 @@ cmake --build --preset windows-x64-debug
 .\scripts\verify.ps1
 ```
 
-`verify.ps1` builds everything, runs the tests and checks the rules in
-[Working on TEKITO](#working-on-tekito). To try your build, register it from
+`verify.ps1` builds everything, runs the tests and checks
+[the rules](CONTRIBUTING.md#rules). To try your build, register it from
 an administrator PowerShell with `scripts\register-debug.ps1`
 and remove it again with `unregister-debug.ps1`.
 
@@ -314,17 +314,11 @@ attach to the release.
 | `data` | Language data packs, each with its own manifest and NOTICE: `en` for English, `ja` for Japanese, `common` for both. |
 | `scripts` | Build, install and check scripts; the ones that build each language's data are in `en` and `ja`. |
 
-## Working on TEKITO
+## Contributing
 
-- Words and phrases belong in data packs, never in `if` statements.
-- Nothing in the input path may use the network, and diagnostics never
-  include what the user typed.
-- TEKITO works through TSF only; no keyboard hooks, and synthesized input only to put the caret back between brackets in older edit controls.
-- Leave correct words, names and code as they are. When unsure, suggest
-  instead of replacing.
-
-Bug reports and ideas are welcome in Issues. We are not taking pull requests
-while TEKITO is in preview.
+Bug reports and ideas are welcome in Issues. See
+[Contributing](CONTRIBUTING.md) for how to report and the rules for working
+on TEKITO.
 
 ## License
 
