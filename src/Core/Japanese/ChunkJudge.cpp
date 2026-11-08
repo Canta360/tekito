@@ -79,13 +79,26 @@ std::wstring ChunkJudge::AsName(std::wstring written, bool inJapanese) const {
     if (std::any_of(written.begin(), written.end(), [](wchar_t c) { return std::iswupper(c) != 0; })) return written;
     // A form of its own written so on purpose (docomo).
     if (forms_ && forms_->Find(written)) return written;
+    // A name in english-names with only its first letter a capital
+    // (Whisky, Vercel) only when English writes it so too (Kindle) or
+    // hardly uses it as a word (vercel; not whisky, 2.97).
+    constexpr double kRareWord = 2.5;
+    const auto titleOnly = [](const std::wstring& name) {
+        return name.size() > 1 && std::iswupper(name.front()) != 0 &&
+               std::none_of(name.begin() + 1, name.end(), [](wchar_t c) { return std::iswupper(c) != 0; });
+    };
     for (const WrittenForms* names : {englishNames_, productNames_}) {
         if (!names) continue;
         const auto name = names->Find(written);
-        if (name && (inJapanese || !name->japaneseOnly) &&
-            std::any_of(name->written.begin(), name->written.end(), [](wchar_t c) { return std::iswupper(c) != 0; })) {
-            return name->written;
+        if (!name || (!inJapanese && name->japaneseOnly) ||
+            std::none_of(name->written.begin(), name->written.end(), [](wchar_t c) { return std::iswupper(c) != 0; })) {
+            continue;
         }
+        if (names == englishNames_ && titleOnly(name->written) && english_.Score(written) >= kRareWord &&
+            !(names_ && names_->WrittenAs(written))) {
+            continue;
+        }
+        return name->written;
     }
     return written;
 }
