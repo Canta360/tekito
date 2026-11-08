@@ -1018,11 +1018,11 @@ private:
         const auto action = tekito::japanese::ActionFromName(message.String(L"action"))
                                 .value_or(tekito::japanese::UserWordAction::First);
         if (!reading) {
-            error = Text(L"Enter the reading in hiragana.", L"読みはひらがなで入れてください。");
+            error = Text(L"Enter the reading in hiragana.", L"読みはひらがなで入力してください。");
             return false;
         }
         if (surface.empty() || !kind) {
-            error = Text(L"Enter the word.", L"単語を入れてください。");
+            error = Text(L"Enter the word.", L"単語を入力してください。");
             return false;
         }
         const auto originalReading = message.String(L"originalReading");
@@ -1275,7 +1275,7 @@ private:
         const auto raw = message.String(L"raw");
         const auto candidate = message.String(L"candidate");
         if (raw.empty() || candidate.empty()) {
-            error = Text(L"Input and output are required.", L"入力と変換後の両方を入れてください。");
+            error = Text(L"Input and output are required.", L"入力と変換後の両方を入力してください。");
             return false;
         }
         const auto previous = dictionary_;

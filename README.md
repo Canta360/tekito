@@ -75,6 +75,10 @@ Japanese input is optional. Without it, or with it turned off in Settings,
 TEKITO has Auto and Direct only. It stays off in terminals, in apps running
 as administrator, and in any apps you list in Settings.
 
+Right-clicking the taskbar button also turns on **Secret mode**: nothing you
+type is learned or kept, in every app, until you turn it off. It turns off
+when you sign out or restart.
+
 ## Typing English
 
 In Auto, type as usual. The word you are typing is underlined and a short
@@ -98,7 +102,9 @@ Space also writes English the usual way: “i” becomes “I”, “dont” and
 “youre” get their apostrophes, “ofthe” keeps both words, and days, months,
 languages and names like “iPhone” get their capitals. Where the word you
 typed is a word too, like “cant” or “march”, it stays, and the other way of
-writing it comes right after it in the list.
+writing it comes right after it in the list. English typed without spaces
+is split into words when the words are clear, and offered as a choice
+otherwise.
 
 The list also offers words that often come next (“to” for “I want t”), and
 Space takes out a word typed twice, like “the the”; Backspace brings it back.
@@ -144,6 +150,10 @@ for the phrase in focus.
   committed just before, so a phrase converted on its own still reads as
   part of the sentence. A small language model then reads the likeliest
   sentences as a whole and picks the one that reads most naturally.
+- **An AI model (optional).** Download one under **Settings → AI** and turn
+  it on, and an AI reviews your Japanese conversions. It runs on this PC, on
+  the CPU or the GPU, and nothing you type leaves your PC. Light (about
+  250 MB) and Accurate (about 1.3 GB) are offered.
 - **A slip is not a dead end.** When the keys look like a slip of the finger
   (a neighboring key, a key dropped or doubled, two swapped), what you meant
   is offered in the list, marked TYPO. What you typed stays first; you
@@ -154,13 +164,16 @@ for the phrase in focus.
 - **Katakana with its English.** Loanwords and names offer the English word
   too (ミーティング → meeting, グーグル → Google), from JMdict and Japanese
   Wikipedia.
+- **Kanji variants and letters.** Variants such as 髙 and 﨑 come among the
+  candidates, and letters can be typed by their names (ぴーしー → PC).
 - **It learns your way of writing.** The conversion you pick for a reading
   comes first the next time.
 - **Your own words.** Add a reading and how you write it under
   **Settings → Dictionary & learning → Japanese words**.
 - **Numbers, dates and symbols.** Digits read as numbers, so 3こ is 3個 and
-  100えん 100円, and converting a number offers the other width and kanji
-  (千二百三十四). **Numbers** and **Kanji** in **Settings → Japanese** set
+  100えん 100円. Digits you type follow the style set under
+  **Settings → Japanese → Numbers**, and converting a number offers the
+  other width and kanji (千二百三十四). **Numbers** and **Kanji** in **Settings → Japanese** set
   how numbers are written and which kanji are used (by school year, 常用,
   人名用). きょう and いま offer the date and time, やじるし and ほし
   symbols, にこにこ emoticons, and 1+2= its answer. Single kanji come after
@@ -196,8 +209,13 @@ Each part is taken as Japanese or English on its own: keys that are no romaji
 (github, push) and well-known names (API) stay English, written the way they
 are (GitHub); Japanese is converted as usual. A part that reads both ways,
 like “take”, follows the sentence: Japanese in Japanese, English after
-English. Space again gives the other one. Enter enters what is shown and
-converts nothing.
+English. Space again gives the other one.
+
+Words typed with a capital show as letters while you type, and English typed
+without spaces is split into words. Enter enters what is shown, with typing
+slips still fixed. With the AI model on, Enter also picks how the sentence is
+written. With live conversion, English typed straight into Japanese shows as
+English and converted Japanese (pushしました).
 
 ## Settings
 
@@ -217,8 +235,9 @@ Everything TEKITO does happens on your computer. It does not send your
 typing anywhere, it has no account and no telemetry, and it does not use the
 network while you type. What it learns from your choices stays in
 `%LOCALAPPDATA%\TEKITO` and can be cleared from Settings. It downloads only
-the Japanese data, when you choose Japanese in the setup program, and
-postal codes, when you turn them on in Settings.
+the Japanese data, when you choose Japanese in the setup program, postal
+codes, when you turn them on in Settings, and an AI model, when you choose
+one in the setup program or in Settings.
 See [the privacy notice](PRIVACY.md).
 
 ## Install
@@ -234,6 +253,8 @@ Download `TEKITO-0.7.0-full-installer.exe` from
 - Without Japanese, TEKITO appears in the English keyboard list with Auto and
   Direct. Run the installer again to add Japanese later.
 - It needs the Microsoft Edge WebView2 Runtime, which Windows 11 already has.
+- **Check with AI** also downloads the AI model (Light, about 250 MB). You
+  can download one later under **Settings → AI** too.
 
 After installing, restart the apps you want to type in (or sign out and back
 in), then pick TEKITO with Win+Space.
@@ -314,7 +335,8 @@ release becomes Apache 2.0 two years after it is published. The installer we
 publish is covered by [the TEKITO License Agreement](installer/TEKITO_LICENSE.md),
 and each data pack keeps the license of its source: among them the Mozc
 dictionary (IPAdic and BSD 3-Clause), the Leipzig Corpora Collection
-(CC BY 4.0), Wiktionary (CC BY-SA 4.0) and the Japanese WordNet. The details
+(CC BY 4.0), Wiktionary (CC BY-SA 4.0) and the Japanese WordNet. The optional
+AI models are Liquid AI's LFM2.5 (LFM Open License). The details
 are in [Licensing](LICENSING.md) and
 [third-party notices](THIRD_PARTY_NOTICES.md).
 

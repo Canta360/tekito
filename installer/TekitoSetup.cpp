@@ -601,7 +601,7 @@ std::wstring UninstallFailureMessage(int code) {
     if (code == 30) {
         return Tr(L"Your dictionary couldn't be exported, so nothing was removed. Try again, or uninstall without "
                   L"exporting it.",
-                  L"ユーザー辞書を書き出せなかったため、何も削除していません。もう一度お試しいただくか、"
+                  L"ユーザー辞書を書き出せなかったため、何も削除されていません。もう一度お試しいただくか、"
                   L"書き出さずにアンインストールしてください。");
     }
     if (UseJapanese()) {
@@ -1205,20 +1205,20 @@ void Paint(Wizard& wizard) {
         DrawText(wizard,
                  Tr(L"TEKITO fixes English typos as you type, and turns romaji into Japanese. Everything runs on "
                     L"this PC, and nothing you type is ever sent anywhere.",
-                    L"TEKITO は英語の入力ミスを修正し、ローマ字を日本語に変換します。処理はすべてこの PC の中で行い、"
-                    L"入力内容を外部に送信することはありません。"),
+                    L"TEKITO は英語の入力ミスを修正し、ローマ字を日本語に変換します。処理はすべてこの PC の中で行われ、"
+                    L"入力内容が外部に送信されることはありません。"),
                  wizard.body.Get(), D2D1::RectF(kMargin, 170.0f, kMargin + bodyWidth, 214.0f), p.ink2);
         if (wizard.webViewReady) {
             DrawText(wizard,
                      wizard.japanese && wizard.ai
                          ? Tr(L"Downloads the Japanese dictionary and language data (about 194 MB) and the AI model "
                               L"(about 250 MB) from TEKITO's release on GitHub while installing.",
-                              L"インストール中に、日本語の辞書と言語データ（約 194 MB）と AI モデル（約 250 MB）を "
-                              L"GitHub の TEKITO のリリースからダウンロードします。")
+                              L"インストール中に、日本語の辞書と言語データ（約 194 MB）と AI モデル（約 250 MB）が、"
+                              L"GitHub の TEKITO のリリースからダウンロードされます。")
                          : Tr(L"Downloads the Japanese dictionary and language data (about 194 MB) from TEKITO's release "
                               L"on GitHub while installing.",
-                              L"インストール中に、日本語の辞書と言語データ（約 194 MB）を GitHub の TEKITO のリリースから"
-                              L"ダウンロードします。"),
+                              L"インストール中に、日本語の辞書と言語データ（約 194 MB）が、GitHub の TEKITO のリリースから"
+                              L"ダウンロードされます。"),
                      wizard.caption.Get(),
                      D2D1::RectF(kMargin + 30.0f, JapaneseRow(wizard) + 28.0f, kWidth - kMargin, JapaneseRow(wizard) + 64.0f),
                      p.ink2);
@@ -1280,7 +1280,7 @@ void Paint(Wizard& wizard) {
                     divider.Get(), 1.0f);
         DrawText(wizard, Tr(L"Start menu shortcut", L"スタートメニューのショートカット"), wizard.body.Get(),
                  D2D1::RectF(left, kOptionsCard.top + 98.0f, kOptionsCard.right - 90.0f, kOptionsCard.top + 118.0f), p.ink);
-        DrawText(wizard, Tr(L"Adds TEKITO Settings to the Start menu.", L"TEKITO の設定をスタートメニューに追加します。"), wizard.caption.Get(),
+        DrawText(wizard, Tr(L"Adds TEKITO Settings to the Start menu.", L"TEKITO の設定がスタートメニューに追加されます。"), wizard.caption.Get(),
                  D2D1::RectF(left, kOptionsCard.top + 120.0f, kOptionsCard.right - 90.0f, kOptionsCard.top + 140.0f), p.ink2);
         if (wizard.japanese) {
             t->DrawLine(D2D1::Point2F(left, kOptionsCard.top + 150.0f),
@@ -1300,14 +1300,14 @@ void Paint(Wizard& wizard) {
                  D2D1::RectF(kMargin, 34.0f, kWidth - kMargin, 64.0f), p.ink);
         DrawText(wizard,
                  Tr(L"Removes TEKITO and its settings, learning and dictionary from this PC.",
-                    L"TEKITO と、その設定・学習した内容・辞書をこの PC から削除します。"),
+                    L"TEKITO と、その設定・学習内容・辞書が、この PC から削除されます。"),
                  wizard.body.Get(), D2D1::RectF(kMargin, 70.0f, kWidth - kMargin, 88.0f), p.ink2);
         const auto card = D2D1::RectF(kOptionsCard.left, kOptionsCard.top, kOptionsCard.right, kOptionsCard.top + 76.0f);
         DrawCard(wizard, card);
         const float left = card.left + 18.0f;
         DrawText(wizard, Tr(L"Export your dictionary", L"ユーザー辞書を書き出す"), wizard.body.Get(),
                  D2D1::RectF(left, card.top + 18.0f, card.right - 90.0f, card.top + 38.0f), p.ink);
-        DrawText(wizard, Tr(L"Saves your words to Documents.", L"登録した単語をドキュメントに保存します。"), wizard.caption.Get(),
+        DrawText(wizard, Tr(L"Saves your words to Documents.", L"登録した単語が、ドキュメントに保存されます。"), wizard.caption.Get(),
                  D2D1::RectF(left, card.top + 40.0f, card.right - 90.0f, card.top + 60.0f), p.ink2);
         break;
     }
