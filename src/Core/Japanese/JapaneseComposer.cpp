@@ -2329,6 +2329,10 @@ std::vector<std::size_t> JapaneseComposer::ReadBest(const std::vector<std::vecto
     std::vector<std::wstring> checked(read.begin(), read.begin() + static_cast<std::ptrdiff_t>(byCost));
     checked.insert(checked.end(), read.begin() + static_cast<std::ptrdiff_t>(combined), read.end());
     std::size_t chosen = reranker_->Choose(checked, byCost, wholePenalty_, precedingText_);
+    if (chosen != 0 && chosen < checked.size()) {
+        const auto& pick = chosen < byCost ? sentences[chosen] : sentences[combined + chosen - byCost];
+        if (KeepsTopic(sentences[0], pick)) chosen = 0;
+    }
     lastCheckedSentences_.shown.assign(sentences.begin(), sentences.begin() + static_cast<std::ptrdiff_t>(byCost));
     lastCheckedSentences_.shown.insert(lastCheckedSentences_.shown.end(), sentences.begin() + static_cast<std::ptrdiff_t>(combined),
                                        sentences.end());
@@ -4733,6 +4737,45 @@ bool JapaneseComposer::UndoCommit() {
     settledLength_ = record.settledLength;
     UpdatePredictions();
     return true;
+}
+
+bool JapaneseComposer::KeepsTopic(const std::wstring& first, const std::wstring& pick) const {
+    // A tie this strong keeps the word, against one under the other.
+    constexpr double kKept = 2.0;
+    constexpr double kNone = 1.0;
+    if (!converter_ || first == pick) return false;
+    // Where they part: from the first character that differs.
+    std::size_t at = 0;
+    while (at < first.size() && at < pick.size() && first[at] == pick[at]) ++at;
+    if (at >= first.size() || at >= pick.size()) return false;
+    // Only one word put in for another of its shape (売った, 打った): the
+    // same length, and the rest of the sentence as it was; where the check
+    // changed more, the rest may be what it put right.
+    std::size_t end = 0;
+    while (end < first.size() - at && end < pick.size() - at && first[first.size() - 1 - end] == pick[pick.size() - 1 - end]) ++end;
+    if (first.size() != pick.size()) return false;
+    const auto content = [](wchar_t c) {
+        return (c >= 0x4E00 && c <= 0x9FFF) || c == 0x3005 || (c >= 0x30A1 && c <= 0x30FA) || c == 0x30FC;
+    };
+    std::size_t run = at;
+    while (run < first.size() && content(first[run]) && content(pick[run])) ++run;
+    if (run == at || first.size() - end > run) return false;
+    // Nor where the pick makes a longer word the model knows (差し支え, not
+    // 指し支え): that is a word, the first choice's run was not.
+    if (converter_->KnownLength(std::wstring_view(pick).substr(at)) >
+        converter_->KnownLength(std::wstring_view(first).substr(at))) {
+        return false;
+    }
+    std::vector<std::wstring> others = contextWords_;
+    AddContentWords(first, others);
+    const auto kept = converter_->TopicTie(std::wstring_view(first).substr(at), others);
+    if (!kept || *kept < kKept) return false;
+    // A word the model does not know may well belong: only one it knows
+    // and finds no tie for is put back.
+    std::vector<std::wstring> theirs = contextWords_;
+    AddContentWords(pick, theirs);
+    const auto put = converter_->TopicTie(std::wstring_view(pick).substr(at), theirs);
+    return put && *put < kNone;
 }
 
 void JapaneseComposer::AddContentWords(std::wstring_view text, std::vector<std::wstring>& words) {

@@ -138,6 +138,15 @@ public:
     // The dictionary's words read exactly as `reading`, likeliest first
     // (へいき: 兵器, 平気, 併記); spelling corrections left out.
     [[nodiscard]] std::vector<PhraseCandidate> Words(std::wstring_view reading) const;
+    // How strongly the word at the start of `text` (a run of kanji or
+    // katakana and the kana after it: 売った) shares sentences with any of
+    // `others` (LanguageModel::Topic), read as written and as the forms a
+    // dictionary lists it by (売る); 0 without a tie, nothing when the
+    // language model knows none of those (or is not there).
+    [[nodiscard]] std::optional<double> TopicTie(std::wstring_view text, std::span<const std::wstring> others) const;
+    // How long the longest word the language model knows at the start of
+    // `text` is (差し支えのない: 4, 差し支え; 指し支えのない: 2, 指し).
+    [[nodiscard]] std::size_t KnownLength(std::wstring_view text) const;
     [[nodiscard]] std::optional<PhraseCandidate> Best(std::wstring_view reading, std::uint16_t context = 0,
                                                       const JapaneseUserDictionary* user = nullptr) const;
     // What the likeliest words for the whole reading cost, as Convert finds

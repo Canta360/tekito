@@ -700,6 +700,10 @@ private:
     void RememberWords(std::wstring_view text);
     // Adds the content words of `text` (runs of kanji or katakana) to `words`.
     static void AddContentWords(std::wstring_view text, std::vector<std::wstring>& words);
+    // Whether the sentence check's pick puts a word with no tie to the
+    // sentence's other words (打った) in place of the first choice's word
+    // that has one (メルカリで…売った): the first choice is kept then.
+    [[nodiscard]] bool KeepsTopic(const std::wstring& first, const std::wstring& pick) const;
 
     // Live conversion: the typed kana converted again, the settled phrases
     // kept as they are, and all but the last kOpenPhrases settled.

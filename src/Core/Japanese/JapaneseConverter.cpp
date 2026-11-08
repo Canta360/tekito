@@ -1249,6 +1249,60 @@ std::vector<PhraseCandidate> JapaneseConverter::Words(std::wstring_view reading)
     return words;
 }
 
+std::size_t JapaneseConverter::KnownLength(std::wstring_view text) const {
+    if (!model_) return 0;
+    constexpr std::size_t kLongest = 8;
+    for (std::size_t length = std::min(kLongest, text.size()); length > 0; --length) {
+        if (model_->LogCount(text.substr(0, length))) return length;
+    }
+    return 0;
+}
+
+std::optional<double> JapaneseConverter::TopicTie(std::wstring_view text, std::span<const std::wstring> others) const {
+    if (!model_ || text.empty()) return std::nullopt;
+    const auto content = [](wchar_t c) {
+        return (c >= 0x4E00 && c <= 0x9FFF) || c == 0x3005 || (c >= 0x30A1 && c <= 0x30FA) || c == 0x30FC;
+    };
+    std::size_t stem = 0;
+    while (stem < text.size() && content(text[stem])) ++stem;
+    if (stem == 0) return std::nullopt;
+    std::size_t kana = stem;
+    while (kana < text.size() && kana - stem < 3 && text[kana] >= 0x3041 && text[kana] <= 0x3093) ++kana;
+    // As written, the stem alone, and the dictionary forms its kana may be
+    // of (売っ: 売る, 売う, 売つ...; 食べ: 食べる).
+    std::vector<std::wstring> forms{std::wstring(text.substr(0, kana)), std::wstring(text.substr(0, stem))};
+    // And the words a longer run starts with (館長考案: 館長).
+    for (std::size_t length = 2; length < stem; ++length) forms.push_back(std::wstring(text.substr(0, length)));
+    for (const wchar_t* ending : {L"る", L"う", L"つ", L"く", L"ぐ", L"す", L"む", L"ぶ", L"ぬ", L"い", L"しい"}) {
+        forms.push_back(std::wstring(text.substr(0, stem)) + ending);
+        if (kana > stem) forms.push_back(std::wstring(text.substr(0, stem + 1)) + ending);
+    }
+    // The others as written, and a compound the model does not know as its
+    // last word it knows (オープンカー: カー), as conversion reads them.
+    std::vector<std::wstring> words(others.begin(), others.end());
+    for (const auto& other : others) {
+        if (model_->LogCount(other)) continue;
+        for (std::size_t from = 1; from + 2 <= other.size(); ++from) {
+            std::wstring tail = other.substr(from);
+            if (model_->LogCount(tail)) {
+                words.push_back(std::move(tail));
+                break;
+            }
+        }
+    }
+    if (std::none_of(forms.begin(), forms.end(), [&](const std::wstring& form) { return model_->LogCount(form).has_value(); })) {
+        return std::nullopt;
+    }
+    double strongest = 0.0;
+    for (const auto& form : forms) {
+        for (const auto& other : words) {
+            if (other == form) continue;
+            if (const auto tie = model_->Topic(form, other)) strongest = std::max(strongest, *tie);
+        }
+    }
+    return strongest;
+}
+
 bool JapaneseConverter::IsWord(std::wstring_view reading) const {
     if (reading.empty()) return false;
     bool found = false;

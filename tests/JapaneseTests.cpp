@@ -1653,6 +1653,13 @@ void TestLanguageModel(const MiniPack& pack) {
 
     tekito::japanese::JapaneseConverter converter(pack.dictionary, pack.matrix);
     converter.SetLanguageModel(&model);
+    const std::vector<std::wstring> others{L"麻酔"};
+    Require(std::abs(converter.TopicTie(L"注射する", others).value_or(0) - std::log(41.0)) < 0.06,
+            "a word with the kana after it meets the others as its stem");
+    Require(std::abs(converter.TopicTie(L"注射液", others).value_or(0) - std::log(41.0)) < 0.06,
+            "and as a word a longer run starts with");
+    Require(converter.TopicTie(L"駐車する", others).value_or(0) == 0.0, "a word that shares no sentences has no tie");
+    Require(!converter.TopicTie(L"する", others), "kana alone is no word to tie");
     const auto phrases = converter.Convert(L"ますいをちゅうしゃする");
     Require(!phrases.empty(), "the sentence converts");
     std::wstring first;
