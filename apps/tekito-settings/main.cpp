@@ -102,7 +102,7 @@ constexpr AiModelInfo kAiModels[] = {
 // model and removed with the last.
 constexpr AiModelInfo kAiRuntime{
     L"ai-runtime", L"https://github.com/Canta360/tekito/releases/download/ai-models/TEKITO-ai-runtime.zip",
-    "BD6AD435F32563FD7F0C6E0AF999FA167662CD3BC2E2A3E23FE927B742E4EA7A", 18246900ull};
+    "E3D1A3B3481BB617225985EA6A1D2F98ACD750085AA96C45CA4938BAC6B4C9C9", 18354072ull};
 
 // Downloads what runs the models when it is not there yet, then `model`
 // (1 or 2), and installs them into `root`.
