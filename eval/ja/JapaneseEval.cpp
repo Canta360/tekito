@@ -585,6 +585,8 @@ int RunKeys(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary
     // (no Space); nothing is left to pick from afterwards.
     const char* liveSetting = std::getenv("TEKITO_EVAL_LIVE");
     const bool live = liveSetting && std::string_view(liveSetting) == "1";
+    const char* chainSetting = std::getenv("TEKITO_EVAL_CHAIN");
+    const bool chain = chainSetting && std::string_view(chainSetting) == "1";
     composer.SetLiveConversion(live);
     // TEKITO_EVAL_LIVE_OPEN=N: phrases kept open (0: none settled).
     if (const char* open = std::getenv("TEKITO_EVAL_LIVE_OPEN"); open && *open) {
@@ -672,6 +674,11 @@ int RunKeys(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary
             }
         }
         WriteOutput(row.source, row.id, output);
+        // TEKITO_EVAL_CHAIN=1: each row is committed and the next row goes on
+        // from it, as typing on right after a commit does.
+        if (chain && !live) {
+            composer.Commit();
+        }
         if (gAiJudge == &gProbe && gProbe.asked.size() == 1) WriteChecked(row.source, row.id, composer.LastCheckedSentences(), row.expected);
         if (gAiJudge == &gProbe) {
             for (auto* t : {&probeTotals[row.source], &probeTotals["all"]}) {
