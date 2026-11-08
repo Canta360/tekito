@@ -72,6 +72,9 @@ struct Prediction {
 struct ReadingGuess {
     std::wstring reading;
     std::vector<std::pair<std::size_t, std::size_t>> pieces;
+    // The last word's part of speech (its right id), as a conversion after
+    // the text starts from.
+    std::uint16_t right{0};
 };
 
 // One phrase (bunsetsu) of the reading and what it can be written as, most

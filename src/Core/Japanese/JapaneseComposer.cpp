@@ -4805,11 +4805,43 @@ void JapaneseComposer::UpdateJoinedStart() const noexcept {
     converter_->SetAtSentenceStart(unlikely);
 }
 
+std::uint16_t JapaneseComposer::ContextOf(std::wstring_view text) const {
+    if (!converter_ || text.empty() || EndsSentence(text)) return 0;
+    // Only after Japanese: English and numbers have contexts of their own.
+    const wchar_t last = text.back();
+    const bool japanese = (last >= 0x3041 && last <= 0x30FF) || (last >= 0x3400 && last <= 0x9FFF) ||
+                          (last >= 0xF900 && last <= 0xFAFF) || last == 0x3005 || last == L'、' || last == L'，';
+    if (!japanese) return 0;
+    // The end of the sentence it is in, as much as its last words need.
+    constexpr std::size_t kTailChars = 12;
+    std::size_t begin = text.size() > kTailChars ? text.size() - kTailChars : 0;
+    for (std::size_t at = text.size(); at > begin; --at) {
+        if (std::wstring_view(L"。．.！!？?\r\n \x3000\t「『（(").find(text[at - 1]) != std::wstring_view::npos) {
+            begin = at;
+            break;
+        }
+    }
+    const auto tail = text.substr(begin);
+    if (tail == contextOfText_) return contextOfRight_;
+    const auto guess = converter_->ReadingOf(tail);
+    contextOfText_ = std::wstring(tail);
+    contextOfRight_ = guess ? guess->right : 0;
+    return contextOfRight_;
+}
+
 void JapaneseComposer::SetPrecedingText(std::wstring_view text) {
     // The end of it: what the sentence check reads (its last pieces) and
     // the content words conversion weighs.
     constexpr std::size_t kPrecedingChars = 60;
     precedingText_ = std::wstring(text.size() > kPrecedingChars ? text.substr(text.size() - kPrecedingChars) : text);
+    // Text TEKITO did not just commit (the caret moved, or it was typed
+    // otherwise): it is as written, so its last word's part of speech is
+    // where the conversion goes on from (住所を + へいき: 併記).
+    // (Its own, from a commit, stays: that knows the words as converted.)
+    if (context_ == 0 || context_ == textContext_) {
+        context_ = ContextOf(precedingText_);
+        textContext_ = context_;
+    }
     UpdateJoinedStart();
     contextWords_.clear();
     AddContentWords(precedingText_, contextWords_);

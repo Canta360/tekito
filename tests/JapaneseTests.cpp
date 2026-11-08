@@ -1612,6 +1612,24 @@ void TestContext(const RomajiTable& table, const MiniPack& pack) {
     composer.Convert();
     (void)composer.Commit();
     Require(composer.Context() == 0, "a sentence that ended starts the next afresh");
+
+    // Text written otherwise (the caret moved): its last word, from the
+    // dictionary, is where the next conversion starts.
+    composer.ForgetContext();
+    composer.SetPrecedingText(L"私の");
+    Require(composer.Context() == after, "written text goes on as the same text committed");
+    composer.SetPrecedingText(L"天気です。");
+    Require(composer.Context() == 0, "but not after a sentence that ended");
+    composer.SetPrecedingText(L"私の");
+    Type(composer, L"namae");
+    composer.Convert();
+    (void)composer.Commit();
+    const auto own = composer.Context();
+    composer.SetPrecedingText(L"私の名前");
+    Require(composer.Context() == own, "a commit's own context stays");
+    composer.ForgetContext();
+    composer.SetPrecedingText(L"hello");
+    Require(composer.Context() == 0, "nor after English");
 }
 
 void TestLanguageModel(const MiniPack& pack) {

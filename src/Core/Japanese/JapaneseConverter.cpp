@@ -1619,6 +1619,7 @@ std::optional<ReadingGuess> JapaneseConverter::ReadingOf(std::wstring_view text)
             right = id;
         }
     }
+    const std::uint16_t lastRight = right;
     std::vector<const Word*> path;
     for (std::size_t at = n; at > 0;) {
         const State& state = best[at].at(right);
@@ -1632,6 +1633,7 @@ std::optional<ReadingGuess> JapaneseConverter::ReadingOf(std::wstring_view text)
         guess.reading += word->reading;
         guess.pieces.emplace_back(word->length, word->reading.size());
     }
+    guess.right = lastRight == dictionary_.UnknownId() ? 0 : lastRight;
     return guess;
 }
 

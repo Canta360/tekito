@@ -380,6 +380,7 @@ public:
     void ForgetContext() noexcept {
         precedingText_.clear();
         context_ = 0;
+        textContext_ = 0;
         contextWords_.clear();
         recentText_.clear();
         mixContext_.clear();
@@ -634,6 +635,9 @@ private:
     // at a sentence start, or after kana (ハンドルネームも | へいき), not after
     // a word in kanji or katakana (東京 | へいく). Tells the converter.
     void UpdateJoinedStart() const noexcept;
+    // The part of speech of the last word of written `text` (not TEKITO's
+    // commit), from the dictionary; 0 when not known.
+    [[nodiscard]] std::uint16_t ContextOf(std::wstring_view text) const;
     // Punctuation keys typed after an English word (you.), as English
     // writes them in an English sentence and as Japanese does otherwise.
     [[nodiscard]] std::wstring MarksAfterEnglish(std::wstring_view keys) const;
@@ -945,6 +949,12 @@ private:
     // was read from, or npos inside a word or unit.
     std::vector<std::size_t> readingKeys_;
     std::uint16_t context_{0};
+    // ContextOf's last answer, as the same text comes again.
+    mutable std::wstring contextOfText_;
+    mutable std::uint16_t contextOfRight_{0};
+    // The context ContextOf gave, so that other text before the caret
+    // gives it again (and a commit's own is kept).
+    std::uint16_t textContext_{0};
     std::vector<std::wstring> contextWords_;
     std::wstring recentText_;
     std::wstring precedingText_;
