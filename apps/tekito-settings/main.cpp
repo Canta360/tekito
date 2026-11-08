@@ -70,6 +70,26 @@ constexpr UINT kStateWatchIntervalMs = 500;
 // A postal code download finished (lParam: PostalDownload*).
 constexpr UINT kPostalDownloaded = WM_APP + 1;
 
+// The copy on TEKITO's release comes with its SHA-256 beside it (the
+// postal-codes workflow writes utf_ken_all.zip.sha256): a copy that does not
+// match it is not taken. Japan Post's own has none; a release from before the
+// checksum was published neither, and is taken as it is.
+bool PostalZipChecked(const wchar_t* url, const std::filesystem::path& zip) {
+    if (!std::wstring_view(url).starts_with(L"https://github.com/")) return true;
+    const auto sumFile = std::filesystem::path(zip.wstring() + L".sha256");
+    const std::wstring sumUrl = std::wstring(url) + L".sha256";
+    if (FAILED(URLDownloadToFileW(nullptr, sumUrl.c_str(), sumFile.c_str(), 0, nullptr))) return true;
+    std::string expected;
+    {
+        std::ifstream in(sumFile);
+        in >> expected;
+    }
+    std::error_code ignored;
+    std::filesystem::remove(sumFile, ignored);
+    for (auto& c : expected) c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+    return !expected.empty() && tekito::userdata::FileSha256(zip) == expected;
+}
+
 struct PostalDownload {
     std::wstring requestId;
     std::filesystem::path file;
@@ -1523,7 +1543,8 @@ private:
                 requestId, std::filesystem::path(folder) / (L"tekito-utf_ken_all-" + std::to_wstring(GetCurrentProcessId()) + L".zip")};
             std::thread([hwnd = hwnd_, download] {
                 for (const auto* url : kPostalCodeZips) {
-                    download->ok = SUCCEEDED(URLDownloadToFileW(nullptr, url, download->file.c_str(), 0, nullptr));
+                    download->ok = SUCCEEDED(URLDownloadToFileW(nullptr, url, download->file.c_str(), 0, nullptr)) &&
+                                   PostalZipChecked(url, download->file);
                     if (download->ok) break;
                 }
                 if (!PostMessageW(hwnd, kPostalDownloaded, 0, reinterpret_cast<LPARAM>(download))) delete download;

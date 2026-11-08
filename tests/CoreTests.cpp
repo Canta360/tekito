@@ -1894,6 +1894,28 @@ void TestPostalCodeImport() {
 
     Require(tekito::userdata::RemovePostalCodes(directory) && !tekito::userdata::InstalledPostalCodes(directory),
             "the postal codes can be removed");
+
+    // From Japan Post's ZIP, unpacked with tar.exe: its CSV inside the
+    // folder unpacked into is read.
+    {
+        const auto work = std::filesystem::temp_directory_path() / L"tekito-postal-zip-test";
+        std::filesystem::remove_all(work, error);
+        std::filesystem::create_directories(work, error);
+        {
+            std::ofstream out(work / L"utf_ken_all.csv", std::ios::binary);
+            out << csv;
+        }
+        const wchar_t* windows = _wgetenv(L"SystemRoot");
+        const auto tar = std::filesystem::path(windows ? windows : L"C:\\Windows") / L"System32" / L"tar.exe";
+        const std::wstring command = L"\"\"" + tar.wstring() + L"\" -a -c -f \"" +
+                                     (work / L"utf_ken_all.zip").wstring() + L"\" -C \"" + work.wstring() +
+                                     L"\" utf_ken_all.csv\"";
+        Require(_wsystem(command.c_str()) == 0, "tar.exe makes the test ZIP");
+        const auto zipped = tekito::userdata::ImportPostalCodes(work / L"utf_ken_all.zip", directory, failure);
+        Require(zipped && zipped->count == 60000, "Japan Post's ZIP is read through its CSV");
+        (void)tekito::userdata::RemovePostalCodes(directory);
+        std::filesystem::remove_all(work, error);
+    }
     std::filesystem::remove_all(directory, error);
 }
 

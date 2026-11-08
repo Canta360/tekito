@@ -125,8 +125,18 @@ std::filesystem::path UnpackCsv(const std::filesystem::path& zip, const std::fil
     CloseHandle(process.hThread);
     CloseHandle(process.hProcess);
     if (!finished) return {};
+    // tar.exe (bsdtar) leaves out members with .. and takes the leading /
+    // off absolute ones; what is read must still be a plain file inside
+    // `into`, not a link out of it.
+    const auto root = std::filesystem::weakly_canonical(into, ignored).wstring();
     for (const auto& entry : std::filesystem::recursive_directory_iterator(into, ignored)) {
-        if (entry.is_regular_file() && _wcsicmp(entry.path().extension().c_str(), L".csv") == 0) return entry.path();
+        if (entry.is_symlink(ignored) || !entry.is_regular_file(ignored)) continue;
+        if (_wcsicmp(entry.path().extension().c_str(), L".csv") != 0) continue;
+        const auto path = std::filesystem::weakly_canonical(entry.path(), ignored).wstring();
+        if (path.size() > root.size() && _wcsnicmp(path.c_str(), root.c_str(), root.size()) == 0 &&
+            (path[root.size()] == L'\\' || path[root.size()] == L'/')) {
+            return entry.path();
+        }
     }
     return {};
 }

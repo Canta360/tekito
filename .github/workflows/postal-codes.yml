@@ -19,10 +19,12 @@ jobs:
         run: |
           curl -fsSL -o utf_ken_all.zip https://www.post.japanpost.jp/service/search/zipcode/download/utf/zip/utf_ken_all.zip
           unzip -l utf_ken_all.zip | grep -q utf_ken_all.csv
+          # Settings checks the copy against this before it imports it.
+          sha256sum utf_ken_all.zip | awk '{print toupper($1) "  utf_ken_all.zip"}' > utf_ken_all.zip.sha256
       - name: Publish on the postal-codes release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
           gh release view postal-codes >/dev/null 2>&1 || gh release create postal-codes --prerelease --latest=false --title "Postal codes" --notes "Japan Post's postal code data (utf_ken_all.zip), updated monthly, for TEKITO Settings."
-          gh release upload postal-codes utf_ken_all.zip --clobber
+          gh release upload postal-codes utf_ken_all.zip utf_ken_all.zip.sha256 --clobber
