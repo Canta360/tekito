@@ -14,6 +14,7 @@
 #include "Core/Japanese/JapaneseComposer.h"
 #include "Core/Japanese/JapaneseData.h"
 #include "Core/Japanese/KanaText.h"
+#include "Core/Japanese/LanguageModel.h"
 #include "Core/Japanese/SentenceReranker.h"
 #include "Core/ConversionEngine.h"
 #include "Core/EnglishSpelling.h"
@@ -66,6 +67,27 @@ int main(int argc, char** argv) {
             MultiByteToWideChar(CP_UTF8, 0, line.data(), static_cast<int>(line.size()), sentence.data(), size);
             const std::wstring one[] = {sentence};
             std::cout << line << '\t' << reranker.LogProbabilities(one).front() << '\n';
+        }
+        return 0;
+    }
+    // "topic" as the second argument: each line is two words and a tab
+    // between, printed with how often each is seen (ln count) and how much
+    // they share sentences (LanguageModel::Topic), as the language model
+    // (japanese-lm) has them.
+    if (argc > 2 && std::string(argv[2]) == "topic") {
+        tekito::japanese::LanguageModel model;
+        if (!model.Open(tekito::ExternalLexiconProvider::PackDirectory(L"japanese-lm"))) return 3;
+        std::ifstream lines(argv[1], std::ios::binary);
+        const auto show = [](const std::optional<double>& value) {
+            return value ? std::to_string(*value).substr(0, 5) : std::string("-");
+        };
+        for (std::string line; std::getline(lines, line);) {
+            if (!line.empty() && line.back() == '\r') line.pop_back();
+            const auto tab = line.find('\t');
+            if (tab == std::string::npos) continue;
+            const std::wstring a = Widen(line.substr(0, tab)), b = Widen(line.substr(tab + 1));
+            std::cout << line << "\tcount " << show(model.LogCount(a)) << " " << show(model.LogCount(b)) << "\ttopic "
+                      << show(model.Topic(a, b)) << "\n";
         }
         return 0;
     }

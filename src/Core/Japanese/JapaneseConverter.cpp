@@ -800,13 +800,28 @@ std::vector<Phrase> JapaneseConverter::Convert(std::wstring_view reading,
     const bool topics = (model_ && weights_.costPerTopic > 0) || (vectors_ && weights_.costPerVector > 0);
     std::vector<std::pair<std::size_t, std::wstring>> sentenceWords;  // (span index, word)
     if (topics) {
+        // A compound the language model does not know (みずほ銀行, 缶ビール)
+        // meets the others as the last word of it the model knows too
+        // (銀行, ビール): a Japanese compound is mostly what its end is.
+        const auto add = [&](std::size_t s, std::wstring word) {
+            if (model_ && !model_->LogCount(word)) {
+                for (std::size_t from = 1; from + 2 <= word.size(); ++from) {
+                    std::wstring tail = word.substr(from);
+                    if (LanguageModel::IsContentWord(tail) && model_->LogCount(tail)) {
+                        sentenceWords.emplace_back(s, std::move(tail));
+                        break;
+                    }
+                }
+            }
+            sentenceWords.emplace_back(s, std::move(word));
+        };
         // Words written just before belong to no phrase here.
-        for (const auto& word : contextWords) sentenceWords.emplace_back(spans.size(), word);
+        for (const auto& word : contextWords) add(spans.size(), word);
         for (std::size_t s = 0; s < spans.size(); ++s) {
             for (std::size_t k = spans[s].first; k < spans[s].second; ++k) {
                 if (!nodes[path[k]].known && !nodes[path[k]].user) continue;
                 auto word = textOf(nodes[path[k]]);
-                if (LanguageModel::IsContentWord(word)) sentenceWords.emplace_back(s, std::move(word));
+                if (LanguageModel::IsContentWord(word)) add(s, std::move(word));
             }
         }
     }
