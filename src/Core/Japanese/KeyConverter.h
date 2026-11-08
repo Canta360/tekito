@@ -58,6 +58,9 @@ public:
         std::int64_t droppedPercent{80};
         std::int64_t addedPercent{100};
         std::int64_t swappedPercent{60};
+        // A key typed again right after itself (ookuru: okuru), in percent
+        // of the cost above.
+        std::int64_t repeatedPercent{100};
         // The keys as typed and the likeliest reading with a slip undone
         // are both converted with the language model and the text before
         // them, and the slip is undone when that costs, with the slips,

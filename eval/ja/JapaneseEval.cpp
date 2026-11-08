@@ -1622,6 +1622,7 @@ int main(int argc, char** argv) {
         else if (arg == "--typo-dropped" && i + 1 < argc) costs.droppedPercent = std::stoll(argv[++i]);
         else if (arg == "--typo-added" && i + 1 < argc) costs.addedPercent = std::stoll(argv[++i]);
         else if (arg == "--typo-swapped" && i + 1 < argc) costs.swappedPercent = std::stoll(argv[++i]);
+        else if (arg == "--typo-repeated" && i + 1 < argc) costs.repeatedPercent = std::stoll(argv[++i]);
         else if (arg == "--typo-lattice") costs.contextDecides = false;
         else if (arg == "--typo-vowels-only") costs.consonantsDropped = false;
         else if (arg == "--typo-no-vowel-swaps") costs.vowelsReplaced = false;

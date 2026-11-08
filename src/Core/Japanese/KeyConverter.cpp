@@ -58,6 +58,8 @@ struct Slip {
     enum class Kind : std::uint8_t { Replaced, Dropped, Added, Swapped } kind;
     std::size_t at;
     std::wstring keys;
+    // Added: the key typed again right after itself (ookuru: okuru).
+    bool repeated{false};
 
     // Keys as typed consumed by the first `meant` keys as meant.
     [[nodiscard]] std::size_t Typed(std::size_t meant) const noexcept {
@@ -88,10 +90,11 @@ void SlipsAt(std::wstring_view typed, std::size_t at, bool consonants, bool vowe
             keys[at] = other;
             slips.push_back({Slip::Kind::Replaced, at, std::move(keys)});
         }
-        // An extra key typed.
+        // An extra key typed, maybe the one before typed again.
         std::wstring keys(typed);
         keys.erase(at, 1);
-        slips.push_back({Slip::Kind::Added, at, std::move(keys)});
+        const bool again = at > 0 && typed[at - 1] == key;
+        slips.push_back({Slip::Kind::Added, at, std::move(keys), again});
     }
     // A key left out before this one: a vowel, n, or the doubled consonant
     // of small tsu.
@@ -296,7 +299,9 @@ std::optional<KeyConversion> KeyConverter::Convert(std::wstring_view keys, std::
                     // An n left out stays dear: nn before a vowel reads two
                     // ways (kakuninnonegai: 確認お願い, not 確認の願い).
                     const bool droppedN = slip.kind == Slip::Kind::Dropped && slip.keys[slip.at] == L'n';
-                    const std::int64_t kindPercent = droppedN ? 100 : KindPercent(slip.kind);
+                    const std::int64_t kindPercent = droppedN       ? 100
+                                                     : slip.repeated ? costs_.repeatedPercent
+                                                                     : KindPercent(slip.kind);
                     const std::int64_t slipCost = firstTwice ? costs_.typo * costs_.doubledFirstPercent / 100
                                                              : SlipCost(bounds[start]) * kindPercent / 100;
                     addWords(bounds[start], kana, keyAfter, true, shortest, slipCost);
