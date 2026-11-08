@@ -61,6 +61,15 @@ if (-not $SkipRegistration -and -not $principal.IsInRole([Security.Principal.Win
 }
 
 Get-Process -Name TEKITO -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+# The AI helper runs from the data folder and keeps the model open while it
+# runs (up to ten minutes after the last request): stop ours.
+$dataPrefix = (Join-Path $env:LOCALAPPDATA "TEKITO").TrimEnd('\') + '\'
+$aiHelpers = @(Get-Process -Name TekitoAI -ErrorAction SilentlyContinue |
+    Where-Object { $_.Path -and $_.Path.StartsWith($dataPrefix, [StringComparison]::OrdinalIgnoreCase) })
+if ($aiHelpers.Count -gt 0) {
+    $aiHelpers | Stop-Process -Force -ErrorAction SilentlyContinue
+    $aiHelpers | Wait-Process -Timeout 5 -ErrorAction SilentlyContinue
+}
 
 # The user's words first: when they cannot be saved, nothing is removed.
 if ($ExportTo) {
