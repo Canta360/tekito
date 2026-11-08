@@ -59,6 +59,9 @@ struct Node {
     // kana (numeral) with its digits.
     bool user{false};
     bool numeral{false};
+    // Letters read by their names that are a known abbreviation (USJ): a
+    // name the sentence check leaves.
+    bool abbreviation{false};
     std::wstring text;
     // A word of the dictionary that is a number read in kana and its counter
     // (三時 for さんじ): the number, and how many characters write it.
@@ -261,14 +264,14 @@ bool WritesCounter(std::wstring_view kana, std::wstring_view written) {
 }
 
 // Letters by their names in kana, as Japanese reads them out (ぴー: P,
-// えいち and えっち: H, だぶりゅー: W).
+// えいち and えっち: H, だぶりゅー: W), long vowels typed with う too (ゆう).
 constexpr std::pair<std::wstring_view, wchar_t> kLetterNames[] = {
     {L"えー", L'A'}, {L"えい", L'A'}, {L"びー", L'B'}, {L"しー", L'C'}, {L"でぃー", L'D'}, {L"でー", L'D'},
     {L"いー", L'E'}, {L"えふ", L'F'}, {L"じー", L'G'}, {L"えいち", L'H'}, {L"えっち", L'H'}, {L"えーち", L'H'},
     {L"あい", L'I'}, {L"じぇー", L'J'}, {L"じぇい", L'J'}, {L"けー", L'K'}, {L"けい", L'K'}, {L"える", L'L'},
-    {L"えむ", L'M'}, {L"えぬ", L'N'}, {L"おー", L'O'}, {L"ぴー", L'P'}, {L"きゅー", L'Q'}, {L"あーる", L'R'},
-    {L"えす", L'S'}, {L"てぃー", L'T'}, {L"ゆー", L'U'}, {L"ぶい", L'V'}, {L"ぶいー", L'V'}, {L"だぶりゅー", L'W'},
-    {L"だぶる", L'W'}, {L"えっくす", L'X'}, {L"わい", L'Y'}, {L"ぜっと", L'Z'}, {L"ずぃー", L'Z'},
+    {L"えむ", L'M'}, {L"えぬ", L'N'}, {L"おー", L'O'}, {L"ぴー", L'P'}, {L"きゅー", L'Q'}, {L"きゅう", L'Q'}, {L"あーる", L'R'},
+    {L"えす", L'S'}, {L"てぃー", L'T'}, {L"ゆー", L'U'}, {L"ゆう", L'U'}, {L"ぶい", L'V'}, {L"ぶいー", L'V'}, {L"だぶりゅー", L'W'},
+    {L"だぶりゅ", L'W'}, {L"だぶる", L'W'}, {L"えっくす", L'X'}, {L"わい", L'Y'}, {L"ぜっと", L'Z'}, {L"ずぃー", L'Z'},
 };
 // Two letters or more read by their names from the start of `reading`:
 // each length that ends after a letter, and the letters (ぴーしー: 4, PC).
@@ -447,6 +450,24 @@ Lattice BuildLattice(const JapaneseDictionary& dictionary, const ReadingCodes& c
                 word.left = letters->left;
                 word.right = letters->right;
                 word.cost = letters->cost;
+                // A word of the dictionary read the same (えいえいおー:
+                // エイエイオー) comes first, unless the letters are a known
+                // abbreviation (USJ over ユーエスジェイ): the letters cost as
+                // much more as they are cheaper than a name.
+                const bool known = letters->known && (*letters->known)(text);
+                word.abbreviation = known;
+                if (const auto record = known ? std::nullopt : dictionary.Find(ReadingCodesView(codes).substr(i, length))) {
+                    bool ordinary = false;
+                    dictionary.ForEachWord(*record, [&](const DictionaryWord& entry) {
+                        const auto surface = dictionary.Surface(entry, reading.substr(i, length));
+                        ordinary = ordinary || std::any_of(surface.begin(), surface.end(), [](wchar_t c) {
+                                   return !((c >= L'A' && c <= L'Z') || (c >= L'a' && c <= L'z') ||
+                                            (c >= L'Ａ' && c <= L'Ｚ') || (c >= L'ａ' && c <= L'ｚ'));
+                               });
+                    });
+                    constexpr std::int64_t kWordFirst = 3500;
+                    if (ordinary) word.cost += kWordFirst;
+                }
                 word.user = true;
                 word.text = text;
                 add(std::move(word));
@@ -883,7 +904,7 @@ std::vector<Phrase> JapaneseConverter::Convert(std::wstring_view reading,
                 spelling = spelling || (nodes[*it].known && nodes[*it].word.spellingCorrection);
                 kanaNumber = kanaNumber || nodes[*it].numeral || nodes[*it].numberPrefix > 0;
                 setPhrase = setPhrase || (nodes[*it].known && nodes[*it].word.setPhrase);
-                name = name || (nodes[*it].known && namedWord(*it));
+                name = name || (nodes[*it].known && namedWord(*it)) || nodes[*it].abbreviation;
                 organization = organization || (organizationPart_ != 0 && nodes[*it].known &&
                                                 nodes[*it].word.left == organizationPart_);
             }

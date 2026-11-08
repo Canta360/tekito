@@ -1,5 +1,7 @@
 #include "Core/Japanese/JapaneseData.h"
 
+#include <cwctype>
+
 #include "Core/ExternalLexiconProvider.h"
 #include "Core/ExternalRankingProviders.h"
 #include "Core/Japanese/AiJudge.h"
@@ -31,6 +33,25 @@ namespace {
 // much over a proper noun: below it, since Japanese writes such names in
 // letters, not as ピーシー (2000 over left them behind the katakana).
 constexpr std::int32_t kLetterWordCost = -1500;
+
+// Whether `letters` (USJ) are written so by the written-forms pack or, three
+// letters or more, a name in english-names (which has AQ and EG too), or
+// are often written in letters in Japanese text (EV, ES; not KA, which is
+// 経営 too).
+bool KnownLetters(std::wstring_view letters, const WrittenForms& forms, const WrittenForms& names,
+                  const Loanwords& loanwords) {
+    constexpr std::size_t kNameLetters = 3;
+    // log10 per million sentences (Loanwords::InJapaneseText): ev 1.80, ka 1.49.
+    constexpr double kOftenInJapanese = 1.6;
+    std::wstring lower(letters);
+    for (auto& c : lower) c = static_cast<wchar_t>(std::towlower(c));
+    if (const auto seen = loanwords.InJapaneseText(lower); seen && *seen >= kOftenInJapanese) return true;
+    for (const WrittenForms* table : {&forms, &names}) {
+        if (!table->IsOpen() || (table == &names && letters.size() < kNameLetters)) continue;
+        if (const auto form = table->Find(lower); form && form->written == letters) return true;
+    }
+    return false;
+}
 
 struct JapaneseData {
     JapaneseDictionary dictionary;
@@ -108,17 +129,20 @@ const JapaneseData* ProcessJapaneseData() {
             loaded->nounContext = noun->right;
             loaded->converter->SetLetterWord(JapaneseConverter::NumberWord{noun->left, noun->right, noun->cost + kLetterWordCost});
         }
+        (void)loaded->writtenForms.Open(ExternalLexiconProvider::PackDirectory(L"written-forms"));
+        (void)loaded->englishNames.Open(ExternalLexiconProvider::PackDirectory(L"english-names"));
+        // Letters known as an abbreviation (USJ, PC): written so by its own
+        // name or a name from Wikidata.
+        loaded->converter->SetKnownLetters([data = loaded.get()](std::wstring_view letters) {
+            return KnownLetters(letters, data->writtenForms, data->englishNames, data->loanwords);
+        });
         loaded->english = std::make_unique<ExternalFrequencyProvider>(ExternalFrequencyProvider::DefaultPath());
         if (const auto* table = ProcessRomajiTable(); table && loaded->english->IsLoaded()) {
             loaded->chunks = std::make_unique<ChunkJudge>(*table, *loaded->converter, loaded->keys.get(),
                                                           *loaded->english,
                                                           loaded->loanwords.IsOpen() ? &loaded->loanwords : nullptr);
-            if (loaded->writtenForms.Open(ExternalLexiconProvider::PackDirectory(L"written-forms"))) {
-                loaded->chunks->SetWrittenForms(&loaded->writtenForms);
-            }
-            if (loaded->englishNames.Open(ExternalLexiconProvider::PackDirectory(L"english-names"))) {
-                loaded->chunks->SetEnglishNames(&loaded->englishNames);
-            }
+            if (loaded->writtenForms.IsOpen()) loaded->chunks->SetWrittenForms(&loaded->writtenForms);
+            if (loaded->englishNames.IsOpen()) loaded->chunks->SetEnglishNames(&loaded->englishNames);
             if (loaded->letterOdds.Open(ExternalLexiconProvider::PackDirectory(L"japanese-letter-odds"))) {
                 loaded->chunks->SetLetterOdds(&loaded->letterOdds);
             }

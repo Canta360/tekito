@@ -58,6 +58,7 @@
 #include "JapaneseEvalCommon.h"
 #include "JapaneseTypingStudy.h"
 
+#include <cwctype>
 #include <algorithm>
 #include <chrono>
 #include <cstdlib>
@@ -112,6 +113,23 @@ void SetNumberWord(tekito::japanese::JapaneseConverter& converter, const std::fi
         if (!cost || std::string_view(cost) != "off") {
             const std::int32_t over = cost && *cost ? static_cast<std::int32_t>(std::strtol(cost, nullptr, 10)) : -1500;
             converter.SetLetterWord(tekito::japanese::JapaneseConverter::NumberWord{noun->left, noun->right, noun->cost + over});
+            // Known abbreviations, as JapaneseData has them (written-forms and
+            // english-names beside the English data).
+            static tekito::japanese::WrittenForms forms, names;
+            static tekito::japanese::Loanwords latin;
+            if (!latin.HasJapaneseTextCounts()) (void)latin.OpenEnglish(tekito::ExternalLexiconProvider::PackDirectory(L"japanese-english"));
+            if (!forms.IsOpen()) (void)forms.Open(tekito::ExternalLexiconProvider::PackDirectory(L"written-forms"));
+            if (!names.IsOpen()) (void)names.Open(tekito::ExternalLexiconProvider::PackDirectory(L"english-names"));
+            converter.SetKnownLetters([](std::wstring_view letters) {
+                std::wstring lower(letters);
+                for (auto& c : lower) c = static_cast<wchar_t>(std::towlower(c));
+                if (const auto seen = latin.InJapaneseText(lower); seen && *seen >= 1.6) return true;
+                for (const auto* table : {&forms, &names}) {
+                    if (!table->IsOpen() || (table == &names && letters.size() < 3)) continue;
+                    if (const auto form = table->Find(lower); form && form->written == letters) return true;
+                }
+                return false;
+            });
         }
     }
     // TEKITO_EVAL_HEAD_WORDS=0: a phrase's candidates without the words read

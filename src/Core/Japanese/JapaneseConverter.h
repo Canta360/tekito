@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <functional>
 
 #include <cstddef>
 #include <cstdint>
@@ -217,11 +218,24 @@ public:
         std::uint16_t left{0};
         std::uint16_t right{0};
         std::int64_t cost{0};
+        // Letters only: which are known abbreviations (USJ, PC), set by
+        // SetKnownLetters.
+        const std::function<bool(std::wstring_view)>* known{nullptr};
     };
     void SetNumberWord(std::optional<NumberWord> number) noexcept { number_ = number; }
     // Letters read by their names (ぴーしー: PC, でぃーえぬえー: DNA) as a word
     // of these parts of speech (a proper noun), offered beside the katakana.
-    void SetLetterWord(std::optional<NumberWord> letters) noexcept { letters_ = letters; }
+    void SetLetterWord(std::optional<NumberWord> letters) noexcept {
+        letters_ = letters;
+        if (letters_) letters_->known = knownLetters_ ? &knownLetters_ : nullptr;
+    }
+    // Which letters are known abbreviations (USJ, PC): they come before a
+    // word of the dictionary read the same, other letters after it
+    // (えいえいおー: エイエイオー, not AAO). Without: every letters after it.
+    void SetKnownLetters(std::function<bool(std::wstring_view)> known) {
+        knownLetters_ = std::move(known);
+        if (letters_) letters_->known = knownLetters_ ? &knownLetters_ : nullptr;
+    }
     // The edge scorer's score taken off each word's cost before the paths
     // are searched (Convert, BestSentences), for words on a path within
     // `margin` of the cheapest, times `weight`; nullptr: off.
@@ -295,6 +309,7 @@ private:
     std::int64_t notationCost_{3000};
     mutable int notationLevel_{3};
     std::vector<std::uint16_t> nameParts_;
+    std::function<bool(std::wstring_view)> knownLetters_;
     std::uint16_t organizationPart_{0};
 };
 
