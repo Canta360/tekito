@@ -625,7 +625,9 @@ int RunKeys(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary
             if (const auto found = gContexts.find(row.id); found != gContexts.end()) context = found->second;
             if (gContextPrevious && row.id.find('-') != std::string::npos && group == previousGroup) context = previousText;
             composer.SetRecentText(context);
-            // As the app passes it: to the AI and to conversion and the sentence check.
+            // As the app passes it: to the AI and to conversion and the sentence check,
+            // and whether a sentence starts here.
+            composer.SetSentenceStart(tekito::japanese::JapaneseComposer::EndsSentence(context));
             composer.SetPrecedingText(context);
             previousText = (group == previousGroup ? previousText : std::wstring()) +
                            (row.expected.empty() ? std::wstring() : row.expected.front());

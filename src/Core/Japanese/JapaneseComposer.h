@@ -83,7 +83,7 @@ public:
     void SetConverter(const JapaneseConverter* converter) noexcept {
         converter_ = converter;
         if (converter_) converter_->SetNotationLevel(notationLevel_);
-        if (converter_) converter_->SetAtSentenceStart(sentenceStart_);
+        UpdateJoinedStart();
     }
     // Converts the keys as typed, correcting slips in them (tried first on
     // Space; nullptr leaves conversion to the kana as typed).
@@ -238,7 +238,7 @@ public:
     // before the caret; committing keeps it up to date.
     void SetSentenceStart(bool start) noexcept {
         sentenceStart_ = start;
-        if (converter_) converter_->SetAtSentenceStart(start);
+        UpdateJoinedStart();
         // A new sentence: what came before is not its English or Japanese.
         if (start) {
             japaneseInSentence_ = false;
@@ -630,6 +630,10 @@ private:
     void AddLongerWords(std::size_t i);
     // A longer word chosen: the focused phrase takes its length.
     void TakeLongerWord();
+    // Whether what is typed next may hardly start with a one-kana particle:
+    // at a sentence start, or after kana (ハンドルネームも | へいき), not after
+    // a word in kanji or katakana (東京 | へいく). Tells the converter.
+    void UpdateJoinedStart() const noexcept;
     // Punctuation keys typed after an English word (you.), as English
     // writes them in an English sentence and as Japanese does otherwise.
     [[nodiscard]] std::wstring MarksAfterEnglish(std::wstring_view keys) const;

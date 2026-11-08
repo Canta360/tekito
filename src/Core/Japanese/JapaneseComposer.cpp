@@ -2606,7 +2606,7 @@ std::optional<std::wstring> JapaneseComposer::RunTogetherEnglish(bool* foreign) 
                 const bool inside = i > 0 || start > 0;
                 if (inside && converter_) converter_->SetAtSentenceStart(false);
                 const auto phrases = ConvertReading(ApplyTypingStyle(piece.text), 0, i == 0 ? context : 0, contextWords_);
-                if (inside && converter_) converter_->SetAtSentenceStart(sentenceStart_);
+                if (inside) UpdateJoinedStart();
                 if (std::any_of(phrases.begin(), phrases.end(), [](const Phrase& phrase) {
                         return phrase.candidates.empty();
                     })) {
@@ -3998,7 +3998,7 @@ std::optional<std::wstring> JapaneseComposer::MixLiveSplit() const {
                 // A piece after another is inside the sentence, not at its start.
                 if (i > 0 && converter_) converter_->SetAtSentenceStart(false);
                 const auto piecePhrases = ConvertReading(ApplyTypingStyle(piece.text), 0, i == 0 ? context_ : 0, contextWords_);
-                if (i > 0 && converter_) converter_->SetAtSentenceStart(sentenceStart_);
+                if (i > 0) UpdateJoinedStart();
                 for (const auto& phrase : piecePhrases) {
                     if (phrase.candidates.empty()) {
                         ok = false;
@@ -4795,11 +4795,22 @@ void JapaneseComposer::PreferWordsWritten(std::vector<PhraseCandidate>& candidat
     }
 }
 
+void JapaneseComposer::UpdateJoinedStart() const noexcept {
+    if (!converter_) return;
+    bool unlikely = sentenceStart_;
+    if (!unlikely && !precedingText_.empty()) {
+        const wchar_t last = precedingText_.back();
+        unlikely = last >= 0x3041 && last <= 0x309F;  // hiragana
+    }
+    converter_->SetAtSentenceStart(unlikely);
+}
+
 void JapaneseComposer::SetPrecedingText(std::wstring_view text) {
     // The end of it: what the sentence check reads (its last pieces) and
     // the content words conversion weighs.
     constexpr std::size_t kPrecedingChars = 60;
     precedingText_ = std::wstring(text.size() > kPrecedingChars ? text.substr(text.size() - kPrecedingChars) : text);
+    UpdateJoinedStart();
     contextWords_.clear();
     AddContentWords(precedingText_, contextWords_);
     if (contextWords_.size() > kContextWords) {
