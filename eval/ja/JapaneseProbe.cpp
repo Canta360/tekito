@@ -87,7 +87,8 @@ int main(int argc, char** argv) {
             if (tab == std::string::npos) continue;
             const std::wstring a = Widen(line.substr(0, tab)), b = Widen(line.substr(tab + 1));
             std::cout << line << "\tcount " << show(model.LogCount(a)) << " " << show(model.LogCount(b)) << "\ttopic "
-                      << show(model.Topic(a, b)) << "\n";
+                      << show(model.Topic(a, b)) << "\tpair " << show(model.PairPmi(tekito::japanese::LanguageModel::PairStart(a), b))
+                      << "\n";
         }
         return 0;
     }

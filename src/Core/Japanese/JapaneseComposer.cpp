@@ -4766,6 +4766,17 @@ bool JapaneseComposer::KeepsTopic(const std::wstring& first, const std::wstring&
         converter_->KnownLength(std::wstring_view(first).substr(at))) {
         return false;
     }
+    // Nor where the pick goes with the word before it as one, clearly more
+    // than the first choice's word does (映画界, not 映画会).
+    constexpr double kBetterPair = 1.0;
+    std::size_t left = at;
+    while (left > 0 && content(first[left - 1])) --left;
+    if (left < at) {
+        const auto before = std::wstring_view(first).substr(left, at - left);
+        const auto mine = converter_->PairFit(before, std::wstring_view(first).substr(at, run - at));
+        const auto theirs = converter_->PairFit(before, std::wstring_view(pick).substr(at, run - at));
+        if (theirs && *theirs > mine.value_or(0.0) + kBetterPair) return false;
+    }
     std::vector<std::wstring> others = contextWords_;
     AddContentWords(first, others);
     const auto kept = converter_->TopicTie(std::wstring_view(first).substr(at), others);

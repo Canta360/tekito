@@ -1249,6 +1249,16 @@ std::vector<PhraseCandidate> JapaneseConverter::Words(std::wstring_view reading)
     return words;
 }
 
+std::optional<double> JapaneseConverter::PairFit(std::wstring_view before, std::wstring_view word) const {
+    if (!model_ || before.empty() || word.empty()) return std::nullopt;
+    for (std::size_t from = 0; from < before.size(); ++from) {
+        const auto left = before.substr(from);
+        if (!model_->LogCount(left)) continue;
+        return model_->PairPmi(LanguageModel::PairStart(left), word);
+    }
+    return std::nullopt;
+}
+
 std::size_t JapaneseConverter::KnownLength(std::wstring_view text) const {
     if (!model_) return 0;
     constexpr std::size_t kLongest = 8;

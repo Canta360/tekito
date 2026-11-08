@@ -147,6 +147,11 @@ public:
     // How long the longest word the language model knows at the start of
     // `text` is (差し支えのない: 4, 差し支え; 指し支えのない: 2, 指し).
     [[nodiscard]] std::size_t KnownLength(std::wstring_view text) const;
+    // How well `word` goes on from the end of `before` as one (映画 + 界:
+    // 映画界), the language model's pointwise mutual information of the
+    // pair, with the longest end of `before` it knows; nothing when it has
+    // no such pair.
+    [[nodiscard]] std::optional<double> PairFit(std::wstring_view before, std::wstring_view word) const;
     [[nodiscard]] std::optional<PhraseCandidate> Best(std::wstring_view reading, std::uint16_t context = 0,
                                                       const JapaneseUserDictionary* user = nullptr) const;
     // What the likeliest words for the whole reading cost, as Convert finds
