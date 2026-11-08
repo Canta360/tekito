@@ -2,7 +2,7 @@
 
 Version 0.1 (preview) · Effective September 26, 2026
 
-This agreement is between you and Capitata (capitata.dev), which makes and distributes TEKITO. It covers TEKITO for Windows: the input method, TEKITO Settings, the setup program, the language data that comes with them (including the Japanese data the setup program downloads), their documentation, and updates we provide for this version. By installing or using TEKITO you accept this agreement. If you do not accept it, do not install or use TEKITO.
+This agreement is between you and Capitata (capitata.dev), the trade name under which the owner of the GitHub account Canta360 makes and distributes TEKITO. It covers TEKITO for Windows: the input method, TEKITO Settings, the setup program, the language data that comes with them (including the Japanese data the setup program downloads), their documentation, and updates we provide for this version. By installing or using TEKITO you accept this agreement. If you do not accept it, do not install or use TEKITO.
 
 ## In short
 
@@ -45,7 +45,7 @@ Keep your own copy of anything you would not want to lose, such as an exported d
 
 TEKITO includes language data, fonts, and software from other people. Each of these stays under its own license, listed in THIRD_PARTY_NOTICES.md and in the NOTICE file of each language data pack. If one of those licenses gives you more rights for that part than this agreement does, that license applies to that part.
 
-TEKITO uses the M PLUS 1 typeface, licensed under the SIL Open Font License 1.1. TEKITO Settings uses the Microsoft Edge WebView2 Runtime, which is provided by Microsoft under its own terms.
+TEKITO uses the M PLUS 1 typeface, licensed under the SIL Open Font License 1.1. TEKITO Settings uses the Microsoft Edge WebView2 Runtime, which is provided by Microsoft under its own terms. The optional AI models, which you can download in the setup program or in TEKITO Settings, are Liquid AI's models under the LFM Open License, and run with llama.cpp under the MIT License.
 
 ## 5. Prices, editions, and updates
 
@@ -75,17 +75,21 @@ These limits do not apply to damage caused by our intentional misconduct or gros
 
 ## 10. Ending this agreement
 
-This agreement lasts until it ends. You may end it at any time by uninstalling TEKITO. It ends automatically if you break it and do not put things right within a reasonable time after we ask. When it ends, stop using TEKITO and remove it. Sections 3, 4, and 7 through 12 continue to apply after it ends.
+This agreement lasts until it ends. You may end it at any time by uninstalling TEKITO. It ends automatically if you break it and do not put things right within a reasonable time after we ask. When it ends, stop using TEKITO and remove it. Sections 3, 4, 7 through 9, and 11 through 13 continue to apply after it ends.
 
-## 11. Changes to these terms
+## 11. Transfer
+
+We may transfer this agreement, and our rights and duties under it, to whoever takes over TEKITO, such as a company set up to run it. Your rights under this agreement stay the same.
+
+## 12. Changes to these terms
 
 The terms you accepted continue to apply to the version you have. A later version may come with updated terms, which you will be asked to accept when you install it.
 
-## 12. Law and disputes
+## 13. Law and disputes
 
 This agreement is governed by the laws of Japan, without regard to conflict-of-law rules. The Tokyo District Court has exclusive jurisdiction over disputes in the first instance. If you are a consumer, nothing in this section takes away the protection of the consumer laws of the place you live, or your right to bring a claim there.
 
-## 13. Contact
+## 14. Contact
 
 Capitata
 https://capitata.dev
