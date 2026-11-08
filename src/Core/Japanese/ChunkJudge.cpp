@@ -233,7 +233,15 @@ ChunkJudge::Judgement ChunkJudge::JudgeLanguage(std::wstring_view keys, std::siz
         // English before, or the start of a sentence (do you, so far).
         const bool sentenceStart = englishBefore == 0 && !japaneseInSentence;
         const bool after = keys == L"to" ? englishSentence : englishBefore > 0 || sentenceStart;
-        judgement.english = !particle && after && score >= thresholds_.commonWord;
+        // Or letters Japanese text writes in capitals very often, wherever
+        // they are (ai: AI, not 愛; log10 per million sentences 2.58).
+        constexpr double kAcronymInJapanese = 2.5;
+        const auto seen = names_ ? names_->InJapaneseText(keys) : std::nullopt;
+        const auto written = names_ ? names_->WrittenAs(keys) : std::nullopt;
+        const bool acronym = seen && *seen >= kAcronymInJapanese && written &&
+                             std::none_of(written->begin(), written->end(), [](wchar_t c) { return std::iswlower(c) != 0; });
+        judgement.english = !particle && ((after && score >= thresholds_.commonWord) || acronym);
+        if (acronym) judgement.written = *written;
         if (!judgement.english) judgement.written = std::wstring(keys);
         return judgement;
     }
