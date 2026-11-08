@@ -251,7 +251,11 @@ ChunkJudge::Judgement ChunkJudge::JudgeLanguage(std::wstring_view keys, std::siz
         constexpr double kAcronymInJapanese = 2.5;
         const auto seen = names_ ? names_->InJapaneseText(keys) : std::nullopt;
         const auto written = names_ ? names_->WrittenAs(keys) : std::nullopt;
-        const bool acronym = seen && *seen >= kAcronymInJapanese && written &&
+        // Not an everyday Japanese word (ii: いい, not II; ai: 愛 is rarer).
+        const auto japanese = converter_.Best(kana);
+        const bool everyday = japanese && !kana.empty() &&
+                              japanese->cost < thresholds_.everydayPerKana * static_cast<std::int64_t>(kana.size());
+        const bool acronym = seen && *seen >= kAcronymInJapanese && written && !everyday &&
                              std::none_of(written->begin(), written->end(), [](wchar_t c) { return std::iswlower(c) != 0; });
         judgement.english = !particle && ((after && score >= thresholds_.commonWord) || acronym);
         if (acronym) judgement.written = *written;
