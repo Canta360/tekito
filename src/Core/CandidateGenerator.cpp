@@ -104,11 +104,12 @@ struct CasingRule {
     bool automatic;
 };
 
-// Words always written with capitals: days, months, languages and
+// Words always written with capitals: the pronoun I, days, months, languages and
 // nationalities, holidays and a few product names. Those that are also
 // everyday small words (march, may, august, polish, china, turkey) are
 // only offered.
 constexpr CasingRule kCasingRules[] = {
+    {L"i", L"I", true},
     {L"monday", L"Monday", true}, {L"tuesday", L"Tuesday", true}, {L"wednesday", L"Wednesday", true},
     {L"thursday", L"Thursday", true}, {L"friday", L"Friday", true}, {L"saturday", L"Saturday", true},
     {L"sunday", L"Sunday", true},
@@ -150,7 +151,8 @@ std::optional<std::pair<std::wstring, bool>> WrittenForm(std::wstring_view lower
         if (lower.size() <= ending.size() || !lower.ends_with(ending)) continue;
         const auto base = lower.substr(0, lower.size() - ending.size());
         for (const auto& rule : kCasingRules) {
-            if (base == rule.lower && !rule.written.ends_with(L"'s")) {
+            // Not a letter of its own (is is no plural of I).
+            if (base == rule.lower && rule.lower.size() > 1 && !rule.written.ends_with(L"'s")) {
                 return std::pair{std::wstring(rule.written) + std::wstring(ending), rule.automatic};
             }
         }
@@ -1124,8 +1126,6 @@ void CandidateGenerator::ApplyWritingRules(std::vector<Candidate>& output, std::
             text.front() = static_cast<wchar_t>(std::towupper(text.front()));
             first = Rule{std::move(text), true};
         }
-    } else if (rawText == L"i") {
-        first = Rule{L"I", true};
     } else if (typedSmall) {
         if (const auto written = WrittenForm(lower)) {
             if (written->second) {

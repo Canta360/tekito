@@ -222,9 +222,11 @@ void CandidateEngine::AddRunTogether(std::wstring_view rawText, const Conversion
     const auto& frequency = providers_->shared->frequencyProvider;
     if (frequency.Score(rawText) >= kListed) return;
     const auto score = [&](std::wstring_view word) { return frequency.Score(word); };
-    // One letter only a and i (engineerss is not engineers s).
+    // One letter only as common as a and i (engineerss is not engineers s;
+    // the next, x and s, are at 4.3).
+    constexpr double kOneLetterWord = 5.0;
     const auto known = [&](std::wstring_view word) {
-        if (word.size() == 1) return word == L"a" || word == L"i";
+        if (word.size() == 1) return score(word) >= kOneLetterWord;
         return score(word) >= (word.size() <= kShortWord ? kCommon : kKnown);
     };
     const auto words = SplitRunTogether(rawText, known, score);

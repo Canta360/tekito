@@ -29,11 +29,13 @@ function Resolve-BuildTool($ExplicitPath, $CommandName) {
     throw "$CommandName was not found. Install CMake or the Visual Studio C++ workload."
 }
 
-# Fails when any file under $Paths contains $Pattern.
+# Fails when any file under $Paths contains $Pattern, but on a line right
+# after a comment with "verify-allow" in it (an exception the rule names).
 function Assert-Absent($Rule, $Pattern, [string[]]$Paths) {
     $hits = foreach ($path in $Paths) {
         Get-ChildItem (Join-Path $repoRoot $path) -Recurse -File -Include *.cpp, *.h |
-            Select-String -Pattern $Pattern
+            Select-String -Pattern $Pattern -Context 1, 0 |
+            Where-Object { -not ($_.Context.PreContext -match "verify-allow") }
     }
     if ($hits) {
         $hits | ForEach-Object { Write-Host "  $($_.Path):$($_.LineNumber): $($_.Line.Trim())" }
@@ -75,7 +77,9 @@ try {
 $product = @("src", "apps")
 
 # TEKITO is a TSF text service. It must not fall back to watching or
-# faking keystrokes the way the retired overlay prototype did.
+# faking keystrokes the way the retired overlay prototype did. The one
+# exception: Left keys that put the caret back between brackets in older
+# edit controls TSF only bridges to (TextService.cpp, marked verify-allow).
 Assert-Absent "no keyboard hooks or synthesized input" `
     "SetWindowsHookEx|WH_KEYBOARD|SendInput|keybd_event|mouse_event" $product
 

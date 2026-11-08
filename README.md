@@ -319,7 +319,7 @@ attach to the release.
 - Words and phrases belong in data packs, never in `if` statements.
 - Nothing in the input path may use the network, and diagnostics never
   include what the user typed.
-- TEKITO works through TSF only; no keyboard hooks or synthesized input.
+- TEKITO works through TSF only; no keyboard hooks, and synthesized input only to put the caret back between brackets in older edit controls.
 - Leave correct words, names and code as they are. When unsure, suggest
   instead of replacing.
 

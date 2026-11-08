@@ -2369,6 +2369,7 @@ HRESULT TextService::InsertPairAtSelection(ITfContext* context, TfEditCookie edi
             keys.push_back(down);
             keys.push_back(up);
         }
+        // The only keys TEKITO sends (scripts/verify.ps1 allows them by this mark): verify-allow
         (void)SendInput(static_cast<UINT>(keys.size()), keys.data(), sizeof(INPUT));
     }
     return S_OK;
