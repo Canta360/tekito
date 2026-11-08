@@ -73,6 +73,10 @@ public:
     // capitals (csv: CSV, deepl: DeepL, redis: Redis); nullptr: off. It
     // writes words, never decides their language.
     void SetEnglishNames(const WrittenForms* names) noexcept { englishNames_ = names; }
+    // Names of software, services, companies and brands from Wikidata (the
+    // product-names pack: zapier: Zapier; safari: Safari only among
+    // Japanese), written the same way; nullptr: off.
+    void SetProductNames(const WrittenForms* names) noexcept { productNames_ = names; }
     // How `keys` are written as English in Japanese text, whatever language
     // they were taken as (jira: Jira, csv: CSV, data: data).
     [[nodiscard]] std::wstring EnglishWritten(std::wstring_view keys) const { return WordAsWritten(keys, true); }
@@ -150,7 +154,9 @@ private:
                                           const EnglishSpelling* spelling, std::wstring_view before,
                                           bool englishSentences) const;
     // `written` in small letters as a name writes it (CSV), or as it is.
-    [[nodiscard]] std::wstring AsName(std::wstring written) const;
+    // `inJapanese`: among Japanese, where a name that is a word too is
+    // written as the name (safari: Safari).
+    [[nodiscard]] std::wstring AsName(std::wstring written, bool inJapanese = true) const;
     // How English writes `word` (GitHub, Google, nice); `inJapanese`: in a
     // Japanese sentence, where a word that is plain English too is written
     // by its name (line: LINE).
@@ -173,6 +179,7 @@ private:
     const Loanwords* names_;
     const WrittenForms* forms_{nullptr};
     const WrittenForms* englishNames_{nullptr};
+    const WrittenForms* productNames_{nullptr};
     const LetterOdds* letterOdds_{nullptr};
     bool englishAround_{true};
     bool particleAfter_{true};

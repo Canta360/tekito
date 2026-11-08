@@ -72,6 +72,7 @@ struct JapaneseData {
     std::unique_ptr<ChunkJudge> chunks;
     WrittenForms writtenForms;
     WrittenForms englishNames;
+    WrittenForms productNames;
     LetterOdds letterOdds;
     std::uint16_t nounContext{0};
 };
@@ -143,6 +144,9 @@ const JapaneseData* ProcessJapaneseData() {
                                                           loaded->loanwords.IsOpen() ? &loaded->loanwords : nullptr);
             if (loaded->writtenForms.IsOpen()) loaded->chunks->SetWrittenForms(&loaded->writtenForms);
             if (loaded->englishNames.IsOpen()) loaded->chunks->SetEnglishNames(&loaded->englishNames);
+            if (loaded->productNames.Open(ExternalLexiconProvider::PackDirectory(L"product-names"))) {
+                loaded->chunks->SetProductNames(&loaded->productNames);
+            }
             if (loaded->letterOdds.Open(ExternalLexiconProvider::PackDirectory(L"japanese-letter-odds"))) {
                 loaded->chunks->SetLetterOdds(&loaded->letterOdds);
             }
