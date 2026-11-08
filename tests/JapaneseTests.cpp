@@ -1090,8 +1090,9 @@ void TestMixedTyping(const RomajiTable& table, const MiniPack& pack) {
             "Mix holds the chunks before the one typed until Enter");
     composer.Convert();
     const auto sentence = composer.Commit();
-    Require(sentence.starts_with(L"Push") && sentence.size() > 4 && sentence[4] >= 0x3000,
-            "Enter commits the whole sentence, Japanese right after English");
+    Require(sentence.starts_with(L"push") && sentence.size() > 4 && sentence[4] >= 0x3000,
+            "Enter commits the whole sentence, Japanese right after English, which starts a Japanese "
+            "sentence in small letters (pushきかい, not Push)");
     {
         // Mix AI: on Enter, a model trained for conversion chooses among the
         // sentence's texts, reading the keys and only what came before it.
@@ -2063,6 +2064,10 @@ void TestSpecialConversions(const RomajiTable& table, const MiniPack& pack) {
         Require(!phrases.empty() && std::any_of(phrases[0].candidates.begin(), phrases[0].candidates.end(),
                                                 [](const auto& c) { return c.text == L"PC"; }),
                 "ぴーしー offers PC");
+        const auto typedU = lettered.Convert(L"ゆうえすじぇい");
+        Require(!typedU.empty() && std::any_of(typedU[0].candidates.begin(), typedU[0].candidates.end(),
+                                               [](const auto& c) { return c.text == L"USJ"; }),
+                "a long vowel typed with う reads as the letter too (ゆう: U)");
         const auto plain = converter.Convert(L"ぴーしー");
         Require(plain.empty() || std::none_of(plain[0].candidates.begin(), plain[0].candidates.end(),
                                               [](const auto& c) { return c.text == L"PC"; }),
