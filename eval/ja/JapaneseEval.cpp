@@ -94,13 +94,23 @@ void SetNumberWord(tekito::japanese::JapaneseConverter& converter, const std::fi
     if (const auto number = parts.Number()) {
         converter.SetNumberWord(tekito::japanese::JapaneseConverter::NumberWord{number->left, number->right, number->cost});
     }
+    // Names the sentence check leaves, as JapaneseData sets them up
+    // (TEKITO_EVAL_NAME_PARTS=0: none).
+    if (const char* off = std::getenv("TEKITO_EVAL_NAME_PARTS"); !off || *off != '0') {
+        std::vector<std::uint16_t> names;
+        for (const auto kind : {tekito::japanese::UserWordKind::Organization, tekito::japanese::UserWordKind::ProperNoun}) {
+            if (const auto part = parts.For(kind)) names.push_back(part->left);
+        }
+        const auto organization = parts.For(tekito::japanese::UserWordKind::Organization);
+        converter.SetNameParts(std::move(names), organization ? organization->left : 0);
+    }
     // Letters read by their names (ぴーしー: PC), as JapaneseData sets them up
-    // (2000 over a proper noun); TEKITO_EVAL_LETTER_COST: another cost, or
+    // (1500 under a proper noun); TEKITO_EVAL_LETTER_COST: another cost, or
     // "off".
     if (const auto noun = parts.For(tekito::japanese::UserWordKind::ProperNoun)) {
         const char* cost = std::getenv("TEKITO_EVAL_LETTER_COST");
         if (!cost || std::string_view(cost) != "off") {
-            const std::int32_t over = cost && *cost ? static_cast<std::int32_t>(std::strtol(cost, nullptr, 10)) : 2000;
+            const std::int32_t over = cost && *cost ? static_cast<std::int32_t>(std::strtol(cost, nullptr, 10)) : -1500;
             converter.SetLetterWord(tekito::japanese::JapaneseConverter::NumberWord{noun->left, noun->right, noun->cost + over});
         }
     }

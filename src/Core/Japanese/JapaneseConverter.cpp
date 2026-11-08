@@ -840,6 +840,23 @@ std::vector<Phrase> JapaneseConverter::Convert(std::wstring_view reading,
         // The content word each candidate stands on (its longest), for the
         // sentence model.
         std::vector<std::wstring> heads;
+        // A word some entry of the same reading and writing has as a common
+        // name (コカ・コーラ is a noun in one added pack, an organization in
+        // Mozc); not a rare one (京都 as a proper noun at 8080, a place first).
+        constexpr std::int64_t kCommonName = 5000;
+        const auto namedWord = [&](int k) {
+            if (nameParts_.empty()) return false;
+            if (IsNamePart(nodes[k].word.left)) return true;
+            const std::wstring text = textOf(nodes[k]);
+            for (const int other : lattice.endingAt[nodes[k].end]) {
+                if (other != k && nodes[other].known && nodes[other].begin == nodes[k].begin &&
+                    nodes[other].word.cost <= kCommonName && IsNamePart(nodes[other].word.left) &&
+                    textOf(nodes[other]) == text) {
+                    return true;
+                }
+            }
+            return false;
+        };
         for (const auto& ending : endings) {
             if (phrase.candidates.size() >= kBestPaths) break;
             std::wstring text;
@@ -847,6 +864,8 @@ std::vector<Phrase> JapaneseConverter::Convert(std::wstring_view reading,
             bool spelling = false;
             bool kanaNumber = false;
             bool setPhrase = false;
+            bool name = false;
+            bool organization = false;
             std::vector<int> parts;
             for (int k = ending.node, r = ending.rank; k >= 0;) {
                 parts.push_back(k);
@@ -864,14 +883,39 @@ std::vector<Phrase> JapaneseConverter::Convert(std::wstring_view reading,
                 spelling = spelling || (nodes[*it].known && nodes[*it].word.spellingCorrection);
                 kanaNumber = kanaNumber || nodes[*it].numeral || nodes[*it].numberPrefix > 0;
                 setPhrase = setPhrase || (nodes[*it].known && nodes[*it].word.setPhrase);
+                name = name || (nodes[*it].known && namedWord(*it));
+                organization = organization || (organizationPart_ != 0 && nodes[*it].known &&
+                                                nodes[*it].word.left == organizationPart_);
             }
             if (!has(text)) {
                 PhraseCandidate candidate{std::move(text), ending.cost, PhraseCandidate::Kind::Dictionary, spelling};
                 candidate.rightId = nodes[ending.node].right;
                 candidate.kanaNumber = kanaNumber;
                 candidate.setPhrase = setPhrase;
+                candidate.name = name;
+                candidate.organization = organization;
                 phrase.candidates.push_back(std::move(candidate));
                 heads.push_back(std::move(head));
+            }
+        }
+        // An organization as it is written, with its ・ (ドン・キホーテ, not ドンキホーテ):
+        // first when the first differs from it only by the dots.
+        if (!phrase.candidates.empty() && !phrase.candidates.front().organization) {
+            const auto undotted = [](std::wstring text) {
+                std::erase(text, L'・');
+                return text;
+            };
+            const std::wstring first = undotted(phrase.candidates.front().text);
+            for (std::size_t c = 1; c < phrase.candidates.size(); ++c) {
+                const auto& candidate = phrase.candidates[c];
+                if (candidate.organization && candidate.text != phrase.candidates.front().text &&
+                    undotted(candidate.text) == first) {
+                    std::rotate(phrase.candidates.begin(), phrase.candidates.begin() + static_cast<std::ptrdiff_t>(c),
+                                phrase.candidates.begin() + static_cast<std::ptrdiff_t>(c) + 1);
+                    std::rotate(heads.begin(), heads.begin() + static_cast<std::ptrdiff_t>(c),
+                                heads.begin() + static_cast<std::ptrdiff_t>(c) + 1);
+                    break;
+                }
             }
         }
 

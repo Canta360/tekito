@@ -1938,6 +1938,26 @@ void JapaneseComposer::CheckSentence() {
     if (phrases_.empty() || (!phrases_.front().candidates.empty() && !phrases_.front().candidates.front().reading.empty())) {
         return;  // the whole input read another way (English run in) stays first
     }
+    // An organization as it is written, with its ・ (ドン・キホーテで, not ドンキホーテで),
+    // over what differs from it only by the dots.
+    for (auto& phrase : phrases_) {
+        if (phrase.learned || phrase.selected >= phrase.candidates.size() || phrase.candidates[phrase.selected].organization) {
+            continue;
+        }
+        const auto undotted = [](std::wstring text) {
+            std::erase(text, L'・');
+            return text;
+        };
+        const std::wstring shown = undotted(phrase.candidates[phrase.selected].text);
+        for (std::size_t c = 0; c < phrase.candidates.size(); ++c) {
+            const auto& candidate = phrase.candidates[c];
+            if (candidate.organization && candidate.text != phrase.candidates[phrase.selected].text &&
+                undotted(candidate.text) == shown) {
+                phrase.selected = c;
+                break;
+            }
+        }
+    }
     // Each phrase's candidates for part of the input only, each text once.
     // Slips undone are left out: finding them for every phrase would take
     // longer than the conversion itself.
@@ -2003,7 +2023,7 @@ void JapaneseComposer::CheckSentence() {
             if (!seen) list.push_back(c);
             // What learning put first stays, and a set phrase (画竜点睛:
             // the check reads its rare kanji as unlikely).
-            if (phrase.learned || marks || shown.setPhrase) break;
+            if (phrase.learned || marks || shown.setPhrase || shown.name) break;
         }
         if (list.empty() || list.front() != phrase.selected) return;
         lists.push_back(std::move(list));
@@ -2024,9 +2044,20 @@ void JapaneseComposer::CheckSentence() {
         SyncEdgeContext();
         guesses = converter_->BestSentences(conversionReading_, wholeSentences_, context_, userDictionary_);
     }
+    // A name or set phrase that stays in its phrase stays in them too
+    // (コカ・コーラ, not コカコーラ).
+    std::vector<std::wstring> kept;
+    for (const auto& phrase : phrases_) {
+        if (phrase.selected >= phrase.candidates.size()) continue;
+        const auto& shown = phrase.candidates[phrase.selected];
+        if (shown.name || shown.setPhrase) kept.push_back(shown.text);
+    }
     std::vector<std::wstring> wholes;
     for (const auto& guess : guesses) {
-        if (InKanjiRange(guess.text)) wholes.push_back(guess.text);
+        const bool keeps = std::all_of(kept.begin(), kept.end(), [&](const std::wstring& text) {
+            return guess.text.find(text) != std::wstring::npos;
+        });
+        if (keeps && InKanjiRange(guess.text)) wholes.push_back(guess.text);
     }
     for (std::size_t i = 0; i < parts.size(); ++i) {
         auto& checked = lastChecked_.emplace_back();

@@ -27,9 +27,10 @@
 namespace tekito::japanese {
 namespace {
 
-// Letters read by their names (ぴーしー: PC) cost this much over a proper
-// noun: offered beside the katakana (ピーシー), not over it.
-constexpr std::int32_t kLetterWordCost = 2000;
+// Letters read by their names (ぴーしー: PC, じぇいてぃーびー: JTB) cost this
+// much over a proper noun: below it, since Japanese writes such names in
+// letters, not as ピーシー (2000 over left them behind the katakana).
+constexpr std::int32_t kLetterWordCost = -1500;
 
 struct JapaneseData {
     JapaneseDictionary dictionary;
@@ -92,6 +93,16 @@ const JapaneseData* ProcessJapaneseData() {
         loaded->userParts = UserPartsOfSpeech::Load(core / L"pos.tsv");
         if (const auto number = loaded->userParts.Number()) {
             loaded->converter->SetNumberWord(JapaneseConverter::NumberWord{number->left, number->right, number->cost});
+        }
+        // Names the sentence check leaves (東武, not 頭部): organizations and
+        // proper nouns; people and places as well did worse.
+        {
+            std::vector<std::uint16_t> names;
+            for (const auto kind : {UserWordKind::Organization, UserWordKind::ProperNoun}) {
+                if (const auto part = loaded->userParts.For(kind)) names.push_back(part->left);
+            }
+            const auto organization = loaded->userParts.For(UserWordKind::Organization);
+            loaded->converter->SetNameParts(std::move(names), organization ? organization->left : 0);
         }
         if (const auto noun = loaded->userParts.For(UserWordKind::ProperNoun)) {
             loaded->nounContext = noun->right;

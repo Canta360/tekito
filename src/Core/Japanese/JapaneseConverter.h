@@ -1,5 +1,7 @@
 #pragma once
 
+#include <algorithm>
+
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -42,6 +44,11 @@ struct PhraseCandidate {
     bool kanaNumber{false};
     // Has a set phrase in it (画竜点睛), which the sentence check leaves.
     bool setPhrase{false};
+    // Has a name in it (東武, 西友, コカ・コーラ: JapaneseConverter::SetNameParts),
+    // which the sentence check leaves when it comes first.
+    bool name{false};
+    // Has an organization's name in it (ドン・キホーテ), written with its ・.
+    bool organization{false};
     // Mix: the chunk in the other language (Japanese read as English, or
     // English as Japanese), as likely as the first. It keeps the place
     // right after the first: other second choices (a slip undone) go after.
@@ -254,6 +261,17 @@ public:
         notationCost_ = cost;
     }
     void SetNotationLevel(int level) const noexcept { notationLevel_ = level; }
+    // The parts of speech (left ids) of names the sentence check leaves
+    // (PhraseCandidate::name): organizations (東武, 西友) and the like.
+    // `organization`: the part of organizations (0: none), written with
+    // their ・ (PhraseCandidate::organization).
+    void SetNameParts(std::vector<std::uint16_t> parts, std::uint16_t organization = 0) {
+        nameParts_ = std::move(parts);
+        organizationPart_ = organization;
+    }
+    [[nodiscard]] bool IsNamePart(std::uint16_t part) const noexcept {
+        return std::find(nameParts_.begin(), nameParts_.end(), part) != nameParts_.end();
+    }
     // With the default weights (not "= {}", which GCC and Clang reject for
     // a nested struct with member initializers).
     void SetLanguageModel(const LanguageModel* model) noexcept { SetLanguageModel(model, ModelWeights{}); }
@@ -276,6 +294,8 @@ private:
     const Notation* notation_{nullptr};
     std::int64_t notationCost_{3000};
     mutable int notationLevel_{3};
+    std::vector<std::uint16_t> nameParts_;
+    std::uint16_t organizationPart_{0};
 };
 
 }  // namespace tekito::japanese
