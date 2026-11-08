@@ -95,6 +95,13 @@ void SetNumberWord(tekito::japanese::JapaneseConverter& converter, const std::fi
     if (const auto number = parts.Number()) {
         converter.SetNumberWord(tekito::japanese::JapaneseConverter::NumberWord{number->left, number->right, number->cost});
     }
+    // A particle first at the start of a sentence costs more, as JapaneseData
+    // sets it up (1000); TEKITO_EVAL_JOINED_START=<cost> another (0: off).
+    // Each row is taken as starting a sentence.
+    if (const auto noun = parts.For(tekito::japanese::UserWordKind::Noun)) {
+        const char* cost = std::getenv("TEKITO_EVAL_JOINED_START");
+        converter.SetJoinedStart(noun->right, cost && *cost ? std::strtoll(cost, nullptr, 10) : 1000);
+    }
     // Names the sentence check leaves, as JapaneseData sets them up
     // (TEKITO_EVAL_NAME_PARTS=0: none).
     if (const char* off = std::getenv("TEKITO_EVAL_NAME_PARTS"); !off || *off != '0') {

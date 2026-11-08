@@ -33,6 +33,10 @@ namespace {
 // much over a proper noun: below it, since Japanese writes such names in
 // letters, not as ピーシー (2000 over left them behind the katakana).
 constexpr std::int32_t kLetterWordCost = -1500;
+// What a word that joins the word before it (a particle) costs more when it
+// would come first at the start of a sentence: enough for 平気 over へ行き;
+// 2000 changed more sentences for the worse.
+constexpr std::int64_t kJoinedStartCost = 1000;
 
 // Whether `letters` (USJ) are written so by the written-forms pack or, three
 // letters or more, a name in english-names (which has AQ and EG too), or
@@ -125,6 +129,10 @@ const JapaneseData* ProcessJapaneseData() {
             }
             const auto organization = loaded->userParts.For(UserWordKind::Organization);
             loaded->converter->SetNameParts(std::move(names), organization ? organization->left : 0);
+        }
+        // A particle first at the start of a sentence (へいき: 平気, not へ行き).
+        if (const auto noun = loaded->userParts.For(UserWordKind::Noun)) {
+            loaded->converter->SetJoinedStart(noun->right, kJoinedStartCost);
         }
         if (const auto noun = loaded->userParts.For(UserWordKind::ProperNoun)) {
             loaded->nounContext = noun->right;

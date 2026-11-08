@@ -2602,7 +2602,11 @@ std::optional<std::wstring> JapaneseComposer::RunTogetherEnglish(bool* foreign) 
                     read.push_back({EnglishForModel(piece.text, HasCapital(piece.text))});
                     continue;
                 }
+                // A piece after another is inside the sentence, not at its start.
+                const bool inside = i > 0 || start > 0;
+                if (inside && converter_) converter_->SetAtSentenceStart(false);
                 const auto phrases = ConvertReading(ApplyTypingStyle(piece.text), 0, i == 0 ? context : 0, contextWords_);
+                if (inside && converter_) converter_->SetAtSentenceStart(sentenceStart_);
                 if (std::any_of(phrases.begin(), phrases.end(), [](const Phrase& phrase) {
                         return phrase.candidates.empty();
                     })) {
@@ -2732,6 +2736,71 @@ void JapaneseComposer::AddPhrases(std::vector<Phrase> phrases, const std::wstrin
         phrases_.push_back({phrase.begin, phrase.length, std::move(phrase.candidates)});
         phrases_.back().learned = learned;
     }
+}
+
+void JapaneseComposer::AddLongerWords(std::size_t i) {
+    // A word of the dictionary over this phrase and the next ones (へ|いき:
+    // 兵器, 平気, 併記) is offered too, whatever the phrases' breaks, after
+    // the phrase's first few: up to this many, over up to this many phrases.
+    // Added when the list opens, as the slips are, so that the choices made
+    // before (learning, the sentence check) never pick one of them.
+    constexpr std::size_t kLongerWords = 4;
+    constexpr std::size_t kPhrasesAhead = 3;
+    constexpr std::size_t kAfter = 3;
+    // A word this costly is too rare to offer this way.
+    constexpr std::int64_t kRareWord = 7000;
+    const std::wstring& reading = conversionReading_;
+    if (!converter_ || i + 1 >= phrases_.size()) return;
+    auto& phrase = phrases_[i];
+    if (phrase.candidates.empty() ||
+        std::any_of(phrase.candidates.begin(), phrase.candidates.end(), [](const PhraseCandidate& c) { return c.length > 0; })) {
+        return;
+    }
+    std::vector<PhraseCandidate> longer;
+    for (std::size_t j = i + 1; j < phrases_.size() && j <= i + kPhrasesAhead; ++j) {
+        const std::size_t end = phrases_[j].begin + phrases_[j].length;
+        if (end > reading.size() || end <= phrase.begin) break;
+        for (auto& word : converter_->Words(std::wstring_view(reading).substr(phrase.begin, end - phrase.begin))) {
+            if (word.cost > kRareWord) continue;
+            word.length = end - phrase.begin;
+            longer.push_back(std::move(word));
+        }
+    }
+    std::stable_sort(longer.begin(), longer.end(),
+                     [](const PhraseCandidate& a, const PhraseCandidate& b) { return a.cost < b.cost; });
+    std::size_t at = std::min(kAfter, phrase.candidates.size());
+    std::size_t added = 0;
+    for (auto& word : longer) {
+        if (added >= kLongerWords) break;
+        const bool listed = std::any_of(phrase.candidates.begin(), phrase.candidates.end(),
+                                        [&](const PhraseCandidate& c) { return c.text == word.text; });
+        if (listed) continue;
+        phrase.candidates.insert(phrase.candidates.begin() + static_cast<std::ptrdiff_t>(at++), std::move(word));
+        ++added;
+    }
+}
+
+void JapaneseComposer::TakeLongerWord() {
+    if (!IsConverted() || focus_ >= phrases_.size()) return;
+    const auto& phrase = phrases_[focus_];
+    if (phrase.selected >= phrase.candidates.size()) return;
+    const auto& chosen = phrase.candidates[phrase.selected];
+    if (chosen.length <= phrase.length) return;
+    // The phrase takes the word's length, then the word.
+    const std::wstring text = chosen.text;
+    const bool open = listOpen_;
+    ResizeFocus(static_cast<int>(chosen.length) - static_cast<int>(phrase.length));
+    if (focus_ >= phrases_.size()) return;
+    auto& now = phrases_[focus_];
+    const auto found = std::find_if(now.candidates.begin(), now.candidates.end(),
+                                    [&](const PhraseCandidate& c) { return c.text == text; });
+    if (found != now.candidates.end()) {
+        now.selected = static_cast<std::size_t>(found - now.candidates.begin());
+    } else {
+        now.candidates.insert(now.candidates.begin(), PhraseCandidate{text, 0, PhraseCandidate::Kind::Dictionary});
+        now.selected = 0;
+    }
+    listOpen_ = open;
 }
 
 std::vector<RomajiToken> JapaneseComposer::ParseRomaji(const RomajiTable& table, std::wstring_view keys) {
@@ -3061,6 +3130,7 @@ void JapaneseComposer::Convert() {
                 whole = candidates[1].text;
             }
         }
+        AddLongerWords(focus_);
         auto& phrase = phrases_[focus_];
         AddSlipCandidates(phrase);
         phrase.form.reset();
@@ -3362,6 +3432,7 @@ void JapaneseComposer::ShowCandidates() {
     if (!IsConverted()) Convert();
     if (!IsConverted()) return;
     StartPicking();
+    AddLongerWords(focus_);
     auto& phrase = phrases_[focus_];
     AddSlipCandidates(phrase);
     if (phrase.candidates.empty()) {
@@ -3376,6 +3447,7 @@ void JapaneseComposer::NextCandidate() {
         return;
     }
     StartPicking();
+    AddLongerWords(focus_);
     auto& phrase = phrases_[focus_];
     AddSlipCandidates(phrase);
     if (phrase.candidates.empty()) {
@@ -3384,6 +3456,7 @@ void JapaneseComposer::NextCandidate() {
     if (!phrase.form) phrase.selected = (phrase.selected + 1) % phrase.candidates.size();
     phrase.form.reset();
     listOpen_ = true;
+    TakeLongerWord();
 }
 
 void JapaneseComposer::PreviousCandidate() {
@@ -3392,6 +3465,7 @@ void JapaneseComposer::PreviousCandidate() {
         return;
     }
     StartPicking();
+    AddLongerWords(focus_);
     auto& phrase = phrases_[focus_];
     AddSlipCandidates(phrase);
     if (phrase.candidates.empty()) {
@@ -3401,6 +3475,7 @@ void JapaneseComposer::PreviousCandidate() {
     if (!phrase.form) phrase.selected = (phrase.selected + count - 1) % count;
     phrase.form.reset();
     listOpen_ = true;
+    TakeLongerWord();
 }
 
 void JapaneseComposer::SelectCandidate(std::size_t index) {
@@ -3410,6 +3485,7 @@ void JapaneseComposer::SelectCandidate(std::size_t index) {
     phrase.selected = index;
     phrase.form.reset();
     listOpen_ = false;
+    TakeLongerWord();
 }
 
 void JapaneseComposer::MoveFocus(int delta) {
@@ -3919,7 +3995,11 @@ std::optional<std::wstring> JapaneseComposer::MixLiveSplit() const {
                     continue;
                 }
                 japanese = true;
-                for (const auto& phrase : ConvertReading(ApplyTypingStyle(piece.text), 0, i == 0 ? context_ : 0, contextWords_)) {
+                // A piece after another is inside the sentence, not at its start.
+                if (i > 0 && converter_) converter_->SetAtSentenceStart(false);
+                const auto piecePhrases = ConvertReading(ApplyTypingStyle(piece.text), 0, i == 0 ? context_ : 0, contextWords_);
+                if (i > 0 && converter_) converter_->SetAtSentenceStart(sentenceStart_);
+                for (const auto& phrase : piecePhrases) {
                     if (phrase.candidates.empty()) {
                         ok = false;
                         break;

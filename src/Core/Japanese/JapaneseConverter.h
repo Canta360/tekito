@@ -54,6 +54,10 @@ struct PhraseCandidate {
     // English as Japanese), as likely as the first. It keeps the place
     // right after the first: other second choices (a slip undone) go after.
     bool otherLanguage{false};
+    // A word longer than the phrase it is offered for, over this many
+    // characters of the reading from the phrase's start (へ|いき: 併記 over
+    // へいき); choosing it makes the phrase that long. 0: the phrase's own.
+    std::size_t length{0};
 };
 
 // A word that starts with what has been typed, for prediction.
@@ -128,6 +132,9 @@ public:
     // Whether `reading` is a word of the dictionary as a whole (たけ: 竹;
     // not いっすえ, which only makes 逸 and 陶).
     [[nodiscard]] bool IsWord(std::wstring_view reading) const;
+    // The dictionary's words read exactly as `reading`, likeliest first
+    // (へいき: 兵器, 平気, 併記); spelling corrections left out.
+    [[nodiscard]] std::vector<PhraseCandidate> Words(std::wstring_view reading) const;
     [[nodiscard]] std::optional<PhraseCandidate> Best(std::wstring_view reading, std::uint16_t context = 0,
                                                       const JapaneseUserDictionary* user = nullptr) const;
     // What the likeliest words for the whole reading cost, as Convert finds
@@ -232,6 +239,19 @@ public:
     // Which letters are known abbreviations (USJ, PC): they come before a
     // word of the dictionary read the same, other letters after it
     // (えいえいおー: エイエイオー, not AAO). Without: every letters after it.
+    // At the start of what is typed with nothing before it, a word that
+    // joins the word before it (a particle, read from the matrix: no phrase
+    // starts between `content`, a noun's right id, and it) costs `penalty`
+    // more (へいき: 平気, not へ行き). 0: off.
+    void SetJoinedStart(std::uint16_t content, std::int64_t penalty) noexcept {
+        startContent_ = content;
+        startPenalty_ = penalty;
+    }
+    // Whether what is converted next starts a sentence (the text before the
+    // caret ends one, or there is none): only then does SetJoinedStart's
+    // cost apply; typed into the middle of a sentence, a particle may well
+    // come first. Set before converting, as SetNotationLevel.
+    void SetAtSentenceStart(bool start) const noexcept { atSentenceStart_ = start; }
     void SetKnownLetters(std::function<bool(std::wstring_view)> known) {
         knownLetters_ = std::move(known);
         if (letters_) letters_->known = knownLetters_ ? &knownLetters_ : nullptr;
@@ -310,6 +330,9 @@ private:
     mutable int notationLevel_{3};
     std::vector<std::uint16_t> nameParts_;
     std::function<bool(std::wstring_view)> knownLetters_;
+    std::uint16_t startContent_{0};
+    std::int64_t startPenalty_{0};
+    mutable bool atSentenceStart_{true};
     std::uint16_t organizationPart_{0};
 };
 
