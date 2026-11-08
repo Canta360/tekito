@@ -68,6 +68,14 @@ public:
     // How a word is written by its own name (ram: RAM, asrock: ASRock);
     // nullptr: off.
     void SetWrittenForms(const WrittenForms* forms) noexcept { forms_ = forms; }
+    // Names from Wikidata (the english-names pack, plain English words left
+    // out): how English taken as English is written when it is a name with
+    // capitals (csv: CSV, deepl: DeepL, redis: Redis); nullptr: off. It
+    // writes words, never decides their language.
+    void SetEnglishNames(const WrittenForms* names) noexcept { englishNames_ = names; }
+    // How `keys` are written as English in Japanese text, whatever language
+    // they were taken as (jira: Jira, csv: CSV, data: data).
+    [[nodiscard]] std::wstring EnglishWritten(std::wstring_view keys) const { return WordAsWritten(keys, true); }
     // How English the letters are against romaji (cappuccino against
     // kyouha), for English no list has; nullptr: off.
     void SetLetterOdds(const LetterOdds* odds) noexcept { letterOdds_ = odds; }
@@ -138,6 +146,11 @@ public:
                                                        bool englishSentences = true) const;
 
 private:
+    [[nodiscard]] Judgement JudgeLanguage(std::wstring_view keys, std::size_t englishBefore, bool japaneseInSentence,
+                                          const EnglishSpelling* spelling, std::wstring_view before,
+                                          bool englishSentences) const;
+    // `written` in small letters as a name writes it (CSV), or as it is.
+    [[nodiscard]] std::wstring AsName(std::wstring written) const;
     // How English writes `word` (GitHub, Google, nice); `inJapanese`: in a
     // Japanese sentence, where a word that is plain English too is written
     // by its name (line: LINE).
@@ -159,6 +172,7 @@ private:
     const IFrequencyProvider& english_;
     const Loanwords* names_;
     const WrittenForms* forms_{nullptr};
+    const WrittenForms* englishNames_{nullptr};
     const LetterOdds* letterOdds_{nullptr};
     bool englishAround_{true};
     bool particleAfter_{true};

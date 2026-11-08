@@ -997,6 +997,12 @@ int RunChunks(const ConnectionMatrix& matrix, const JapaneseDictionary& dictiona
         writtenForms.Open(tekito::ExternalLexiconProvider::PackDirectory(L"written-forms"))) {
         const_cast<tekito::japanese::ChunkJudge&>(judge).SetWrittenForms(&writtenForms);
     }
+    // english-names beside it too (TEKITO_EVAL_NO_ENGLISH_NAMES=1: not).
+    tekito::japanese::WrittenForms englishNames;
+    if (!std::getenv("TEKITO_EVAL_NO_ENGLISH_NAMES") &&
+        englishNames.Open(tekito::ExternalLexiconProvider::PackDirectory(L"english-names"))) {
+        const_cast<tekito::japanese::ChunkJudge&>(judge).SetEnglishNames(&englishNames);
+    }
     // japanese-letter-odds beside japanese-core (TEKITO_EVAL_NO_LETTER_ODDS=1: not).
     tekito::japanese::LetterOdds letterOdds;
     if (!std::getenv("TEKITO_EVAL_NO_LETTER_ODDS") && letterOdds.Open(options.pack.parent_path() / "japanese-letter-odds")) {

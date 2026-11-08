@@ -301,18 +301,40 @@ std::vector<std::wstring> TopConversions(const std::vector<Phrase>& phrases, std
     return texts;
 }
 
-// English as the sentence model reads it in a Japanese sentence: a word it
-// knows in its place, its punctuation kept (it reads English poorly, and a
-// loanword in its place, lunch: ランチ, did worse).
-std::wstring EnglishForModel(std::wstring_view english) {
-    std::wstring text = L"それ";
-    for (const wchar_t c : english) {
-        if (std::wstring_view(L".,!?。、！？").find(c) != std::wstring_view::npos) text.push_back(c);
-    }
-    return text;
+// Written with a capital letter: a name (Zoom, GitHub, API).
+bool HasCapital(std::wstring_view text) {
+    return std::any_of(text.begin(), text.end(), [](wchar_t c) { return c >= L'A' && c <= L'Z'; });
 }
 
 }  // namespace
+
+// English as the sentence model reads it in a Japanese sentence (it reads
+// English poorly): the katakana word Japanese writes for it when that is a
+// common loanword (hotel: ホテル, so that ホテルに泊まった reads better than
+// ホテルに止まった), else それ, which fits anywhere. A name stays それ (Zoom,
+// not ズーム), and so does a less common loanword: every loanword in its
+// place did worse. The marks after it stay.
+std::wstring JapaneseComposer::EnglishForModel(std::wstring_view english, bool named) const {
+    // Loanwords pack scores (Loanwords::Spelling): a common loanword is 6.
+    constexpr double kCommonLoanword = 6.0;
+    std::wstring word;
+    std::wstring marks;
+    for (const wchar_t c : english) {
+        if (std::wstring_view(L".,!?。、！？").find(c) != std::wstring_view::npos) {
+            marks.push_back(c);
+        } else if (c != L' ') {
+            word.push_back(c);
+        }
+    }
+    std::wstring text = L"それ";
+    if (loanwords_ && !word.empty() && !named) {
+        const auto spellings = loanwords_->ForEnglish(word, 1);
+        if (!spellings.empty() && !spellings.front().katakana.empty() && spellings.front().score >= kCommonLoanword) {
+            text = spellings.front().katakana;
+        }
+    }
+    return text + marks;
+}
 
 void JapaneseComposer::SetTable(const RomajiTable* table) noexcept {
     table_ = table;
@@ -2540,12 +2562,13 @@ std::optional<std::wstring> JapaneseComposer::RunTogetherEnglish(bool* foreign) 
                 whole.push_back({false, std::wstring(part), *kana});
             }
             const auto& parts = pieces ? *pieces : whole;
+            const bool allEnglish = std::all_of(parts.begin(), parts.end(), [](const ChunkJudge::Piece& p) { return p.english; });
             for (std::size_t i = 0; i < parts.size(); ++i) {
                 const auto& piece = parts[i];
                 if (piece.english) {
                     if (foreign && ChunkJudge::ForeignLetters(piece.keys)) *foreign = true;
-                    choices.push_back({start == 0 && i == 0 ? EnglishAsWritten(piece.text) : piece.text});
-                    read.push_back({EnglishForModel(piece.text)});
+                    choices.push_back({start == 0 && i == 0 && allEnglish ? EnglishAsWritten(piece.text) : piece.text});
+                    read.push_back({EnglishForModel(piece.text, HasCapital(piece.text))});
                     continue;
                 }
                 const auto phrases = ConvertReading(ApplyTypingStyle(piece.text), 0, i == 0 ? context : 0, contextWords_);
@@ -3704,7 +3727,14 @@ void JapaneseComposer::SettleChunk() {
     const std::wstring marks = MarksAfterEnglish(std::wstring_view(keys).substr(word));
     if (word > 0) {
         const auto judged = JudgeChunk(chunk.keys);
-        chunk.english = EnglishAsWritten(TypedWithCapitals(chunk.keys).value_or(judged.written)) + marks;
+        // Taken as Japanese, as English writes it all the same, for when the
+        // sentence takes it as English after all (jira: Jira).
+        const std::wstring written = TypedWithCapitals(chunk.keys).value_or(
+            judged.english || !chunkJudge_ ? judged.written : chunkJudge_->EnglishWritten(chunk.keys));
+        chunk.named = HasCapital(written);
+        const std::wstring asWritten = EnglishAsWritten(written);
+        chunk.capitalized = asWritten != written;
+        chunk.english = asWritten + marks;
         chunk.either = judged.either;
     } else {
         chunk.english = marks;
@@ -3759,6 +3789,30 @@ void JapaneseComposer::SettleChunk() {
     chunk.ownEnglish = chunk.english;
     lastCommit_.reset();
     settled_.push_back(std::move(chunk));
+    LowerSentenceStarts();
+}
+
+void JapaneseComposer::LowerSentenceStarts() {
+    for (std::size_t first = 0; first < settled_.size();) {
+        std::size_t end = first + 1;
+        while (end < settled_.size() && !settled_[end].sentenceStart) ++end;
+        const bool japanese = std::any_of(settled_.begin() + static_cast<std::ptrdiff_t>(first),
+                                          settled_.begin() + static_cast<std::ptrdiff_t>(end),
+                                          [](const SettledChunk& c) { return !c.isEnglish && !c.marksOnly; });
+        for (std::size_t i = first; japanese && i < end; ++i) {
+            auto& chunk = settled_[i];
+            if (!chunk.capitalized || !chunk.isEnglish || chunk.english.empty()) continue;
+            const auto lower = [](std::wstring& text) {
+                if (!text.empty() && text.front() >= L'A' && text.front() <= L'Z') {
+                    text.front() = static_cast<wchar_t>(text.front() - L'A' + L'a');
+                }
+            };
+            lower(chunk.english);
+            lower(chunk.ownEnglish);
+            chunk.capitalized = false;
+        }
+        first = end;
+    }
 }
 
 std::optional<std::wstring> JapaneseComposer::TypedLetters() const {
@@ -3823,11 +3877,14 @@ std::optional<std::wstring> JapaneseComposer::MixLiveSplit() const {
         if (const auto pieces = chunkJudge_->Split(core)) {
             std::wstring text;
             bool english = false, japanese = false, ok = true;
+            // English with Japanese stays in small letters at the start of
+            // a sentence too (LowerSentenceStarts).
+            const bool allEnglish = std::all_of(pieces->begin(), pieces->end(), [](const ChunkJudge::Piece& p) { return p.english; });
             for (std::size_t i = 0; i < pieces->size() && ok; ++i) {
                 const auto& piece = (*pieces)[i];
                 if (piece.english) {
                     english = true;
-                    text += i == 0 ? EnglishAsWritten(piece.text) : piece.text;
+                    text += i == 0 && allEnglish ? EnglishAsWritten(piece.text) : piece.text;
                     continue;
                 }
                 japanese = true;
@@ -3986,11 +4043,12 @@ void JapaneseComposer::ConvertJapaneseRuns() {
 void JapaneseComposer::CheckMixedSentence() {
     // Each chunk as taken first, then its other conversions when it was
     // taken as Japanese. Picked or typed with capitals stays as it is. The
-    // model knows little English: an English chunk is read as それ.
+    // model knows little English: an English chunk is read as a common
+    // loanword or それ (EnglishForModel).
     std::vector<std::vector<std::wstring>> parts;
     for (const auto& chunk : settled_) {
         if (chunk.isEnglish && !chunk.marksOnly) {
-            parts.push_back({EnglishForModel(chunk.english)});
+            parts.push_back({EnglishForModel(chunk.english, chunk.named)});
         } else if (chunk.marksOnly || chunk.locked || chunk.japaneseChoices.empty()) {
             parts.push_back({chunk.japanese});
         } else {
@@ -4061,7 +4119,7 @@ void JapaneseComposer::CheckMixedSentence() {
                 if (k != i && !settled_[k].isEnglish && !settled_[k].marksOnly) settled_[k].japanese = english[k];
                 read[k] = english[k];
             }
-            if (!japanese) read[i] = EnglishForModel(chunk.english);
+            if (!japanese) read[i] = EnglishForModel(chunk.english, chunk.named);
         }
     }
 }
@@ -4174,6 +4232,7 @@ std::wstring JapaneseComposer::CommitSentence() {
     lastShown_ = SettledText();
     ConvertJapaneseRuns();
     if (reranker_ && sentenceCheck_) CheckMixedSentence();
+    LowerSentenceStarts();
     if (keepMixed_ > 0) {
         lastMixed_ = MixedSentences(keepMixed_);
         lastMixedKeys_ = SettledKeys();
@@ -4214,6 +4273,7 @@ void JapaneseComposer::RecountSentence() {
             japaneseInSentence_ = true;
         }
     }
+    LowerSentenceStarts();
 }
 
 void JapaneseComposer::JudgeWholeSentence(std::optional<ChunkJudge::Judgement>& current, std::wstring_view currentKeys) {

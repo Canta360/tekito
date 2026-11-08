@@ -71,12 +71,33 @@ std::wstring ChunkJudge::WrittenAs(std::wstring_view word, bool inJapanese) cons
             if (capitals) return spelling.english;
         }
     }
-    return std::wstring(word);
+    return AsName(std::wstring(word));
+}
+
+std::wstring ChunkJudge::AsName(std::wstring written) const {
+    if (!englishNames_ || written.size() < 2) return written;
+    if (std::any_of(written.begin(), written.end(), [](wchar_t c) { return std::iswupper(c) != 0; })) return written;
+    // A form of its own written so on purpose (docomo).
+    if (forms_ && forms_->Find(written)) return written;
+    if (const auto name = englishNames_->Find(written)) {
+        if (std::any_of(name->written.begin(), name->written.end(), [](wchar_t c) { return std::iswupper(c) != 0; })) {
+            return name->written;
+        }
+    }
+    return written;
 }
 
 ChunkJudge::Judgement ChunkJudge::Judge(std::wstring_view keys, std::size_t englishBefore,
                                         bool japaneseInSentence, const EnglishSpelling* spelling,
                                         std::wstring_view before, bool englishSentences) const {
+    auto judgement = JudgeLanguage(keys, englishBefore, japaneseInSentence, spelling, before, englishSentences);
+    if (judgement.english) judgement.written = AsName(std::move(judgement.written));
+    return judgement;
+}
+
+ChunkJudge::Judgement ChunkJudge::JudgeLanguage(std::wstring_view keys, std::size_t englishBefore,
+                                                bool japaneseInSentence, const EnglishSpelling* spelling,
+                                                std::wstring_view before, bool englishSentences) const {
     Judgement judgement;
     judgement.written = std::wstring(keys);
     // A word with a number after it (iphone15, gpt4): as the word is, with

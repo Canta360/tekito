@@ -619,6 +619,10 @@ private:
     // `written`, with a capital when it starts a sentence (hello: Hello;
     // GitHub stays).
     [[nodiscard]] std::wstring EnglishAsWritten(std::wstring written) const;
+    [[nodiscard]] std::wstring EnglishForModel(std::wstring_view english, bool named) const;
+    // English that begins a sentence with Japanese in it, as Japanese text
+    // writes it: in small letters (ticketはスマホで買える).
+    void LowerSentenceStarts();
     // Punctuation keys typed after an English word (you.), as English
     // writes them in an English sentence and as Japanese does otherwise.
     [[nodiscard]] std::wstring MarksAfterEnglish(std::wstring_view keys) const;
@@ -748,6 +752,8 @@ private:
         bool picked{false};     // picked from the list, or Japanese taken as typed
         bool sentenceStart{false};  // it began a sentence (English capitalized)
         bool either{false};     // it reads as either language (data, sake)
+        bool named{false};      // as English it is written with capitals (Zoom, GitHub, API)
+        bool capitalized{false};  // a capital only for the start of a sentence (Ticket)
         std::wstring reading;   // Japanese: the kana converted
         std::uint16_t context{0};  // what conversion went on from
     };
