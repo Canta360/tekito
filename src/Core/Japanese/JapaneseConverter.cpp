@@ -865,18 +865,25 @@ std::vector<Phrase> JapaneseConverter::Convert(std::wstring_view reading,
         // name (コカ・コーラ is a noun in one added pack, an organization in
         // Mozc); not a rare one (京都 as a proper noun at 8080, a place first).
         constexpr std::int64_t kCommonName = 5000;
-        const auto namedWord = [&](int k) {
-            if (nameParts_.empty()) return false;
-            if (IsNamePart(nodes[k].word.left)) return true;
+        const auto withTwin = [&](int k, const auto& part) {
+            if (part(nodes[k].word.left)) return true;
             const std::wstring text = textOf(nodes[k]);
             for (const int other : lattice.endingAt[nodes[k].end]) {
                 if (other != k && nodes[other].known && nodes[other].begin == nodes[k].begin &&
-                    nodes[other].word.cost <= kCommonName && IsNamePart(nodes[other].word.left) &&
+                    nodes[other].word.cost <= kCommonName && part(nodes[other].word.left) &&
                     textOf(nodes[other]) == text) {
                     return true;
                 }
             }
             return false;
+        };
+        const auto namedWord = [&](int k) {
+            return !nameParts_.empty() && withTwin(k, [&](std::uint16_t left) { return IsNamePart(left); });
+        };
+        // And as an organization (コカ・コーラ: a proper noun and an organization).
+        const auto organizationWord = [&](int k) {
+            return organizationPart_ != 0 &&
+                   withTwin(k, [&](std::uint16_t left) { return left == organizationPart_; });
         };
         for (const auto& ending : endings) {
             if (phrase.candidates.size() >= kBestPaths) break;
@@ -905,8 +912,7 @@ std::vector<Phrase> JapaneseConverter::Convert(std::wstring_view reading,
                 kanaNumber = kanaNumber || nodes[*it].numeral || nodes[*it].numberPrefix > 0;
                 setPhrase = setPhrase || (nodes[*it].known && nodes[*it].word.setPhrase);
                 name = name || (nodes[*it].known && namedWord(*it)) || nodes[*it].abbreviation;
-                organization = organization || (organizationPart_ != 0 && nodes[*it].known &&
-                                                nodes[*it].word.left == organizationPart_);
+                organization = organization || (nodes[*it].known && organizationWord(*it));
             }
             if (!has(text)) {
                 PhraseCandidate candidate{std::move(text), ending.cost, PhraseCandidate::Kind::Dictionary, spelling};
