@@ -21,6 +21,7 @@
 #include "Core/Japanese/PostalCodes.h"
 #include "Core/Japanese/RomajiTable.h"
 #include "Core/Japanese/SentenceReranker.h"
+#include "Core/Japanese/Collocations.h"
 #include "Core/Japanese/EnglishTies.h"
 #include "Core/Japanese/TopicVectors.h"
 
@@ -64,6 +65,7 @@ struct JapaneseData {
     LanguageModel model;
     TopicVectors topics;
     EnglishTies englishTies;
+    Collocations collocations;
     SentenceReranker reranker;
     KanaSlips slips;
     Loanwords loanwords;
@@ -104,6 +106,9 @@ const JapaneseData* ProcessJapaneseData() {
         }
         if (loaded->topics.Open(ExternalLexiconProvider::PackDirectory(L"japanese-topics"))) {
             loaded->converter->SetTopicVectors(&loaded->topics);
+        }
+        if (loaded->collocations.Open(ExternalLexiconProvider::PackDirectory(L"japanese-collocations"))) {
+            loaded->converter->SetCollocations(&loaded->collocations);
         }
         if (loaded->englishTies.Open(ExternalLexiconProvider::PackDirectory(L"english-pairs"),
                                      ExternalLexiconProvider::PackDirectory(L"japanese-english-senses"))) {

@@ -15,6 +15,7 @@ namespace tekito::japanese {
 
 class TopicVectors;
 class EnglishTies;
+class Collocations;
 
 class Compounds;
 class Notation;
@@ -241,6 +242,10 @@ public:
         // The same for the Japanese words of the phrases next to it, read
         // in English too (costPerEnglishJapanese; 0: off).
         std::int64_t costPerEnglishJapanese{0};
+        // And by how its word goes with the word on the other side of the
+        // particle before or after it (Collocations: エラー を 直 often,
+        // エラー を 治 never): costPerCollocation per nat.
+        std::int64_t costPerCollocation{150};
     };
     // Digits (and a decimal point or comma between them) read as one number
     // word of this part of speech (japanese-core/pos.tsv, "number"), so
@@ -302,6 +307,8 @@ public:
     void SetTopicVectors(const TopicVectors* vectors) noexcept { vectors_ = vectors; }
     // The English ties (ModelWeights::costPerEnglish); nullptr: off.
     void SetEnglishTies(const EnglishTies* ties) noexcept { englishTies_ = ties; }
+    // The particle pairs (ModelWeights::costPerCollocation); nullptr: off.
+    void SetCollocations(const Collocations* collocations) noexcept { collocations_ = collocations; }
     // A phrase of a word and kana after it (こうそうが) also offers every
     // word read like that word, with the same kana (紅藻が).
     void SetHeadWords(bool on) noexcept { headWords_ = on; }
@@ -343,6 +350,7 @@ private:
     const LanguageModel* model_{nullptr};
     const TopicVectors* vectors_{nullptr};
     const EnglishTies* englishTies_{nullptr};
+    const Collocations* collocations_{nullptr};
     bool headWords_{true};
     const Compounds* compounds_{nullptr};
     std::int64_t compoundCost_{0};

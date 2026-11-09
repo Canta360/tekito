@@ -53,6 +53,7 @@
 #include "Core/Japanese/TopicVectors.h"
 #include "Core/Japanese/Loanwords.h"
 #include "Core/Japanese/RomajiTable.h"
+#include "Core/Japanese/Collocations.h"
 #include "Core/Japanese/EnglishTies.h"
 #include "Core/Japanese/SentenceReranker.h"
 #include "Core/Japanese/KanaSlips.h"
@@ -1615,6 +1616,7 @@ int main(int argc, char** argv) {
     std::filesystem::path topicPack;
     // --english-ties <data folder>: english-pairs and japanese-english-senses there.
     std::filesystem::path englishTiesRoot;
+    std::filesystem::path collocationsPack;
     std::size_t showMisses = 0;
     TypingStudyOptions study;
     ChunkOptions chunks;
@@ -1701,6 +1703,8 @@ int main(int argc, char** argv) {
         else if (arg == "--topic-scale" && i + 1 < argc) weights.costPerTopic = std::stoll(argv[++i]);
         else if (arg == "--topic-vectors" && i + 1 < argc) topicPack = argv[++i];
         else if (arg == "--english-ties" && i + 1 < argc) englishTiesRoot = argv[++i];
+        else if (arg == "--collocations" && i + 1 < argc) collocationsPack = argv[++i];
+        else if (arg == "--colloc-scale" && i + 1 < argc) weights.costPerCollocation = std::stoll(argv[++i]);
         else if (arg == "--english-scale" && i + 1 < argc) weights.costPerEnglish = std::stoll(argv[++i]);
         else if (arg == "--english-ja-scale" && i + 1 < argc) weights.costPerEnglishJapanese = std::stoll(argv[++i]);
         else if (arg == "--topic-vector-scale" && i + 1 < argc) weights.costPerVector = std::stoll(argv[++i]);
@@ -1741,6 +1745,11 @@ int main(int argc, char** argv) {
         return 1;
     }
     tekito::japanese::TopicVectors topicVectors;
+    tekito::japanese::Collocations collocations;
+    if (!collocationsPack.empty() && !collocations.Open(collocationsPack)) {
+        std::cerr << "could not open the collocations at " << collocationsPack.string() << "\n";
+        return 2;
+    }
     tekito::japanese::EnglishTies englishTies;
     if (!englishTiesRoot.empty() &&
         !englishTies.Open(englishTiesRoot / L"english-pairs", englishTiesRoot / L"japanese-english-senses")) {
@@ -1783,6 +1792,7 @@ int main(int argc, char** argv) {
         if (model.IsOpen()) converter.SetLanguageModel(&model, weights);
         if (topicVectors.IsOpen()) converter.SetTopicVectors(&topicVectors);
         if (englishTies.IsOpen()) converter.SetEnglishTies(&englishTies);
+        if (collocations.IsOpen()) converter.SetCollocations(&collocations);
         SetNumberWord(converter, pack);
         chunks.pack = pack;
         chunks.rerankerPack = rerankerPack;
@@ -1837,6 +1847,7 @@ int main(int argc, char** argv) {
         if (model.IsOpen()) converter.SetLanguageModel(&model, weights);
         if (topicVectors.IsOpen()) converter.SetTopicVectors(&topicVectors);
         if (englishTies.IsOpen()) converter.SetEnglishTies(&englishTies);
+        if (collocations.IsOpen()) converter.SetCollocations(&collocations);
         SetNumberWord(converter, pack);
         if (!study.study.empty()) {
             study.pack = pack;
@@ -1879,6 +1890,7 @@ int main(int argc, char** argv) {
         if (model.IsOpen()) converter.SetLanguageModel(&model, weights);
         if (topicVectors.IsOpen()) converter.SetTopicVectors(&topicVectors);
         if (englishTies.IsOpen()) converter.SetEnglishTies(&englishTies);
+        if (collocations.IsOpen()) converter.SetCollocations(&collocations);
         SetNumberWord(converter, pack);
     const auto rows = LoadCorpus(corpus);
     if (rows.empty()) {

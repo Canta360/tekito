@@ -1,5 +1,6 @@
 #include "Core/Japanese/JapaneseConverter.h"
 
+#include "Core/Japanese/Collocations.h"
 #include "Core/Japanese/EnglishTies.h"
 
 #include "Core/Japanese/EdgeScorer.h"
@@ -580,6 +581,23 @@ Lattice BuildLattice(const JapaneseDictionary& dictionary, const ReadingCodes& c
     return lattice;
 }
 
+bool IsContentChar(wchar_t c) noexcept {
+    return (c >= 0x3400 && c <= 0x9FFF) || c == 0x3005 || (c >= 0x30A1 && c <= 0x30FA) || c == 0x30FC;
+}
+bool IsParticle(wchar_t c) noexcept { return std::wstring_view(L"をにがでへとの").find(c) != std::wstring_view::npos; }
+// The run of kanji and katakana a text starts with, and the one it ends with
+// (as japanese-collocations counts words: 直 of 直した).
+std::wstring_view LeadingContent(std::wstring_view text) noexcept {
+    std::size_t end = 0;
+    while (end < text.size() && end < 8 && IsContentChar(text[end])) ++end;
+    return end < text.size() && end == 8 && IsContentChar(text[end]) ? std::wstring_view{} : text.substr(0, end);
+}
+std::wstring_view TrailingContent(std::wstring_view text) noexcept {
+    std::size_t begin = text.size();
+    while (begin > 0 && text.size() - begin < 8 && IsContentChar(text[begin - 1])) --begin;
+    return begin > 0 && text.size() - begin == 8 && IsContentChar(text[begin - 1]) ? std::wstring_view{} : text.substr(begin);
+}
+
 // What the language model takes off for `right` following `left`.
 // A pair never seen is as if seen half a time: negative for words common
 // enough that they would have met; no evidence either way otherwise.
@@ -801,6 +819,15 @@ std::vector<Phrase> JapaneseConverter::Convert(std::wstring_view reading,
     // sentence model: each phrase's candidates meet the others' words.
     const bool topics = (model_ && weights_.costPerTopic > 0) || (vectors_ && weights_.costPerVector > 0);
     std::vector<std::pair<std::size_t, std::wstring>> sentenceWords;  // (span index, word)
+    // Each span's text on the likeliest path, for the words across particles.
+    std::vector<std::wstring> spanTexts;
+    if (collocations_) {
+        for (const auto& [from, to] : spans) {
+            std::wstring text;
+            for (std::size_t k = from; k < to; ++k) text += textOf(nodes[path[k]]);
+            spanTexts.push_back(std::move(text));
+        }
+    }
     // Each word's English meanings, looked up once.
     std::map<std::wstring, std::vector<std::string>> english;
     const auto englishOf = [&](const std::wstring& word) -> const std::vector<std::string>& {
@@ -1118,6 +1145,24 @@ std::vector<Phrase> JapaneseConverter::Convert(std::wstring_view reading,
                         }
                     }
                 }
+                // With the word across the particle before it and after it.
+                double fit = 0.0;
+                if (collocations_ && weights_.costPerCollocation > 0) {
+                    const auto& text = phrase.candidates[c].text;
+                    const auto lead = LeadingContent(text);
+                    if (spanIndex > 0 && !lead.empty()) {
+                        const auto& before = spanTexts[spanIndex - 1];
+                        if (!before.empty() && IsParticle(before.back())) {
+                            const auto x = TrailingContent(std::wstring_view(before).substr(0, before.size() - 1));
+                            if (const auto f = collocations_->Fit(x, before.back(), lead)) fit += std::clamp(*f, -4.0, 6.0);
+                        }
+                    }
+                    if (spanIndex + 1 < spans.size() && !text.empty() && IsParticle(text.back())) {
+                        const auto x = TrailingContent(std::wstring_view(text).substr(0, text.size() - 1));
+                        const auto y = LeadingContent(spanTexts[spanIndex + 1]);
+                        if (const auto f = collocations_->Fit(x, text.back(), y)) fit += std::clamp(*f, -4.0, 6.0);
+                    }
+                }
                 // Only a clearly better fit than the first choice counts:
                 // small differences are the other models' to settle.
                 double close = 0.0;
@@ -1129,6 +1174,7 @@ std::vector<Phrase> JapaneseConverter::Convert(std::wstring_view reading,
                 places.push_back(c);
                 ranked.emplace_back(phrase.candidates[c].cost -
                                         std::llround(strongest * static_cast<double>(weights_.costPerTopic)) -
+                                        std::llround(fit * static_cast<double>(weights_.costPerCollocation)) -
                                         std::llround(inEnglish * static_cast<double>(weights_.costPerEnglish)) -
                                         std::llround(japaneseInEnglish * static_cast<double>(weights_.costPerEnglishJapanese)) -
                                         std::llround(close * static_cast<double>(weights_.costPerVector)),
