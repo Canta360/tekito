@@ -58,6 +58,7 @@ add_library(tekito_core STATIC
     src/Core/Japanese/Collocations.cpp
     src/Core/Japanese/Compounds.cpp
     src/Core/Japanese/EnglishTies.cpp
+    src/Core/Japanese/Homophones.cpp
     src/Core/Japanese/EdgeScorer.cpp
     src/Core/Japanese/LetterOdds.cpp
     src/Core/Japanese/Loanwords.cpp

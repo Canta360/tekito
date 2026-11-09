@@ -6,7 +6,8 @@ never meets though both words are common (エラー を 治: never).
 Words are runs of kanji or katakana (the content of a phrase): the run
 right before one of を に が で へ と の, and the run right after it, which for
 a verb is its stem (直, of 直す, 直した), so homophones that differ in their
-kanji (直す, 治す) are told apart without knowing their forms.
+kanji (直す, 治す) are told apart without knowing their forms; or, where kana
+follows the particle, its first two kana (見当 を つけ).
 
 Counted in the Leipzig Corpora Collection's Japanese news 2019 and Wikipedia
 2021 corpora (CC BY 4.0) and in the first lines of the zenz-v2.5 dataset's
@@ -39,7 +40,9 @@ sys.path.insert(0, str(ROOT / "scripts"))
 from datapacks import pack_dir  # noqa: E402
 
 CONTENT = "[㐀-鿿々ァ-ヺー]"
-PAIR = re.compile(f"(?<!{CONTENT})({CONTENT}{{1,8}})([をにがでへとの])({CONTENT}{{1,8}})")
+# After the particle: a run of kanji or katakana, or else the first two kana
+# of what follows (見当 を つけ: a verb written in kana).
+PAIR = re.compile(f"(?<!{CONTENT})({CONTENT}{{1,8}})([をにがでへとの])({CONTENT}{{1,8}}|[ぁ-ゖ]{{2}})")
 LEIPZIG = ["jpn_newscrawl_2019_1M", "jpn_wikipedia_2021_1M"]
 MIN_PAIR = 3
 MIN_SIDE = 5

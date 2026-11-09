@@ -16,6 +16,7 @@ namespace tekito::japanese {
 class TopicVectors;
 class EnglishTies;
 class Collocations;
+class Homophones;
 
 class Compounds;
 class Notation;
@@ -246,6 +247,13 @@ public:
         // particle before or after it (Collocations: エラー を 直 often,
         // エラー を 治 never): costPerCollocation per nat.
         std::int64_t costPerCollocation{150};
+        // A pair seen counts this many nats at most (lower ones, tried,
+        // kept 映画を見 from 映画を観 in Mix but lost as much in Japanese).
+        double collocationCeiling{6.0};
+        // And by the other words of the sentence its own word's sentences
+        // have (Homophones: 信任 with 内閣, 新任 with 教師):
+        // costPerHomophone per nat of its two strongest.
+        std::int64_t costPerHomophone{150};
     };
     // Digits (and a decimal point or comma between them) read as one number
     // word of this part of speech (japanese-core/pos.tsv, "number"), so
@@ -309,6 +317,8 @@ public:
     void SetEnglishTies(const EnglishTies* ties) noexcept { englishTies_ = ties; }
     // The particle pairs (ModelWeights::costPerCollocation); nullptr: off.
     void SetCollocations(const Collocations* collocations) noexcept { collocations_ = collocations; }
+    // The homophone contexts (ModelWeights::costPerHomophone); nullptr: off.
+    void SetHomophones(const Homophones* homophones) noexcept { homophones_ = homophones; }
     // A phrase of a word and kana after it (こうそうが) also offers every
     // word read like that word, with the same kana (紅藻が).
     void SetHeadWords(bool on) noexcept { headWords_ = on; }
@@ -351,6 +361,7 @@ private:
     const TopicVectors* vectors_{nullptr};
     const EnglishTies* englishTies_{nullptr};
     const Collocations* collocations_{nullptr};
+    const Homophones* homophones_{nullptr};
     bool headWords_{true};
     const Compounds* compounds_{nullptr};
     std::int64_t compoundCost_{0};

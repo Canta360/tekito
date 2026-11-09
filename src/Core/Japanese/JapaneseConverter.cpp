@@ -2,6 +2,7 @@
 
 #include "Core/Japanese/Collocations.h"
 #include "Core/Japanese/EnglishTies.h"
+#include "Core/Japanese/Homophones.h"
 
 #include "Core/Japanese/EdgeScorer.h"
 
@@ -592,6 +593,14 @@ std::wstring_view LeadingContent(std::wstring_view text) noexcept {
     while (end < text.size() && end < 8 && IsContentChar(text[end])) ++end;
     return end < text.size() && end == 8 && IsContentChar(text[end]) ? std::wstring_view{} : text.substr(0, end);
 }
+// What follows a particle as japanese-collocations counts it: a run of
+// kanji and katakana, or else the first two kana (つけ of つけた).
+std::wstring_view AfterParticle(std::wstring_view text) noexcept {
+    const auto lead = LeadingContent(text);
+    if (!lead.empty() || text.size() < 2) return lead;
+    const auto kana = [](wchar_t c) { return c >= 0x3041 && c <= 0x3096; };
+    return kana(text[0]) && kana(text[1]) ? text.substr(0, 2) : std::wstring_view{};
+}
 std::wstring_view TrailingContent(std::wstring_view text) noexcept {
     std::size_t begin = text.size();
     while (begin > 0 && text.size() - begin < 8 && IsContentChar(text[begin - 1])) --begin;
@@ -821,12 +830,32 @@ std::vector<Phrase> JapaneseConverter::Convert(std::wstring_view reading,
     std::vector<std::pair<std::size_t, std::wstring>> sentenceWords;  // (span index, word)
     // Each span's text on the likeliest path, for the words across particles.
     std::vector<std::wstring> spanTexts;
-    if (collocations_) {
+    if (collocations_ || homophones_) {
         for (const auto& [from, to] : spans) {
             std::wstring text;
             for (std::size_t k = from; k < to; ++k) text += textOf(nodes[path[k]]);
             spanTexts.push_back(std::move(text));
         }
+    }
+    // The runs of kanji and katakana of each span and of the words before,
+    // as the homophone contexts were counted.
+    std::vector<std::vector<std::wstring>> spanRuns(spanTexts.size());
+    std::vector<std::wstring> beforeRuns;
+    if (homophones_) {
+        const auto runsOf = [](std::wstring_view text, std::vector<std::wstring>& runs) {
+            for (std::size_t i = 0; i < text.size();) {
+                if (!IsContentChar(text[i])) {
+                    ++i;
+                    continue;
+                }
+                std::size_t end = i;
+                while (end < text.size() && IsContentChar(text[end])) ++end;
+                if (end - i >= 2) runs.emplace_back(text.substr(i, end - i));
+                i = end;
+            }
+        };
+        for (std::size_t s = 0; s < spanTexts.size(); ++s) runsOf(spanTexts[s], spanRuns[s]);
+        for (const auto& word : contextWords) runsOf(word, beforeRuns);
     }
     // Each word's English meanings, looked up once.
     std::map<std::wstring, std::vector<std::string>> english;
@@ -1149,18 +1178,44 @@ std::vector<Phrase> JapaneseConverter::Convert(std::wstring_view reading,
                 double fit = 0.0;
                 if (collocations_ && weights_.costPerCollocation > 0) {
                     const auto& text = phrase.candidates[c].text;
-                    const auto lead = LeadingContent(text);
+                    const auto lead = AfterParticle(text);
                     if (spanIndex > 0 && !lead.empty()) {
                         const auto& before = spanTexts[spanIndex - 1];
                         if (!before.empty() && IsParticle(before.back())) {
                             const auto x = TrailingContent(std::wstring_view(before).substr(0, before.size() - 1));
-                            if (const auto f = collocations_->Fit(x, before.back(), lead)) fit += std::clamp(*f, -4.0, 6.0);
+                            if (const auto f = collocations_->Fit(x, before.back(), lead)) fit += std::clamp(*f, -4.0, weights_.collocationCeiling);
                         }
                     }
                     if (spanIndex + 1 < spans.size() && !text.empty() && IsParticle(text.back())) {
                         const auto x = TrailingContent(std::wstring_view(text).substr(0, text.size() - 1));
-                        const auto y = LeadingContent(spanTexts[spanIndex + 1]);
-                        if (const auto f = collocations_->Fit(x, text.back(), y)) fit += std::clamp(*f, -4.0, 6.0);
+                        const auto y = AfterParticle(spanTexts[spanIndex + 1]);
+                        if (const auto f = collocations_->Fit(x, text.back(), y)) fit += std::clamp(*f, -4.0, weights_.collocationCeiling);
+                    }
+                }
+                // By what else the sentence says, if its word has homophones.
+                double homophone = 0.0;
+                if (homophones_ && weights_.costPerHomophone > 0) {
+                    const auto lead = LeadingContent(phrase.candidates[c].text);
+                    for (std::size_t length = std::min<std::size_t>(4, lead.size()); length >= 2; --length) {
+                        const auto word = lead.substr(0, length);
+                        double strongest = 0.0, second = 0.0;
+                        const auto weigh = [&](const std::wstring& context) {
+                            if (context.find(word) != std::wstring::npos) return;
+                            if (const auto w = homophones_->Weight(word, context)) {
+                                if (*w > strongest) {
+                                    second = strongest;
+                                    strongest = *w;
+                                } else if (*w > second) {
+                                    second = *w;
+                                }
+                            }
+                        };
+                        for (std::size_t s = 0; s < spanRuns.size(); ++s) {
+                            if (s == spanIndex) continue;
+                            for (const auto& run : spanRuns[s]) weigh(run);
+                        }
+                        for (const auto& run : beforeRuns) weigh(run);
+                        homophone = std::max(homophone, std::min(8.0, strongest + second));
                     }
                 }
                 // Only a clearly better fit than the first choice counts:
@@ -1175,6 +1230,7 @@ std::vector<Phrase> JapaneseConverter::Convert(std::wstring_view reading,
                 ranked.emplace_back(phrase.candidates[c].cost -
                                         std::llround(strongest * static_cast<double>(weights_.costPerTopic)) -
                                         std::llround(fit * static_cast<double>(weights_.costPerCollocation)) -
+                                        std::llround(homophone * static_cast<double>(weights_.costPerHomophone)) -
                                         std::llround(inEnglish * static_cast<double>(weights_.costPerEnglish)) -
                                         std::llround(japaneseInEnglish * static_cast<double>(weights_.costPerEnglishJapanese)) -
                                         std::llround(close * static_cast<double>(weights_.costPerVector)),

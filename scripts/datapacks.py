@@ -45,6 +45,7 @@ LANGUAGE = {
     "japanese-jmdict": "ja",
     "japanese-english-senses": "ja",
     "japanese-collocations": "ja",
+    "japanese-homophones": "ja",
     "japanese-sudachi": "ja",
     "japanese-places": "ja",
     "japanese-variants": "ja",

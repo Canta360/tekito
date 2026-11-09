@@ -23,6 +23,7 @@
 #include "Core/Japanese/SentenceReranker.h"
 #include "Core/Japanese/Collocations.h"
 #include "Core/Japanese/EnglishTies.h"
+#include "Core/Japanese/Homophones.h"
 #include "Core/Japanese/TopicVectors.h"
 
 #include <filesystem>
@@ -66,6 +67,7 @@ struct JapaneseData {
     TopicVectors topics;
     EnglishTies englishTies;
     Collocations collocations;
+    Homophones homophones;
     SentenceReranker reranker;
     KanaSlips slips;
     Loanwords loanwords;
@@ -106,6 +108,9 @@ const JapaneseData* ProcessJapaneseData() {
         }
         if (loaded->topics.Open(ExternalLexiconProvider::PackDirectory(L"japanese-topics"))) {
             loaded->converter->SetTopicVectors(&loaded->topics);
+        }
+        if (loaded->homophones.Open(ExternalLexiconProvider::PackDirectory(L"japanese-homophones"))) {
+            loaded->converter->SetHomophones(&loaded->homophones);
         }
         if (loaded->collocations.Open(ExternalLexiconProvider::PackDirectory(L"japanese-collocations"))) {
             loaded->converter->SetCollocations(&loaded->collocations);
