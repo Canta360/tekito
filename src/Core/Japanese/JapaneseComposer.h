@@ -705,6 +705,8 @@ private:
     // sentence's other words (打った) in place of the first choice's word
     // that has one (メルカリで…売った): the first choice is kept then.
     [[nodiscard]] bool KeepsTopic(const std::wstring& first, const std::wstring& pick) const;
+    // contextWords_ with the English chunks settled in this sentence.
+    [[nodiscard]] std::vector<std::wstring> WordsWithEnglish() const;
 
     // Live conversion: the typed kana converted again, the settled phrases
     // kept as they are, and all but the last kOpenPhrases settled.

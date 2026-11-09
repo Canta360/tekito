@@ -1208,7 +1208,7 @@ void JapaneseComposer::BuildPhrasesFor(bool convert) {
                 std::wstring kana;
                 for (const auto& token : ParseRomaji(*table_, chunk->meant)) kana += token.kana;
                 std::vector<PhraseCandidate> candidates;
-                for (const auto& phrase : ConvertReading(ApplyTypingStyle(kana) + marks, 0, context_, contextWords_)) {
+                for (const auto& phrase : ConvertReading(ApplyTypingStyle(kana) + marks, 0, context_, WordsWithEnglish())) {
                     if (!phrase.candidates.empty()) {
                         candidates.push_back({phrase.candidates.front().text, 0, PhraseCandidate::Kind::Dictionary, false});
                     }
@@ -1260,7 +1260,7 @@ void JapaneseComposer::BuildPhrasesFor(bool convert) {
         // A slip in the keys: converted from the keys as meant when the
         // user allows auto-apply. Esc still goes back to what was typed.
         if (auto conversion = slipAutoApply_ && keyConverter_ && !HasAscii() && !KanaTyped() && !endsInLetters
-                                  ? keyConverter_->Convert(Keys(false), context_, contextWords_, userDictionary_)
+                                  ? keyConverter_->Convert(Keys(false), context_, WordsWithEnglish(), userDictionary_)
                                             : std::nullopt) {
             slipUndone = true;
             conversionReading_ = ApplyTypingStyle(std::move(conversion->reading));
@@ -1268,7 +1268,7 @@ void JapaneseComposer::BuildPhrasesFor(bool convert) {
             for (auto& phrase : conversion->phrases) StyleKanaNumbers(phrase.candidates);
             AddPhrases(std::move(conversion->phrases), conversionReading_);
         } else {
-            AddPhrases(ConvertReading(reading, 0, context_, contextWords_), reading);
+            AddPhrases(ConvertReading(reading, 0, context_, WordsWithEnglish()), reading);
         }
         // In Mix, a chunk taken as Japanese that reads as no English (not
         // either, no word) is Japanese with a slip as in Japanese mode
@@ -1288,7 +1288,7 @@ void JapaneseComposer::BuildPhrasesFor(bool convert) {
         if (slipUndone && !phrases_.empty() && reading.size() <= kTypedChoiceLength &&
             LeftoverLetters(ToFullWidthAscii(reading)) == 0) {
             std::wstring typed;
-            for (const auto& phrase : ConvertReading(reading, 0, context_, contextWords_)) {
+            for (const auto& phrase : ConvertReading(reading, 0, context_, WordsWithEnglish())) {
                 if (phrase.candidates.empty()) {
                     typed.clear();
                     break;
@@ -1827,7 +1827,7 @@ bool JapaneseComposer::FixSlips() {
         Converted out;
         out.score = fixed.score;
         std::vector<Phrase> converted;
-        if (auto conversion = keyConverter_ ? keyConverter_->Convert(fixed.keys, context_, contextWords_, userDictionary_)
+        if (auto conversion = keyConverter_ ? keyConverter_->Convert(fixed.keys, context_, WordsWithEnglish(), userDictionary_)
                                             : std::nullopt) {
             out.reading = ApplyTypingStyle(std::move(conversion->reading));
             out.keyAt = std::move(conversion->keyAt);
@@ -1846,7 +1846,7 @@ bool JapaneseComposer::FixSlips() {
             out.keyAt.assign(out.reading.size() + 1, std::wstring::npos);
             for (const auto& [offset, at] : units) out.keyAt[offset] = at;
             out.keyAt[out.reading.size()] = key;
-            converted = ConvertReading(out.reading, 0, context_, contextWords_);
+            converted = ConvertReading(out.reading, 0, context_, WordsWithEnglish());
         }
         for (auto& at : out.keyAt) {
             if (at == std::wstring::npos) continue;
@@ -2087,7 +2087,7 @@ void JapaneseComposer::TakeWritten(const std::wstring& text, std::span<const std
     // makes it.
     if (!breaks.empty() && converter_) {
         SyncEdgeContext();
-        auto rebuilt = converter_->Convert(conversionReading_, {}, context_, contextWords_, userDictionary_, breaks);
+        auto rebuilt = converter_->Convert(conversionReading_, {}, context_, WordsWithEnglish(), userDictionary_, breaks);
         // Numbers as the number style writes them, as the first conversion's.
         for (auto& phrase : rebuilt) StyleKanaNumbers(phrase.candidates);
         if (!rebuilt.empty()) {
@@ -2609,7 +2609,7 @@ std::optional<std::wstring> JapaneseComposer::RunTogetherEnglish(bool* foreign) 
                 // A piece after another is inside the sentence, not at its start.
                 const bool inside = i > 0 || start > 0;
                 if (inside && converter_) converter_->SetAtSentenceStart(false);
-                const auto phrases = ConvertReading(ApplyTypingStyle(piece.text), 0, i == 0 ? context : 0, contextWords_);
+                const auto phrases = ConvertReading(ApplyTypingStyle(piece.text), 0, i == 0 ? context : 0, WordsWithEnglish());
                 if (inside) UpdateJoinedStart();
                 if (std::any_of(phrases.begin(), phrases.end(), [](const Phrase& phrase) {
                         return phrase.candidates.empty();
@@ -2680,7 +2680,7 @@ std::vector<PhraseCandidate> JapaneseComposer::EnglishCandidates(const std::wstr
     }
     if (converter_ && LeftoverLetters(reading) == 0) {
         std::wstring japanese;
-        for (const auto& phrase : ConvertReading(reading, 0, context_, contextWords_)) {
+        for (const auto& phrase : ConvertReading(reading, 0, context_, WordsWithEnglish())) {
             if (phrase.candidates.empty()) {
                 japanese.clear();
                 break;
@@ -2690,7 +2690,7 @@ std::vector<PhraseCandidate> JapaneseComposer::EnglishCandidates(const std::wstr
         add(std::move(japanese), PhraseCandidate::Kind::Dictionary);
         for (auto& kana : KanaCandidates(reading)) add(std::move(kana.text), kana.kind);
         // A reading of one phrase: its other words too (i: 位, 胃, 意).
-        auto phrases = ConvertReading(reading, 0, context_, contextWords_);
+        auto phrases = ConvertReading(reading, 0, context_, WordsWithEnglish());
         if (phrases.size() == 1) {
             for (auto& candidate : phrases.front().candidates) add(std::move(candidate.text), candidate.kind);
         }
@@ -3282,7 +3282,7 @@ void JapaneseComposer::AddSlipCandidatesFor(PhraseState& phrase) const {
             // the one the sentence model reads best (い: 胃, not 位).
             const std::size_t breaks[] = {split};
             SyncEdgeContext();
-            const auto parts = converter_->Convert(reading, {}, context_, contextWords_, userDictionary_, breaks);
+            const auto parts = converter_->Convert(reading, {}, context_, WordsWithEnglish(), userDictionary_, breaks);
             if (parts.empty() || parts.front().length != split || parts.front().candidates.empty()) continue;
             std::wstring rest;
             for (std::size_t i = 1; i < parts.size(); ++i) {
@@ -3531,7 +3531,7 @@ void JapaneseComposer::ResizeFocus(int delta) {
 
     phrases_.clear();
     SyncEdgeContext();
-    AddPhrases(converter_->Convert(reading, fixed, context_, contextWords_, userDictionary_), reading);
+    AddPhrases(converter_->Convert(reading, fixed, context_, WordsWithEnglish(), userDictionary_), reading);
     if (phrases_.size() <= focus_) {
         BuildPhrases(true);
         return;
@@ -3864,7 +3864,7 @@ void JapaneseComposer::SettleChunk() {
                                 conversionReading_.size() + 2 >= typedReading.size();
         chunk.reading = slipUndone ? conversionReading_ : typedReading;
         chunk.context = context_;
-        const auto phrases = ConvertReading(chunk.reading, 0, context_, contextWords_);
+        const auto phrases = ConvertReading(chunk.reading, 0, context_, WordsWithEnglish());
         for (const auto& phrase : phrases) {
             if (!phrase.candidates.empty()) chunk.japanese += phrase.candidates.front().text;
         }
@@ -4007,7 +4007,7 @@ std::optional<std::wstring> JapaneseComposer::MixLiveSplit() const {
                 japanese = true;
                 // A piece after another is inside the sentence, not at its start.
                 if (i > 0 && converter_) converter_->SetAtSentenceStart(false);
-                const auto piecePhrases = ConvertReading(ApplyTypingStyle(piece.text), 0, i == 0 ? context_ : 0, contextWords_);
+                const auto piecePhrases = ConvertReading(ApplyTypingStyle(piece.text), 0, i == 0 ? context_ : 0, WordsWithEnglish());
                 if (i > 0) UpdateJoinedStart();
                 for (const auto& phrase : piecePhrases) {
                     if (phrase.candidates.empty()) {
@@ -4056,7 +4056,7 @@ std::optional<std::wstring> JapaneseComposer::MixLiveText() const {
     const std::wstring kana = reading.substr(0, end);
     if (kana != mixLiveReading_) {
         std::wstring text;
-        for (const auto& phrase : ConvertReading(kana, 0, context_, contextWords_)) {
+        for (const auto& phrase : ConvertReading(kana, 0, context_, WordsWithEnglish())) {
             if (phrase.candidates.empty()) return std::nullopt;
             text += phrase.candidates.front().text;
         }
@@ -4081,6 +4081,16 @@ std::wstring JapaneseComposer::JoinChunks(const std::vector<SettledChunk>& chunk
         englishBefore = english;
     }
     return text;
+}
+
+std::vector<std::wstring> JapaneseComposer::WordsWithEnglish() const {
+    // The words before, and the English typed among Japanese in this
+    // sentence (lint, error): conversion reads those through English.
+    auto words = contextWords_;
+    for (const auto& chunk : settled_) {
+        if (chunk.isEnglish && chunk.english.size() >= 2) words.push_back(chunk.english);
+    }
+    return words;
 }
 
 void JapaneseComposer::ConvertJapaneseRuns() {
@@ -4108,7 +4118,7 @@ void JapaneseComposer::ConvertJapaneseRuns() {
         }
         SyncEdgeContext();
         const auto phrases =
-            converter_->Convert(reading, {}, settled_[first].context, contextWords_, userDictionary_, breaks);
+            converter_->Convert(reading, {}, settled_[first].context, WordsWithEnglish(), userDictionary_, breaks);
         // Each chunk's phrases, as the breaks keep them.
         std::size_t p = 0, at = 0;
         bool whole = true;

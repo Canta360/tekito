@@ -53,6 +53,7 @@
 #include "Core/Japanese/TopicVectors.h"
 #include "Core/Japanese/Loanwords.h"
 #include "Core/Japanese/RomajiTable.h"
+#include "Core/Japanese/EnglishTies.h"
 #include "Core/Japanese/SentenceReranker.h"
 #include "Core/Japanese/KanaSlips.h"
 #include "JapaneseEvalCommon.h"
@@ -1612,6 +1613,8 @@ int main(int argc, char** argv) {
     std::filesystem::path slipsPack;
     JapaneseConverter::ModelWeights weights;
     std::filesystem::path topicPack;
+    // --english-ties <data folder>: english-pairs and japanese-meanings-en there.
+    std::filesystem::path englishTiesRoot;
     std::size_t showMisses = 0;
     TypingStudyOptions study;
     ChunkOptions chunks;
@@ -1697,6 +1700,8 @@ int main(int argc, char** argv) {
         else if (arg == "--lm-threshold" && i + 1 < argc) weights.threshold = std::stod(argv[++i]);
         else if (arg == "--topic-scale" && i + 1 < argc) weights.costPerTopic = std::stoll(argv[++i]);
         else if (arg == "--topic-vectors" && i + 1 < argc) topicPack = argv[++i];
+        else if (arg == "--english-ties" && i + 1 < argc) englishTiesRoot = argv[++i];
+        else if (arg == "--english-scale" && i + 1 < argc) weights.costPerEnglish = std::stoll(argv[++i]);
         else if (arg == "--topic-vector-scale" && i + 1 < argc) weights.costPerVector = std::stoll(argv[++i]);
         else if (arg == "--no-context") useContext = false;
         else if (arg == "--show-misses" && i + 1 < argc) showMisses = std::stoul(argv[++i]);
@@ -1735,6 +1740,12 @@ int main(int argc, char** argv) {
         return 1;
     }
     tekito::japanese::TopicVectors topicVectors;
+    tekito::japanese::EnglishTies englishTies;
+    if (!englishTiesRoot.empty() &&
+        !englishTies.Open(englishTiesRoot / L"english-pairs", englishTiesRoot / L"japanese-meanings-en")) {
+        std::cerr << "could not open the English ties in " << englishTiesRoot.string() << "\n";
+        return 2;
+    }
     if (!topicPack.empty() && !topicVectors.Open(topicPack)) {
         std::cerr << "could not open the topic vectors at " << topicPack.string() << "\n";
         return 1;
@@ -1770,6 +1781,7 @@ int main(int argc, char** argv) {
         JapaneseConverter converter(dictionary, matrix);
         if (model.IsOpen()) converter.SetLanguageModel(&model, weights);
         if (topicVectors.IsOpen()) converter.SetTopicVectors(&topicVectors);
+        if (englishTies.IsOpen()) converter.SetEnglishTies(&englishTies);
         SetNumberWord(converter, pack);
         chunks.pack = pack;
         chunks.rerankerPack = rerankerPack;
@@ -1823,6 +1835,7 @@ int main(int argc, char** argv) {
         JapaneseConverter converter(dictionary, matrix);
         if (model.IsOpen()) converter.SetLanguageModel(&model, weights);
         if (topicVectors.IsOpen()) converter.SetTopicVectors(&topicVectors);
+        if (englishTies.IsOpen()) converter.SetEnglishTies(&englishTies);
         SetNumberWord(converter, pack);
         if (!study.study.empty()) {
             study.pack = pack;
@@ -1864,6 +1877,7 @@ int main(int argc, char** argv) {
     JapaneseConverter converter(dictionary, matrix);
         if (model.IsOpen()) converter.SetLanguageModel(&model, weights);
         if (topicVectors.IsOpen()) converter.SetTopicVectors(&topicVectors);
+        if (englishTies.IsOpen()) converter.SetEnglishTies(&englishTies);
         SetNumberWord(converter, pack);
     const auto rows = LoadCorpus(corpus);
     if (rows.empty()) {

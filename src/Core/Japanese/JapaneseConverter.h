@@ -14,6 +14,7 @@
 namespace tekito::japanese {
 
 class TopicVectors;
+class EnglishTies;
 
 class Compounds;
 class Notation;
@@ -233,6 +234,10 @@ public:
         // phrases' words and those written just before make (the
         // japanese-topics pack): costPerVector per unit of cosine.
         std::int64_t costPerVector{20000};
+        // And by how much its English meanings go with those of the words
+        // next to its phrase and the words before (EnglishTies: error を
+        // 直す, fix error): costPerEnglish per nat of the strongest pair.
+        std::int64_t costPerEnglish{300};
     };
     // Digits (and a decimal point or comma between them) read as one number
     // word of this part of speech (japanese-core/pos.tsv, "number"), so
@@ -292,6 +297,8 @@ public:
     }
     // The topic vectors (ModelWeights::costPerVector); nullptr: off.
     void SetTopicVectors(const TopicVectors* vectors) noexcept { vectors_ = vectors; }
+    // The English ties (ModelWeights::costPerEnglish); nullptr: off.
+    void SetEnglishTies(const EnglishTies* ties) noexcept { englishTies_ = ties; }
     // A phrase of a word and kana after it (こうそうが) also offers every
     // word read like that word, with the same kana (紅藻が).
     void SetHeadWords(bool on) noexcept { headWords_ = on; }
@@ -332,6 +339,7 @@ private:
     const ConnectionMatrix& matrix_;
     const LanguageModel* model_{nullptr};
     const TopicVectors* vectors_{nullptr};
+    const EnglishTies* englishTies_{nullptr};
     bool headWords_{true};
     const Compounds* compounds_{nullptr};
     std::int64_t compoundCost_{0};

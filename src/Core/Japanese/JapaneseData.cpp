@@ -21,6 +21,7 @@
 #include "Core/Japanese/PostalCodes.h"
 #include "Core/Japanese/RomajiTable.h"
 #include "Core/Japanese/SentenceReranker.h"
+#include "Core/Japanese/EnglishTies.h"
 #include "Core/Japanese/TopicVectors.h"
 
 #include <filesystem>
@@ -62,6 +63,7 @@ struct JapaneseData {
     ConnectionMatrix matrix;
     LanguageModel model;
     TopicVectors topics;
+    EnglishTies englishTies;
     SentenceReranker reranker;
     KanaSlips slips;
     Loanwords loanwords;
@@ -102,6 +104,10 @@ const JapaneseData* ProcessJapaneseData() {
         }
         if (loaded->topics.Open(ExternalLexiconProvider::PackDirectory(L"japanese-topics"))) {
             loaded->converter->SetTopicVectors(&loaded->topics);
+        }
+        if (loaded->englishTies.Open(ExternalLexiconProvider::PackDirectory(L"english-pairs"),
+                                     ExternalLexiconProvider::PackDirectory(L"japanese-meanings-en"))) {
+            loaded->converter->SetEnglishTies(&loaded->englishTies);
         }
         if (const auto* table = ProcessRomajiTable()) {
             loaded->keys = std::make_unique<KeyConverter>(loaded->dictionary, loaded->matrix, *loaded->converter,

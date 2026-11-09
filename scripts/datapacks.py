@@ -25,6 +25,7 @@ LANGUAGE = {
     "proper-nouns": "en",
     "english-names": "en",
     "product-names": "en",
+    "english-pairs": "en",
     "qwerty-typo-catalog": "en",
     "slang": "en",
     "written-forms": "en",
