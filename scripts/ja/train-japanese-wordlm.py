@@ -85,27 +85,34 @@ def prepare(args) -> None:
     out.mkdir(parents=True, exist_ok=True)
     left_out = excluded_test(args)
     rows, dropped = [], 0
-    for line in open(args.lm_tsv, encoding="utf-8"):
-        context, _, text = line.rstrip("\n").partition("\t")
-        text = text.strip()
-        if not text:
-            continue
-        if left_out(text):
-            dropped += 1
-            continue
-        rows.append((context.strip(), text))
+    for lm_tsv in args.lm_tsv:
+        for line in open(lm_tsv, encoding="utf-8"):
+            context, _, text = line.rstrip("\n").partition("\t")
+            text = text.strip()
+            if not text:
+                continue
+            if left_out(text):
+                dropped += 1
+                continue
+            rows.append((context.strip(), text))
     print(f"{len(rows)} sentences, {dropped} left out as measured")
     random.Random(0).shuffle(rows)
-    sample = out / "pieces_sample.txt"
-    with open(sample, "w", encoding="utf-8", newline="\n") as f:
-        for _, text in rows[:args.piece_sample]:
-            f.write(text + "\n")
-    spm.SentencePieceTrainer.train(
-        input=str(sample), model_prefix=str(out / "pieces"), vocab_size=args.vocab, model_type="unigram",
-        character_coverage=0.9995, byte_fallback=True, user_defined_symbols=["<sep>"],
-        unk_id=0, bos_id=1, eos_id=2, num_threads=16, input_sentence_size=args.piece_sample,
-        shuffle_input_sentence=True, max_sentence_length=4096)
-    sample.unlink()
+    if args.pieces:
+        # Pieces another model has, so what was built for it still fits.
+        import shutil
+        for suffix in (".model", ".vocab"):
+            shutil.copyfile(Path(args.pieces).with_suffix(suffix), out / f"pieces{suffix}")
+    else:
+        sample = out / "pieces_sample.txt"
+        with open(sample, "w", encoding="utf-8", newline="\n") as f:
+            for _, text in rows[:args.piece_sample]:
+                f.write(text + "\n")
+        spm.SentencePieceTrainer.train(
+            input=str(sample), model_prefix=str(out / "pieces"), vocab_size=args.vocab, model_type="unigram",
+            character_coverage=0.9995, byte_fallback=True, user_defined_symbols=["<sep>"],
+            unk_id=0, bos_id=1, eos_id=2, num_threads=16, input_sentence_size=args.piece_sample,
+            shuffle_input_sentence=True, max_sentence_length=4096)
+        sample.unlink()
     sp = spm.SentencePieceProcessor(model_file=str(out / "pieces.model"))
     assert sp.piece_to_id("<sep>") == SEP
     tokens, starts, targets = [], [0], []
@@ -286,6 +293,10 @@ def finetune(args) -> None:
     random.Random(0).shuffle(ids)
     apart = ids[:max(1, len(ids) * 2 // 100)]
     train_ids = ids[len(apart):]
+    if args.apart_max:
+        apart = apart[:args.apart_max]
+    if args.max_lists:
+        train_ids = train_ids[:args.max_lists]
     print(f"{len(lists)} lists ({len(train_ids)} to learn from, {len(apart)} kept apart)")
     # The engine's rank as a prior, and how much the model counts.
     prior = torch.nn.Parameter(torch.zeros(args.top, device=dev))
@@ -307,6 +318,7 @@ def finetune(args) -> None:
         lengths = torch.as_tensor([len(s) for s in seqs], device=dev)
         with torch.autocast("cuda", dtype=torch.bfloat16, enabled=dev.type == "cuda"):
             lp = model.sentence_logprob(x, torch.as_tensor(starts, device=dev), lengths).float()
+        scores.lp, scores.pieces = lp, lengths - torch.as_tensor(starts, device=dev)
         return scale * lp + prior[torch.as_tensor(ranks, device=dev)], owners
 
     def loss_and_right(batch_ids):
@@ -315,9 +327,14 @@ def finetune(args) -> None:
         for n, k in enumerate(batch_ids):
             count = len(lists[k][0])
             row = s[at:at + count]
-            at += count
             meant = lists[k][1]
             loss = loss + torch.nn.functional.cross_entropy(row.unsqueeze(0), torch.tensor([meant], device=dev))
+            # The meant sentence still read as likely text (--lm-weight), so
+            # the model stays a language model and does not learn the
+            # lists' quirks alone.
+            if args.lm_weight:
+                loss = loss - args.lm_weight * scores.lp[at + meant] / scores.pieces[at + meant]
+            at += count
             right += int(row.argmax().item() == meant)
         return loss / len(batch_ids), right
 
@@ -346,7 +363,7 @@ def finetune(args) -> None:
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             opt.step()
             step += 1
-            if step % 500 == 0:
+            if step % args.check_every == 0:
                 before, after = check()
                 print(f"epoch {epoch} step {step}: kept apart engine first {before:.1f}%, with the model "
                       f"{after:.1f}%, scale {scale.item():.3f} ({time.time() - began:.0f}s)", flush=True)
@@ -771,7 +788,8 @@ def main() -> int:
     sub = parser.add_subparsers(dest="step", required=True)
     p = sub.add_parser("prepare")
     p.add_argument("--out", required=True)
-    p.add_argument("--lm-tsv", required=True)
+    p.add_argument("--lm-tsv", action="append", required=True)
+    p.add_argument("--pieces", help="an existing pieces.model to use instead of training new pieces")
     p.add_argument("--exclude-dir", action="append", default=[])
     p.add_argument("--exclude-sha1", action="append", default=[])
     p.add_argument("--vocab", type=int, default=16000)
@@ -796,6 +814,10 @@ def main() -> int:
     f.add_argument("--epochs", type=int, default=1)
     f.add_argument("--batch", type=int, default=32)
     f.add_argument("--lr", type=float, default=3e-4)
+    f.add_argument("--check-every", type=int, default=500)
+    f.add_argument("--lm-weight", type=float, default=0.0, help="how much the meant sentence's ln p per piece counts too")
+    f.add_argument("--apart-max", type=int, default=0, help="check on at most this many of the lists kept apart")
+    f.add_argument("--max-lists", type=int, default=0, help="learn from at most this many lists")
     q = sub.add_parser("refit-prior")
     q.add_argument("--out", required=True)
     q.add_argument("--lists", action="append", required=True)
@@ -844,4 +866,11 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    code = main()
+    # ROCm on Windows can hang while the process tears down, keeping the
+    # GPU's memory: everything is written by now, so leave at once.
+    import os
+    import sys
+    sys.stdout.flush()
+    sys.stderr.flush()
+    os._exit(code)

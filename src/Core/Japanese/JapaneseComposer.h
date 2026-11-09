@@ -492,9 +492,9 @@ public:
     // the prior alone, with the topic keeping the first (KeepsTopic).
     struct SentenceWeights {
         bool on{true};
-        float model{0.634f}, prior{0.385f}, whole{-1.216f}, cost{-0.612f};
-        std::array<float, 5> signals{0.089f, 0.145f, 0.264f, 0.0f, 0.040f};
-        float changed{-0.114f}, keepsTopic{-0.492f};
+        float model{1.018f}, prior{0.163f}, whole{-0.753f}, cost{-0.333f};
+        std::array<float, 5> signals{-0.006f, 0.034f, 0.197f, 0.0f, 0.033f};
+        float changed{-0.294f}, keepsTopic{-0.306f};
         float margin{0.5f};
     };
     void SetSentenceWeights(const SentenceWeights& weights) noexcept { sentenceWeights_ = weights; }
