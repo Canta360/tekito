@@ -4083,12 +4083,14 @@ std::wstring JapaneseComposer::JoinChunks(const std::vector<SettledChunk>& chunk
     return text;
 }
 
-std::vector<std::wstring> JapaneseComposer::WordsWithEnglish() const {
-    // The words before, and the English typed among Japanese in this
-    // sentence (lint, error): conversion reads those through English.
+std::vector<std::wstring> JapaneseComposer::WordsWithEnglish(std::size_t before) const {
+    // The words before, and the English typed right before what is
+    // converted (error を直す): conversion reads that through English. Only
+    // that one: English further off is no object of the verb (AI に…を直す).
     auto words = contextWords_;
-    for (const auto& chunk : settled_) {
-        if (chunk.isEnglish && chunk.english.size() >= 2) words.push_back(chunk.english);
+    if (before > settled_.size()) before = settled_.size();
+    if (before > 0 && settled_[before - 1].isEnglish && settled_[before - 1].english.size() >= 2) {
+        words.push_back(settled_[before - 1].english);
     }
     return words;
 }
@@ -4118,7 +4120,7 @@ void JapaneseComposer::ConvertJapaneseRuns() {
         }
         SyncEdgeContext();
         const auto phrases =
-            converter_->Convert(reading, {}, settled_[first].context, WordsWithEnglish(), userDictionary_, breaks);
+            converter_->Convert(reading, {}, settled_[first].context, WordsWithEnglish(first), userDictionary_, breaks);
         // Each chunk's phrases, as the breaks keep them.
         std::size_t p = 0, at = 0;
         bool whole = true;

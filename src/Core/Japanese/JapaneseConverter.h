@@ -238,6 +238,9 @@ public:
         // next to its phrase and the words before (EnglishTies: error を
         // 直す, fix error): costPerEnglish per nat of the strongest pair.
         std::int64_t costPerEnglish{300};
+        // The same for the Japanese words of the phrases next to it, read
+        // in English too (costPerEnglishJapanese; 0: off).
+        std::int64_t costPerEnglishJapanese{0};
     };
     // Digits (and a decimal point or comma between them) read as one number
     // word of this part of speech (japanese-core/pos.tsv, "number"), so

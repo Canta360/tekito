@@ -1613,7 +1613,7 @@ int main(int argc, char** argv) {
     std::filesystem::path slipsPack;
     JapaneseConverter::ModelWeights weights;
     std::filesystem::path topicPack;
-    // --english-ties <data folder>: english-pairs and japanese-meanings-en there.
+    // --english-ties <data folder>: english-pairs and japanese-english-senses there.
     std::filesystem::path englishTiesRoot;
     std::size_t showMisses = 0;
     TypingStudyOptions study;
@@ -1702,6 +1702,7 @@ int main(int argc, char** argv) {
         else if (arg == "--topic-vectors" && i + 1 < argc) topicPack = argv[++i];
         else if (arg == "--english-ties" && i + 1 < argc) englishTiesRoot = argv[++i];
         else if (arg == "--english-scale" && i + 1 < argc) weights.costPerEnglish = std::stoll(argv[++i]);
+        else if (arg == "--english-ja-scale" && i + 1 < argc) weights.costPerEnglishJapanese = std::stoll(argv[++i]);
         else if (arg == "--topic-vector-scale" && i + 1 < argc) weights.costPerVector = std::stoll(argv[++i]);
         else if (arg == "--no-context") useContext = false;
         else if (arg == "--show-misses" && i + 1 < argc) showMisses = std::stoul(argv[++i]);
@@ -1742,7 +1743,7 @@ int main(int argc, char** argv) {
     tekito::japanese::TopicVectors topicVectors;
     tekito::japanese::EnglishTies englishTies;
     if (!englishTiesRoot.empty() &&
-        !englishTies.Open(englishTiesRoot / L"english-pairs", englishTiesRoot / L"japanese-meanings-en")) {
+        !englishTies.Open(englishTiesRoot / L"english-pairs", englishTiesRoot / L"japanese-english-senses")) {
         std::cerr << "could not open the English ties in " << englishTiesRoot.string() << "\n";
         return 2;
     }

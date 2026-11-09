@@ -7,38 +7,27 @@ namespace tekito::japanese {
 
 namespace {
 
-// The first senses only: later ones are rarer readings of the word.
-constexpr std::size_t kSenses = 4;
-constexpr std::size_t kNames = 10;
-
 bool IsLatin(wchar_t c) noexcept { return (c >= L'a' && c <= L'z') || (c >= L'A' && c <= L'Z'); }
 
 }  // namespace
 
-bool EnglishTies::Open(const std::filesystem::path& pairsPack, const std::filesystem::path& meaningsPack) noexcept {
+bool EnglishTies::Open(const std::filesystem::path& pairsPack, const std::filesystem::path& sensesPack) noexcept {
     const bool pairs = pairs_.Open(pairsPack / L"pairs.tsv");
-    const bool meanings = meanings_.Open(meaningsPack / L"meanings.tsv");
-    return pairs && meanings;
+    const bool senses = senses_.Open(sensesPack / L"senses.tsv");
+    return pairs && senses;
 }
 
 std::vector<std::string> EnglishTies::Senses(std::wstring_view word) const {
     std::vector<std::string> names;
-    meanings_.ForEachRow(ToUtf8(word), [&](const std::vector<std::string_view>& fields) {
-        // word, reading, then one sense a field: "bring around, cure, heal: provide a cure".
-        for (std::size_t f = 2; f < fields.size() && f < 2 + kSenses; ++f) {
-            const auto sense = fields[f].substr(0, fields[f].find(':'));
-            for (std::size_t at = 0; at <= sense.size();) {
-                std::size_t end = sense.find(',', at);
-                if (end == std::string_view::npos) end = sense.size();
-                auto name = sense.substr(at, end - at);
-                while (!name.empty() && name.front() == ' ') name.remove_prefix(1);
-                while (!name.empty() && name.back() == ' ') name.remove_suffix(1);
-                if (!name.empty() && std::all_of(name.begin(), name.end(), [](char c) { return c >= 'a' && c <= 'z'; }) &&
-                    std::find(names.begin(), names.end(), name) == names.end() && names.size() < kNames) {
-                    names.emplace_back(name);
-                }
-                at = end + 1;
-            }
+    senses_.ForEachRow(ToUtf8(word), [&](const std::vector<std::string_view>& fields) {
+        // word, then its English words: "repair,mend,fix,correct".
+        if (fields.size() < 2) return false;
+        const auto list = fields[1];
+        for (std::size_t at = 0; at <= list.size();) {
+            std::size_t end = list.find(',', at);
+            if (end == std::string_view::npos) end = list.size();
+            if (end > at) names.emplace_back(list.substr(at, end - at));
+            at = end + 1;
         }
         return false;
     });

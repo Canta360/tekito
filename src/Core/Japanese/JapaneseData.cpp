@@ -106,7 +106,7 @@ const JapaneseData* ProcessJapaneseData() {
             loaded->converter->SetTopicVectors(&loaded->topics);
         }
         if (loaded->englishTies.Open(ExternalLexiconProvider::PackDirectory(L"english-pairs"),
-                                     ExternalLexiconProvider::PackDirectory(L"japanese-meanings-en"))) {
+                                     ExternalLexiconProvider::PackDirectory(L"japanese-english-senses"))) {
             loaded->converter->SetEnglishTies(&loaded->englishTies);
         }
         if (const auto* table = ProcessRomajiTable()) {

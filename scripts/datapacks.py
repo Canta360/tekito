@@ -43,6 +43,7 @@ LANGUAGE = {
     "japanese-wikimedia": "ja",
     "japanese-names": "ja",
     "japanese-jmdict": "ja",
+    "japanese-english-senses": "ja",
     "japanese-sudachi": "ja",
     "japanese-places": "ja",
     "japanese-variants": "ja",

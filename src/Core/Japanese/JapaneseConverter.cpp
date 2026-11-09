@@ -1099,19 +1099,22 @@ std::vector<Phrase> JapaneseConverter::Convert(std::wstring_view reading,
                 // Through English: the words of the phrases next to it and
                 // those before (English typed among Japanese among them).
                 double inEnglish = 0.0;
-                if (englishTies_ && weights_.costPerEnglish > 0) {
+                double japaneseInEnglish = 0.0;
+                if (englishTies_ && (weights_.costPerEnglish > 0 || weights_.costPerEnglishJapanese > 0)) {
                     const auto& mine = englishOf(heads[c]);
                     if (!mine.empty()) {
                         for (const auto& [where, word] : sentenceWords) {
-                            if (where == spanIndex) continue;
-                            // English typed among Japanese only: Japanese words
-                            // through their English senses tie too loosely.
-                            if (word.empty() || !std::all_of(word.begin(), word.end(), [](wchar_t ch) {
-                                    return (ch >= L'a' && ch <= L'z') || (ch >= L'A' && ch <= L'Z');
-                                })) {
-                                continue;
+                            if (where == spanIndex || word.empty()) continue;
+                            const bool latin = std::all_of(word.begin(), word.end(), [](wchar_t ch) {
+                                return (ch >= L'a' && ch <= L'z') || (ch >= L'A' && ch <= L'Z');
+                            });
+                            // English before the reading: the phrase right after it.
+                            if (latin && weights_.costPerEnglish > 0 && spanIndex <= 1) {
+                                inEnglish = std::max(inEnglish, englishTies_->Tie(mine, englishOf(word)));
+                            } else if (!latin && weights_.costPerEnglishJapanese > 0 &&
+                                       (where == spans.size() || where + 1 == spanIndex || where == spanIndex + 1)) {
+                                japaneseInEnglish = std::max(japaneseInEnglish, englishTies_->Tie(mine, englishOf(word)));
                             }
-                            inEnglish = std::max(inEnglish, englishTies_->Tie(mine, englishOf(word)));
                         }
                     }
                 }
@@ -1127,6 +1130,7 @@ std::vector<Phrase> JapaneseConverter::Convert(std::wstring_view reading,
                 ranked.emplace_back(phrase.candidates[c].cost -
                                         std::llround(strongest * static_cast<double>(weights_.costPerTopic)) -
                                         std::llround(inEnglish * static_cast<double>(weights_.costPerEnglish)) -
+                                        std::llround(japaneseInEnglish * static_cast<double>(weights_.costPerEnglishJapanese)) -
                                         std::llround(close * static_cast<double>(weights_.costPerVector)),
                                     phrase.candidates[c]);
             }
