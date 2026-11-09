@@ -1226,6 +1226,9 @@ std::vector<Phrase> JapaneseConverter::Convert(std::wstring_view reading,
                     const auto first = vectors_->Closeness(around, heads.front());
                     if (mine && first) close = std::max(0.0, *mine - *first - kTopicMargin);
                 }
+                phrase.candidates[c].signals = {static_cast<float>(strongest), static_cast<float>(fit),
+                                                static_cast<float>(homophone),
+                                                static_cast<float>(inEnglish + japaneseInEnglish), static_cast<float>(close)};
                 places.push_back(c);
                 ranked.emplace_back(phrase.candidates[c].cost -
                                         std::llround(strongest * static_cast<double>(weights_.costPerTopic)) -

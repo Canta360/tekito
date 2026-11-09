@@ -2035,6 +2035,13 @@ void JapaneseComposer::CheckSentence() {
         for (const std::size_t c : lists[i]) texts.push_back(phrases_[i].candidates[c].text);
         if (sentencesByCost_) deltas.push_back(CostDeltas(phrases_[i].candidates, lists[i]));
     }
+    std::vector<std::vector<std::array<float, 5>>> signals;
+    if (keepFeatures_ || sentenceWeights_.on) {
+        for (std::size_t i = 0; i < lists.size(); ++i) {
+            auto& each = signals.emplace_back();
+            for (const std::size_t c : lists[i]) each.push_back(phrases_[i].candidates[c].signals);
+        }
+    }
     // Whole texts that break the reading elsewhere (作成 or 作 成) are
     // read alongside: what was meant is often only among them.
     // Not when learning put a phrase's choice first: that stays.
@@ -2066,7 +2073,7 @@ void JapaneseComposer::CheckSentence() {
         for (const auto& candidate : phrases_[i].candidates) checked.all.push_back(candidate.text);
     }
     std::wstring written;
-    const auto picks = ReadBest(parts, sentencesByCost_ ? &deltas : nullptr, true, &written, wholes);
+    const auto picks = ReadBest(parts, sentencesByCost_ ? &deltas : nullptr, true, &written, wholes, signals);
     if (!written.empty()) {
         // One of those: its phrases, where they break.
         const auto guess = std::find_if(guesses.begin(), guesses.end(),
@@ -2265,7 +2272,8 @@ std::vector<std::int64_t> JapaneseComposer::CostDeltas(const std::vector<PhraseC
 
 std::vector<std::size_t> JapaneseComposer::ReadBest(const std::vector<std::vector<std::wstring>>& parts,
                                                     const std::vector<std::vector<std::int64_t>>* deltas, bool ai,
-                                                    std::wstring* written, std::span<const std::wstring> wholes) const {
+                                                    std::wstring* written, std::span<const std::wstring> wholes,
+                                                    std::span<const std::vector<std::array<float, 5>>> signals) const {
     std::vector<std::size_t> keep(parts.size(), 0);
     std::vector<std::size_t> sizes;
     for (const auto& part : parts) {
@@ -2328,8 +2336,13 @@ std::vector<std::size_t> JapaneseComposer::ReadBest(const std::vector<std::vecto
     // The sentence check reads those by cost and the whole ones.
     std::vector<std::wstring> checked(read.begin(), read.begin() + static_cast<std::ptrdiff_t>(byCost));
     checked.insert(checked.end(), read.begin() + static_cast<std::ptrdiff_t>(combined), read.end());
-    std::size_t chosen = reranker_->Choose(checked, byCost, wholePenalty_, precedingText_);
-    if (chosen != 0 && chosen < checked.size()) {
+    // A conversion's sentences (with what its phrases' candidates say) by
+    // the learned weights; others by the sentence model and the prior.
+    const bool weighed = sentenceWeights_.on && !signals.empty();
+    std::vector<std::pair<double, double>> scored;
+    std::size_t chosen = reranker_->Choose(checked, byCost, wholePenalty_, precedingText_,
+                                           keepFeatures_ || weighed ? &scored : nullptr);
+    if (!weighed && chosen != 0 && chosen < checked.size()) {
         const auto& pick = chosen < byCost ? sentences[chosen] : sentences[combined + chosen - byCost];
         if (KeepsTopic(sentences[0], pick)) chosen = 0;
     }
@@ -2339,6 +2352,58 @@ std::vector<std::size_t> JapaneseComposer::ReadBest(const std::vector<std::vecto
     lastCheckedSentences_.read = checked;
     lastCheckedSentences_.ranked = byCost;
     lastCheckedSentences_.chosen = chosen;
+    lastCheckedSentences_.serial = ++checks_;
+    lastCheckedSentences_.features.clear();
+    if ((keepFeatures_ || weighed) && scored.size() == checked.size()) {
+        auto& features = lastCheckedSentences_.features;
+        features.assign(checked.size(), {});
+        for (std::size_t k = 0; k < checked.size(); ++k) {
+            auto& f = features[k];
+            if (k < scored.size()) {
+                f[kFeatureModel] = static_cast<float>(scored[k].first);
+                f[kFeaturePrior] = static_cast<float>(scored[k].second);
+            }
+            const bool whole = k >= byCost;
+            const auto& text = whole ? sentences[combined + k - byCost] : sentences[k];
+            f[kFeatureWhole] = whole ? 1.0f : 0.0f;
+            f[kFeatureRank] = whole ? -1.0f : static_cast<float>(k);
+            f[kFeatureLength] = static_cast<float>(sentences[0].size());
+            if (k > 0 && KeepsTopic(sentences[0], text)) f[kFeatureKeepsTopic] = 1.0f;
+            if (whole) continue;
+            double cost = 0.0;
+            for (std::size_t i = 0; i < parts.size(); ++i) {
+                const std::size_t pick = picked[k][i];
+                if (pick == 0) continue;
+                f[kFeatureChanged] += 1.0f;
+                if (deltas) cost += static_cast<double>((*deltas)[i][pick]);
+                if (i < signals.size() && pick < signals[i].size()) {
+                    for (std::size_t s = 0; s < 5; ++s) f[kFeatureSignals + s] += signals[i][pick][s] - signals[i][0][s];
+                }
+            }
+            f[kFeatureCost] = static_cast<float>(cost / 1000.0);
+        }
+        if (weighed) {
+            const auto& w = sentenceWeights_;
+            const auto sum = [&](const std::array<float, kSentenceFeatures>& f) {
+                double total = w.model * f[kFeatureModel] + w.prior * f[kFeaturePrior] + w.whole * f[kFeatureWhole] +
+                               w.cost * std::clamp(f[kFeatureCost], 0.0f, 10.0f) + w.changed * f[kFeatureChanged] +
+                               w.keepsTopic * f[kFeatureKeepsTopic];
+                for (std::size_t s = 0; s < 5; ++s) total += w.signals[s] * f[kFeatureSignals + s];
+                return total;
+            };
+            const double first = sum(features[0]);
+            double best = first + w.margin;
+            chosen = 0;
+            for (std::size_t k = 1; k < features.size(); ++k) {
+                if (const double total = sum(features[k]); total > best) {
+                    best = total;
+                    chosen = k;
+                }
+            }
+            lastCheckedSentences_.chosen = chosen;
+        }
+        if (!keepFeatures_) features.clear();
+    }
     if (chosen >= byCost) chosen += combined - byCost;
     if (beamWidth_ > 0 && deltas && reranker_->IsOpen()) {
         // Phrase by phrase: each start read once, the likeliest kept.

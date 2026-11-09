@@ -412,6 +412,26 @@ void WriteChecked(const std::string& source, const std::string& id,
             << (k == checked.chosen ? 1 : 0) << "\t" << Narrow(checked.shown[k]) << "\t" << Narrow(checked.read[k]) << "\n";
     }
 }
+// TEKITO_EVAL_FEATURES=<path>: for each row's last sentence check, the
+// sentences it chose among with what it knew of each (source, id, k,
+// meant 1/0, chosen 1/0, the SentenceFeature values, text as shown).
+void WriteFeatures(const std::string& source, const std::string& id,
+                   const tekito::japanese::JapaneseComposer::CheckedSentences& checked,
+                   const std::vector<std::wstring>& expected) {
+    static std::ofstream out = [] {
+        const char* path = std::getenv("TEKITO_EVAL_FEATURES");
+        return path && *path ? std::ofstream(path, std::ios::binary) : std::ofstream();
+    }();
+    static std::uint64_t written = 0;
+    if (!out.is_open() || checked.serial == written || checked.features.size() != checked.shown.size()) return;
+    written = checked.serial;
+    for (std::size_t k = 0; k < checked.shown.size(); ++k) {
+        const bool meant = std::find(expected.begin(), expected.end(), checked.shown[k]) != expected.end();
+        out << source << "\t" << id << "\t" << k << "\t" << (meant ? 1 : 0) << "\t" << (k == checked.chosen ? 1 : 0);
+        for (const float f : checked.features[k]) out << "\t" << f;
+        out << "\t" << Narrow(checked.shown[k]) << "\n";
+    }
+}
 // Why what was meant is not among the sentences the AI reads, best first:
 // its phrases are those the check read and each piece among the candidates
 // it read (only the combination was not reached), among all the phrase's
@@ -511,6 +531,11 @@ int RunKeys(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary
     if (loanwords) composer.SetLoanwords(loanwords);
     composer.SetSentenceReranker(reranker);
     composer.SetAiJudge(gAiJudge, true);
+    if (const char* features = std::getenv("TEKITO_EVAL_FEATURES"); features && *features) composer.SetKeepCheckedFeatures(true);
+    // TEKITO_EVAL_SENTENCE_WEIGHTS=0: the sentence check without its learned weights.
+    if (const char* weights = std::getenv("TEKITO_EVAL_SENTENCE_WEIGHTS"); weights && *weights == '0') {
+        composer.SetSentenceWeights({.on = false});
+    }
     // TEKITO_EVAL_WHOLES=N: how many whole texts with other phrase breaks
     // the sentence check reads too (the composer's default otherwise).
     if (const char* wholes = std::getenv("TEKITO_EVAL_WHOLES")) composer.SetWholeSentences(std::strtoul(wholes, nullptr, 10));
@@ -682,6 +707,7 @@ int RunKeys(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary
         if (chain && !live) {
             composer.Commit();
         }
+        WriteFeatures(row.source, row.id, composer.LastCheckedSentences(), row.expected);
         if (gAiJudge == &gProbe && gProbe.asked.size() == 1) WriteChecked(row.source, row.id, composer.LastCheckedSentences(), row.expected);
         if (gAiJudge == &gProbe) {
             for (auto* t : {&probeTotals[row.source], &probeTotals["all"]}) {

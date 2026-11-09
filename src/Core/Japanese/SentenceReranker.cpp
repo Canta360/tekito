@@ -347,7 +347,8 @@ std::vector<double> SentenceReranker::LogProbabilities(std::span<const std::wstr
 }
 
 std::size_t SentenceReranker::Choose(std::span<const std::wstring> sentences, std::size_t ranked,
-                                     double penalty, std::wstring_view context) const {
+                                     double penalty, std::wstring_view context,
+                                     std::vector<std::pair<double, double>>* scored) const {
     ranked = std::min(ranked, sentences.size());
     const std::size_t count = std::min(ranked, prior_.size());
     if (!IsOpen() || count + (sentences.size() - ranked) < 2 || count == 0) return 0;
@@ -361,6 +362,13 @@ std::size_t SentenceReranker::Choose(std::span<const std::wstring> sentences, st
         const double prior = i < count ? prior_[i] : prior_.back() - penalty;
         scores[i] = weight_ * ramp * scale_ * logProbabilities[i] + prior;
         if (scores[i] > scores[best]) best = i;
+    }
+    if (scored) {
+        scored->assign(sentences.size(), {0.0, 0.0});
+        for (std::size_t i = 0; i < read.size(); ++i) {
+            const double prior = i < count ? prior_[i] : prior_.back() - penalty;
+            (*scored)[i < count ? i : ranked + (i - count)] = {weight_ * ramp * scale_ * logProbabilities[i], prior};
+        }
     }
     if (scores[best] - scores[0] <= margin_) return 0;
     return best < count ? best : ranked + (best - count);

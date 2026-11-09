@@ -10,6 +10,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 namespace tekito::japanese {
@@ -41,9 +42,12 @@ public:
     // to take: 0 keeps the first. Only the first Top() of the first
     // `ranked` are looked at; those after `ranked` (whole texts read with
     // other phrase breaks) count as the last rank less `penalty`. `context`:
-    // the text just before them.
+    // the text just before them. `read` (when given): each one's log
+    // probability, weighted as compared (0 for those not looked at), and
+    // its prior.
     [[nodiscard]] std::size_t Choose(std::span<const std::wstring> sentences, std::size_t ranked = SIZE_MAX,
-                                     double penalty = 0.0, std::wstring_view context = {}) const;
+                                     double penalty = 0.0, std::wstring_view context = {},
+                                     std::vector<std::pair<double, double>>* read = nullptr) const;
 
     // Reads many texts that start alike, as a search phrase by phrase makes
     // them: what they share is read once.

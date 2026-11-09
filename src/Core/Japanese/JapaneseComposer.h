@@ -5,6 +5,7 @@
 #include "Core/Japanese/KanjiSets.h"
 #include "Core/SpecialConversions.h"
 
+#include <array>
 #include <cstdint>
 #include <functional>
 #include <optional>
@@ -75,6 +76,26 @@ struct PreeditSegment {
 // Muhenkan write the focused phrase (or, before conversion, the whole text)
 // in another form. After any of those, the next key the caller sees commits
 // the text, as in Microsoft IME.
+// What the sentence check knows of each sentence it chooses among
+// (JapaneseComposer::CheckedSentences::features): the sentence model's
+// weighted log probability and the prior for its place, whether it is a
+// whole text read with other phrase breaks, its rank, the converter's
+// cost over the first in thousands, its phrases' PhraseSignal values over
+// the first's, how many phrases differ, and whether the topic keeps the
+// first over it (KeepsTopic).
+enum SentenceFeature : std::size_t {
+    kFeatureModel,
+    kFeaturePrior,
+    kFeatureWhole,
+    kFeatureRank,
+    kFeatureCost,
+    kFeatureSignals,
+    kFeatureChanged = kFeatureSignals + 5,
+    kFeatureKeepsTopic,
+    kFeatureLength,
+    kSentenceFeatures
+};
+
 class JapaneseComposer final {
 public:
     explicit JapaneseComposer(const RomajiTable* table = nullptr) noexcept : table_(table) {}
@@ -459,8 +480,26 @@ public:
         std::vector<std::wstring> read;
         std::size_t ranked{0};
         std::size_t chosen{0};
+        // Each one's SentenceFeature values; counts the checks made.
+        std::vector<std::array<float, kSentenceFeatures>> features;
+        std::uint64_t serial{0};
     };
     [[nodiscard]] const CheckedSentences& LastCheckedSentences() const noexcept { return lastCheckedSentences_; }
+    // How the sentence check weighs what it knows of each sentence of a
+    // conversion (SentenceFeature), learned from typed text
+    // (zenz text no pack counted): a sentence is taken over the first when its sum is
+    // more than `margin` above the first's. Off: the sentence model and
+    // the prior alone, with the topic keeping the first (KeepsTopic).
+    struct SentenceWeights {
+        bool on{true};
+        float model{0.634f}, prior{0.385f}, whole{-1.216f}, cost{-0.612f};
+        std::array<float, 5> signals{0.089f, 0.145f, 0.264f, 0.0f, 0.040f};
+        float changed{-0.114f}, keepsTopic{-0.492f};
+        float margin{0.5f};
+    };
+    void SetSentenceWeights(const SentenceWeights& weights) noexcept { sentenceWeights_ = weights; }
+    // For evaluation: CheckedSentences::features kept too.
+    void SetKeepCheckedFeatures(bool on) noexcept { keepFeatures_ = on; }
     // Mixed typing, for evaluation: on Enter, up to `count` texts of the
     // sentence with other choices of its chunks (MixedSentences), the first
     // as committed, and the keys typed.
@@ -598,7 +637,8 @@ private:
     [[nodiscard]] std::vector<std::size_t> ReadBest(const std::vector<std::vector<std::wstring>>& parts,
                                                     const std::vector<std::vector<std::int64_t>>* deltas = nullptr,
                                                     bool ai = false, std::wstring* written = nullptr,
-                                                    std::span<const std::wstring> wholes = {}) const;
+                                                    std::span<const std::wstring> wholes = {},
+                                                    std::span<const std::vector<std::array<float, 5>>> signals = {}) const;
     // A writing of the whole input taken (the AI model's own, or a text
     // that breaks the reading elsewhere): the phrases' candidates that make
     // it selected; else the reading split at `breaks` if that makes it;
@@ -921,6 +961,9 @@ private:
     std::wstring conversionReading_;
     std::vector<CheckedPhrase> lastChecked_;
     mutable CheckedSentences lastCheckedSentences_;
+    mutable std::uint64_t checks_{0};
+    bool keepFeatures_{false};
+    SentenceWeights sentenceWeights_;
     std::size_t keepMixed_{0};
     std::vector<std::wstring> lastMixed_;
     std::wstring lastMixedKeys_;

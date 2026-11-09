@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <array>
 #include <functional>
 
 #include <cstddef>
@@ -61,7 +62,15 @@ struct PhraseCandidate {
     // characters of the reading from the phrase's start (へ|いき: 併記 over
     // へいき); choosing it makes the phrase that long. 0: the phrase's own.
     std::size_t length{0};
+    // What the sentence's other words say for it, as the topic order read
+    // them (PhraseSignal); 0 when not read.
+    std::array<float, 5> signals{};
 };
+
+// PhraseCandidate::signals: its strongest topic tie, particle pair fit,
+// homophone context, tie through English and topic vector closeness over
+// the first choice's.
+enum PhraseSignal : std::size_t { kSignalTopic, kSignalPair, kSignalHomophone, kSignalEnglish, kSignalVector };
 
 // A word that starts with what has been typed, for prediction.
 struct Prediction {
