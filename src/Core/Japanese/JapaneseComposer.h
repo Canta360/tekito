@@ -80,6 +80,7 @@ public:
     explicit JapaneseComposer(const RomajiTable* table = nullptr) noexcept : table_(table) {}
 
     void SetTable(const RomajiTable* table) noexcept;
+    [[nodiscard]] const JapaneseConverter* Converter() const noexcept { return converter_; }
     void SetConverter(const JapaneseConverter* converter) noexcept {
         converter_ = converter;
         if (converter_) converter_->SetNotationLevel(notationLevel_);

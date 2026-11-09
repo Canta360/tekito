@@ -843,7 +843,14 @@ std::vector<Phrase> JapaneseConverter::Convert(std::wstring_view reading,
                 list.clear();
                 if (node.end > finish) continue;
                 if (i == begin) {
-                    list.push_back({node.cost + matrix_.Cost(leftContext, node.left), -1, -1});
+                    // The word before the phrase counts as within it does
+                    // (併用 | 橋に: 橋 goes with 併用, 強 does not).
+                    std::int64_t join = matrix_.Cost(leftContext, node.left);
+                    if (first > 0) {
+                        const Node& before = nodes[path[first - 1]];
+                        join -= PairBonus(model_, weights_, before, node) + CompoundBonus(lattice, before, node);
+                    }
+                    list.push_back({node.cost + join, -1, -1});
                 } else {
                     for (const int p : lattice.endingAt[i]) {
                         if (nodes[p].begin < begin) continue;
@@ -1062,9 +1069,22 @@ std::vector<Phrase> JapaneseConverter::Convert(std::wstring_view reading,
                 if (heads[c].empty()) continue;
                 double strongest = 0.0;
                 if (model_ && weights_.costPerTopic > 0) {
+                    // A compound the model does not know (少年誌) meets the
+                    // others as the longest start of it the model knows
+                    // (少年), as the same written in parts (少年 師) does:
+                    // else the parts would win for being known.
+                    std::wstring head = heads[c];
+                    if (!model_->LogCount(head)) {
+                        for (std::size_t length = head.size(); length-- > 2;) {
+                            if (model_->LogCount(std::wstring_view(head).substr(0, length))) {
+                                head.resize(length);
+                                break;
+                            }
+                        }
+                    }
                     for (const auto& [where, word] : sentenceWords) {
                         if (where == spanIndex) continue;
-                        if (const auto tie = model_->Topic(heads[c], word)) strongest = std::max(strongest, *tie);
+                        if (const auto tie = model_->Topic(head, word)) strongest = std::max(strongest, *tie);
                     }
                 }
                 // Only a clearly better fit than the first choice counts:

@@ -24,8 +24,10 @@
 
 #include <windows.h>
 
+#include <cctype>
 #include <fstream>
 #include <iostream>
+#include <optional>
 #include <string>
 
 namespace {
@@ -112,9 +114,54 @@ int main(int argc, char** argv) {
         }
         return 0;
     }
-    const std::size_t rows = argc > 2 ? std::stoul(argv[2]) : 27;
+    const std::size_t rows = argc > 2 && std::isdigit(static_cast<unsigned char>(argv[2][0])) ? std::stoul(argv[2]) : 27;
     tekito::japanese::JapaneseComposer composer(tekito::japanese::ProcessRomajiTable());
     tekito::japanese::AttachJapaneseData(composer);
+    // "lattice" as the second argument: each line is a reading in kana,
+    // printed with the converter's likeliest path, each word's cost and the
+    // join into it (connection, pairs, compounds), and beside each the other
+    // words over the same span with their joins from the word before.
+    if (argc > 2 && std::string(argv[2]) == "lattice") {
+        const auto* converter = composer.Converter();
+        if (!converter) return 3;
+        std::ifstream lines(argv[1], std::ios::binary);
+        for (std::string line; std::getline(lines, line);) {
+            if (!line.empty() && line.back() == '\r') line.pop_back();
+            if (line.empty()) continue;
+            const auto lattice = converter->ExportLattice(Widen(line));
+            std::cout << line << "\tbest " << lattice.bestCost << "\n";
+            const auto join = [&](int from, int to) -> std::optional<std::int64_t> {
+                for (const auto& j : lattice.joins) {
+                    if (j.left == from && j.right == to) return j.cost;
+                }
+                return std::nullopt;
+            };
+            int previous = -1;
+            for (std::size_t b = 0; b < lattice.best.size(); ++b) {
+                const int k = lattice.best[b];
+                const auto& word = lattice.words[static_cast<std::size_t>(k)];
+                const int next = b + 1 < lattice.best.size() ? lattice.best[b + 1] : -1;
+                const auto show = [&](int index) {
+                    const auto& w = lattice.words[static_cast<std::size_t>(index)];
+                    const auto in = previous >= 0 ? join(previous, index) : std::nullopt;
+                    const auto out = next >= 0 ? join(index, next) : std::nullopt;
+                    return Narrow(w.text) + "(" + std::to_string(w.cost) + " in " + (in ? std::to_string(*in) : "-") + " out " +
+                           (out ? std::to_string(*out) : "-") + ")";
+                };
+                std::cout << "  " << show(k) << "   vs";
+                int shown = 0;
+                for (std::size_t o = 0; o < lattice.words.size() && shown < 6; ++o) {
+                    const auto& other = lattice.words[o];
+                    if (static_cast<int>(o) == k || other.begin != word.begin || other.end != word.end) continue;
+                    std::cout << " " << show(static_cast<int>(o));
+                    ++shown;
+                }
+                std::cout << "\n";
+                previous = k;
+            }
+        }
+        return 0;
+    }
     tekito::userdata::UserSettings settings;
     bool mix = false;
     bool steps = false;
