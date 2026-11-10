@@ -1720,8 +1720,9 @@ int main(int argc, char** argv) {
                     model,
                     device && std::string_view(device) == "cpu"   ? tekito::japanese::AiDevice::Cpu
                     : device && std::string_view(device) == "gpu" ? tekito::japanese::AiDevice::Gpu
+                    : device && std::string_view(device) == "npu" ? tekito::japanese::AiDevice::Npu
                                                                   : tekito::japanese::AiDevice::Auto,
-                    std::chrono::milliseconds(std::atoi(wait)), gAiJudge->Top());
+                    0, std::chrono::milliseconds(std::atoi(wait)), gAiJudge->Top());
                 gAiJudge = &patient;
             }
         }
