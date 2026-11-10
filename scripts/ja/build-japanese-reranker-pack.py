@@ -36,12 +36,27 @@ import numpy as np
 import torch
 
 NOTICE = """The language model that checks whole sentences, trained by TEKITO
-(scripts/ja/train-japanese-wordlm.py) on text from the zenz-v2.5-dataset
-(https://huggingface.co/datasets/Miwa-Keita/zenz-v2.5-dataset), its
-llm-jp-corpus-v3 part, which is made available under the Open Data Commons
-Attribution License (ODC-BY 1.0): https://opendatacommons.org/licenses/by/1-0/
+(scripts/ja/train-japanese-wordlm.py) on Japanese text from:
+
+- the zenz-v2.5-dataset (https://huggingface.co/datasets/Miwa-Keita/zenz-v2.5-dataset),
+  its llm-jp-corpus-v3 part, under the Open Data Commons Attribution License
+  (ODC-BY 1.0): https://opendatacommons.org/licenses/by/1-0/
+- ABEJA-CC-JA (https://registry.opendata.aws/abeja-cc-ja/), under the Open Data
+  Commons Public Domain Dedication and License (PDDL 1.0)
+- YODAS (https://huggingface.co/datasets/espnet/yodas), its Japanese manual
+  captions (ja000), under CC BY 3.0: https://creativecommons.org/licenses/by/3.0/
+  X. Li et al., "YODAS: Youtube-Oriented Dataset for Audio and Speech", ASRU 2023
+- ASDC, Megagon Labs (https://github.com/megagonlabs/asdc), under CC BY 4.0
+- the Rosebleu dataset (c) Rosebleu, under the Apache License 2.0:
+  https://www.apache.org/licenses/LICENSE-2.0
+- Tatoeba (https://tatoeba.org), under CC BY 2.0 FR
+- Common Voice text sentences (https://commonvoice.mozilla.org), under CC0 1.0
+- the Leipzig Corpora Collection, Japanese news 2019 (jpn_newscrawl_2019_1M),
+  under CC BY 4.0: D. Goldhahn, T. Eckart and U. Quasthoff, "Building Large
+  Monolingual Dictionaries at the Leipzig Corpora Collection", LREC 2012
+
 The pack holds the model's weights and word pieces only; it contains no
-sentences from the dataset.
+sentences from these sources.
 """
 
 
@@ -120,7 +135,9 @@ def main() -> int:
         "entry_count": vocab,
         "sha256": {"file": sha("reranker.bin"), "pieces": sha("pieces.tsv")},
         "license": "TEKITO-OWNED",
-        "source": "scripts/ja/train-japanese-wordlm.py on zenz-v2.5-dataset (ODC-BY 1.0)",
+        "source": "scripts/ja/train-japanese-wordlm.py on zenz-v2.5-dataset (ODC-BY 1.0), ABEJA-CC-JA (PDDL), "
+                  "YODAS ja000 (CC BY 3.0), ASDC (CC BY 4.0), Rosebleu (Apache-2.0), Tatoeba (CC BY 2.0 FR), "
+                  "Common Voice (CC0), Leipzig jpn_newscrawl_2019_1M (CC BY 4.0)",
         "notice_file": "NOTICE",
     }
     (out / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8", newline="\n")
