@@ -1,6 +1,6 @@
 #include "UserData/SqliteUserDictionaryRepository.h"
 
-#include "sqlite3.h"
+#include "sqlite3mc_amalgamation.h"
 
 #include <algorithm>
 #include <cstdlib>

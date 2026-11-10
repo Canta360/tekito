@@ -90,8 +90,9 @@ target_include_directories(tekito_core PUBLIC src)
 target_compile_options(tekito_core PRIVATE ${TEKITO_WARNINGS})
 target_link_libraries(tekito_core PUBLIC advapi32)
 
-set(TEKITO_SQLITE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/sqlite/sqlite-amalgamation-3530400")
-add_library(tekito_sqlite STATIC "${TEKITO_SQLITE_DIR}/sqlite3.c")
+# SQLite with page encryption (SQLite3 Multiple Ciphers, the same SQLite).
+set(TEKITO_SQLITE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/sqlite3mc")
+add_library(tekito_sqlite STATIC "${TEKITO_SQLITE_DIR}/sqlite3mc_amalgamation.c")
 target_include_directories(tekito_sqlite PUBLIC "${TEKITO_SQLITE_DIR}")
 target_compile_definitions(tekito_sqlite PRIVATE SQLITE_THREADSAFE=1 SQLITE_OMIT_LOAD_EXTENSION)
 target_compile_options(tekito_sqlite PRIVATE /W0)
