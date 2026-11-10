@@ -2463,6 +2463,22 @@ std::optional<int> ExportDictionariesFromCommandLine() {
     return written ? 0 : 2;
 }
 
+// "--erase-user-data" (the uninstaller's, removing the user's data): the
+// words, learning, settings and recent conversions erased from the user's
+// database, which apps that still have TEKITO loaded keep open so it cannot
+// be deleted until they close. 0 when erased, 2 when not.
+std::optional<int> EraseUserDataFromCommandLine() {
+    int count = 0;
+    LPWSTR* arguments = CommandLineToArgvW(GetCommandLineW(), &count);
+    bool erase = false;
+    for (int i = 1; arguments && i < count; ++i) erase = erase || std::wstring_view(arguments[i]) == L"--erase-user-data";
+    if (arguments) LocalFree(arguments);
+    if (!erase) return std::nullopt;
+    const auto repository = tekito::userdata::CreateDefaultUserDataRepository();
+    if (!repository || !repository->Open()) return 2;
+    return repository->EraseAll() ? 0 : 2;
+}
+
 // "--install-ai light|strong" (the installer's, when the user chose AI):
 // downloads and installs the model, and what runs it, with no window, and
 // turns it on. 0 when it is installed, 3 when it could not be downloaded,
@@ -2494,6 +2510,7 @@ std::optional<int> InstallAiFromCommandLine() {
 
 int RunTekitoSettings(HINSTANCE instance) {
     if (const auto exported = ExportDictionariesFromCommandLine()) return *exported;
+    if (const auto erased = EraseUserDataFromCommandLine()) return *erased;
     if (const auto installed = InstallAiFromCommandLine()) return *installed;
     const HRESULT comResult = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
     const bool comInitialized = SUCCEEDED(comResult);

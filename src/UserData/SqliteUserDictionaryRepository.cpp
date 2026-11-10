@@ -871,6 +871,32 @@ bool SqliteUserDictionaryRepository::LoadRecentConversions(std::vector<RecentCon
     return success;
 }
 
+bool SqliteUserDictionaryRepository::EraseAll() noexcept {
+    if (!database_) return false;
+    // Deleted rows overwritten with zeros, every table emptied, and the
+    // write-ahead log folded in and truncated.
+    if (sqlite3_exec(database_, "PRAGMA secure_delete = ON;", nullptr, nullptr, nullptr) != SQLITE_OK) return false;
+    std::vector<std::string> tables;
+    sqlite3_stmt* statement = nullptr;
+    if (sqlite3_prepare_v2(database_, "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%';",
+                           -1, &statement, nullptr) != SQLITE_OK) {
+        return false;
+    }
+    while (sqlite3_step(statement) == SQLITE_ROW) {
+        if (const auto* name = reinterpret_cast<const char*>(sqlite3_column_text(statement, 0))) tables.emplace_back(name);
+    }
+    sqlite3_finalize(statement);
+    bool success = sqlite3_exec(database_, "BEGIN IMMEDIATE;", nullptr, nullptr, nullptr) == SQLITE_OK;
+    for (const auto& table : tables) {
+        if (!success) break;
+        const std::string sql = "DELETE FROM \"" + table + "\";";
+        success = sqlite3_exec(database_, sql.c_str(), nullptr, nullptr, nullptr) == SQLITE_OK;
+    }
+    success = sqlite3_exec(database_, success ? "COMMIT;" : "ROLLBACK;", nullptr, nullptr, nullptr) == SQLITE_OK && success;
+    (void)sqlite3_exec(database_, "PRAGMA wal_checkpoint(TRUNCATE);", nullptr, nullptr, nullptr);
+    return success;
+}
+
 bool SqliteUserDictionaryRepository::ForgetRecentConversion(std::int64_t id) noexcept {
     if (!database_) return false;
     if (id == 0) return sqlite3_exec(database_, "DELETE FROM conversion_history;", nullptr, nullptr, nullptr) == SQLITE_OK;

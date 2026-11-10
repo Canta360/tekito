@@ -50,6 +50,10 @@ public:
     // id 0: all of them.
     [[nodiscard]] virtual bool ForgetRecentConversion(std::int64_t id) noexcept = 0;
     [[nodiscard]] virtual bool IsOpen() const noexcept = 0;
+    // Everything kept (words, learning, settings, recent conversions) gone,
+    // overwritten where it was stored: for an uninstall that cannot delete
+    // the file while apps still have it open.
+    [[nodiscard]] virtual bool EraseAll() noexcept { return false; }
 };
 
 [[nodiscard]] std::unique_ptr<IUserDataRepository> CreateDefaultUserDataRepository() noexcept;

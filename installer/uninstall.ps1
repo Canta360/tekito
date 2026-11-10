@@ -88,6 +88,17 @@ if ($ExportTo) {
     }
 }
 
+# Removing the user's data: apps that still have TEKITO loaded keep its
+# database open, so the file may stay until they close. Its contents go now.
+if ($RemoveUserData) {
+    $app = Join-Path $installRoot "TEKITO.exe"
+    $userData = Join-Path $env:LOCALAPPDATA "TEKITO\user.db"
+    if ((Test-Path -LiteralPath $userData) -and (Test-Path -LiteralPath $app)) {
+        $process = Start-Process $app -ArgumentList @('--erase-user-data') -Wait -PassThru
+        if ($process.ExitCode -ne 0) { Write-Warning "The data in $userData could not be erased (TEKITO.exe returned $($process.ExitCode))." }
+    }
+}
+
 if (-not $SkipRegistration) {
     $regsvr32 = Join-Path $env:WINDIR "System32\regsvr32.exe"
     foreach ($dll in @(Get-ChildItem -LiteralPath $installRoot -Filter "Tekito.Tsf*.dll" -File -Recurse -ErrorAction SilentlyContinue)) {
