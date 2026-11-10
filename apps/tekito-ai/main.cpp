@@ -105,18 +105,18 @@ struct Tensor {
         for (std::size_t i = 1; i < shape.size(); ++i) n *= static_cast<std::size_t>(shape[i]);
         return n;
     }
-    // An attention state ([batch, heads, past, dim]) of its last `n` places;
-    // any other state as it is.
-    [[nodiscard]] Tensor Last(std::size_t n) const {
-        if (shape.size() != 4 || static_cast<std::size_t>(shape[2]) <= n) return *this;
+    // An attention state ([batch, heads, past, dim]) as `n` places, its own
+    // at the end (a fixed graph's window); any other state as it is.
+    [[nodiscard]] Tensor PadTo(std::size_t n) const {
+        if (shape.size() != 4 || static_cast<std::size_t>(shape[2]) >= n) return *this;
         Tensor out{shape, {}};
         out.shape[2] = static_cast<std::int64_t>(n);
         const auto places = static_cast<std::size_t>(shape[2]), dim = static_cast<std::size_t>(shape[3]);
         const std::size_t rows = static_cast<std::size_t>(shape[0] * shape[1]);
-        out.data.resize(rows * n * dim);
+        out.data.assign(rows * n * dim, 0.0f);
         for (std::size_t r = 0; r < rows; ++r) {
-            std::copy_n(data.begin() + static_cast<std::ptrdiff_t>((r * places + places - n) * dim), n * dim,
-                        out.data.begin() + static_cast<std::ptrdiff_t>(r * n * dim));
+            std::copy_n(data.begin() + static_cast<std::ptrdiff_t>(r * places * dim), places * dim,
+                        out.data.begin() + static_cast<std::ptrdiff_t>((r * n + n - places) * dim));
         }
         return out;
     }
@@ -252,15 +252,13 @@ std::vector<Ort::ConstEpDevice> NpuDevices() {
 // One graph of a pack: its session, input and output names, and the
 // state's shapes ([batch, hidden, 2] and [batch, heads, past, dim]; -1 where
 // any size goes). A body (body-<b>x<t>.onnx) gives the last hidden state,
-// and its heads ln p from it: of each target, and of every token after the
-// last one.
+// and its head ln p of each target from it.
 struct Graph {
     std::unique_ptr<Ort::Session> session;
     std::vector<std::string> inputs, outputs;
     std::vector<std::vector<std::int64_t>> stateShapes;
     std::int64_t batch{-1}, tokens{-1}, window{0};
     Graph* targetHead{nullptr};
-    Graph* lastHead{nullptr};
 
     void Open(const std::filesystem::path& file, const Ort::SessionOptions& options) {
         session = std::make_unique<Ort::Session>(Environment(), file.c_str(), options);
@@ -374,16 +372,6 @@ Step Run(Graph& graph, std::size_t batch, std::size_t tokens, const std::vector<
         if (graph.targetHead) {
             step.targetLogprobs = RunHead(*graph.targetHead, hidden.data(), batch * tokens, width, targets.data());
         }
-        if (graph.lastHead) {
-            std::vector<float> last(batch * width);
-            for (std::size_t r = 0; r < batch; ++r) {
-                std::copy_n(hidden.begin() + static_cast<std::ptrdiff_t>((r * tokens + tokens - 1) * width), width,
-                            last.begin() + static_cast<std::ptrdiff_t>(r * width));
-            }
-            std::vector<std::int64_t> lastShape;
-            step.lastLogprobs = RunHead(*graph.lastHead, last.data(), batch, width, nullptr, &lastShape);
-            step.vocab = static_cast<std::size_t>(lastShape.back());
-        }
     } else {
         copy(results[0], step.targetLogprobs, nullptr);
         std::vector<std::int64_t> lastShape;
@@ -398,13 +386,12 @@ Step Run(Graph& graph, std::size_t batch, std::size_t tokens, const std::vector<
     return step;
 }
 
-// What a prompt left to go on from: its state, its tokens, ln p of the next
-// token, and (fixed shapes) which places of the state's window it fills.
+// What a prompt left to go on from: its state (as the processor's graph
+// keeps it), its tokens, and ln p of the next token.
 struct Prompt {
     std::vector<Tensor> state;
     std::size_t tokens{0};
     std::vector<float> last;
-    std::vector<std::int64_t> window;
 };
 
 // One model loaded, the one asked for last, where it was asked to run: the
@@ -482,25 +469,17 @@ public:
         if (loading_.joinable()) loading_.join();
         stop_ = false;
         fixedReady_ = false;
-        prompt_ = Graph{};
         score_ = Graph{};
         scoreHead_ = Graph{};
-        lastHead_ = Graph{};
         cpu_ = Graph{};
         loaded_ = AiModel::None;
     }
 
 private:
-    // The fixed-shape bodies and the scoring head on the GPU (DirectML) or
-    // the NPU; the head for the last tokens (a few rows) on the processor.
+    // The scoring body and its head on the GPU (DirectML) or the NPU (the
+    // prompt is read on the processor, a few dozen tokens).
     void LoadFixed(std::filesystem::path directory, AiDevice device, std::uint32_t gpu) {
         try {
-            Ort::SessionOptions here;
-            here.SetIntraOpNumThreads(Threads());
-            here.SetInterOpNumThreads(1);
-            here.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
-            Graph lastHead;
-            lastHead.Open(directory / L"head.onnx", here);
             Ort::SessionOptions options;
             options.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
             if (device == AiDevice::Gpu) {
@@ -517,9 +496,7 @@ private:
                 // driver's own folder.
                 std::unordered_map<std::string, std::string> epOptions;
                 if (std::string_view(npus.front().EpName()) == "OpenVINOExecutionProvider") {
-                    const auto cache = directory / L"npu-cache";
-                    std::error_code error;
-                    std::filesystem::create_directories(cache, error);
+                    const auto cache = NpuCache(directory);
                     std::string path = Utf8(cache.wstring());
                     std::replace(path.begin(), path.end(), '\\', '/');
                     std::string escaped;
@@ -531,18 +508,14 @@ private:
                 }
                 options.AppendExecutionProvider_V2(Environment(), npus, epOptions);
             }
-            Graph prompt, score, scoreHead;
-            for (auto [graph, name] : {std::pair{&prompt, L"body-1x64.onnx"}, std::pair{&score, L"body-10x32.onnx"},
-                                       std::pair{&scoreHead, L"head-320.onnx"}}) {
+            Graph score, scoreHead;
+            for (auto [graph, name] : {std::pair{&score, L"body-10x32.onnx"}, std::pair{&scoreHead, L"head-320.onnx"}}) {
                 if (stop_) return;
                 graph->Open(directory / name, options);
             }
             std::lock_guard lock(fixedLock_);
-            prompt_ = std::move(prompt);
             score_ = std::move(score);
             scoreHead_ = std::move(scoreHead);
-            lastHead_ = std::move(lastHead);
-            prompt_.lastHead = &lastHead_;
             score_.targetHead = &scoreHead_;
             fixedReady_ = true;
         } catch (const Ort::Exception&) {
@@ -552,36 +525,40 @@ private:
     // Whether the fixed-shape graphs answer this time.
     bool Fixed() const { return fixedReady_; }
 
-    // Reads the prompt (BOS and `start`): on the fixed graphs padded at its
-    // start to their tokens, else as it is.
-    std::optional<Prompt> ReadPrompt(const std::string& start, bool fixed) {
+    // Where OpenVINO keeps what it compiles for the NPU: npu-cache/<layout>
+    // in the pack, so it goes with the model; what an earlier layout of the
+    // graphs left there is removed (read-only, as the compiler writes it).
+    static std::filesystem::path NpuCache(const std::filesystem::path& pack) {
+        constexpr wchar_t kLayout[] = L"score-10x32";
+        const auto root = pack / L"npu-cache";
+        std::error_code error;
+        for (const auto& entry : std::filesystem::directory_iterator(root, error)) {
+            if (entry.path().filename() == kLayout) continue;
+            for (auto it = std::filesystem::recursive_directory_iterator(entry.path(), error);
+                 !error && it != std::filesystem::recursive_directory_iterator(); it.increment(error)) {
+                SetFileAttributesW(it->path().c_str(), FILE_ATTRIBUTE_NORMAL);
+            }
+            error.clear();
+            SetFileAttributesW(entry.path().c_str(), FILE_ATTRIBUTE_NORMAL);
+            std::filesystem::remove_all(entry.path(), error);
+        }
+        error.clear();
+        std::filesystem::create_directories(root / kLayout, error);
+        return root / kLayout;
+    }
+
+    // Reads the prompt (BOS and `start`) on the processor.
+    std::optional<Prompt> ReadPrompt(const std::string& start) {
         const auto tokens = tokenizer_.Encode(start, true);
         if (tokens.empty() || tokens.size() > kBatch) return std::nullopt;
         Prompt p;
         p.tokens = tokens.size();
-        if (!fixed) {
-            std::vector<std::int64_t> ids(tokens.begin(), tokens.end()), zeros(ids.size(), 0), ones(ids.size(), 1), at(ids.size());
-            for (std::size_t i = 0; i < at.size(); ++i) at[i] = static_cast<std::int64_t>(i);
-            auto empty = cpu_.Empty(1);
-            auto read = Run(cpu_, 1, ids.size(), ids, at, zeros, ones, empty);
-            p.state = std::move(read.state);
-            p.last = std::move(read.lastLogprobs);
-            return p;
-        }
-        const auto length = static_cast<std::size_t>(prompt_.tokens), window = static_cast<std::size_t>(prompt_.window);
-        if (tokens.size() > length) return std::nullopt;
-        const std::size_t pad = length - tokens.size();
-        std::vector<std::int64_t> ids(length, 0), at(length, 0), zeros(length, 0), mask(window + length, 0);
-        for (std::size_t i = 0; i < tokens.size(); ++i) {
-            ids[pad + i] = tokens[i];
-            at[pad + i] = static_cast<std::int64_t>(i);
-            mask[window + pad + i] = 1;
-        }
-        auto empty = prompt_.Empty(1);
-        auto read = Run(prompt_, 1, length, ids, at, zeros, mask, empty);
+        std::vector<std::int64_t> ids(tokens.begin(), tokens.end()), zeros(ids.size(), 0), ones(ids.size(), 1), at(ids.size());
+        for (std::size_t i = 0; i < at.size(); ++i) at[i] = static_cast<std::int64_t>(i);
+        auto empty = cpu_.Empty(1);
+        auto read = Run(cpu_, 1, ids.size(), ids, at, zeros, ones, empty);
         p.state = std::move(read.state);
         p.last = std::move(read.lastLogprobs);
-        p.window.assign(mask.begin() + static_cast<std::ptrdiff_t>(length), mask.end());
         return p;
     }
 
@@ -600,15 +577,21 @@ private:
             rows.push_back(std::move(tokens));
         }
         // On the fixed graphs when it fits them, else on the processor.
-        bool fixed = Fixed() && longest <= static_cast<std::size_t>(score_.tokens);
-        auto prompt = ReadPrompt(start, fixed);
-        if (!prompt && fixed) {
-            fixed = false;
-            prompt = ReadPrompt(start, false);
-        }
+        auto prompt = ReadPrompt(start);
         if (!prompt) return std::nullopt;
         promptRead_ = *prompt;
-        promptFixed_ = fixed;
+        // The fixed graphs read on from the prompt's state as their window:
+        // its places at the end, the rest not counted.
+        bool fixed = Fixed() && longest <= static_cast<std::size_t>(score_.tokens) &&
+                     prompt->tokens <= static_cast<std::size_t>(score_.window);
+        std::vector<Tensor> windowState;
+        std::vector<std::int64_t> windowMask;
+        if (fixed) {
+            const auto places = static_cast<std::size_t>(score_.window);
+            for (const auto& t : prompt->state) windowState.push_back(t.PadTo(places));
+            windowMask.assign(places - prompt->tokens, 0);
+            windowMask.resize(places, 1);
+        }
         std::vector<double> scores(rows.size(), 0.0);
         if (longest == 0) return scores;
         Graph& graph = fixed ? score_ : cpu_;
@@ -616,12 +599,12 @@ private:
         if (!fixed && past + longest > kContext) return std::nullopt;
         const std::size_t width = fixed ? static_cast<std::size_t>(graph.tokens) : longest;
         const std::size_t group = fixed ? static_cast<std::size_t>(graph.batch) : rows.size();
-        const std::size_t window = fixed ? prompt->window.size() : past;
+        const std::size_t window = fixed ? windowMask.size() : past;
         for (std::size_t from = 0; from < rows.size(); from += group) {
             const std::size_t n = fixed ? group : rows.size();
             std::vector<std::int64_t> ids(n * width, 0), targets(n * width, 0), at(n * width), mask(n * (window + width), 0);
             for (std::size_t r = 0; r < n; ++r) {
-                for (std::size_t k = 0; k < window; ++k) mask[r * (window + width) + k] = fixed ? prompt->window[k] : 1;
+                for (std::size_t k = 0; k < window; ++k) mask[r * (window + width) + k] = fixed ? windowMask[k] : 1;
                 for (std::size_t t = 0; t < width; ++t) at[r * width + t] = static_cast<std::int64_t>(past + t);
                 if (from + r >= rows.size()) continue;
                 const auto& row = rows[from + r];
@@ -633,7 +616,7 @@ private:
             }
             std::vector<std::size_t> each(n, 0);
             std::vector<Tensor> state;
-            for (const auto& t : prompt->state) state.push_back(t.Rows(each));
+            for (const auto& t : fixed ? windowState : prompt->state) state.push_back(t.Rows(each));
             const auto read = Run(graph, n, width, ids, at, targets, mask, state);
             for (std::size_t r = 0; r < n && from + r < rows.size(); ++r) {
                 const auto& row = rows[from + r];
@@ -673,7 +656,7 @@ private:
         std::vector<Beam> beams(1);
         std::vector<std::vector<std::pair<float, std::int32_t>>> next{best(prompt.last.data(), vocab)};
         std::vector<Tensor> state;
-        for (const auto& t : prompt.state) state.push_back(promptFixed_ ? t.Last(prompt.tokens) : t);
+        for (const auto& t : prompt.state) state.push_back(t);
         std::size_t past = prompt.tokens;
         // Tokens: plenty for any writing of the reading.
         const std::size_t limit = std::min(readingLength * 2 + 8, kContext - prompt.tokens);
@@ -732,7 +715,7 @@ private:
         return written;
     }
 
-    Graph cpu_, prompt_, score_, scoreHead_, lastHead_;
+    Graph cpu_, score_, scoreHead_;
     std::thread loading_;
     std::mutex fixedLock_;
     std::atomic<bool> fixedReady_{false}, stop_{false};
@@ -742,7 +725,6 @@ private:
     std::uint32_t gpu_{0};
     bool writes_{false};
     Prompt promptRead_;
-    bool promptFixed_{false};
 };
 
 std::vector<std::uint8_t> Answer(Model& model, std::span<const std::uint8_t> message, bool& stop) {
