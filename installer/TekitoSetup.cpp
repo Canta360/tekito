@@ -1211,13 +1211,13 @@ void Paint(Wizard& wizard) {
         if (wizard.webViewReady) {
             DrawText(wizard,
                      wizard.japanese && wizard.ai
-                         ? Tr(L"Downloads the Japanese dictionary and language data (about 194 MB) and the AI model "
+                         ? Tr(L"Downloads the Japanese dictionary and language data (about 232 MB) and the AI model "
                               L"(about 250 MB) from TEKITO's release on GitHub while installing.",
-                              L"インストール中に、日本語の辞書と言語データ（約 194 MB）と AI モデル（約 250 MB）が、"
+                              L"インストール中に、日本語の辞書と言語データ（約 232 MB）と AI モデル（約 250 MB）が、"
                               L"GitHub の TEKITO のリリースからダウンロードされます。")
-                         : Tr(L"Downloads the Japanese dictionary and language data (about 194 MB) from TEKITO's release "
+                         : Tr(L"Downloads the Japanese dictionary and language data (about 232 MB) from TEKITO's release "
                               L"on GitHub while installing.",
-                              L"インストール中に、日本語の辞書と言語データ（約 194 MB）が、GitHub の TEKITO のリリースから"
+                              L"インストール中に、日本語の辞書と言語データ（約 232 MB）が、GitHub の TEKITO のリリースから"
                               L"ダウンロードされます。"),
                      wizard.caption.Get(),
                      D2D1::RectF(kMargin + 30.0f, JapaneseRow(wizard) + 28.0f, kWidth - kMargin, JapaneseRow(wizard) + 64.0f),

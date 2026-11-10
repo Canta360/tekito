@@ -242,11 +242,11 @@ See [the privacy notice](PRIVACY.md).
 
 ## Install
 
-Download `TEKITO-0.7.0-full-installer.exe` from
+Download `TEKITO-0.7.1-full-installer.exe` from
 [Releases](https://github.com/Canta360/tekito/releases) and run it.
 
 - **Add Japanese input** (on when Windows shows Japanese) downloads the
-  Japanese dictionary and language data, about 194 MB, from the same release,
+  Japanese dictionary and language data, about 232 MB, from the same release,
   and checks it against the checksum the installer carries. TEKITO then
   appears in the Japanese keyboard list; its Auto and Direct cover English,
   so it leaves the English list unless you keep it there under **Options**.
