@@ -124,7 +124,7 @@ namespace aihelper {
 void Stop();
 // The pipe's name: one per signed-in user.
 [[nodiscard]] std::wstring PipeName();
-// The Data Pack TekitoAI.exe and llama.cpp come in, downloaded with the
+// The Data Pack TekitoAI.exe and ONNX Runtime come in, downloaded with the
 // first model (the same for every model).
 constexpr std::wstring_view kRuntimePack = L"ai-runtime";
 // TekitoAI.exe, as the client starts it and checks the pipe's server is it:
