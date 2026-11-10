@@ -1174,6 +1174,10 @@ private:
         json += settings_.mixSettledMarker ? L"true" : L"false";
         json += L",\"mixEnglishUnderline\":";
         json += settings_.mixEnglishUnderline ? L"true" : L"false";
+        json += L",\"rainbowAccent\":";
+        json += settings_.rainbowAccent ? L"true" : L"false";
+        json += L",\"catSounds\":";
+        json += settings_.catSounds ? L"true" : L"false";
         json += L",\"mixCorrection\":";
         json += settings_.mixCorrection ? L"true" : L"false";
         json += L",\"spacelessEnglish\":";
@@ -1430,6 +1434,8 @@ private:
             else if (key == L"spacelessEnglishAlways") settings_.spacelessEnglishAlways = value;
             else if (key == L"mixSettledMarker") settings_.mixSettledMarker = value;
             else if (key == L"mixEnglishUnderline") settings_.mixEnglishUnderline = value;
+            else if (key == L"rainbowAccent") settings_.rainbowAccent = value;
+            else if (key == L"catSounds") settings_.catSounds = value;
             else if (key == L"correctionEnabled") settings_.correctionEnabled = value;
             else if (key == L"commonMisspellingsEnabled") settings_.commonMisspellingsEnabled = value;
             else if (key == L"contextSuggestionsEnabled") settings_.contextSuggestionsEnabled = value;

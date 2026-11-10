@@ -55,6 +55,9 @@ public:
     // 0 = glass, 1 = simple (see UserSettings::candidateWindowStyle). Takes
     // effect from the next Show.
     void SetStyle(int style) noexcept;
+    // The accent's colour going round the rainbow while the list is shown
+    // (UserSettings::rainbowAccent). Takes effect from the next Show.
+    void SetRainbow(bool on) noexcept { rainbow_ = on; }
     // Japanese tags (そのまま, スラング, 絵文字) instead of English ones.
     // Takes effect from the next Show.
     void SetJapanese(bool japanese) noexcept { japanese_ = japanese; }
@@ -94,6 +97,7 @@ private:
     bool shown_{false};
     bool japanese_{false};
     int style_{0};
+    bool rainbow_{false};
 };
 
 }  // namespace tekito::tsf

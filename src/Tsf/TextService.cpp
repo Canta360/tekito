@@ -2442,6 +2442,7 @@ void TextService::ShowCandidates(ITfContext* context, TfEditCookie editCookie) {
     const RECT anchor = GetCandidateAnchor(context, editCookie);
     candidateAnchor_ = anchor;
     candidateWindow_.SetStyle(userSettings_.candidateWindowStyle);
+    candidateWindow_.SetRainbow(userSettings_.rainbowAccent);
     candidateWindow_.SetJapanese(userdata::UseJapaneseUi(userSettings_.uiLanguage));
     candidateWindow_.Show(anchor, EnglishRows(), state_.SelectedIndex(), state_.PageStart(), state_.VisibleCount(),
                           SelectedEnglishMeaning());
@@ -2502,6 +2503,7 @@ void TextService::ShowModeIndicator(ITfContext* context) {
 
 void TextService::ShowModeBadge(const RECT& caret) {
     candidateWindow_.SetStyle(userSettings_.candidateWindowStyle);
+    candidateWindow_.SetRainbow(userSettings_.rainbowAccent);
     candidateWindow_.ShowModeBadge(caret, mode_);
 }
 

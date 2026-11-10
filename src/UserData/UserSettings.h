@@ -232,6 +232,10 @@ struct UserSettings {
     // Settings shows its finer options (and the Special conversions page);
     // off, only what most people change.
     bool advancedSettings{false};
+    // Found by searching Settings for them: the accent colour goes round the
+    // rainbow (Settings and the candidate list), and each key typed meows.
+    bool rainbowAccent{false};
+    bool catSounds{false};
     // The last Japanese conversions are kept (in user.db, the newest 30,
     // none from private windows) for Settings to list and report.
     bool keepRecentConversions{true};

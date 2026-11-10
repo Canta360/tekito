@@ -90,6 +90,29 @@ constexpr int kCaretGap = 6;
 // faded out.
 constexpr int kBadgeIcon = 24;
 constexpr UINT_PTR kBadgeTimer = 7;
+// Rainbow: the accent's hue goes round while the list is shown.
+constexpr UINT_PTR kRainbowTimer = 8;
+constexpr UINT kRainbowTickMs = 50;
+constexpr ULONGLONG kRainbowRoundMs = 4000;
+
+// The accent at this moment of the rainbow (hue from the clock).
+D2D1_COLOR_F RainbowColor(bool dark) {
+    const float hue = static_cast<float>(GetTickCount64() % kRainbowRoundMs) / kRainbowRoundMs * 6.0f;
+    const float x = 1.0f - std::fabs(std::fmod(hue, 2.0f) - 1.0f);
+    float r = 0, g = 0, b = 0;
+    switch (static_cast<int>(hue)) {
+    case 0: r = 1; g = x; break;
+    case 1: r = x; g = 1; break;
+    case 2: g = 1; b = x; break;
+    case 3: g = x; b = 1; break;
+    case 4: r = x; b = 1; break;
+    default: r = 1; b = x; break;
+    }
+    // Lighter on dark glass, deeper on light, as the Windows accent shades are.
+    const float low = dark ? 0.35f : 0.0f, high = dark ? 1.0f : 0.85f;
+    const auto shade = [&](float c) { return low + (high - low) * c; };
+    return {shade(r), shade(g), shade(b), 1.0f};
+}
 constexpr UINT kBadgeHoldMs = 850;
 constexpr UINT kBadgeFadeTickMs = 25;
 constexpr int kBadgeFadeSteps = 8;
@@ -328,6 +351,7 @@ struct Frame {
     std::size_t totalCount{0};
     std::uint64_t generation{0};
     int style{0};  // CandidateWindow::Style
+    bool rainbow{false};  // CandidateWindow::SetRainbow
     std::wstring detailHead;
     std::vector<std::wstring> detailSenses;
     // A mode badge instead of rows: 0 none, else the mode.
@@ -1263,6 +1287,10 @@ private:
                 self->OnBadgeTimer();
                 return 0;
             }
+            if (hwnd == self->panel_ && wParam == kRainbowTimer) {
+                self->OnRainbowTimer();
+                return 0;
+            }
             break;
         default:
             break;
@@ -1321,6 +1349,7 @@ private:
         if (!visible_ || frame.style != frame_.style) {
             style_ = ReadStyle(composition_ && hostBackdrop_, frame.style == 1);
         }
+        if (frame.rainbow && !frame.badge) TintRainbow();
 
         // DPI follows the monitor under the caret; move there first so
         // GetDpiForWindow reports the DPI the panel is about to render at.
@@ -1369,6 +1398,35 @@ private:
         }
         visible_ = true;
         if (frame_.badge) SetTimer(panel_, kBadgeTimer, kBadgeHoldMs, nullptr);
+        if (frame_.rainbow && !frame_.badge) {
+            SetTimer(panel_, kRainbowTimer, kRainbowTickMs, nullptr);
+        } else {
+            KillTimer(panel_, kRainbowTimer);
+        }
+    }
+
+    // The accent (the light under the selection, the simple list's rail) in
+    // the rainbow's colour now.
+    void TintRainbow() {
+        const bool dark = IsDarkThemeActive();
+        const auto color = RainbowColor(dark);
+        style_.light = color;
+        style_.rail = color;
+    }
+
+    // Each tick: the list drawn again in the next colour.
+    void OnRainbowTimer() {
+        if (!visible_ || !frame_.rainbow || IsHighContrast()) {
+            KillTimer(panel_, kRainbowTimer);
+            return;
+        }
+        TintRainbow();
+        if (composition_) {
+            HRESULT hr = RenderComposition(false);
+            if (IsDeviceLost(hr) && RecreateDevices()) hr = RenderComposition(false);
+        } else {
+            InvalidateRect(panel_, nullptr, FALSE);
+        }
     }
 
     // The badge's first tick ends its hold; the rest fade it out.
@@ -1395,6 +1453,7 @@ private:
 
     void HidePopup() noexcept {
         if (panel_) KillTimer(panel_, kBadgeTimer);
+        if (panel_) KillTimer(panel_, kRainbowTimer);
         if (!visible_) return;
         visible_ = false;
         try {
@@ -2261,6 +2320,7 @@ void CandidateWindow::Show(const RECT& caretRect,
     frame.generation = ++generation_;
     frame.firstIndex = pageStart_;
     frame.style = style_;
+    frame.rainbow = rainbow_;
     frame.totalCount = candidates_.size();
     frame.rows.reserve(visibleCount_);
     for (std::size_t row = 0; row < visibleCount_; ++row) {
@@ -2305,6 +2365,7 @@ void CandidateWindow::ShowModeBadge(const RECT& caretRect, InputMode mode) {
     frame.caret = caretRect;
     frame.generation = ++generation_;
     frame.style = style_;
+    frame.rainbow = rainbow_;
     frame.badge = mode == InputMode::Mixed ? kBadgeMixed
                   : TypesJapanese(mode)    ? kBadgeJapanese
                   : mode == InputMode::Direct ? kBadgeDirect

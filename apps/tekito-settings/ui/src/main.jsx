@@ -40,6 +40,8 @@ const initialSettings = {
   spacelessEnglishAlways: false,
   mixSettledMarker: true,
   mixEnglishUnderline: false,
+  rainbowAccent: false,
+  catSounds: false,
   japaneseEnabled: true,
   modeIndicatorEnabled: true,
   modeUnderlineColors: true,
@@ -178,7 +180,17 @@ function App() {
 
   useEffect(() => {
     document.documentElement.style.setProperty("--accent", appearance.accent);
-  }, [appearance.accent]);
+    if (!settings.rainbowAccent) return undefined;
+    const started = performance.now();
+    const timer = window.setInterval(() => {
+      const hue = Math.round(((performance.now() - started) / 4000) * 360) % 360;
+      document.documentElement.style.setProperty("--accent", `hsl(${hue} 85% 45%)`);
+    }, 50);
+    return () => {
+      window.clearInterval(timer);
+      document.documentElement.style.setProperty("--accent", appearance.accent);
+    };
+  }, [appearance.accent, settings.rainbowAccent]);
 
   useEffect(() => {
     document.documentElement.lang = t.lang;
@@ -256,8 +268,12 @@ function App() {
     (id !== "ai" || japaneseInstalled));
   // 入力の見本 opens from 一般 and is not in the list.
   const current = page === "samples" || shownPages.includes(page) ? page : "general";
+  // Each visit draws the page afresh, so one opened from search on the page
+  // already shown opens its 詳細 too.
+  const [visit, setVisit] = useState(0);
   const open = (id) => {
     setPage(id);
+    setVisit((n) => n + 1);
     document.querySelector(".content")?.scrollTo(0, 0);
   };
   const pageProps = { settings, setSetting, runAction, setConfirm, showKeys: setKeys, open };
@@ -278,7 +294,7 @@ function App() {
         </aside>
 
         <main className="content">
-          <div className="page" key={current}>
+          <div className="page" key={`${current}-${visit}`}>
             <h1 className="page-title">{t.pages[current]}</h1>
             {connection.status !== "ready" ? (
               <Card className="state-card" role="status">
@@ -339,6 +355,27 @@ function NavItem({ id, current, onClick }) {
   );
 }
 
+// Settings found only by searching for them by name: [page, name, under
+// 詳細, names that find it, key]. Once found they stay on the page.
+const hiddenSettings = (t) => [
+  ["general", t.general.rainbow.title, true, ["rainbow", "レインボー", "にじ", "虹"], "rainbow"],
+  ["general", t.general.cat.title, true, ["cat", "ねこ", "猫", "ネコ"], "cat"],
+];
+const revealHidden = (key) => {
+  try {
+    window.localStorage.setItem(`tekito.found.${key}`, "1");
+  } catch {
+    // Showing it again later is a convenience only.
+  }
+};
+const wasFound = (key) => {
+  try {
+    return window.localStorage.getItem(`tekito.found.${key}`) === "1";
+  } catch {
+    return false;
+  }
+};
+
 // The settings by name, for the search box: [page, name, under 詳細].
 function searchIndex(t, pages, japaneseInstalled) {
   const g = t.general;
@@ -378,8 +415,12 @@ function SettingsSearch({ pages, open, japaneseInstalled }) {
   const t = useText();
   const [query, setQuery] = useState("");
   const needle = query.trim().toLowerCase();
-  const results = needle ? searchIndex(t, pages, japaneseInstalled).filter(([, title]) => title.toLowerCase().includes(needle)).slice(0, 8) : [];
-  const go = ([page, , detailed]) => {
+  const eggs = needle ? hiddenSettings(t).filter(([, , , names]) => names.includes(needle)) : [];
+  const results = needle
+    ? [...eggs, ...searchIndex(t, pages, japaneseInstalled).filter(([, title]) => title.toLowerCase().includes(needle))].slice(0, 8)
+    : [];
+  const go = ([page, , detailed, , egg]) => {
+    if (egg) revealHidden(egg);
     if (detailed) {
       try {
         window.localStorage.setItem(`tekito.details.${page}`, "1");
@@ -578,6 +619,20 @@ function GeneralPage({ settings, setSetting, runAction, showKeys, open, mode, ch
         </Card>
         <ExcludedApps settings={settings} runAction={runAction} />
         <KeysCard page="general" showKeys={showKeys} />
+        {(settings.rainbowAccent || settings.catSounds || wasFound("rainbow") || wasFound("cat")) && (
+          <Card label={g.rainbow.title}>
+            {(settings.rainbowAccent || wasFound("rainbow")) && (
+              <Row icon="palette" title={g.rainbow.title} description={g.rainbow.description}>
+                <Toggle label={g.rainbow.title} checked={settings.rainbowAccent} onChange={(value) => setSetting("rainbowAccent", value)} />
+              </Row>
+            )}
+            {(settings.catSounds || wasFound("cat")) && (
+              <Row icon="pets" title={g.cat.title} description={g.cat.description}>
+                <Toggle label={g.cat.title} checked={settings.catSounds} onChange={(value) => setSetting("catSounds", value)} />
+              </Row>
+            )}
+          </Card>
+        )}
       </Details>
     </>
   );

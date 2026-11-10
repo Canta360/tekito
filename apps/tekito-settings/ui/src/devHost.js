@@ -34,6 +34,8 @@ function initialState() {
       spacelessEnglishAlways: false,
       mixSettledMarker: true,
       mixEnglishUnderline: false,
+      rainbowAccent: false,
+      catSounds: false,
       correctionEnabled: true,
       commonMisspellingsEnabled: true,
       contextSuggestionsEnabled: true,
