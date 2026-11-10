@@ -148,12 +148,13 @@ endif()
 target_compile_options(Tekito.Tsf PRIVATE ${TEKITO_WARNINGS})
 target_link_libraries(Tekito.Tsf PRIVATE
     tekito_core tekito_userdata
-    ole32 oleaut32 advapi32 user32 gdi32 uuid
+    ole32 oleaut32 advapi32 user32 gdi32 uuid winmm
     ${TEKITO_CANDIDATE_WINDOW_LIBS} delayimp
 )
 set_target_properties(Tekito.Tsf PROPERTIES OUTPUT_NAME "${TEKITO_TSF_OUTPUT_NAME}")
-# Load the rendering stack only once a candidate list is first shown.
-target_link_options(Tekito.Tsf PRIVATE /DELAYLOAD:d3d11.dll /DELAYLOAD:CoreMessaging.dll)
+# Load the rendering stack only once a candidate list is first shown, and the
+# sound library only once Cat plays.
+target_link_options(Tekito.Tsf PRIVATE /DELAYLOAD:d3d11.dll /DELAYLOAD:CoreMessaging.dll /DELAYLOAD:winmm.dll)
 
 # ---------------------------------------------------------------------------
 # TEKITO.exe: the Settings window

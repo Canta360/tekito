@@ -13,3 +13,4 @@
 #define IDR_FONT_MPLUS1 601
 // installer/TEKITO_LICENSE.md, shown by Settings > About > License.
 #define IDR_LICENSE_TEXT 602
+#define IDR_CAT_SOUND 603

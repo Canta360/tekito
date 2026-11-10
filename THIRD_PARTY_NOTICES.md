@@ -58,6 +58,13 @@ and in the Settings UI. It is licensed under the SIL Open Font License 1.1; the
 full license text is `assets/fonts/OFL.txt` (shipped in the package at the same
 path).
 
+## Cat sound
+
+The sound of the Cat option is "Meow" by IgnasD
+(https://opengameart.org/content/meow), dedicated to the public domain under
+CC0 1.0, with only the silence before and after it removed. It is embedded in
+`Tekito.Tsf.dll`.
+
 This file is a release inventory, not a replacement for the original license
 texts.
 
