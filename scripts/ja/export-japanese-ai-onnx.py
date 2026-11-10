@@ -26,7 +26,7 @@ head-<rows>.onnx (hidden [rows, hidden], targets [rows] -> target_logprobs
 [rows]) for each shape that reads many tokens; and head.onnx (hidden [any,
 hidden] -> logprobs [any, vocab], for the processor) for the last tokens.
 An NPU compiles the output layer over the whole vocabulary very slowly as
-part of a body, quickly on its own. All 4-bit, sharing one model.data; and
+part of a body, quickly on its own. All 4-bit (or 8: --bits), sharing one model.data; and
 the tokenizer as vocab.txt and merges.txt.
 """
 
@@ -221,12 +221,12 @@ def empty_states(step: Step, batch: int):
     return s
 
 
-def quantize(path: Path, block: int) -> None:
-    """Every matrix of the graph at `path` as 4-bit blocks (MatMulNBits)."""
+def quantize(path: Path, block: int, bits: int = 4) -> None:
+    """Every matrix of the graph at `path` as blocks of `bits`-bit weights (MatMulNBits)."""
     import onnx
     from onnxruntime.quantization.matmul_nbits_quantizer import MatMulNBitsQuantizer
     model = onnx.load(str(path))
-    q = MatMulNBitsQuantizer(model, block_size=block, is_symmetric=True, accuracy_level=4)
+    q = MatMulNBitsQuantizer(model, bits=bits, block_size=block, is_symmetric=True, accuracy_level=4)
     q.process()
     onnx.save(q.model.model, str(path))
 
@@ -268,8 +268,7 @@ def export_pack(config: dict, weights: dict, model_dir: Path, out: Path, args) -
     graphs = []
     step = Step(config, weights).eval()
     ins, outs = names(step)
-    export_dynamic(step, ins, outs, work / "model.onnx", args.opset)
-    graphs.append(work / "model.onnx")
+    graphs.append(export_dynamic(step, ins, outs, place(work, "model.onnx"), args.opset))
     fixed = Step(config, weights, args.window, body=True).eval()
     body_outs = ["hidden"] + outs[2:]
     for shape in args.shape:
@@ -279,7 +278,7 @@ def export_pack(config: dict, weights: dict, model_dir: Path, out: Path, args) -
             graphs.append(export_target_head(step, work, b * t, args.opset))
     graphs.append(export_last_head(step, work, args.opset))
     for g in graphs:
-        quantize(g, args.block)
+        quantize(g, args.block, args.bits)
         print("quantized", g.name, flush=True)
     finals = []
     for g in graphs:
@@ -310,6 +309,14 @@ def write_tokenizer(tokenizer: Path, out: Path) -> None:
     (out / "merges.txt").write_text(merges_text, encoding="utf-8", newline="\n")
 
 
+def place(directory: Path, name: str) -> Path:
+    """Where a graph is first exported: a folder of its own, as a large
+    model's weights go into files beside it named alike in every graph."""
+    folder = directory / Path(name).stem
+    folder.mkdir(parents=True, exist_ok=True)
+    return folder / name
+
+
 def export_dynamic(step: Step, ins, outs, path: Path, opset: int) -> Path:
     """The step with any batch, tokens and past (for the processor)."""
     B, T, P = 2, 3, 4
@@ -331,7 +338,7 @@ def export_dynamic(step: Step, ins, outs, path: Path, opset: int) -> Path:
 
 def export_target_head(step: Step, directory: Path, rows: int, opset: int) -> Path:
     """head-<rows>.onnx: ln p of each of `rows` targets (fixed, for a GPU or an NPU)."""
-    path = directory / f"head-{rows}.onnx"
+    path = place(directory, f"head-{rows}.onnx")
     with torch.no_grad():
         torch.onnx.export(TargetHead(step).eval(), (torch.zeros(rows, step.hidden), torch.zeros(rows, dtype=torch.int64)),
                           str(path), input_names=["hidden", "targets"], output_names=["target_logprobs"],
@@ -341,7 +348,7 @@ def export_target_head(step: Step, directory: Path, rows: int, opset: int) -> Pa
 
 def export_last_head(step: Step, directory: Path, opset: int) -> Path:
     """head.onnx: ln p of every token after any number of hidden states."""
-    path = directory / "head.onnx"
+    path = place(directory, "head.onnx")
     with torch.no_grad():
         torch.onnx.export(LastHead(step).eval(), (torch.zeros(2, step.hidden),), str(path), input_names=["hidden"],
                           output_names=["logprobs"], dynamic_axes={"hidden": {0: "rows"}, "logprobs": {0: "rows"}},
@@ -357,7 +364,7 @@ def export_shape(step: Step, ins, outs, directory: Path, shape: str, window: int
     states = [torch.zeros(B, step.hidden, CONV_STATE) for _ in step.conv_layers]
     for _ in step.attn_layers:
         states += [torch.zeros(B, step.kv_heads, window, step.head_dim)] * 2
-    path = directory / f"body-{B}x{T}.onnx"
+    path = place(directory, f"body-{B}x{T}.onnx")
     with torch.no_grad():
         torch.onnx.export(step, tuple(sample + states), str(path), input_names=ins, output_names=outs,
                           opset_version=opset, dynamo=False)
@@ -374,6 +381,7 @@ def main() -> int:
     ap.add_argument("--window", type=int, default=128)
     ap.add_argument("--shape", action="append", default=[], help="batch x tokens, e.g. 10x32")
     ap.add_argument("--block", type=int, default=32, help="weights quantized in blocks of this many")
+    ap.add_argument("--bits", type=int, default=4, choices=(4, 8), help="bits per weight (8 for the strong model)")
     args = ap.parse_args()
     if not args.shape:
         args.shape = ["1x64", "10x32"]

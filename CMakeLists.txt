@@ -200,11 +200,30 @@ if(TEKITO_BUILD_AI)
     add_executable(TekitoAI apps/tekito-ai/main.cpp apps/tekito-ai/ByteBpe.cpp)
     target_compile_definitions(TekitoAI PRIVATE ${TEKITO_WINDOWS_DEFINES})
     target_compile_options(TekitoAI PRIVATE ${TEKITO_WARNINGS})
-    target_link_libraries(TekitoAI PRIVATE tekito_core WindowsML::Api WindowsML::OnnxRuntime icu dxgi)
+    target_link_libraries(TekitoAI PRIVATE tekito_core WindowsML::Api WindowsML::OnnxRuntime icu dxgi delayimp)
+    # The processor's runtime pack has no Windows ML: its DLL is loaded only
+    # when it is there, and DirectML is looked up in ONNX Runtime.
+    target_link_options(TekitoAI PRIVATE /DELAYLOAD:Microsoft.Windows.AI.MachineLearning.dll)
     add_custom_command(TARGET TekitoAI POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_RUNTIME_DLLS:TekitoAI> "${WINML_DIRECTML_DLL}"
                 "$<TARGET_FILE_DIR:TekitoAI>"
         COMMAND_EXPAND_LISTS
+    )
+
+    # The processor's runtime pack: TekitoAI.exe with ONNX Runtime's own
+    # release (MIT, the same version as Windows ML's), in ai-runtime-cpu/.
+    set(TEKITO_ORT_VERSION "1.28.3")
+    FetchContent_Declare(ort_cpu
+        URL https://github.com/microsoft/onnxruntime/releases/download/v${TEKITO_ORT_VERSION}/onnxruntime-win-x64-${TEKITO_ORT_VERSION}.zip
+        URL_HASH SHA256=1d6fab48e85f948436af7c8c971d2c145cf224e2c444755dec894f8b0de11a83
+        DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+    )
+    FetchContent_MakeAvailable(ort_cpu)
+    add_custom_command(TARGET TekitoAI POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:TekitoAI>/ai-runtime-cpu"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:TekitoAI>" "${ort_cpu_SOURCE_DIR}/lib/onnxruntime.dll"
+                "${ort_cpu_SOURCE_DIR}/LICENSE" "${ort_cpu_SOURCE_DIR}/ThirdPartyNotices.txt"
+                "$<TARGET_FILE_DIR:TekitoAI>/ai-runtime-cpu"
     )
 endif()
 

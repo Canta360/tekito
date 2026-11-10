@@ -20,8 +20,9 @@ const detectedJapaneseKeyboard = new URLSearchParams(window.location.search).get
 function initialState() {
   return {
     postalCodes: { installed: false },
-    aiModels: { light: { installed: false, bytes: 229322365 }, strong: { installed: false, bytes: 1246265200 },
-      runtime: { installed: false, bytes: 18246900 }, downloading: 0, error: "",
+    aiModels: { light: { installed: false, bytes: 358021668 }, strong: { installed: false, bytes: 1587553900 },
+      runtime: { installed: false, bytes: 6000000, windowsMl: false, windowsMlBytes: 20000000, windowsMlDownloading: false },
+      downloading: 0, error: "",
       gpus: [{ id: 268566271, name: "AMD Radeon RX 7600" }, { id: -2142881189, name: "Intel(R) Arc(TM) Graphics" }],
       npu: true, npuPreparing: false, npuError: "" },
     settings: {
@@ -238,6 +239,14 @@ export function installMockHost() {
           state.aiModels = { ...state.aiModels, [key]: { ...state.aiModels[key], installed: true },
             runtime: { ...state.aiModels.runtime, installed: true }, downloading: 0 };
           state.settings.japaneseSentenceModel = message.model;
+          const data = JSON.stringify({ type: "state.changed", state });
+          listeners.forEach((listener) => listener({ data }));
+        }, 2500);
+      } else if (type === "aiRuntime.windowsMl") {
+        state.aiModels = { ...state.aiModels, runtime: { ...state.aiModels.runtime, windowsMlDownloading: true } };
+        window.setTimeout(() => {
+          state.aiModels = { ...state.aiModels, runtime: { ...state.aiModels.runtime, windowsMl: true, windowsMlDownloading: false } };
+          state.settings.japaneseAiDevice = message.device;
           const data = JSON.stringify({ type: "state.changed", state });
           listeners.forEach((listener) => listener({ data }));
         }, 2500);

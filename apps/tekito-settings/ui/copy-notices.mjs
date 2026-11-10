@@ -13,6 +13,7 @@ const files = {
   "OFL.txt": "assets/fonts/OFL.txt",
   "webview2-LICENSE.txt": "third_party/webview2/LICENSE.txt",
   "webview2-NOTICE.txt": "third_party/webview2/NOTICE.txt",
+  "windows-ml-LICENSE.txt": "third_party/windows-ml/LICENSE.txt",
 };
 mkdirSync(target, { recursive: true });
 for (const [name, source] of Object.entries(files)) copyFileSync(join(root, source), join(target, name));

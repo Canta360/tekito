@@ -8,6 +8,8 @@
 #endif
 #include <windows.h>
 
+#include <fstream>
+#include <iterator>
 #include <string>
 #include <thread>
 
@@ -107,8 +109,24 @@ bool AiModelPackInstalled(std::wstring_view packId, const std::filesystem::path&
 bool AiRuntimeInstalled(const std::filesystem::path& dataRoot) {
     std::error_code error;
     const auto pack = dataRoot / std::wstring(japanese::aihelper::kRuntimePack);
+    // "protocol": "TKA3" in its manifest (an older pack ran llama.cpp).
+    std::ifstream in(pack / L"manifest.json", std::ios::binary);
+    const std::string manifest((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    const auto key = manifest.find("\"protocol\"");
+    const auto value = key == std::string::npos ? key : manifest.find('"', manifest.find(':', key) + 1);
+    if (value == std::string::npos ||
+        manifest.compare(value + 1, japanese::aihelper::kProtocol.size(), japanese::aihelper::kProtocol) != 0) {
+        return false;
+    }
     return std::filesystem::is_regular_file(pack / L"manifest.json", error) &&
            std::filesystem::is_regular_file(pack / L"TekitoAI.exe", error);
+}
+
+bool AiRuntimeHasWindowsMl(const std::filesystem::path& dataRoot) {
+    std::error_code error;
+    const auto pack = dataRoot / std::wstring(japanese::aihelper::kRuntimePack);
+    return AiRuntimeInstalled(dataRoot) &&
+           std::filesystem::is_regular_file(pack / L"Microsoft.Windows.AI.MachineLearning.dll", error);
 }
 
 void StopAiHelper() { japanese::aihelper::Stop(); }

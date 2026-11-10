@@ -45,7 +45,7 @@ Keep your own copy of anything you would not want to lose, such as an exported d
 
 TEKITO includes language data, fonts, and software from other people. Each of these stays under its own license, listed in THIRD_PARTY_NOTICES.md and in the NOTICE file of each language data pack. If one of those licenses gives you more rights for that part than this agreement does, that license applies to that part.
 
-TEKITO uses the M PLUS 1 typeface, licensed under the SIL Open Font License 1.1. TEKITO Settings uses the Microsoft Edge WebView2 Runtime, which is provided by Microsoft under its own terms. The optional AI models, which you can download in the setup program or in TEKITO Settings, are Liquid AI's models under the LFM Open License, and run with llama.cpp under the MIT License.
+TEKITO uses the M PLUS 1 typeface, licensed under the SIL Open Font License 1.1. TEKITO Settings uses the Microsoft Edge WebView2 Runtime, which is provided by Microsoft under its own terms. The optional AI models, which you can download in the setup program or in TEKITO Settings, are Liquid AI's models under the LFM Open License, and run with ONNX Runtime under the MIT License. To run them on a GPU or an NPU, TEKITO Settings downloads Microsoft's Windows ML, which is Microsoft's software under the Microsoft Software License Terms for the Windows ML Runtime, not under this agreement; you agree to those terms before it is downloaded.
 
 ## 5. Prices, editions, and updates
 

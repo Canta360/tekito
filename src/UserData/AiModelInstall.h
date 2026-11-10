@@ -22,8 +22,12 @@ enum class AiModelInstallError { None, Download, Checksum, Unpack, Invalid, InUs
 
 // Whether a valid copy of the pack is in `dataRoot`.
 [[nodiscard]] bool AiModelPackInstalled(std::wstring_view packId, const std::filesystem::path& dataRoot);
-// Whether what runs the models (the ai-runtime pack) is in `dataRoot`.
+// Whether what runs the models (the ai-runtime pack, speaking this
+// build's protocol) is in `dataRoot`.
 [[nodiscard]] bool AiRuntimeInstalled(const std::filesystem::path& dataRoot);
+// Whether that copy has Windows ML (to run them on a GPU or an NPU); the
+// processor's copy has ONNX Runtime alone.
+[[nodiscard]] bool AiRuntimeHasWindowsMl(const std::filesystem::path& dataRoot);
 
 // Has TekitoAI.exe (next to this program) let go of its model files: it
 // exits, and starts again when the input method next asks for it.

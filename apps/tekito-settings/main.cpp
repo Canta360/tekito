@@ -108,6 +108,9 @@ struct AiModelDownload {
 };
 // Making the NPU ready finished (wParam: 1 when it is).
 constexpr UINT kAiNpuPrepared = WM_APP + 3;
+// Windows ML's runtime installed, or not (wParam: AiModelInstallError,
+// lParam: the device it was for).
+constexpr UINT kAiWindowsMlInstalled = WM_APP + 4;
 
 // The GPUs the AI model can run on (DirectML's adapters, not software
 // ones), each once: japanese::GpuId and its name.
@@ -173,16 +176,23 @@ struct AiModelInfo {
     unsigned long long bytes;
 };
 constexpr AiModelInfo kAiModels[] = {
-    {L"japanese-ai-light", L"https://github.com/Canta360/tekito/releases/download/ai-models/TEKITO-japanese-ai-light.zip",
-     "C5CEB8A2669F98DC35DCCEFC10EF59ABF90A831793BB164F42A89CD0DB1C7185", 229323012ull},
-    {L"japanese-ai-strong", L"https://github.com/Canta360/tekito/releases/download/ai-models/TEKITO-japanese-ai-strong.zip",
-     "9C80701006F9E60F1837E6C0CB7E586C8897793E4D00E968B106A8E025E9906B", 1246265200ull},
+    {L"japanese-ai-light", L"https://github.com/Canta360/tekito/releases/download/ai-models-2/TEKITO-japanese-ai-light.zip",
+     "44A8FA9CD516DC169CC0F03449E946B299AE44C440C8EFB027128A834819DD04", 358021668ull},
+    {L"japanese-ai-strong", L"https://github.com/Canta360/tekito/releases/download/ai-models-2/TEKITO-japanese-ai-strong.zip",
+     "23EECE917B66F960BB7DE9FA44C6AA5CC78B49652B63BA7FE3B1256870E6FFFC", 1587553900ull},
 };
-// What runs them (TekitoAI.exe and llama.cpp), downloaded with the first
-// model and removed with the last.
+// What runs them (TekitoAI.exe and ONNX Runtime, on the processor),
+// downloaded with the first model and removed with the last; and the copy
+// with Windows ML in its place (GPUs and NPUs), downloaded once the user
+// chooses one and agrees to Microsoft's terms.
 constexpr AiModelInfo kAiRuntime{
-    L"ai-runtime", L"https://github.com/Canta360/tekito/releases/download/ai-models/TEKITO-ai-runtime.zip",
-    "E3D1A3B3481BB617225985EA6A1D2F98ACD750085AA96C45CA4938BAC6B4C9C9", 18354072ull};
+    L"ai-runtime", L"https://github.com/Canta360/tekito/releases/download/ai-models-2/TEKITO-ai-runtime.zip",
+    "A6CB720BC9C35659C3432D6A207E5C9E90E2767C7C88795AA3F55E03C003B7E9", 6373633ull};
+constexpr AiModelInfo kAiRuntimeWindowsMl{
+    L"ai-runtime", L"https://github.com/Canta360/tekito/releases/download/ai-models-2/TEKITO-ai-runtime-windows-ml.zip",
+    "BFE57C35E50C55A2AAF526CAFC3ED388F9149CAC0C79C00EDC7D04B2D35F05C1", 18125131ull};
+
+tekito::userdata::AiModelInstallError DownloadAiPack(const AiModelInfo& pack, const std::filesystem::path& root);
 
 // Downloads what runs the models when it is not there yet, then `model`
 // (1 or 2), and installs them into `root`.
@@ -190,18 +200,30 @@ tekito::userdata::AiModelInstallError DownloadAiModel(int model, const std::file
     using tekito::userdata::AiModelInstallError;
     for (const AiModelInfo* info : {&kAiRuntime, &kAiModels[model - 1]}) {
         if (info == &kAiRuntime && tekito::userdata::AiRuntimeInstalled(root)) continue;
-        wchar_t folder[MAX_PATH]{};
-        GetTempPathW(MAX_PATH, folder);
-        const auto file = std::filesystem::path(folder) /
-                          (L"tekito-" + std::wstring(info->pack) + L"-" + std::to_wstring(GetCurrentProcessId()) + L".zip");
-        const auto error = FAILED(URLDownloadToFileW(nullptr, info->url, file.c_str(), 0, nullptr))
-                               ? AiModelInstallError::Download
-                               : tekito::userdata::InstallAiModelPack(file, info->sha256, info->pack, root);
-        std::error_code ignored;
-        std::filesystem::remove(file, ignored);
+        const auto error = DownloadAiPack(*info, root);
         if (error != AiModelInstallError::None) return error;
     }
     return AiModelInstallError::None;
+}
+
+// What runs the models, with Windows ML (in place of the processor's copy).
+tekito::userdata::AiModelInstallError DownloadAiRuntimeWindowsMl(const std::filesystem::path& root) {
+    return DownloadAiPack(kAiRuntimeWindowsMl, root);
+}
+
+// Downloads one pack and installs it into `root`.
+tekito::userdata::AiModelInstallError DownloadAiPack(const AiModelInfo& pack, const std::filesystem::path& root) {
+    using tekito::userdata::AiModelInstallError;
+    wchar_t folder[MAX_PATH]{};
+    GetTempPathW(MAX_PATH, folder);
+    const auto file = std::filesystem::path(folder) /
+                      (L"tekito-" + std::wstring(pack.pack) + L"-" + std::to_wstring(GetCurrentProcessId()) + L".zip");
+    const auto error = FAILED(URLDownloadToFileW(nullptr, pack.url, file.c_str(), 0, nullptr))
+                           ? AiModelInstallError::Download
+                           : tekito::userdata::InstallAiModelPack(file, pack.sha256, pack.pack, root);
+    std::error_code ignored;
+    std::filesystem::remove(file, ignored);
+    return error;
 }
 
 // The distributor's site, opened by the About page. Fixed here rather than
@@ -1626,6 +1648,25 @@ private:
             }).detach();
             Reply(requestId, true);
             PostState();
+        } else if (type == L"aiRuntime.windowsMl") {
+            // The user agreed to Microsoft's terms for the GPU or the NPU.
+            const int device = static_cast<int>(message.Number(L"device"));
+            if (windowsMlDownloading_ || aiDownloading_ || (device != 2 && device != 3)) {
+                Reply(requestId, false);
+                return;
+            }
+            windowsMlDownloading_ = true;
+            npuError_.clear();
+            std::thread([hwnd = hwnd_, device, root = AiDataRoot()] {
+                const auto error = DownloadAiRuntimeWindowsMl(root);
+                PostMessageW(hwnd, kAiWindowsMlInstalled, static_cast<WPARAM>(error), device);
+            }).detach();
+            Reply(requestId, true);
+            PostState();
+        } else if (type == L"windowsMl.terms") {
+            const auto file = ExecutableDirectory() / L"settings-ui" / L"notices" / L"windows-ml-LICENSE.txt";
+            const auto result = reinterpret_cast<INT_PTR>(ShellExecuteW(hwnd_, L"open", file.c_str(), nullptr, nullptr, SW_SHOWNORMAL));
+            Reply(requestId, result > 32, result > 32 ? L"" : Text(L"The terms could not be opened.", L"条項を開けませんでした。"));
         } else if (type == L"aiNpu.prepare") {
             if (npuPreparing_) {
                 Reply(requestId, false);
@@ -1959,6 +2000,10 @@ private:
             SetTimer(hwnd, kStateWatchTimer, kStateWatchIntervalMs, nullptr);
             return 0;
         }
+        if (message == kAiWindowsMlInstalled) {
+            self->FinishWindowsMlInstall(static_cast<tekito::userdata::AiModelInstallError>(wParam), static_cast<int>(lParam));
+            return 0;
+        }
         if (message == kAiNpuPrepared) {
             self->FinishNpuPrepare(wParam != 0);
             return 0;
@@ -2069,6 +2114,27 @@ private:
         PostState();
     }
 
+    // Windows ML there: the AI model runs where the user chose (the NPU made
+    // ready first).
+    void FinishWindowsMlInstall(tekito::userdata::AiModelInstallError error, int device) {
+        windowsMlDownloading_ = false;
+        if (error == tekito::userdata::AiModelInstallError::None) {
+            settings_.japaneseAiDevice = device;
+            (void)SaveSettings();
+            if (device == 3 && !npuPreparing_) {
+                npuPreparing_ = true;
+                std::thread([hwnd = hwnd_] { PostMessageW(hwnd, kAiNpuPrepared, PrepareNpu() ? 1 : 0, 0); }).detach();
+            }
+        } else {
+            npuError_ = error == tekito::userdata::AiModelInstallError::Download
+                            ? Text(L"It could not be downloaded. Check the connection and try again.",
+                                   L"ダウンロードできませんでした。接続を確認して、もう一度お試しください。")
+                            : Text(L"It could not be installed. Close the apps you type in and try again.",
+                                   L"インストールできませんでした。入力中のアプリを閉じてから、もう一度お試しください。");
+        }
+        PostState();
+    }
+
     // The NPU ready, or not: the AI model goes back to running where it
     // chooses.
     void FinishNpuPrepare(bool ready) {
@@ -2094,7 +2160,10 @@ private:
         }
         json += std::wstring(L",\"runtime\":{\"installed\":") +
                 (tekito::userdata::AiRuntimeInstalled(AiDataRoot()) ? L"true" : L"false") +
-                L",\"bytes\":" + std::to_wstring(kAiRuntime.bytes) + L"}";
+                L",\"bytes\":" + std::to_wstring(kAiRuntime.bytes) + L",\"windowsMl\":" +
+                (tekito::userdata::AiRuntimeHasWindowsMl(AiDataRoot()) ? L"true" : L"false") +
+                L",\"windowsMlBytes\":" + std::to_wstring(kAiRuntimeWindowsMl.bytes) + L",\"windowsMlDownloading\":" +
+                (windowsMlDownloading_ ? L"true" : L"false") + L"}";
         json += L",\"downloading\":" + std::to_wstring(aiDownloading_) + L",\"error\":\"" + JsonEscape(aiError_) + L"\"";
         // Where it can run: the GPUs (ids as the setting keeps them) and
         // whether there is an NPU, looked up once.
@@ -2351,8 +2420,9 @@ private:
     // one failed.
     int aiDownloading_{0};
     std::wstring aiError_;
-    // The NPU being made ready, and why it last could not be.
+    // The NPU being made ready, and why it (or Windows ML) last could not be.
     bool npuPreparing_{false};
+    bool windowsMlDownloading_{false};
     std::wstring npuError_;
     EventRegistrationToken navigationToken_{};
     std::wstring dataPackSummary_{L"Unavailable"};

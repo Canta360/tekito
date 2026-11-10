@@ -74,8 +74,9 @@ sentences was trained on the zenz-v2.5 dataset (llm-jp-corpus-v3 part, Open
 Data Commons Attribution License 1.0), ABEJA-CC-JA (PDDL 1.0), YODAS's Japanese captions (CC BY 3.0),
 ASDC (Megagon Labs, CC BY 4.0), the Rosebleu dataset (Apache-2.0), Tatoeba (CC BY 2.0 FR), Common Voice's
 text sentences (CC0) and the Leipzig Corpora Collection's Japanese news, and holds no text from them. The optional AI models (Liquid AI's
-LFM2.5, LFM Open License) and what runs them (llama.cpp, MIT; the Visual C++ runtime) are downloaded only
-when the user chooses AI. Japan Post's postal code data is not
+LFM2.5, LFM Open License) and what runs them (ONNX Runtime, MIT; the Visual C++ runtime) are downloaded only
+when the user chooses AI; Microsoft's Windows ML (Microsoft Software License Terms) only when the user
+chooses to run them on a GPU or an NPU and agrees to those terms. Japan Post's postal code data is not
 included: Settings downloads it (from the postal-codes release, a monthly copy
 of Japan Post's file, which Japan Post allows to be redistributed, or from
 Japan Post), or reads a file the user downloaded, only when the user turns it

@@ -4,7 +4,8 @@ TEKITO works entirely on your PC. It does not send what you type, your
 dictionary or what it has learned anywhere. It has no account, no telemetry
 and no update check, and nothing in the input path uses the network. The
 only downloads are the ones you ask for: the Japanese data in the setup
-program, the postal code data in Settings, and an AI model in either.
+program, the postal code data in Settings, an AI model in either, and in
+Settings what runs it on a GPU or an NPU.
 
 ## What TEKITO keeps, and where
 
@@ -84,9 +85,17 @@ or a model under **Settings → AI** (which asks first), downloads the model and
 (github.com) and checks them against the checksums Settings carries. The
 request sends nothing about you beyond what any download does, such as your
 IP address, and GitHub's privacy terms apply to it. The model then runs on
-your PC, on the CPU or the GPU, in a separate TEKITO process; what you type
-is passed to it on your PC only and is not saved. **Remove the model**
-deletes it.
+your PC, on the CPU, the GPU or the NPU, in a separate TEKITO process; what
+you type is passed to it on your PC only and is not saved. **Remove the
+model** deletes it.
+
+Choosing **GPU** or **NPU** under **Settings → AI** (which asks first)
+downloads Microsoft's Windows ML from TEKITO's release on GitHub. With
+**NPU**, Windows ML may also download the part that runs your NPU from
+Microsoft, and Microsoft's privacy statement applies to that download.
+TEKITO turns off the telemetry of ONNX Runtime and Windows ML. The first
+time, the model is prepared for the NPU and kept with the model (1 to 2
+GB); **Remove the model** deletes it too.
 
 ## Postal codes
 

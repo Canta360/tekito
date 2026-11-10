@@ -152,8 +152,8 @@ for the phrase in focus.
   sentences as a whole and picks the one that reads most naturally.
 - **An AI model (optional).** Download one under **Settings → AI** and turn
   it on, and an AI reviews your Japanese conversions. It runs on this PC, on
-  the CPU or the GPU, and nothing you type leaves your PC. Light (about
-  250 MB) and Accurate (about 1.3 GB) are offered.
+  the CPU, the GPU or the NPU, and nothing you type leaves your PC. Light
+  (about 360 MB) and Accurate (about 1.6 GB) are offered.
 - **A slip is not a dead end.** When the keys look like a slip of the finger
   (a neighboring key, a key dropped or doubled, two swapped), what you meant
   is offered in the list, marked TYPO. What you typed stays first; you
@@ -236,8 +236,9 @@ typing anywhere, it has no account and no telemetry, and it does not use the
 network while you type. What it learns from your choices stays in
 `%LOCALAPPDATA%\TEKITO` and can be cleared from Settings. It downloads only
 the Japanese data, when you choose Japanese in the setup program, postal
-codes, when you turn them on in Settings, and an AI model, when you choose
-one in the setup program or in Settings.
+codes, when you turn them on in Settings, an AI model, when you choose
+one in the setup program or in Settings, and what runs it on a GPU or an NPU,
+when you choose one in Settings.
 See [the privacy notice](PRIVACY.md).
 
 ## Install
@@ -253,7 +254,7 @@ Download `TEKITO-0.7.1-full-installer.exe` from
 - Without Japanese, TEKITO appears in the English keyboard list with Auto and
   Direct. Run the installer again to add Japanese later.
 - It needs the Microsoft Edge WebView2 Runtime, which Windows 11 already has.
-- **Check with AI** also downloads the AI model (Light, about 250 MB). You
+- **Check with AI** also downloads the AI model (Light, about 360 MB). You
   can download one later under **Settings → AI** too.
 
 After installing, restart the apps you want to type in (or sign out and back
@@ -330,7 +331,8 @@ publish is covered by [the TEKITO License Agreement](installer/TEKITO_LICENSE.md
 and each data pack keeps the license of its source: among them the Mozc
 dictionary (IPAdic and BSD 3-Clause), the Leipzig Corpora Collection
 (CC BY 4.0), Wiktionary (CC BY-SA 4.0) and the Japanese WordNet. The optional
-AI models are Liquid AI's LFM2.5 (LFM Open License). The details
+AI models are Liquid AI's LFM2.5 (LFM Open License), run with ONNX Runtime
+(MIT), or with Microsoft's Windows ML for a GPU or an NPU. The details
 are in [Licensing](LICENSING.md) and
 [third-party notices](THIRD_PARTY_NOTICES.md).
 

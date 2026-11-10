@@ -133,6 +133,9 @@ constexpr std::wstring_view kRuntimePack = L"ai-runtime";
 [[nodiscard]] std::wstring HelperPath();
 
 constexpr std::uint32_t kMagic = 0x3341'4B54;  // "TKA3"
+// The protocol as the ai-runtime pack's manifest names it: a pack that
+// speaks another is replaced.
+constexpr std::string_view kProtocol = "TKA3";
 // Score: Convert without the model's own writings.
 enum class Request : std::uint32_t { Convert = 0, Warm = 1, Stop = 2, Score = 3 };
 enum class Status : std::uint32_t { Ok = 0, NoModel = 1, TooLong = 2, Failed = 3 };

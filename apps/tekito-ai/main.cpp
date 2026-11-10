@@ -28,7 +28,6 @@
 #include <sddl.h>
 
 #include <onnxruntime_cxx_api.h>
-#include <dml_provider_factory.h>
 
 #include <algorithm>
 #include <atomic>
@@ -159,6 +158,34 @@ std::optional<int> PickGpu(std::uint32_t gpu) {
     return asked ? asked : best;
 }
 
+// Whether Windows ML came with this copy (the ai-runtime pack for GPUs and
+// NPUs: its ONNX Runtime with DirectML, and its catalog of NPU providers);
+// the processor's pack has ONNX Runtime alone. Its DLL is loaded only then
+// (delay-loaded).
+bool HasWindowsMl() {
+    static const bool has = [] {
+        std::wstring file(MAX_PATH, L'\0');
+        const DWORD size = GetModuleFileNameW(nullptr, file.data(), static_cast<DWORD>(file.size()));
+        if (size == 0 || size >= file.size()) return false;
+        file.resize(size);
+        const auto path = std::filesystem::path(file).parent_path() / L"Microsoft.Windows.AI.MachineLearning.dll";
+        std::error_code error;
+        return std::filesystem::is_regular_file(path, error);
+    }();
+    return has;
+}
+
+// DirectML on the GPU `adapter`, when this ONNX Runtime has it.
+bool AppendDirectMl(Ort::SessionOptions& options, int adapter) {
+    using Append = OrtStatus*(ORT_API_CALL*)(OrtSessionOptions*, int);
+    const HMODULE runtime = GetModuleHandleW(L"onnxruntime.dll");
+    const auto append =
+        runtime ? reinterpret_cast<Append>(GetProcAddress(runtime, "OrtSessionOptionsAppendExecutionProvider_DML")) : nullptr;
+    if (!append) return false;
+    Ort::ThrowOnError(append(options, adapter));
+    return true;
+}
+
 Ort::Env& Environment() {
     static Ort::Env env = [] {
         Ort::Env e(ORT_LOGGING_LEVEL_ERROR, "TekitoAI");
@@ -176,7 +203,7 @@ void RegisterReadyProviders() {
     static std::mutex lock;
     static std::set<std::string> registered;
     std::lock_guard hold(lock);
-    {
+    if (HasWindowsMl()) {
         WinMLEpCatalogHandle catalog = nullptr;
         if (FAILED(WinMLEpCatalogCreate(&catalog))) return;
         std::vector<std::pair<std::string, std::string>> ready;
@@ -481,7 +508,7 @@ private:
                 if (!adapter) return;
                 options.DisableMemPattern();
                 options.SetExecutionMode(ExecutionMode::ORT_SEQUENTIAL);
-                Ort::ThrowOnError(OrtSessionOptionsAppendExecutionProvider_DML(options, *adapter));
+                if (!AppendDirectMl(options, *adapter)) return;
             } else {
                 const auto npus = NpuDevices();
                 if (npus.empty()) return;
@@ -866,7 +893,9 @@ int ListDevices(std::string_view prepare) {
         std::vector<std::pair<std::string, std::string>> registered;
     } context{prepare, {}};
     WinMLEpCatalogHandle catalog = nullptr;
-    if (FAILED(WinMLEpCatalogCreate(&catalog))) {
+    if (!HasWindowsMl()) {
+        std::printf("no Windows ML with this copy (the processor alone)\n");
+    } else if (FAILED(WinMLEpCatalogCreate(&catalog))) {
         std::printf("no Windows ML catalog (Windows 11 24H2 or later is needed)\n");
     } else {
         WinMLEpCatalogEnumProviders(

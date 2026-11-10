@@ -310,7 +310,7 @@ function App() {
         </Dialog>
         <Dialog open={Boolean(confirm)} title={confirm?.title} onClose={() => setConfirm(null)}>
           {confirm?.message && <p className="dialog-message">{confirm.message}</p>}
-          {confirm?.link && <button type="button" className="dialog-link" onClick={() => { const link = confirm.link; setConfirm(null); link.action(); }}>{confirm.link.label}</button>}
+          {confirm?.link && <button type="button" className="dialog-link" onClick={() => { const link = confirm.link; if (!link.keep) setConfirm(null); link.action(); }}>{confirm.link.label}</button>}
           <div className="dialog-actions">
             <Button variant={confirm?.danger ? "danger" : "primary"} onClick={async () => { const action = confirm.action; setConfirm(null); await action(); }}>{confirm?.confirmLabel}</Button>
             <Button onClick={() => setConfirm(null)}>{t.cancel}</Button>
@@ -933,8 +933,21 @@ function AiModelRow({ settings, setSetting, runAction, setConfirm, aiModels }) {
   if (aiModels.npu) devices.push([3, "NPU"]);
   const saved = settings.japaneseAiDevice || 0;
   const device = devices.some(([value]) => value === saved) ? saved : 0;
+  const busy = aiModels.npuPreparing || aiModels.runtime?.windowsMlDownloading;
   const chooseDevice = (value) => {
-    if (aiModels.npuPreparing) return;
+    if (busy) return;
+    // The GPU and the NPU need Windows ML: downloaded once the user agrees
+    // to Microsoft's terms, then used.
+    if (value >= 2 && !aiModels.runtime?.windowsMl) {
+      setConfirm({
+        title: a.device.dialogTitle,
+        message: a.device.dialogBody(downloadSize(aiModels.runtime?.windowsMlBytes || 0)),
+        confirmLabel: a.download,
+        action: () => runAction("aiRuntime.windowsMl", { device: value }),
+        link: { label: a.device.terms, keep: true, action: () => runAction("windowsMl.terms", {}) },
+      });
+      return;
+    }
     setSetting("japaneseAiDevice", value);
     if (value === 3) runAction("aiNpu.prepare", {});
   };
@@ -973,8 +986,9 @@ function AiModelRow({ settings, setSetting, runAction, setConfirm, aiModels }) {
       <Row icon="memory" title={a.device.title}
         description={(
           <>
-            {aiModels.npuPreparing ? "" : aiModels.npuError || (device === 3 ? a.device.npuFirst : a.device.description)}
-            {aiModels.npuPreparing && <span className="row-status"><span className="progress" />{a.device.preparing}</span>}
+            {busy ? "" : aiModels.npuError || (device === 3 ? a.device.npuFirst : a.device.description)}
+            {busy && <span className="row-status"><span className="progress" />
+              {aiModels.runtime?.windowsMlDownloading ? a.device.downloading : a.device.preparing}</span>}
           </>
         )}>
         <Segmented label={a.device.title} value={device} options={devices} onChange={chooseDevice} />
