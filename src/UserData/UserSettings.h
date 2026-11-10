@@ -204,6 +204,8 @@ struct UserSettings {
     // Mix: the sentence held until Enter has a marker in Mix's orange; off,
     // it is underlined as converted text.
     bool mixSettledMarker{true};
+    // Mix: what is taken as English is underlined in English Auto's blue.
+    bool mixEnglishUnderline{false};
     // A half-width space between Japanese and an English word when text is
     // committed (今日は GitHub に push した).
     bool japaneseEnglishSpacing{false};

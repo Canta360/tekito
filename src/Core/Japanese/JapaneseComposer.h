@@ -65,6 +65,8 @@ struct PreeditSegment {
     // Mixed typing: chunks before the one being typed, held with it until
     // Enter so the sentence is judged as a whole.
     bool settled{false};
+    // Mixed typing: taken as English.
+    bool english{false};
 };
 
 // The text being typed in Japanese mode, before it is committed.

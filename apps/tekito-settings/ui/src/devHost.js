@@ -33,6 +33,7 @@ function initialState() {
       spacelessEnglish: true,
       spacelessEnglishAlways: false,
       mixSettledMarker: true,
+      mixEnglishUnderline: false,
       correctionEnabled: true,
       commonMisspellingsEnabled: true,
       contextSuggestionsEnabled: true,

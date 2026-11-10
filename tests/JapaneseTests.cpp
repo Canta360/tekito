@@ -1084,10 +1084,12 @@ void TestMixedTyping(const RomajiTable& table, const MiniPack& pack) {
     Require(converted.size() == 2 && converted.back().text == L" " &&
                 composer.CaretOffset() == converted.front().text.size() + 1,
             "English converted with Space shows the space after it, the caret past it");
+    Require(converted.front().english && !converted.back().english, "the English phrase is marked English, its space not");
     Type(composer, L"kikai");
     const auto held = composer.Segments();
     Require(held.size() == 2 && held.front().settled && held.front().text == L"Push ",
             "Mix holds the chunks before the one typed until Enter");
+    Require(held.front().english && !held.back().english, "the held English chunk is English, the kana typed after it not");
     composer.Convert();
     const auto sentence = composer.Commit();
     Require(sentence.starts_with(L"push") && sentence.size() > 4 && sentence[4] >= 0x3000,

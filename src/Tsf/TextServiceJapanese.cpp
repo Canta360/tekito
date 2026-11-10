@@ -604,10 +604,16 @@ HRESULT TextService::ReplaceJapaneseComposition(ITfContext* context, TfEditCooki
             // The held sentence: marked, or (mixSettledMarker off) underlined
             // as converted text.
             const bool marked = segment.settled && userSettings_.mixSettledMarker;
-            const auto underline = marked              ? JapaneseUnderline::Settled
-                                   : !segment.converted && !segment.settled ? (mix ? JapaneseUnderline::MixInput : JapaneseUnderline::Input)
-                                   : segment.focused  ? (mix ? JapaneseUnderline::MixFocused : JapaneseUnderline::Focused)
-                                                      : (mix ? JapaneseUnderline::MixConverted : JapaneseUnderline::Converted);
+            auto underline = marked              ? JapaneseUnderline::Settled
+                             : !segment.converted && !segment.settled ? (mix ? JapaneseUnderline::MixInput : JapaneseUnderline::Input)
+                             : segment.focused  ? (mix ? JapaneseUnderline::MixFocused : JapaneseUnderline::Focused)
+                                                : (mix ? JapaneseUnderline::MixConverted : JapaneseUnderline::Converted);
+            // What Mix took as English, in English Auto's colour.
+            if (segment.english && mode_ == InputMode::Mixed && userSettings_.mixEnglishUnderline) {
+                underline = marked            ? JapaneseUnderline::SettledEnglish
+                            : segment.focused ? JapaneseUnderline::MixEnglishFocused
+                                              : JapaneseUnderline::MixEnglish;
+            }
             (void)ApplyDisplayAttribute(context, editCookie, part.Get(), JapaneseUnderlineGuid(underline));
         }
         offset += length;

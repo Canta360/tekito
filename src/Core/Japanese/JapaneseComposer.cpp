@@ -3797,30 +3797,49 @@ std::wstring JapaneseComposer::Preedit() const {
 std::vector<PreeditSegment> JapaneseComposer::Segments() const {
     std::vector<PreeditSegment> segments;
     if (!settled_.empty()) {
+        // One segment for each run of English or Japanese chunks, joined as
+        // SettledText joins them (English words apart).
+        bool englishBefore = false;
+        for (const auto& chunk : settled_) {
+            const bool english = chunk.marksOnly ? englishBefore : chunk.isEnglish;
+            std::wstring text;
+            if (!segments.empty() && englishBefore && english && !chunk.marksOnly) text.push_back(L' ');
+            text += english ? chunk.english : chunk.japanese;
+            if (!segments.empty() && segments.back().english == english) {
+                segments.back().text += text;
+            } else {
+                segments.push_back({std::move(text), true, false, true, english});
+            }
+            englishBefore = english;
+        }
         // English settled last keeps its space before what is typed next,
         // unless that is Japanese.
-        std::wstring text = SettledText();
         bool englishLast = false;
         for (const auto& chunk : settled_) {
             if (!chunk.marksOnly) englishLast = chunk.isEnglish;
         }
         const bool japaneseNext = IsConverted() && !ChoseEnglish();
-        if (englishLast && Typing() && !japaneseNext && !text.empty() && text.back() < 0x3000) text.push_back(L' ');
-        segments.push_back({std::move(text), true, false, true});
+        auto& last = segments.back().text;
+        if (englishLast && Typing() && !japaneseNext && !last.empty() && last.back() < 0x3000) last.push_back(L' ');
     }
     if (!IsConverted()) {
         if (const auto live = MixLiveText()) {
             segments.push_back({*live, true, false});
         } else if (Typing()) {
+            // Not taken as anything yet, even shown as letters.
             segments.push_back({TypedLetters().value_or(RenderTyping(true)), false, false});
         }
         return segments;
     }
+    const auto english = [](const PhraseCandidate& candidate) { return candidate.kind == PhraseCandidate::Kind::English; };
     if (const auto* whole = WholeChoice()) {
-        segments.push_back({whole->text, true, true});
+        segments.push_back({whole->text, true, true, false, chunkJudge_ && english(*whole)});
     } else {
         for (std::size_t i = 0; i < phrases_.size(); ++i) {
-            segments.push_back({PhraseText(phrases_[i]), true, !preview_ && i == focus_});
+            const auto& phrase = phrases_[i];
+            const bool isEnglish = chunkJudge_ && !phrase.form && phrase.selected < phrase.candidates.size() &&
+                                   english(phrase.candidates[phrase.selected]);
+            segments.push_back({PhraseText(phrase), true, !preview_ && i == focus_, false, isEnglish});
         }
     }
     // Live: the keys still pending follow, as typed.

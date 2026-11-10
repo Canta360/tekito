@@ -39,6 +39,7 @@ const initialSettings = {
   spacelessEnglish: true,
   spacelessEnglishAlways: false,
   mixSettledMarker: true,
+  mixEnglishUnderline: false,
   japaneseEnabled: true,
   modeIndicatorEnabled: true,
   modeUnderlineColors: true,
@@ -358,7 +359,7 @@ function searchIndex(t, pages, japaneseInstalled) {
     ["japanese", j.sentenceCheck.title, true], ["japanese", j.firstPageSymbol.title, true], ["japanese", j.typedForms.title, true],
     ["japanese", j.kanjiVariants.title, true],
     ["mixed", m.live.title], ["mixed", m.prediction.title], ["mixed", m.singleVowel.title], ["mixed", m.correction.title],
-    ["mixed", m.firstPageSymbol.title, true], ["mixed", m.marker.title, true], ["mixed", m.spaceless.title, true],
+    ["mixed", m.firstPageSymbol.title, true], ["mixed", m.marker.title, true], ["mixed", m.englishUnderline.title, true], ["mixed", m.spaceless.title, true],
     ["auto", a.correction.title], ["auto", a.spelling.title], ["auto", a.completion.title], ["auto", a.next.title], ["auto", a.casual.title],
     ["auto", a.doubled.title, true], ["auto", a.recheck.title, true], ["auto", a.phonetic.title, true], ["auto", a.period.title, true],
     ["auto", a.doubleSpace.title, true], ["auto", a.smart.title, true], ["auto", a.spaceless.title, true],
@@ -1128,6 +1129,10 @@ function MixedPage({ settings, setSetting }) {
           </Row>
           <Row icon="ink_highlighter" title={m.marker.title} description={m.marker.description}>
             <Toggle label={m.marker.title} checked={settings.mixSettledMarker} onChange={(value) => setSetting("mixSettledMarker", value)} />
+          </Row>
+          <Row icon="format_underlined" title={m.englishUnderline.title} description={m.englishUnderline.description}>
+            <Toggle label={m.englishUnderline.title} checked={settings.mixEnglishUnderline}
+              onChange={(value) => setSetting("mixEnglishUnderline", value)} />
           </Row>
           <Row icon="space_bar" title={m.spaceless.title} description={m.spaceless.description}>
             <Toggle label={m.spaceless.title} checked={settings.spacelessEnglish} onChange={(value) => setSetting("spacelessEnglish", value)} />

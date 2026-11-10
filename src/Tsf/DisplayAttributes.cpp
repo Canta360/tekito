@@ -57,6 +57,9 @@ const GUID& JapaneseUnderlineGuid(JapaneseUnderline underline) noexcept {
     case JapaneseUnderline::MixConverted: return GUID_TekitoDisplayAttributeMixConverted;
     case JapaneseUnderline::MixFocused: return GUID_TekitoDisplayAttributeMixFocused;
     case JapaneseUnderline::AutoInput: return GUID_TekitoDisplayAttributeAuto;
+    case JapaneseUnderline::MixEnglish: return GUID_TekitoDisplayAttributeMixEnglish;
+    case JapaneseUnderline::MixEnglishFocused: return GUID_TekitoDisplayAttributeMixEnglishFocused;
+    case JapaneseUnderline::SettledEnglish: return GUID_TekitoDisplayAttributeSettledEnglish;
     case JapaneseUnderline::Input: break;
     }
     return GUID_TekitoDisplayAttributeInput;
@@ -78,21 +81,25 @@ ITfDisplayAttributeInfo* CreateJapaneseUnderline(JapaneseUnderline underline) {
         break;
     case JapaneseUnderline::Converted:
     case JapaneseUnderline::MixConverted:
+    case JapaneseUnderline::MixEnglish:
         attribute.lsStyle = TF_LS_SOLID;
         attribute.bAttr = TF_ATTR_CONVERTED;
         description = L"TEKITO Japanese converted phrase";
         break;
     case JapaneseUnderline::Focused:
     case JapaneseUnderline::MixFocused:
+    case JapaneseUnderline::MixEnglishFocused:
         attribute.lsStyle = TF_LS_SOLID;
         attribute.fBoldLine = TRUE;
         attribute.bAttr = TF_ATTR_TARGET_CONVERTED;
         description = L"TEKITO Japanese phrase being converted";
         break;
     case JapaneseUnderline::Settled:
+    case JapaneseUnderline::SettledEnglish:
         // A marker in Mix's orange, the colour of its underline, with dark
-        // text, readable on light and dark pages (white text would not be).
-        attribute.lsStyle = TF_LS_NONE;
+        // text, readable on light and dark pages (white text would not be);
+        // English in it underlined too.
+        attribute.lsStyle = underline == JapaneseUnderline::SettledEnglish ? TF_LS_SOLID : TF_LS_NONE;
         attribute.crText.type = TF_CT_COLORREF;
         attribute.crText.cr = RGB(32, 32, 32);
         attribute.crBk.type = TF_CT_COLORREF;
@@ -115,6 +122,13 @@ ITfDisplayAttributeInfo* CreateJapaneseUnderline(JapaneseUnderline underline) {
         attribute.crLine.type = TF_CT_COLORREF;
         attribute.crLine.cr = RGB(0, 103, 248);
         description = L"TEKITO Auto word";
+        break;
+    case JapaneseUnderline::MixEnglish:
+    case JapaneseUnderline::MixEnglishFocused:
+    case JapaneseUnderline::SettledEnglish:
+        attribute.crLine.type = TF_CT_COLORREF;
+        attribute.crLine.cr = RGB(0, 103, 248);
+        description = L"TEKITO Mix English";
         break;
     default:
         break;
