@@ -33,6 +33,16 @@ if ($packDirectories.Count -eq 0) {
 # memory) only renamed. A file that cannot be overwritten is moved aside as
 # "<name>.old-<id>", which the next install removes.
 function Install-PackFile([string]$Source, [string]$Target) {
+    # The same file already there stays as it is (apps may have it open).
+    if ((Test-Path -LiteralPath $Target -PathType Leaf) -and
+        (Get-Item -LiteralPath $Target).Length -eq (Get-Item -LiteralPath $Source).Length) {
+        try {
+            if ((Get-FileHash -LiteralPath $Target -Algorithm SHA256).Hash -eq
+                (Get-FileHash -LiteralPath $Source -Algorithm SHA256).Hash) { return }
+        } catch {
+            # Not readable: replaced below as any other file.
+        }
+    }
     try {
         Copy-Item -LiteralPath $Source $Target -Force -ErrorAction Stop
         return
