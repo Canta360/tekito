@@ -897,7 +897,7 @@ function AiPage({ settings, setSetting, runAction, setConfirm, aiModels }) {
   const d = t.ai.device;
   const gpus = aiModels.gpus || [];
   // Which GPU, once the AI model runs on one and there are several.
-  const pickGpu = (settings.japaneseSentenceModel || 0) > 0 && settings.japaneseAiDevice === 2 && gpus.length > 1;
+  const pickGpu = (settings.japaneseSentenceModel || 0) > 0 && aiModels.runtime?.installed && settings.japaneseAiDevice === 2 && gpus.length > 1;
   return (
     <>
       <Card label={t.pages.ai}>
@@ -926,7 +926,10 @@ function AiModelRow({ settings, setSetting, runAction, setConfirm, aiModels }) {
   const a = t.ai;
   const keys = ["", "light", "strong"];
   const downloading = aiModels.downloading || 0;
-  const current = settings.japaneseSentenceModel || 0;
+  // The model chosen, while it and what runs it are there (an older
+  // model's format is not: it is downloaded again).
+  const chosen = settings.japaneseSentenceModel || 0;
+  const current = chosen > 0 && aiModels[keys[chosen]]?.installed && aiModels.runtime?.installed ? chosen : 0;
   // Where it runs: the GPU when the PC has one, the NPU only when it has one.
   const devices = [[0, a.device.auto], [1, "CPU"]];
   if ((aiModels.gpus || []).length > 0) devices.push([2, "GPU"]);
@@ -953,7 +956,7 @@ function AiModelRow({ settings, setSetting, runAction, setConfirm, aiModels }) {
   };
   const choose = (value) => {
     if (downloading) return;
-    if (value === 0 || aiModels[keys[value]]?.installed) {
+    if (value === 0 || (aiModels[keys[value]]?.installed && aiModels.runtime?.installed)) {
       setSetting("japaneseSentenceModel", value);
       return;
     }
