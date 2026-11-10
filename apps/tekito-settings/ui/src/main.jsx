@@ -897,7 +897,8 @@ function AiPage({ settings, setSetting, runAction, setConfirm, aiModels }) {
   const d = t.ai.device;
   const gpus = aiModels.gpus || [];
   // Which GPU, once the AI model runs on one and there are several.
-  const pickGpu = (settings.japaneseSentenceModel || 0) > 0 && aiModels.runtime?.installed && settings.japaneseAiDevice === 2 && gpus.length > 1;
+  const pickGpu = (settings.japaneseSentenceModel || 0) > 0 && aiModels.runtime?.windowsMl && settings.japaneseAiDevice === 2 &&
+    gpus.length > 1;
   return (
     <>
       <Card label={t.pages.ai}>
@@ -935,7 +936,9 @@ function AiModelRow({ settings, setSetting, runAction, setConfirm, aiModels }) {
   if ((aiModels.gpus || []).length > 0) devices.push([2, "GPU"]);
   if (aiModels.npu) devices.push([3, "NPU"]);
   const saved = settings.japaneseAiDevice || 0;
-  const device = devices.some(([value]) => value === saved) ? saved : 0;
+  // The GPU or the NPU only once Windows ML is there: a choice saved
+  // without it (an older version's GPU) runs on the processor.
+  const device = devices.some(([value]) => value === saved) && (saved < 2 || aiModels.runtime?.windowsMl) ? saved : 0;
   const busy = aiModels.npuPreparing || aiModels.runtime?.windowsMlDownloading;
   const chooseDevice = (value) => {
     if (busy) return;
