@@ -19,7 +19,6 @@
 #include <cwchar>
 #include <cwctype>
 #include <shellapi.h>
-#include <mmsystem.h>
 #include <filesystem>
 #include <iterator>
 #include <new>
@@ -1151,11 +1150,10 @@ HRESULT TextService::OnKeyDown(ITfContext* context, WPARAM wParam, LPARAM lParam
         *eaten = FALSE;
         return S_OK;
     }
-    // Cat: each key pressed (not held, not a modifier alone) meows; a new
-    // meow cuts the last one short.
-    if (userSettings_.catSounds && !(lParam & (1 << 30)) && wParam != VK_SHIFT && wParam != VK_CONTROL &&
-        wParam != VK_MENU && wParam != VK_LWIN && wParam != VK_RWIN && wParam != VK_CAPITAL) {
-        PlaySoundW(MAKEINTRESOURCEW(IDR_CAT_SOUND), g_moduleInstance, SND_RESOURCE | SND_ASYNC | SND_NODEFAULT);
+    // Cat: each key pressed meows, a key held mews once (not a modifier alone).
+    if (userSettings_.catSounds && wParam != VK_SHIFT && wParam != VK_CONTROL && wParam != VK_MENU &&
+        wParam != VK_LWIN && wParam != VK_RWIN && wParam != VK_CAPITAL) {
+        catSounds_.OnKey(wParam, (lParam & (1 << 30)) != 0);
     }
     ModeKey modeKey;
     if (TranslateModeKey(wParam, modeKey)) {

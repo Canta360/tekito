@@ -8,5 +8,7 @@ IDI_JAPANESE ICON "icons/japanese.ico"
 IDI_JAPANESE_DARK ICON "icons/japanese-dark.ico"
 IDI_MIXED ICON "icons/mixed.ico"
 IDR_FONT_MPLUS1 RCDATA "fonts/MPLUS1-wght.ttf"
-// Cat (UserSettings::catSounds): "Meow" by IgnasD, OpenGameArt, CC0.
+// Cat (UserSettings::catSounds): "Meow" by IgnasD for each key, "Kitten Mew"
+// by AntumDeluge for a key held (both OpenGameArt, CC0).
 IDR_CAT_SOUND WAVE "sounds/cat.wav"
+IDR_CAT_HOLD_SOUND WAVE "sounds/cat-hold.wav"

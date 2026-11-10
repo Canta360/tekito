@@ -14,3 +14,4 @@
 // installer/TEKITO_LICENSE.md, shown by Settings > About > License.
 #define IDR_LICENSE_TEXT 602
 #define IDR_CAT_SOUND 603
+#define IDR_CAT_HOLD_SOUND 604

@@ -130,6 +130,7 @@ set(TEKITO_CANDIDATE_WINDOW_LIBS d2d1 dwrite dwmapi d3d11 runtimeobject CoreMess
 
 add_library(Tekito.Tsf SHARED
     src/Tsf/CandidateListElement.cpp
+    src/Tsf/CatSounds.cpp
     src/Tsf/CandidateWindow.cpp
     src/Tsf/ClassFactory.cpp
     src/Tsf/DisplayAttributes.cpp
