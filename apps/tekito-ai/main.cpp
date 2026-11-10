@@ -5,9 +5,9 @@
 // answers one at a time and exits after a while without a request. What it
 // is sent stays in memory and is never written anywhere.
 //
-// The backends are DLLs next to it, loaded at start: the processor's (the
-// build for its generation) and, where the PC has a Vulkan driver, the
-// GPU's.
+// It runs them with ONNX Runtime as Windows ML ships it (onnxruntime.dll,
+// DirectML.dll and Microsoft.Windows.AI.MachineLearning.dll next to it): on
+// the processor, or on the GPU through DirectML.
 //
 //   TekitoAI.exe                                serve the pipe
 //   TekitoAI.exe --convert <model> <device> <file>
@@ -16,25 +16,36 @@
 #include "Core/ExternalLexiconProvider.h"
 #include "Core/Japanese/AiJudge.h"
 
-#include "ggml-backend.h"
-#include "llama.h"
+#include "ByteBpe.h"
+
+#include <WinMLEpCatalog.h>
 
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
 #include <windows.h>
+#include <dxgi.h>
 #include <sddl.h>
 
+#include <onnxruntime_cxx_api.h>
+#include <dml_provider_factory.h>
+
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
 #include <memory>
+#include <mutex>
+#include <optional>
+#include <set>
+#include <span>
 #include <sstream>
 #include <string>
 #include <thread>
+#include <unordered_map>
 #include <vector>
 
 namespace {
@@ -54,8 +65,6 @@ constexpr std::size_t kContextChars = 40;
 constexpr wchar_t kContextTag[] = L"";
 constexpr wchar_t kInputTag[] = L"";
 constexpr wchar_t kOutputTag[] = L"";
-
-void Quiet(ggml_log_level, const char*, void*) {}
 
 std::string Utf8(std::wstring_view text) {
     if (text.empty()) return {};
@@ -87,288 +96,610 @@ std::filesystem::path HereDirectory() {
     return std::filesystem::path(file).parent_path();
 }
 
-// Whether the PC has a GPU of its own (not one built into the processor).
-bool HasOwnGpu() {
-    for (std::size_t i = 0; i < ggml_backend_dev_count(); ++i) {
-        if (ggml_backend_dev_type(ggml_backend_dev_get(i)) == GGML_BACKEND_DEVICE_TYPE_GPU) return true;
+// A tensor of the model's state kept on the CPU: its shape and floats.
+struct Tensor {
+    std::vector<std::int64_t> shape;
+    std::vector<float> data;
+
+    [[nodiscard]] std::size_t Row() const {
+        std::size_t n = 1;
+        for (std::size_t i = 1; i < shape.size(); ++i) n *= static_cast<std::size_t>(shape[i]);
+        return n;
     }
-    return false;
+    // An attention state ([batch, heads, past, dim]) of its last `n` places;
+    // any other state as it is.
+    [[nodiscard]] Tensor Last(std::size_t n) const {
+        if (shape.size() != 4 || static_cast<std::size_t>(shape[2]) <= n) return *this;
+        Tensor out{shape, {}};
+        out.shape[2] = static_cast<std::int64_t>(n);
+        const auto places = static_cast<std::size_t>(shape[2]), dim = static_cast<std::size_t>(shape[3]);
+        const std::size_t rows = static_cast<std::size_t>(shape[0] * shape[1]);
+        out.data.resize(rows * n * dim);
+        for (std::size_t r = 0; r < rows; ++r) {
+            std::copy_n(data.begin() + static_cast<std::ptrdiff_t>((r * places + places - n) * dim), n * dim,
+                        out.data.begin() + static_cast<std::ptrdiff_t>(r * n * dim));
+        }
+        return out;
+    }
+    // Rows `from` (indices into this one's batch), in that order.
+    [[nodiscard]] Tensor Rows(const std::vector<std::size_t>& from) const {
+        Tensor out{shape, {}};
+        out.shape[0] = static_cast<std::int64_t>(from.size());
+        const std::size_t row = Row();
+        out.data.resize(from.size() * row);
+        for (std::size_t i = 0; i < from.size(); ++i) {
+            std::copy_n(data.begin() + static_cast<std::ptrdiff_t>(from[i] * row), row,
+                        out.data.begin() + static_cast<std::ptrdiff_t>(i * row));
+        }
+        return out;
+    }
+};
+
+// The DXGI adapter (and DirectML device) of the GPU with the most memory of
+// The DirectML device (DXGI's adapter index) of the GPU `gpu` (GpuId), or
+// with 0 or that GPU not there, of the one with the most memory of its own.
+std::optional<int> PickGpu(std::uint32_t gpu) {
+    IDXGIFactory1* factory = nullptr;
+    if (FAILED(CreateDXGIFactory1(__uuidof(IDXGIFactory1), reinterpret_cast<void**>(&factory)))) return std::nullopt;
+    std::optional<int> best, asked;
+    SIZE_T most = 0;
+    IDXGIAdapter1* adapter = nullptr;
+    for (UINT i = 0; factory->EnumAdapters1(i, &adapter) != DXGI_ERROR_NOT_FOUND; ++i) {
+        DXGI_ADAPTER_DESC1 desc{};
+        adapter->GetDesc1(&desc);
+        adapter->Release();
+        if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE) continue;
+        if (gpu != 0 && !asked && tekito::japanese::GpuId(desc.VendorId, desc.DeviceId) == gpu) asked = static_cast<int>(i);
+        if (!best || desc.DedicatedVideoMemory > most) {
+            most = desc.DedicatedVideoMemory;
+            best = static_cast<int>(i);
+        }
+    }
+    factory->Release();
+    return asked ? asked : best;
 }
 
-// One model loaded, the one asked for last, where it was asked to run.
+Ort::Env& Environment() {
+    static Ort::Env env = [] {
+        Ort::Env e(ORT_LOGGING_LEVEL_ERROR, "TekitoAI");
+        // Nothing about the use of the model is reported anywhere.
+        e.DisableTelemetryEvents();
+        return e;
+    }();
+    return env;
+}
+
+// The execution providers Windows ML has on this PC (the catalog's that are
+// installed, made ready for this app: none is downloaded here), registered
+// with ONNX Runtime; each call registers those not registered yet.
+void RegisterReadyProviders() {
+    static std::mutex lock;
+    static std::set<std::string> registered;
+    std::lock_guard hold(lock);
+    {
+        WinMLEpCatalogHandle catalog = nullptr;
+        if (FAILED(WinMLEpCatalogCreate(&catalog))) return;
+        std::vector<std::pair<std::string, std::string>> ready;
+        WinMLEpCatalogEnumProviders(
+            catalog,
+            [](WinMLEpHandle ep, const WinMLEpInfo* info, void* data) -> BOOL {
+                if (!info || !info->name || info->readyState == WinMLEpReadyState_NotPresent) return TRUE;
+                if (info->readyState == WinMLEpReadyState_NotReady && FAILED(WinMLEpEnsureReady(ep))) return TRUE;
+                std::size_t size = 0;
+                if (FAILED(WinMLEpGetLibraryPathSize(ep, &size)) || size == 0) return TRUE;
+                std::string path(size, '\0');
+                std::size_t used = 0;
+                if (FAILED(WinMLEpGetLibraryPath(ep, size, path.data(), &used)) || used == 0) return TRUE;
+                path.resize(used - 1);
+                static_cast<std::vector<std::pair<std::string, std::string>>*>(data)->emplace_back(info->name, path);
+                return TRUE;
+            },
+            &ready);
+        WinMLEpCatalogRelease(catalog);
+        for (const auto& [name, path] : ready) {
+            if (registered.contains(name)) continue;
+            try {
+                Environment().RegisterExecutionProviderLibrary(name.c_str(), std::filesystem::path(path).wstring());
+                registered.insert(name);
+            } catch (const Ort::Exception&) {
+            }
+        }
+    }
+}
+
+// The NPU devices of the providers registered (OpenVINO, QNN, VitisAI...).
+std::vector<Ort::ConstEpDevice> NpuDevices() {
+    RegisterReadyProviders();
+    std::vector<Ort::ConstEpDevice> npus;
+    for (const auto& device : Environment().GetEpDevices()) {
+        const std::string_view name = device.EpName();
+        // The provider's own device, not its automatic choice among devices.
+        if (device.Device().Type() == OrtHardwareDeviceType_NPU && name.find('.') == std::string_view::npos) {
+            npus.push_back(device);
+            break;
+        }
+    }
+    return npus;
+}
+
+// One graph of a pack: its session, input and output names, and the
+// state's shapes ([batch, hidden, 2] and [batch, heads, past, dim]; -1 where
+// any size goes). A body (body-<b>x<t>.onnx) gives the last hidden state,
+// and its heads ln p from it: of each target, and of every token after the
+// last one.
+struct Graph {
+    std::unique_ptr<Ort::Session> session;
+    std::vector<std::string> inputs, outputs;
+    std::vector<std::vector<std::int64_t>> stateShapes;
+    std::int64_t batch{-1}, tokens{-1}, window{0};
+    Graph* targetHead{nullptr};
+    Graph* lastHead{nullptr};
+
+    void Open(const std::filesystem::path& file, const Ort::SessionOptions& options) {
+        session = std::make_unique<Ort::Session>(Environment(), file.c_str(), options);
+        Ort::AllocatorWithDefaultOptions allocator;
+        for (std::size_t i = 0; i < session->GetInputCount(); ++i) inputs.push_back(session->GetInputNameAllocated(i, allocator).get());
+        for (std::size_t i = 0; i < session->GetOutputCount(); ++i) outputs.push_back(session->GetOutputNameAllocated(i, allocator).get());
+        const auto ids = session->GetInputTypeInfo(0).GetTensorTypeAndShapeInfo().GetShape();
+        batch = ids[0];
+        tokens = ids[1];
+        for (std::size_t i = 0; i < session->GetInputCount(); ++i) {
+            if (!inputs[i].starts_with("past_")) continue;
+            stateShapes.push_back(session->GetInputTypeInfo(i).GetTensorTypeAndShapeInfo().GetShape());
+            if (stateShapes.back().size() == 4) window = std::max<std::int64_t>(window, stateShapes.back()[2]);
+        }
+    }
+
+    // A state of nothing read yet, for `rows` rows.
+    [[nodiscard]] std::vector<Tensor> Empty(std::size_t rows) const {
+        std::vector<Tensor> state;
+        for (auto shape : stateShapes) {
+            shape[0] = static_cast<std::int64_t>(rows);
+            std::size_t n = 1;
+            for (auto& d : shape) {
+                if (d < 0) d = 0;  // no past tokens yet
+                n *= static_cast<std::size_t>(d);
+            }
+            state.push_back(Tensor{shape, std::vector<float>(n, 0.0f)});
+        }
+        return state;
+    }
+};
+
+// What one run of a graph gives.
+struct Step {
+    std::vector<float> targetLogprobs;  // [batch, tokens]
+    std::vector<float> lastLogprobs;    // [batch, vocab]
+    std::size_t vocab{0};
+    std::vector<Tensor> state;
+};
+
+// The first output of a head graph for `rows` hidden states (and their
+// targets, when it takes them).
+std::vector<float> RunHead(Graph& head, const float* hidden, std::size_t rows, std::size_t width,
+                           const std::int64_t* targets, std::vector<std::int64_t>* shapeOut = nullptr) {
+    const auto memory = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
+    const std::int64_t hiddenShape[] = {static_cast<std::int64_t>(rows), static_cast<std::int64_t>(width)};
+    const std::int64_t targetShape[] = {static_cast<std::int64_t>(rows)};
+    std::vector<Ort::Value> values;
+    std::vector<const char*> in;
+    for (const auto& n : head.inputs) {
+        in.push_back(n.c_str());
+        if (n == "targets") {
+            values.push_back(Ort::Value::CreateTensor<std::int64_t>(memory, const_cast<std::int64_t*>(targets), rows, targetShape, 1));
+        } else {
+            values.push_back(Ort::Value::CreateTensor<float>(memory, const_cast<float*>(hidden), rows * width, hiddenShape, 2));
+        }
+    }
+    const char* out = head.outputs[0].c_str();
+    auto results = head.session->Run(Ort::RunOptions{nullptr}, in.data(), values.data(), values.size(), &out, 1);
+    const auto info = results[0].GetTensorTypeAndShapeInfo();
+    const float* data = results[0].GetTensorData<float>();
+    if (shapeOut) *shapeOut = info.GetShape();
+    return {data, data + info.GetElementCount()};
+}
+
+// Reads `ids` ([batch, tokens]) at `positions` after `state`, with `mask`
+// ([batch, past + tokens]: 1 where a token counts).
+Step Run(Graph& graph, std::size_t batch, std::size_t tokens, const std::vector<std::int64_t>& ids,
+         const std::vector<std::int64_t>& positions, const std::vector<std::int64_t>& targets,
+         const std::vector<std::int64_t>& mask, std::vector<Tensor>& state) {
+    const auto memory = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
+    const std::size_t all = mask.size() / batch;
+    const std::int64_t shape[] = {static_cast<std::int64_t>(batch), static_cast<std::int64_t>(tokens)};
+    const std::int64_t maskShape[] = {static_cast<std::int64_t>(batch), static_cast<std::int64_t>(all)};
+    auto cast = [](const std::vector<std::int64_t>& v) { return const_cast<std::int64_t*>(v.data()); };
+    // By name: a body takes no targets.
+    std::vector<Ort::Value> values;
+    std::size_t next = 0;
+    for (const auto& n : graph.inputs) {
+        if (n == "input_ids") {
+            values.push_back(Ort::Value::CreateTensor<std::int64_t>(memory, cast(ids), ids.size(), shape, 2));
+        } else if (n == "position_ids") {
+            values.push_back(Ort::Value::CreateTensor<std::int64_t>(memory, cast(positions), positions.size(), shape, 2));
+        } else if (n == "attention_mask") {
+            values.push_back(Ort::Value::CreateTensor<std::int64_t>(memory, cast(mask), mask.size(), maskShape, 2));
+        } else if (n == "targets") {
+            values.push_back(Ort::Value::CreateTensor<std::int64_t>(memory, cast(targets), targets.size(), shape, 2));
+        } else {
+            auto& t = state.at(next++);
+            values.push_back(Ort::Value::CreateTensor<float>(memory, t.data.data(), t.data.size(), t.shape.data(), t.shape.size()));
+        }
+    }
+    std::vector<const char*> in, out;
+    for (const auto& n : graph.inputs) in.push_back(n.c_str());
+    for (const auto& n : graph.outputs) out.push_back(n.c_str());
+    auto results = graph.session->Run(Ort::RunOptions{nullptr}, in.data(), values.data(), values.size(), out.data(), out.size());
+    Step step;
+    const auto copy = [](Ort::Value& v, std::vector<float>& to, std::vector<std::int64_t>* shapeOut) {
+        const auto info = v.GetTensorTypeAndShapeInfo();
+        const float* data = v.GetTensorData<float>();
+        to.assign(data, data + info.GetElementCount());
+        if (shapeOut) *shapeOut = info.GetShape();
+    };
+    std::size_t first = 2;  // the first output of the state
+    if (graph.outputs[0] == "hidden") {
+        first = 1;
+        std::vector<float> hidden;
+        std::vector<std::int64_t> hiddenShape;
+        copy(results[0], hidden, &hiddenShape);
+        const auto width = static_cast<std::size_t>(hiddenShape.back());
+        if (graph.targetHead) {
+            step.targetLogprobs = RunHead(*graph.targetHead, hidden.data(), batch * tokens, width, targets.data());
+        }
+        if (graph.lastHead) {
+            std::vector<float> last(batch * width);
+            for (std::size_t r = 0; r < batch; ++r) {
+                std::copy_n(hidden.begin() + static_cast<std::ptrdiff_t>((r * tokens + tokens - 1) * width), width,
+                            last.begin() + static_cast<std::ptrdiff_t>(r * width));
+            }
+            std::vector<std::int64_t> lastShape;
+            step.lastLogprobs = RunHead(*graph.lastHead, last.data(), batch, width, nullptr, &lastShape);
+            step.vocab = static_cast<std::size_t>(lastShape.back());
+        }
+    } else {
+        copy(results[0], step.targetLogprobs, nullptr);
+        std::vector<std::int64_t> lastShape;
+        copy(results[1], step.lastLogprobs, &lastShape);
+        step.vocab = static_cast<std::size_t>(lastShape.back());
+    }
+    for (std::size_t i = first; i < results.size(); ++i) {
+        Tensor t;
+        copy(results[i], t.data, &t.shape);
+        step.state.push_back(std::move(t));
+    }
+    return step;
+}
+
+// What a prompt left to go on from: its state, its tokens, ln p of the next
+// token, and (fixed shapes) which places of the state's window it fills.
+struct Prompt {
+    std::vector<Tensor> state;
+    std::size_t tokens{0};
+    std::vector<float> last;
+    std::vector<std::int64_t> window;
+};
+
+// One model loaded, the one asked for last, where it was asked to run: the
+// graph of any shapes on the processor, and with a GPU or an NPU the
+// fixed-shape graphs there (an NPU compiles them the first time, which may
+// take minutes: until then the processor answers).
 class Model {
 public:
     ~Model() { Unload(); }
 
-    bool Load(AiModel which, AiDevice device) {
-        const bool gpu = device == AiDevice::Gpu || (device == AiDevice::Auto && HasOwnGpu());
-        if (which == loaded_ && gpu == gpu_ && context_) return true;
+    bool Load(AiModel which, AiDevice device, std::uint32_t gpu = 0) {
+        if (which == loaded_ && device == device_ && gpu == gpu_ && cpu_.session) return true;
         Unload();
         const auto directory = tekito::ExternalLexiconProvider::PackDirectory(AiModelPack(which));
-        const auto file = directory / L"model.gguf";
         std::error_code error;
-        if (directory.empty() || !std::filesystem::is_regular_file(file, error)) return false;
-        auto modelParams = llama_model_default_params();
-        // On the processor no device at all, so nothing goes to a GPU.
-        static ggml_backend_dev_t none[] = {nullptr};
-        if (!gpu) modelParams.devices = none;
-        modelParams.n_gpu_layers = gpu ? 999 : 0;
-        // Weights stay mapped from the file: repacking them for speed would
-        // hold a second copy in memory.
-        modelParams.use_extra_bufts = false;
-        model_ = llama_model_load_from_file(Utf8(file.wstring()).c_str(), modelParams);
-        if (!model_) return false;
-        auto contextParams = llama_context_default_params();
-        contextParams.n_ctx = kContext;
-        // Logits for this many tokens at a time are kept (each a row of the
-        // whole vocabulary), so it stays small.
-        contextParams.n_batch = kBatch;
-        contextParams.n_ubatch = kBatch;
-        // The start, a copy of it each sentence goes on from, and two sets
-        // of writings (one growing from the other).
-        contextParams.n_seq_max = static_cast<std::uint32_t>(2 * aihelper::kWritten + 2);
-        contextParams.kv_unified = true;
-        contextParams.n_threads = Threads();
-        contextParams.n_threads_batch = Threads();
-        contextParams.offload_kqv = gpu;
-        contextParams.op_offload = gpu;
-        context_ = llama_init_from_model(model_, contextParams);
-        if (!context_) {
+        if (directory.empty() || !std::filesystem::is_regular_file(directory / L"model.onnx", error) ||
+            !tokenizer_.Load(directory)) {
+            return false;
+        }
+        try {
+            Ort::SessionOptions options;
+            options.SetIntraOpNumThreads(Threads());
+            options.SetInterOpNumThreads(1);
+            options.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
+            cpu_.Open(directory / L"model.onnx", options);
+        } catch (const Ort::Exception&) {
             Unload();
             return false;
         }
         loaded_ = which;
+        device_ = device;
         gpu_ = gpu;
         writes_ = ReadAiModelKind(which).writes;
+        if (device == AiDevice::Gpu || device == AiDevice::Npu) {
+            loading_ = std::thread([this, directory, device, gpu] { LoadFixed(directory, device, gpu); });
+        }
         return true;
     }
 
     std::optional<AiConversion> Convert(const aihelper::Asked& asked) {
-        if (!writes_) {
-            auto scores = Score(asked.sentences, asked.context);
+        try {
+            if (!writes_) {
+                // A model that reads sentences alone: after the context; the
+                // first token not counted without one, as the margins were chosen.
+                auto scores = ScoreAfter(Utf8(asked.context), asked.sentences, !asked.context.empty(), false);
+                if (!scores) return std::nullopt;
+                return AiConversion{std::move(*scores), {}};
+            }
+            std::wstring prompt;
+            if (!asked.context.empty()) {
+                prompt = kContextTag;
+                prompt += asked.context.size() > kContextChars ? asked.context.substr(asked.context.size() - kContextChars)
+                                                               : asked.context;
+            }
+            prompt += kInputTag + asked.reading + kOutputTag;
+            auto scores = ScoreAfter(Utf8(prompt), asked.sentences, true, true);
             if (!scores) return std::nullopt;
-            return AiConversion{std::move(*scores), {}};
+            AiConversion answer{std::move(*scores), {}};
+            if (asked.request != aihelper::Request::Score) answer.written = Write(asked.reading.size());
+            return answer;
+        } catch (const Ort::Exception&) {
+            return std::nullopt;
         }
-        std::wstring prompt;
-        if (!asked.context.empty()) {
-            prompt = kContextTag;
-            prompt += asked.context.size() > kContextChars ? asked.context.substr(asked.context.size() - kContextChars)
-                                                           : asked.context;
-        }
-        prompt += kInputTag + asked.reading + kOutputTag;
-        auto scores = ScoreAfter(prompt, asked.sentences);
-        if (!scores) return std::nullopt;
-        AiConversion answer{std::move(*scores), {}};
-        if (asked.request != aihelper::Request::Score) answer.written = Write(prompt, asked.reading.size());
-        return answer;
     }
 
-    // ln p of each sentence after `context`, for a model that reads
-    // sentences alone. The start (BOS and the context) is read once and each
-    // sentence goes on from a copy of it. Without a context the first token
-    // is not counted, as when the margins were chosen.
-    std::optional<std::vector<double>> Score(const std::vector<std::wstring>& sentences, std::wstring_view context) {
-        const auto start = Tokenize(Utf8(context), true);
-        if (start.empty() || start.size() > kBatch) return std::nullopt;
-        llama_memory_clear(Memory(), true);
-        if (!Decode(start, 0, 0, false)) return std::nullopt;
-        const auto startLogits = LastLogits();
-        std::vector<double> scores;
-        for (const auto& sentence : sentences) {
-            const auto tokens = Tokenize(Utf8(sentence), false);
-            if (tokens.empty()) {
-                scores.push_back(0);
-                continue;
-            }
-            if (tokens.size() > kBatch || start.size() + tokens.size() > kContext) return std::nullopt;
-            Branch(0, 1);
-            if (!Decode(tokens, 1, static_cast<int>(start.size()), true)) return std::nullopt;
-            double sum = context.empty() ? 0 : LogProbability(startLogits.data(), tokens.front());
-            for (std::size_t i = 1; i < tokens.size(); ++i) sum += LogProbability(Logits(static_cast<int>(i) - 1), tokens[i]);
-            scores.push_back(sum);
-        }
-        return scores;
+    // For checking a pack: waits until the GPU or NPU graphs are loaded (or
+    // could not be).
+    bool WaitFixed() {
+        if (loading_.joinable()) loading_.join();
+        return fixedReady_;
     }
 
     void Unload() {
-        if (context_) llama_free(context_);
-        if (model_) llama_model_free(model_);
-        context_ = nullptr;
-        model_ = nullptr;
+        stop_ = true;
+        if (loading_.joinable()) loading_.join();
+        stop_ = false;
+        fixedReady_ = false;
+        prompt_ = Graph{};
+        score_ = Graph{};
+        scoreHead_ = Graph{};
+        lastHead_ = Graph{};
+        cpu_ = Graph{};
         loaded_ = AiModel::None;
     }
 
 private:
-    llama_memory_t Memory() const { return llama_get_memory(context_); }
-    const llama_vocab* Vocab() const { return llama_model_get_vocab(model_); }
-    int VocabSize() const { return llama_vocab_n_tokens(Vocab()); }
-    const float* Logits(int i) const { return llama_get_logits_ith(context_, i); }
-    std::vector<float> LastLogits() const {
-        const float* last = Logits(-1);
-        return std::vector<float>(last, last + VocabSize());
-    }
-
-    double LogProbability(const float* logits, llama_token token) const {
-        const int size = VocabSize();
-        const float top = *std::max_element(logits, logits + size);
-        double total = 0;
-        for (int v = 0; v < size; ++v) total += std::exp(static_cast<double>(logits[v] - top));
-        return logits[token] - top - std::log(total);
-    }
-
-    // Sequence `to` made a copy of sequence `from`.
-    void Branch(llama_seq_id from, llama_seq_id to) {
-        llama_memory_seq_rm(Memory(), to, -1, -1);
-        llama_memory_seq_cp(Memory(), from, to, -1, -1);
-    }
-
-    std::vector<llama_token> Tokenize(const std::string& text, bool start) const {
-        std::vector<llama_token> tokens(text.size() + 8);
-        const int count = llama_tokenize(Vocab(), text.c_str(), static_cast<int>(text.size()), tokens.data(),
-                                         static_cast<int>(tokens.size()), start, false);
-        tokens.resize(count > 0 ? static_cast<std::size_t>(count) : 0);
-        return tokens;
-    }
-
-    // Reads `tokens` into sequence `sequence` from position `at`, with
-    // logits for every token (`all`) or the last only.
-    bool Decode(const std::vector<llama_token>& tokens, llama_seq_id sequence, int at, bool all) {
-        const int count = static_cast<int>(tokens.size());
-        llama_batch batch = llama_batch_init(count, 0, 1);
-        for (int i = 0; i < count; ++i) {
-            batch.token[i] = tokens[static_cast<std::size_t>(i)];
-            batch.pos[i] = at + i;
-            batch.n_seq_id[i] = 1;
-            batch.seq_id[i][0] = sequence;
-            batch.logits[i] = all || i == count - 1;
+    // The fixed-shape bodies and the scoring head on the GPU (DirectML) or
+    // the NPU; the head for the last tokens (a few rows) on the processor.
+    void LoadFixed(std::filesystem::path directory, AiDevice device, std::uint32_t gpu) {
+        try {
+            Ort::SessionOptions here;
+            here.SetIntraOpNumThreads(Threads());
+            here.SetInterOpNumThreads(1);
+            here.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
+            Graph lastHead;
+            lastHead.Open(directory / L"head.onnx", here);
+            Ort::SessionOptions options;
+            options.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
+            if (device == AiDevice::Gpu) {
+                const auto adapter = PickGpu(gpu);
+                if (!adapter) return;
+                options.DisableMemPattern();
+                options.SetExecutionMode(ExecutionMode::ORT_SEQUENTIAL);
+                Ort::ThrowOnError(OrtSessionOptionsAppendExecutionProvider_DML(options, *adapter));
+            } else {
+                const auto npus = NpuDevices();
+                if (npus.empty()) return;
+                // The NPU's driver keeps what it compiles, for the next time.
+                options.AppendExecutionProvider_V2(Environment(), npus, std::unordered_map<std::string, std::string>{});
+            }
+            Graph prompt, score, scoreHead;
+            for (auto [graph, name] : {std::pair{&prompt, L"body-1x64.onnx"}, std::pair{&score, L"body-10x32.onnx"},
+                                       std::pair{&scoreHead, L"head-320.onnx"}}) {
+                if (stop_) return;
+                graph->Open(directory / name, options);
+            }
+            std::lock_guard lock(fixedLock_);
+            prompt_ = std::move(prompt);
+            score_ = std::move(score);
+            scoreHead_ = std::move(scoreHead);
+            lastHead_ = std::move(lastHead);
+            prompt_.lastHead = &lastHead_;
+            score_.targetHead = &scoreHead_;
+            fixedReady_ = true;
+        } catch (const Ort::Exception&) {
         }
-        batch.n_tokens = count;
-        const bool ok = llama_decode(context_, batch) == 0;
-        llama_batch_free(batch);
-        return ok;
     }
 
-    // ln p of each sentence and the end after the prompt (BOS, prompt).
-    std::optional<std::vector<double>> ScoreAfter(const std::wstring& prompt, const std::vector<std::wstring>& sentences) {
-        const auto start = Tokenize(Utf8(prompt), true);
-        if (start.empty() || start.size() > kBatch) return std::nullopt;
-        llama_memory_clear(Memory(), true);
-        if (!Decode(start, 0, 0, false)) return std::nullopt;
-        promptLogits_ = LastLogits();
-        promptTokens_ = static_cast<int>(start.size());
-        const llama_token end = llama_vocab_eos(Vocab());
-        std::vector<double> scores;
+    // Whether the fixed-shape graphs answer this time.
+    bool Fixed() const { return fixedReady_; }
+
+    // Reads the prompt (BOS and `start`): on the fixed graphs padded at its
+    // start to their tokens, else as it is.
+    std::optional<Prompt> ReadPrompt(const std::string& start, bool fixed) {
+        const auto tokens = tokenizer_.Encode(start, true);
+        if (tokens.empty() || tokens.size() > kBatch) return std::nullopt;
+        Prompt p;
+        p.tokens = tokens.size();
+        if (!fixed) {
+            std::vector<std::int64_t> ids(tokens.begin(), tokens.end()), zeros(ids.size(), 0), ones(ids.size(), 1), at(ids.size());
+            for (std::size_t i = 0; i < at.size(); ++i) at[i] = static_cast<std::int64_t>(i);
+            auto empty = cpu_.Empty(1);
+            auto read = Run(cpu_, 1, ids.size(), ids, at, zeros, ones, empty);
+            p.state = std::move(read.state);
+            p.last = std::move(read.lastLogprobs);
+            return p;
+        }
+        const auto length = static_cast<std::size_t>(prompt_.tokens), window = static_cast<std::size_t>(prompt_.window);
+        if (tokens.size() > length) return std::nullopt;
+        const std::size_t pad = length - tokens.size();
+        std::vector<std::int64_t> ids(length, 0), at(length, 0), zeros(length, 0), mask(window + length, 0);
+        for (std::size_t i = 0; i < tokens.size(); ++i) {
+            ids[pad + i] = tokens[i];
+            at[pad + i] = static_cast<std::int64_t>(i);
+            mask[window + pad + i] = 1;
+        }
+        auto empty = prompt_.Empty(1);
+        auto read = Run(prompt_, 1, length, ids, at, zeros, mask, empty);
+        p.state = std::move(read.state);
+        p.last = std::move(read.lastLogprobs);
+        p.window.assign(mask.begin() + static_cast<std::ptrdiff_t>(length), mask.end());
+        return p;
+    }
+
+    // ln p of each sentence (and the end, `withEnd`) after `start` (BOS and
+    // it). The start is read once and each sentence goes on from it, many
+    // at a time; `countFirst`: the first token of each counts too.
+    std::optional<std::vector<double>> ScoreAfter(const std::string& start, const std::vector<std::wstring>& sentences,
+                                                  bool countFirst, bool withEnd) {
+        std::vector<std::vector<std::int32_t>> rows;
+        std::size_t longest = 0;
         for (const auto& sentence : sentences) {
-            auto tokens = Tokenize(Utf8(sentence), false);
-            tokens.push_back(end);
-            if (tokens.size() > kBatch || start.size() + tokens.size() > kContext) return std::nullopt;
-            Branch(0, 1);
-            if (!Decode(tokens, 1, promptTokens_, true)) return std::nullopt;
-            double sum = LogProbability(promptLogits_.data(), tokens.front());
-            for (std::size_t i = 1; i < tokens.size(); ++i) sum += LogProbability(Logits(static_cast<int>(i) - 1), tokens[i]);
-            scores.push_back(sum);
+            auto tokens = tokenizer_.Encode(Utf8(sentence), false);
+            if (withEnd) tokens.push_back(tokenizer_.End());
+            if (tokens.size() > kBatch) return std::nullopt;
+            longest = std::max(longest, tokens.size());
+            rows.push_back(std::move(tokens));
+        }
+        // On the fixed graphs when it fits them, else on the processor.
+        bool fixed = Fixed() && longest <= static_cast<std::size_t>(score_.tokens);
+        auto prompt = ReadPrompt(start, fixed);
+        if (!prompt && fixed) {
+            fixed = false;
+            prompt = ReadPrompt(start, false);
+        }
+        if (!prompt) return std::nullopt;
+        promptRead_ = *prompt;
+        promptFixed_ = fixed;
+        std::vector<double> scores(rows.size(), 0.0);
+        if (longest == 0) return scores;
+        Graph& graph = fixed ? score_ : cpu_;
+        const std::size_t past = prompt->tokens;
+        if (!fixed && past + longest > kContext) return std::nullopt;
+        const std::size_t width = fixed ? static_cast<std::size_t>(graph.tokens) : longest;
+        const std::size_t group = fixed ? static_cast<std::size_t>(graph.batch) : rows.size();
+        const std::size_t window = fixed ? prompt->window.size() : past;
+        for (std::size_t from = 0; from < rows.size(); from += group) {
+            const std::size_t n = fixed ? group : rows.size();
+            std::vector<std::int64_t> ids(n * width, 0), targets(n * width, 0), at(n * width), mask(n * (window + width), 0);
+            for (std::size_t r = 0; r < n; ++r) {
+                for (std::size_t k = 0; k < window; ++k) mask[r * (window + width) + k] = fixed ? prompt->window[k] : 1;
+                for (std::size_t t = 0; t < width; ++t) at[r * width + t] = static_cast<std::int64_t>(past + t);
+                if (from + r >= rows.size()) continue;
+                const auto& row = rows[from + r];
+                for (std::size_t t = 0; t < row.size(); ++t) {
+                    ids[r * width + t] = row[t];
+                    if (t + 1 < row.size()) targets[r * width + t] = row[t + 1];
+                    mask[r * (window + width) + window + t] = 1;
+                }
+            }
+            std::vector<std::size_t> each(n, 0);
+            std::vector<Tensor> state;
+            for (const auto& t : prompt->state) state.push_back(t.Rows(each));
+            const auto read = Run(graph, n, width, ids, at, targets, mask, state);
+            for (std::size_t r = 0; r < n && from + r < rows.size(); ++r) {
+                const auto& row = rows[from + r];
+                if (row.empty()) continue;
+                double sum = countFirst ? prompt->last[static_cast<std::size_t>(row[0])] : 0.0;
+                for (std::size_t t = 0; t + 1 < row.size(); ++t) sum += read.targetLogprobs[r * width + t];
+                scores[from + r] = sum;
+            }
+            if (!fixed) break;
         }
         return scores;
     }
 
     // The likeliest writings after the prompt read last (ScoreAfter), by
-    // beam search: each beam a sequence; a longer one copies its parent's
-    // and reads one token more.
-    std::vector<std::pair<std::wstring, double>> Write(const std::wstring& prompt, std::size_t readingLength) {
-        (void)prompt;
-        constexpr int kBeams = static_cast<int>(aihelper::kWritten);
+    // beam search on the processor: the beams read their next tokens
+    // together, each going on from its parent's state (one token at a time
+    // a GPU or an NPU runs no faster).
+    std::vector<std::pair<std::wstring, double>> Write(std::size_t readingLength) {
+        constexpr std::size_t kBeams = aihelper::kWritten;
         struct Beam {
-            std::vector<llama_token> tokens;
+            std::vector<std::int32_t> tokens;
             double score{0};
             bool done{false};
-            llama_seq_id seq{0};
-            std::vector<std::pair<float, llama_token>> next;
+            std::size_t row{0};  // its row in the state
         };
-        const int size = VocabSize();
-        const auto best = [&](const float* logits) {
-            const float top = *std::max_element(logits, logits + size);
-            double total = 0;
-            for (int v = 0; v < size; ++v) total += std::exp(static_cast<double>(logits[v] - top));
-            const float logTotal = static_cast<float>(std::log(total)) + top;
-            std::vector<std::pair<float, llama_token>> all;
-            all.reserve(static_cast<std::size_t>(size));
-            for (int v = 0; v < size; ++v) all.emplace_back(logits[v] - logTotal, v);
+        const auto best = [&](const float* logprobs, std::size_t vocab) {
+            std::vector<std::pair<float, std::int32_t>> all(vocab);
+            for (std::size_t v = 0; v < vocab; ++v) all[v] = {logprobs[v], static_cast<std::int32_t>(v)};
             std::partial_sort(all.begin(), all.begin() + kBeams, all.end(),
                               [](const auto& a, const auto& b) { return a.first > b.first; });
             all.resize(kBeams);
             return all;
         };
+        Graph& graph = cpu_;
+        const Prompt& prompt = promptRead_;
+        const std::size_t vocab = prompt.last.size();
         std::vector<Beam> beams(1);
-        beams[0].next = best(promptLogits_.data());
+        std::vector<std::vector<std::pair<float, std::int32_t>>> next{best(prompt.last.data(), vocab)};
+        std::vector<Tensor> state;
+        for (const auto& t : prompt.state) state.push_back(promptFixed_ ? t.Last(prompt.tokens) : t);
+        std::size_t past = prompt.tokens;
         // Tokens: plenty for any writing of the reading.
-        const int limit = static_cast<int>(readingLength) * 2 + 8;
-        for (int step = 0; step < limit; ++step) {
+        const std::size_t limit = std::min(readingLength * 2 + 8, kContext - prompt.tokens);
+        for (std::size_t step = 0; step < limit; ++step) {
             struct Option {
                 double score;
-                int from;
-                llama_token token;  // -1: the beam as it is (done)
+                std::size_t from;
+                std::int32_t token;  // -1: the beam as it is (done)
             };
             std::vector<Option> options;
-            for (int b = 0; b < static_cast<int>(beams.size()); ++b) {
+            for (std::size_t b = 0; b < beams.size(); ++b) {
                 if (beams[b].done) {
                     options.push_back({beams[b].score, b, -1});
                     continue;
                 }
-                for (const auto& [lp, token] : beams[b].next) options.push_back({beams[b].score + lp, b, token});
+                for (const auto& [lp, token] : next[beams[b].row]) options.push_back({beams[b].score + lp, b, token});
             }
-            std::sort(options.begin(), options.end(), [](const Option& a, const Option& b) { return a.score > b.score; });
-            if (static_cast<int>(options.size()) > kBeams) options.resize(kBeams);
-            // Children go in the set of sequences the parents are not in.
-            const llama_seq_id base = (step % 2 == 0) ? 2 + kBeams : 2;
+            std::stable_sort(options.begin(), options.end(), [](const Option& a, const Option& b) { return a.score > b.score; });
+            if (options.size() > kBeams) options.resize(kBeams);
             std::vector<Beam> children;
-            for (int k = 0; k < static_cast<int>(options.size()); ++k) {
-                const Beam& parent = beams[options[k].from];
-                Beam child{parent.tokens, options[k].score, parent.done, base + k, {}};
-                if (options[k].token >= 0) {
-                    child.tokens.push_back(options[k].token);
-                    child.done = llama_vocab_is_eog(Vocab(), options[k].token);
+            std::vector<std::size_t> parents;
+            std::vector<std::int64_t> ids;
+            for (const auto& option : options) {
+                const Beam& parent = beams[option.from];
+                Beam child{parent.tokens, option.score, parent.done, 0};
+                if (option.token >= 0) {
+                    child.tokens.push_back(option.token);
+                    child.done = option.token == tokenizer_.End();
                     if (!child.done) {
-                        Branch(parent.seq, child.seq);
-                        const int at = promptTokens_ + static_cast<int>(child.tokens.size()) - 1;
-                        if (Decode({options[k].token}, child.seq, at, true)) {
-                            child.next = best(Logits(-1));
-                        } else {
-                            child.done = true;
-                        }
+                        child.row = parents.size();
+                        parents.push_back(parent.row);
+                        ids.push_back(option.token);
                     }
                 }
                 children.push_back(std::move(child));
             }
-            for (const auto& beam : beams) {
-                if (beam.seq) llama_memory_seq_rm(Memory(), beam.seq, -1, -1);
-            }
             beams = std::move(children);
-            if (std::all_of(beams.begin(), beams.end(), [](const Beam& b) { return b.done; })) break;
+            if (parents.empty()) break;
+            const std::size_t batch = parents.size();
+            std::vector<Tensor> picked;
+            for (const auto& t : state) picked.push_back(t.Rows(parents));
+            std::vector<std::int64_t> zeros(batch, 0), at(batch, static_cast<std::int64_t>(past)), mask(batch * (past + 1), 1);
+            auto read = Run(graph, batch, 1, ids, at, zeros, mask, picked);
+            ++past;
+            state = std::move(read.state);
+            next.assign(batch, {});
+            for (std::size_t r = 0; r < batch; ++r) next[r] = best(read.lastLogprobs.data() + r * read.vocab, read.vocab);
         }
         std::vector<std::pair<std::wstring, double>> written;
         for (const auto& beam : beams) {
             if (!beam.done) continue;
-            std::string text;
-            for (const llama_token t : beam.tokens) {
-                if (llama_vocab_is_eog(Vocab(), t)) break;
-                char piece[256];
-                const int n = llama_token_to_piece(Vocab(), t, piece, sizeof(piece), 0, false);
-                if (n > 0) text.append(piece, static_cast<std::size_t>(n));
-            }
-            auto wide = Wide(text);
+            auto wide = Wide(tokenizer_.Decode(beam.tokens));
             const bool seen = std::any_of(written.begin(), written.end(), [&](const auto& w) { return w.first == wide; });
             if (!wide.empty() && !seen) written.emplace_back(std::move(wide), beam.score);
         }
         return written;
     }
 
-    llama_model* model_{nullptr};
-    llama_context* context_{nullptr};
+    Graph cpu_, prompt_, score_, scoreHead_, lastHead_;
+    std::thread loading_;
+    std::mutex fixedLock_;
+    std::atomic<bool> fixedReady_{false}, stop_{false};
+    tekito::ai::ByteBpe tokenizer_;
     AiModel loaded_{AiModel::None};
-    bool gpu_{false};
+    AiDevice device_{AiDevice::Auto};
+    std::uint32_t gpu_{0};
     bool writes_{false};
-    std::vector<float> promptLogits_;
-    int promptTokens_{0};
+    Prompt promptRead_;
+    bool promptFixed_{false};
 };
 
 std::vector<std::uint8_t> Answer(Model& model, std::span<const std::uint8_t> message, bool& stop) {
@@ -379,7 +710,7 @@ std::vector<std::uint8_t> Answer(Model& model, std::span<const std::uint8_t> mes
         stop = true;
         return aihelper::EncodeReply(aihelper::Status::Ok);
     }
-    if (!model.Load(asked->model, asked->device)) return aihelper::EncodeReply(aihelper::Status::NoModel);
+    if (!model.Load(asked->model, asked->device, asked->gpu)) return aihelper::EncodeReply(aihelper::Status::NoModel);
     if (asked->request == aihelper::Request::Warm) return aihelper::EncodeReply(aihelper::Status::Ok);
     const auto answer = model.Convert(*asked);
     if (!answer) return aihelper::EncodeReply(aihelper::Status::TooLong);
@@ -474,11 +805,17 @@ int Serve() {
 
 // For checking a pack: each line "reading<TAB>sentence..." asked as the
 // input method asks, the answer and how long it took printed.
-int ConvertFile(AiModel which, AiDevice device, const std::filesystem::path& file) {
+int ConvertFile(AiModel which, AiDevice device, std::uint32_t gpu, const std::filesystem::path& file) {
     Model model;
-    if (!model.Load(which, device)) {
+    if (!model.Load(which, device, gpu)) {
         std::fprintf(stderr, "the model is not installed\n");
         return 2;
+    }
+    if (device == AiDevice::Gpu || device == AiDevice::Npu) {
+        const auto start = std::chrono::steady_clock::now();
+        const bool ready = model.WaitFixed();
+        std::printf("%s graphs %s in %.1f s\n", device == AiDevice::Gpu ? "GPU" : "NPU", ready ? "loaded" : "not loaded",
+                    std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count());
     }
     std::ifstream in(file, std::ios::binary);
     for (std::string line; std::getline(in, line);) {
@@ -504,23 +841,87 @@ int ConvertFile(AiModel which, AiDevice device, const std::filesystem::path& fil
 
 }  // namespace
 
+// The execution providers Windows ML offers on this PC (its catalog), and
+// the devices ONNX Runtime then sees. `prepare`: a provider not yet on the
+// PC downloaded first (Windows ML fetches it from Microsoft).
+int ListDevices(std::string_view prepare) {
+    struct Context {
+        std::string_view prepare;  // the provider to download, if any
+        std::vector<std::pair<std::string, std::string>> registered;
+    } context{prepare, {}};
+    WinMLEpCatalogHandle catalog = nullptr;
+    if (FAILED(WinMLEpCatalogCreate(&catalog))) {
+        std::printf("no Windows ML catalog (Windows 11 24H2 or later is needed)\n");
+    } else {
+        WinMLEpCatalogEnumProviders(
+            catalog,
+            [](WinMLEpHandle ep, const WinMLEpInfo* info, void* data) -> BOOL {
+                auto* c = static_cast<Context*>(data);
+                if (!info || !info->name) return TRUE;
+                const char* states[] = {"ready", "not ready", "not present"};
+                std::printf("provider %s %s: %s%s\n", info->name, info->version ? info->version : "",
+                            states[std::clamp(static_cast<int>(info->readyState), 0, 2)],
+                            info->certification == WinMLEpCertification_Certified ? ", certified" : "");
+                // "npu": the providers that run NPUs (Intel's, Qualcomm's, AMD's).
+                const std::string_view name = info->name;
+                const bool npu = name == "OpenVINOExecutionProvider" || name == "QNNExecutionProvider" ||
+                                 name == "VitisAIExecutionProvider";
+                const bool wanted = c->prepare == name || (c->prepare == "npu" && npu);
+                if (info->readyState != WinMLEpReadyState_Ready && !(wanted && SUCCEEDED(WinMLEpEnsureReady(ep)))) {
+                    return TRUE;
+                }
+                std::size_t size = 0;
+                if (FAILED(WinMLEpGetLibraryPathSize(ep, &size)) || size == 0) return TRUE;
+                std::string path(size, '\0');
+                std::size_t used = 0;
+                if (FAILED(WinMLEpGetLibraryPath(ep, size, path.data(), &used)) || used == 0) return TRUE;
+                path.resize(used - 1);
+                c->registered.emplace_back(info->name, path);
+                return TRUE;
+            },
+            &context);
+        WinMLEpCatalogRelease(catalog);
+    }
+    for (const auto& [name, path] : context.registered) {
+        try {
+            Environment().RegisterExecutionProviderLibrary(name.c_str(), std::filesystem::path(path).wstring());
+            std::printf("registered %s\n", name.c_str());
+        } catch (const Ort::Exception& e) {
+            std::printf("could not register %s: %s\n", name.c_str(), e.what());
+        }
+    }
+    bool npu = false;
+    for (const auto& device : Environment().GetEpDevices()) {
+        const auto type = device.Device().Type();
+        npu = npu || type == OrtHardwareDeviceType_NPU;
+        std::printf("device %s on %s (%s)\n", device.EpName(), type == OrtHardwareDeviceType_NPU ? "NPU"
+                                                             : type == OrtHardwareDeviceType_GPU ? "GPU" : "CPU",
+                    device.Device().Vendor());
+    }
+    // Preparing the NPU: whether one is ready now.
+    return prepare == "npu" && !npu ? 1 : 0;
+}
+
 // A console program, started without a console (CREATE_NO_WINDOW), so
 // --convert prints where it was run from.
 int wmain(int argc, wchar_t** argv) {
-    // TEKITO_AI_LOG=1: llama.cpp's messages on the console, for --convert.
-    if (!_wgetenv(L"TEKITO_AI_LOG")) llama_log_set(Quiet, nullptr);
-    ggml_backend_load_all_from_path(Utf8(HereDirectory().wstring()).c_str());
-    llama_backend_init();
     int result = 0;
-    if (argc == 5 && std::wstring_view(argv[1]) == L"--convert") {
+    if (argc >= 2 && std::wstring_view(argv[1]) == L"--devices") {
+        result = ListDevices(argc >= 4 && std::wstring_view(argv[2]) == L"--prepare" ? Utf8(argv[3]) : std::string{});
+    } else if (argc == 5 && std::wstring_view(argv[1]) == L"--convert") {
         const AiModel which = std::wstring_view(argv[2]) == L"strong" ? AiModel::Strong : AiModel::Light;
+        // cpu, gpu, gpu=<GpuId in hex>, npu, or auto.
         const std::wstring_view where = argv[3];
-        const AiDevice device = where == L"cpu" ? AiDevice::Cpu : where == L"gpu" ? AiDevice::Gpu : AiDevice::Auto;
-        result = ConvertFile(which, device, argv[4]);
+        const AiDevice device = where == L"cpu"            ? AiDevice::Cpu
+                               : where.starts_with(L"gpu") ? AiDevice::Gpu
+                               : where == L"npu"           ? AiDevice::Npu
+                                                           : AiDevice::Auto;
+        const std::uint32_t gpu = where.starts_with(L"gpu=") ? std::wcstoul(argv[3] + 4, nullptr, 16) : 0;
+        result = ConvertFile(which, device, gpu, argv[4]);
     } else {
         SetPriorityClass(GetCurrentProcess(), BELOW_NORMAL_PRIORITY_CLASS);
+        RegisterReadyProviders();
         result = Serve();
     }
-    llama_backend_free();
     return result;
 }

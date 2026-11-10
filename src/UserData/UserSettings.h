@@ -152,9 +152,12 @@ struct UserSettings {
     // alone, 1 = it and the light AI model, 2 = it and the strong one. An
     // AI model not installed counts as 0.
     int japaneseSentenceModel{0};
-    // Where the AI model runs (japanese::AiDevice): 0 = the GPU when the PC
-    // has its own, else the processor; 1 = the processor; 2 = the GPU.
+    // Where the AI model runs (japanese::AiDevice): 0 = automatic (the
+    // processor); 1 = the processor; 2 = the GPU; 3 = the NPU.
     int japaneseAiDevice{0};
+    // Which GPU, when there are several (japanese::GpuId, kept as its bits):
+    // 0 = the one with the most memory of its own.
+    int japaneseAiGpu{0};
     // Space may rewrite the reading when keys look like a typing slip
     // (KeyConverter / KanaSlips), then convert; the keys as typed stay a
     // choice. Off: convert as typed; slip readings stay in the list only.

@@ -185,8 +185,9 @@ struct AiAsking {
     bool running{false};
 };
 
-AiHelperClient::AiHelperClient(AiModel model, AiDevice device, std::chrono::milliseconds wait, std::size_t top)
-    : model_(model), device_(device), wait_(wait), top_(top), kind_(ReadAiModelKind(model)),
+AiHelperClient::AiHelperClient(AiModel model, AiDevice device, std::uint32_t gpu, std::chrono::milliseconds wait,
+                               std::size_t top)
+    : model_(model), device_(device), gpu_(gpu), wait_(wait), top_(top), kind_(ReadAiModelKind(model)),
       asking_(std::make_shared<AiAsking>()) {}
 
 std::optional<AiConversion> AiHelperClient::Convert(std::wstring_view reading, std::span<const std::wstring> sentences,
@@ -195,7 +196,7 @@ std::optional<AiConversion> AiHelperClient::Convert(std::wstring_view reading, s
     if (context.size() > aihelper::kMaxCharacters) context = context.substr(context.size() - aihelper::kMaxCharacters);
     aihelper::Asked asked{write ? aihelper::Request::Convert : aihelper::Request::Score, model_, device_,
                           std::wstring(context), std::wstring(reading),
-                          std::vector<std::wstring>(sentences.begin(), sentences.end())};
+                          std::vector<std::wstring>(sentences.begin(), sentences.end()), gpu_};
     const auto reply = Exchange(aihelper::EncodeRequest(asked), Clock::now() + wait_);
     if (!reply) return std::nullopt;
     auto answer = aihelper::DecodeReply(*reply);
@@ -242,7 +243,7 @@ std::optional<AiConversion> AiHelperClient::Ask(std::wstring_view reading, std::
     if (context.size() > aihelper::kMaxCharacters) context = context.substr(context.size() - aihelper::kMaxCharacters);
     aihelper::Asked asked{write ? aihelper::Request::Convert : aihelper::Request::Score, model_, device_,
                           std::wstring(context), std::wstring(reading),
-                          std::vector<std::wstring>(sentences.begin(), sentences.end())};
+                          std::vector<std::wstring>(sentences.begin(), sentences.end()), gpu_};
     auto request = aihelper::EncodeRequest(asked);
     std::lock_guard lock(asking_->mutex);
     if (asking_->answered == request) {
@@ -274,7 +275,7 @@ bool AiHelperClient::Asking() const {
 
 void AiHelperClient::Warm() const {
     constexpr auto kWait = std::chrono::milliseconds(20);
-    aihelper::Asked asked{aihelper::Request::Warm, model_, device_, {}, {}, {}};
+    aihelper::Asked asked{aihelper::Request::Warm, model_, device_, {}, {}, {}, gpu_};
     (void)Exchange(aihelper::EncodeRequest(asked), Clock::now() + kWait);
 }
 
@@ -371,6 +372,7 @@ std::vector<std::uint8_t> EncodeRequest(const Asked& asked) {
     Put32(out, static_cast<std::uint32_t>(asked.request));
     Put32(out, static_cast<std::uint32_t>(asked.model));
     Put32(out, static_cast<std::uint32_t>(asked.device));
+    Put32(out, asked.gpu);
     PutText(out, asked.context);
     PutText(out, asked.reading);
     Put32(out, static_cast<std::uint32_t>(asked.sentences.size()));
@@ -383,12 +385,12 @@ std::optional<Asked> DecodeRequest(std::span<const std::uint8_t> message) {
     std::uint32_t magic = 0, request = 0, model = 0, device = 0, count = 0;
     Asked asked;
     if (!Take(message, at, magic) || magic != kMagic || !Take(message, at, request) || !Take(message, at, model) ||
-        !Take(message, at, device) || !TakeText(message, at, asked.context) || !TakeText(message, at, asked.reading) ||
+        !Take(message, at, device) || !Take(message, at, asked.gpu) || !TakeText(message, at, asked.context) || !TakeText(message, at, asked.reading) ||
         !Take(message, at, count)) {
         return std::nullopt;
     }
     if (request > static_cast<std::uint32_t>(Request::Score) || model < 1 ||
-        model > static_cast<std::uint32_t>(AiModel::Strong) || device > static_cast<std::uint32_t>(AiDevice::Gpu) ||
+        model > static_cast<std::uint32_t>(AiModel::Strong) || device > static_cast<std::uint32_t>(AiDevice::Npu) ||
         count > kMaxSentences) {
         return std::nullopt;
     }

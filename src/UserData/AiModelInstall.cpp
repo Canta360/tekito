@@ -92,7 +92,7 @@ bool AiModelPackInstalled(std::wstring_view packId, const std::filesystem::path&
     std::error_code error;
     const auto pack = dataRoot / std::wstring(packId);
     return std::filesystem::is_regular_file(pack / L"manifest.json", error) &&
-           std::filesystem::is_regular_file(pack / L"model.gguf", error);
+           std::filesystem::is_regular_file(pack / L"model.onnx", error);
 }
 
 bool AiRuntimeInstalled(const std::filesystem::path& dataRoot) {

@@ -27,7 +27,9 @@
 #include "Core/Japanese/TopicVectors.h"
 
 #include <filesystem>
+#include <map>
 #include <mutex>
+#include <tuple>
 
 namespace tekito::japanese {
 namespace {
@@ -242,28 +244,29 @@ const MeaningDictionary& ProcessMeanings() {
     return *meanings;
 }
 
-const AiJudge* ProcessAiJudge(AiModel model, AiDevice device) {
+const AiJudge* ProcessAiJudge(AiModel model, AiDevice device, std::uint32_t gpu) {
     if (model != AiModel::Light && model != AiModel::Strong) return nullptr;
     std::error_code error;
     const auto directory = ExternalLexiconProvider::PackDirectory(AiModelPack(model));
-    if (directory.empty() || !std::filesystem::is_regular_file(directory / L"model.gguf", error)) return nullptr;
-    // One client per model and device, made once its pack is there (it
-    // reads how to use the model from the pack). How long a conversion
-    // waits for it: the light model reads ten sentences and writes five in
-    // about 0.15 s on a GPU, 1 s on a processor; the strong one about four
-    // times that.
+    if (directory.empty() || !std::filesystem::is_regular_file(directory / L"model.onnx", error)) return nullptr;
+    // One client per model, device and GPU, made once its pack is there (it
+    // reads how to use the model from the pack), kept while the process
+    // lives (composers hold it). How long a conversion waits for it: the
+    // light model reads ten sentences and writes five in about 0.2 s to
+    // 0.4 s wherever it runs (the GPU or the NPU take over only once ready);
+    // the strong one about four times that.
     static std::mutex lock;
-    static std::unique_ptr<AiHelperClient> clients[3][3];
-    const auto m = static_cast<std::size_t>(model);
-    const auto d = static_cast<std::size_t>(std::clamp(static_cast<int>(device), 0, 2));
+    static std::map<std::tuple<int, int, std::uint32_t>, std::unique_ptr<AiHelperClient>> clients;
+    const int d = std::clamp(static_cast<int>(device), 0, 3);
+    if (static_cast<AiDevice>(d) != AiDevice::Gpu) gpu = 0;
     std::lock_guard<std::mutex> hold(lock);
-    if (!clients[m][d]) {
+    auto& client = clients[{static_cast<int>(model), d, gpu}];
+    if (!client) {
         using std::chrono::milliseconds;
-        const auto wait = model == AiModel::Light ? milliseconds(device == AiDevice::Cpu ? 1500 : 600)
-                                                  : milliseconds(device == AiDevice::Cpu ? 4000 : 1500);
-        clients[m][d] = std::make_unique<AiHelperClient>(model, device, wait, 10);
+        const auto wait = model == AiModel::Light ? milliseconds(1500) : milliseconds(4000);
+        client = std::make_unique<AiHelperClient>(model, static_cast<AiDevice>(d), gpu, wait, 10);
     }
-    return clients[m][d].get();
+    return client.get();
 }
 
 void AttachJapaneseData(JapaneseComposer& composer) {

@@ -172,7 +172,14 @@ const en = {
     downloading: "Downloading",
     remove: "Remove the model",
     removed: "Removed the AI model",
-    device: { title: "Run AI on", description: "The GPU is faster. Auto uses it when the PC has one.", auto: "Auto" },
+    device: {
+      title: "Run AI on",
+      description: "Runs on the CPU by default. Choose GPU or NPU to ease the load on the CPU.",
+      auto: "Auto",
+      npuFirst: "The first time takes a few minutes to get ready. The CPU runs it until then.",
+      preparing: "Preparing the NPU",
+      gpu: "GPU to use",
+    },
   },
   mixed: {
     live: { title: "Live conversion", description: "Converts Japanese as you type. English stays as typed." },
@@ -499,7 +506,14 @@ const ja = {
     downloading: "ダウンロード中",
     remove: "モデルを削除",
     removed: "AI モデルを削除しました",
-    device: { title: "AI の処理", description: "GPU のほうが高速に動作します。「自動」では、GPU がある場合は GPU が使用されます", auto: "自動" },
+    device: {
+      title: "AI の処理",
+      description: "通常は CPU で処理されます。GPU や NPU を選ぶと、CPU の負担を減らせます",
+      auto: "自動",
+      npuFirst: "初回は準備に数分かかります。その間は CPU で処理されます",
+      preparing: "NPU を準備中",
+      gpu: "使用する GPU",
+    },
   },
   mixed: {
     live: { title: "ライブ変換", description: "日本語が入力と同時に変換されます。英語はそのまま表示されます" },

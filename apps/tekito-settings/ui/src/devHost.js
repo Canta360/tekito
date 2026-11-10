@@ -21,7 +21,9 @@ function initialState() {
   return {
     postalCodes: { installed: false },
     aiModels: { light: { installed: false, bytes: 229322365 }, strong: { installed: false, bytes: 1246265200 },
-      runtime: { installed: false, bytes: 18246900 }, downloading: 0, error: "" },
+      runtime: { installed: false, bytes: 18246900 }, downloading: 0, error: "",
+      gpus: [{ id: 268566271, name: "AMD Radeon RX 7600" }, { id: -2142881189, name: "Intel(R) Arc(TM) Graphics" }],
+      npu: true, npuPreparing: false, npuError: "" },
     settings: {
       startMode: 0,
       switchOrder: 1234,
@@ -85,6 +87,7 @@ function initialState() {
       japaneseSentenceCheck: true,
       japaneseSentenceModel: 0,
       japaneseAiDevice: 0,
+      japaneseAiGpu: 0,
       japaneseSlipAutoApply: true,
       japaneseFirstPageSymbol: true,
       japaneseTypedForms: true,
@@ -235,6 +238,13 @@ export function installMockHost() {
           state.aiModels = { ...state.aiModels, [key]: { ...state.aiModels[key], installed: true },
             runtime: { ...state.aiModels.runtime, installed: true }, downloading: 0 };
           state.settings.japaneseSentenceModel = message.model;
+          const data = JSON.stringify({ type: "state.changed", state });
+          listeners.forEach((listener) => listener({ data }));
+        }, 2500);
+      } else if (type === "aiNpu.prepare") {
+        state.aiModels = { ...state.aiModels, npuPreparing: true, npuError: "" };
+        window.setTimeout(() => {
+          state.aiModels = { ...state.aiModels, npuPreparing: false };
           const data = JSON.stringify({ type: "state.changed", state });
           listeners.forEach((listener) => listener({ data }));
         }, 2500);

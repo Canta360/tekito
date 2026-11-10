@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <filesystem>
 #include <memory>
 #include <string_view>
@@ -45,7 +46,7 @@ void ReloadUserRomaji();
 
 // The AI model `model` as converting asks it (TekitoAI.exe); null for
 // AiModel::None or while its pack is not installed.
-[[nodiscard]] const AiJudge* ProcessAiJudge(AiModel model, AiDevice device);
+[[nodiscard]] const AiJudge* ProcessAiJudge(AiModel model, AiDevice device, std::uint32_t gpu = 0);
 
 // Mixed typing (JapaneseComposer::SetMixedTyping) on or off for `composer`;
 // stays off when the English word scores are missing.

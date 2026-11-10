@@ -382,7 +382,9 @@ bool SqliteUserDictionaryRepository::LoadSettings(UserSettings& settings) const 
         } else if (std::strcmp(key, "japanese_sentence_model") == 0) {
             loaded.japaneseSentenceModel = std::clamp(static_cast<int>(value), 0, 2);
         } else if (std::strcmp(key, "japanese_ai_device") == 0) {
-            loaded.japaneseAiDevice = std::clamp(static_cast<int>(value), 0, 2);
+            loaded.japaneseAiDevice = std::clamp(static_cast<int>(value), 0, 3);
+        } else if (std::strcmp(key, "japanese_ai_gpu") == 0) {
+            loaded.japaneseAiGpu = value;
         } else if (std::strcmp(key, "japanese_slip_auto_apply") == 0) {
             loaded.japaneseSlipAutoApply = value != 0;
         } else if (std::strcmp(key, "japanese_first_page_symbol") == 0) {
@@ -538,7 +540,8 @@ bool SqliteUserDictionaryRepository::SaveSettings(const UserSettings& settings) 
     saveValue("japanese_live_conversion", settings.japaneseLiveConversion ? 1 : 0);
     saveValue("japanese_sentence_check", settings.japaneseSentenceCheck ? 1 : 0);
     saveValue("japanese_sentence_model", std::clamp(settings.japaneseSentenceModel, 0, 2));
-    saveValue("japanese_ai_device", std::clamp(settings.japaneseAiDevice, 0, 2));
+    saveValue("japanese_ai_device", std::clamp(settings.japaneseAiDevice, 0, 3));
+    saveValue("japanese_ai_gpu", settings.japaneseAiGpu);
     saveValue("japanese_slip_auto_apply", settings.japaneseSlipAutoApply ? 1 : 0);
     saveValue("japanese_first_page_symbol", settings.japaneseFirstPageSymbol ? 1 : 0);
     saveValue("japanese_typed_forms", settings.japaneseTypedForms ? 1 : 0);

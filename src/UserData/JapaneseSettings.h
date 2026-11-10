@@ -66,7 +66,8 @@ inline void ApplyJapaneseSettings(japanese::JapaneseComposer& composer, const Us
     // The text service applies the AI's answer once it comes (TakeAiAnswer).
     composer.SetAiJudge(japanese::ProcessAiJudge(
                             static_cast<japanese::AiModel>(std::clamp(settings.japaneseSentenceModel, 0, 2)),
-                            static_cast<japanese::AiDevice>(std::clamp(settings.japaneseAiDevice, 0, 2))),
+                            static_cast<japanese::AiDevice>(std::clamp(settings.japaneseAiDevice, 0, 3)),
+                            static_cast<std::uint32_t>(settings.japaneseAiGpu)),
                         false);
     composer.SetSlipAutoApply(settings.japaneseSlipAutoApply);
     composer.SetTypedForms(settings.japaneseTypedForms);

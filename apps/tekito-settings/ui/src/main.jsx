@@ -71,6 +71,7 @@ const initialSettings = {
   japaneseSentenceCheck: true,
   japaneseSentenceModel: 0,
   japaneseAiDevice: 0,
+  japaneseAiGpu: 0,
   japaneseSlipAutoApply: true,
   japaneseFirstPageSymbol: true,
   japaneseTypedForms: true,
@@ -893,10 +894,27 @@ function NumbersRow({ settings, setSetting, options, onChange }) {
 // it), and where it runs.
 function AiPage({ settings, setSetting, runAction, setConfirm, aiModels }) {
   const t = useText();
+  const d = t.ai.device;
+  const gpus = aiModels.gpus || [];
+  // Which GPU, once the AI model runs on one and there are several.
+  const pickGpu = (settings.japaneseSentenceModel || 0) > 0 && settings.japaneseAiDevice === 2 && gpus.length > 1;
   return (
-    <Card label={t.pages.ai}>
-      <AiModelRow settings={settings} setSetting={setSetting} runAction={runAction} setConfirm={setConfirm} aiModels={aiModels} />
-    </Card>
+    <>
+      <Card label={t.pages.ai}>
+        <AiModelRow settings={settings} setSetting={setSetting} runAction={runAction} setConfirm={setConfirm} aiModels={aiModels} />
+      </Card>
+      {pickGpu && (
+        <Details id="ai" title={t.details}>
+          <Card label={d.gpu}>
+            <Row icon="memory" title={d.gpu}>
+              <Select label={d.gpu} value={gpus.some((gpu) => gpu.id === settings.japaneseAiGpu) ? settings.japaneseAiGpu : 0}
+                options={[[0, d.auto], ...gpus.map((gpu) => [gpu.id, gpu.name])]}
+                onChange={(value) => setSetting("japaneseAiGpu", value)} />
+            </Row>
+          </Card>
+        </Details>
+      )}
+    </>
   );
 }
 
@@ -909,6 +927,17 @@ function AiModelRow({ settings, setSetting, runAction, setConfirm, aiModels }) {
   const keys = ["", "light", "strong"];
   const downloading = aiModels.downloading || 0;
   const current = settings.japaneseSentenceModel || 0;
+  // Where it runs: the GPU when the PC has one, the NPU only when it has one.
+  const devices = [[0, a.device.auto], [1, "CPU"]];
+  if ((aiModels.gpus || []).length > 0) devices.push([2, "GPU"]);
+  if (aiModels.npu) devices.push([3, "NPU"]);
+  const saved = settings.japaneseAiDevice || 0;
+  const device = devices.some(([value]) => value === saved) ? saved : 0;
+  const chooseDevice = (value) => {
+    if (aiModels.npuPreparing) return;
+    setSetting("japaneseAiDevice", value);
+    if (value === 3) runAction("aiNpu.prepare", {});
+  };
   const choose = (value) => {
     if (downloading) return;
     if (value === 0 || aiModels[keys[value]]?.installed) {
@@ -941,9 +970,14 @@ function AiModelRow({ settings, setSetting, runAction, setConfirm, aiModels }) {
         onChange={choose} />
     </Row>
     {current > 0 && (
-      <Row icon="memory" title={a.device.title} description={a.device.description}>
-        <Segmented label={a.device.title} value={settings.japaneseAiDevice || 0}
-          options={[[0, a.device.auto], [1, "CPU"], [2, "GPU"]]} onChange={(value) => setSetting("japaneseAiDevice", value)} />
+      <Row icon="memory" title={a.device.title}
+        description={(
+          <>
+            {aiModels.npuPreparing ? "" : aiModels.npuError || (device === 3 ? a.device.npuFirst : a.device.description)}
+            {aiModels.npuPreparing && <span className="row-status"><span className="progress" />{a.device.preparing}</span>}
+          </>
+        )}>
+        <Segmented label={a.device.title} value={device} options={devices} onChange={chooseDevice} />
       </Row>
     )}
     </>

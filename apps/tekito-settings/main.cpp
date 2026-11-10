@@ -13,6 +13,7 @@
 
 #include "Core/DataPackPath.h"
 #include "Core/ExternalLexiconProvider.h"
+#include "Core/Japanese/AiJudge.h"
 #include "Core/Japanese/JapaneseData.h"
 #include "Core/Japanese/RomajiTable.h"
 #include "Dictionary/ExternalDictionaryProvider.h"
@@ -29,6 +30,9 @@
 
 #include <windows.h>
 #include <commdlg.h>
+#include <initguid.h>  // DXCore's GUIDs, defined here
+#include <dxcore.h>
+#include <dxgi.h>
 #include <dwmapi.h>
 #include <shellapi.h>
 #include <urlmon.h>
@@ -102,6 +106,62 @@ struct AiModelDownload {
     int model{0};
     tekito::userdata::AiModelInstallError error{tekito::userdata::AiModelInstallError::None};
 };
+// Making the NPU ready finished (wParam: 1 when it is).
+constexpr UINT kAiNpuPrepared = WM_APP + 3;
+
+// The GPUs the AI model can run on (DirectML's adapters, not software
+// ones), each once: japanese::GpuId and its name.
+std::vector<std::pair<std::uint32_t, std::wstring>> AiGpus() {
+    std::vector<std::pair<std::uint32_t, std::wstring>> gpus;
+    Microsoft::WRL::ComPtr<IDXGIFactory1> factory;
+    if (FAILED(CreateDXGIFactory1(IID_PPV_ARGS(&factory)))) return gpus;
+    Microsoft::WRL::ComPtr<IDXGIAdapter1> adapter;
+    for (UINT i = 0; factory->EnumAdapters1(i, &adapter) != DXGI_ERROR_NOT_FOUND; ++i) {
+        DXGI_ADAPTER_DESC1 desc{};
+        if (FAILED(adapter->GetDesc1(&desc)) || (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)) continue;
+        const auto id = tekito::japanese::GpuId(desc.VendorId, desc.DeviceId);
+        if (std::none_of(gpus.begin(), gpus.end(), [&](const auto& gpu) { return gpu.first == id; })) {
+            gpus.emplace_back(id, desc.Description);
+        }
+    }
+    return gpus;
+}
+
+// Whether the PC has an NPU (DXCore lists it; Windows 11 24H2 or later).
+bool HasNpu() {
+    const HMODULE dxcore = LoadLibraryExW(L"dxcore.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
+    if (!dxcore) return false;
+    using Create = HRESULT(WINAPI*)(REFIID, void**);
+    const auto create = reinterpret_cast<Create>(GetProcAddress(dxcore, "DXCoreCreateAdapterFactory"));
+    bool found = false;
+    Microsoft::WRL::ComPtr<IDXCoreAdapterFactory> factory;
+    if (create && SUCCEEDED(create(IID_PPV_ARGS(&factory)))) {
+        const GUID npu[] = {DXCORE_HARDWARE_TYPE_ATTRIBUTE_NPU};
+        Microsoft::WRL::ComPtr<IDXCoreAdapterList> list;
+        found = SUCCEEDED(factory->CreateAdapterList(1, npu, IID_PPV_ARGS(&list))) && list->GetAdapterCount() > 0;
+    }
+    factory.Reset();
+    FreeLibrary(dxcore);
+    return found;
+}
+
+// Has TekitoAI.exe make the NPU's provider ready (Windows ML downloads it
+// from Microsoft when it is not on the PC yet); true when an NPU is ready.
+bool PrepareNpu() {
+    std::wstring command = L"\"" + tekito::japanese::aihelper::HelperPath() + L"\" --devices --prepare npu";
+    STARTUPINFOW startup{sizeof(startup)};
+    PROCESS_INFORMATION process{};
+    if (!CreateProcessW(nullptr, command.data(), nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr, nullptr, &startup,
+                        &process)) {
+        return false;
+    }
+    CloseHandle(process.hThread);
+    WaitForSingleObject(process.hProcess, INFINITE);
+    DWORD code = 1;
+    GetExitCodeProcess(process.hProcess, &code);
+    CloseHandle(process.hProcess);
+    return code == 0;
+}
 
 // The AI models (japanese::AiModel 1 and 2) Settings downloads, from
 // TEKITO's releases, each checked against its SHA-256
@@ -1190,6 +1250,7 @@ private:
         json += settings_.japaneseSentenceCheck ? L"true" : L"false";
         json += L",\"japaneseSentenceModel\":" + std::to_wstring(settings_.japaneseSentenceModel);
         json += L",\"japaneseAiDevice\":" + std::to_wstring(settings_.japaneseAiDevice);
+        json += L",\"japaneseAiGpu\":" + std::to_wstring(settings_.japaneseAiGpu);
         json += L",\"japaneseSlipAutoApply\":";
         json += settings_.japaneseSlipAutoApply ? L"true" : L"false";
         json += L",\"japaneseFirstPageSymbol\":";
@@ -1438,7 +1499,8 @@ private:
                     settings_.japaneseSentenceModel = model;
                 }
             }
-            else if (key == L"japaneseAiDevice") settings_.japaneseAiDevice = std::clamp(integerValue, 0, 2);
+            else if (key == L"japaneseAiDevice") settings_.japaneseAiDevice = std::clamp(integerValue, 0, 3);
+            else if (key == L"japaneseAiGpu") settings_.japaneseAiGpu = integerValue;
             else if (key == L"japaneseSlipAutoApply") settings_.japaneseSlipAutoApply = value;
             else if (key == L"japaneseFirstPageSymbol") settings_.japaneseFirstPageSymbol = value;
             else if (key == L"japaneseTypedForms") settings_.japaneseTypedForms = value;
@@ -1562,6 +1624,16 @@ private:
                 download->error = DownloadAiModel(download->model, root);
                 if (!PostMessageW(hwnd, kAiModelInstalled, 0, reinterpret_cast<LPARAM>(download))) delete download;
             }).detach();
+            Reply(requestId, true);
+            PostState();
+        } else if (type == L"aiNpu.prepare") {
+            if (npuPreparing_) {
+                Reply(requestId, false);
+                return;
+            }
+            npuPreparing_ = true;
+            npuError_.clear();
+            std::thread([hwnd = hwnd_] { PostMessageW(hwnd, kAiNpuPrepared, PrepareNpu() ? 1 : 0, 0); }).detach();
             Reply(requestId, true);
             PostState();
         } else if (type == L"aiModel.remove") {
@@ -1887,6 +1959,10 @@ private:
             SetTimer(hwnd, kStateWatchTimer, kStateWatchIntervalMs, nullptr);
             return 0;
         }
+        if (message == kAiNpuPrepared) {
+            self->FinishNpuPrepare(wParam != 0);
+            return 0;
+        }
         if (message == kAiModelInstalled) {
             self->FinishAiModelInstall(std::unique_ptr<AiModelDownload>(reinterpret_cast<AiModelDownload*>(lParam)));
             return 0;
@@ -1993,6 +2069,21 @@ private:
         PostState();
     }
 
+    // The NPU ready, or not: the AI model goes back to running where it
+    // chooses.
+    void FinishNpuPrepare(bool ready) {
+        npuPreparing_ = false;
+        if (!ready) {
+            npuError_ = Text(L"The NPU could not be prepared. Check the connection and try again.",
+                             L"NPU を準備できませんでした。接続を確認して、もう一度お試しください。");
+            if (settings_.japaneseAiDevice == 3) {
+                settings_.japaneseAiDevice = 0;
+                (void)SaveSettings();
+            }
+        }
+        PostState();
+    }
+
     std::wstring AiModelsJson() const {
         std::wstring json = L"{";
         const wchar_t* names[] = {L"light", L"strong"};
@@ -2004,7 +2095,18 @@ private:
         json += std::wstring(L",\"runtime\":{\"installed\":") +
                 (tekito::userdata::AiRuntimeInstalled(AiDataRoot()) ? L"true" : L"false") +
                 L",\"bytes\":" + std::to_wstring(kAiRuntime.bytes) + L"}";
-        json += L",\"downloading\":" + std::to_wstring(aiDownloading_) + L",\"error\":\"" + JsonEscape(aiError_) + L"\"}";
+        json += L",\"downloading\":" + std::to_wstring(aiDownloading_) + L",\"error\":\"" + JsonEscape(aiError_) + L"\"";
+        // Where it can run: the GPUs (ids as the setting keeps them) and
+        // whether there is an NPU, looked up once.
+        static const auto gpus = AiGpus();
+        static const bool npu = HasNpu();
+        json += L",\"gpus\":[";
+        for (std::size_t i = 0; i < gpus.size(); ++i) {
+            json += std::wstring(i ? L"," : L"") + L"{\"id\":" + std::to_wstring(static_cast<int>(gpus[i].first)) +
+                    L",\"name\":\"" + JsonEscape(gpus[i].second) + L"\"}";
+        }
+        json += std::wstring(L"],\"npu\":") + (npu ? L"true" : L"false") + L",\"npuPreparing\":" +
+                (npuPreparing_ ? L"true" : L"false") + L",\"npuError\":\"" + JsonEscape(npuError_) + L"\"}";
         return json;
     }
 
@@ -2249,6 +2351,9 @@ private:
     // one failed.
     int aiDownloading_{0};
     std::wstring aiError_;
+    // The NPU being made ready, and why it last could not be.
+    bool npuPreparing_{false};
+    std::wstring npuError_;
     EventRegistrationToken navigationToken_{};
     std::wstring dataPackSummary_{L"Unavailable"};
     std::wstring japaneseDataSummary_{L"0 / 0"};

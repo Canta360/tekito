@@ -66,8 +66,14 @@ public:
 // The AI models Settings offers (UserSettings::japaneseSentenceModel).
 enum class AiModel : int { None = 0, Light = 1, Strong = 2 };
 // Where the helper runs a model (UserSettings::japaneseAiDevice): Auto is
-// the GPU when the PC has one of its own (not built into the processor).
-enum class AiDevice : int { Auto = 0, Cpu = 1, Gpu = 2 };
+// the processor; the GPU or the NPU take over once their graphs are loaded
+// (an NPU compiles them the first time).
+enum class AiDevice : int { Auto = 0, Cpu = 1, Gpu = 2, Npu = 3 };
+// Which GPU (UserSettings::japaneseAiGpu): its PCI vendor and device IDs as
+// vendor << 16 | device; 0 for the one with the most memory of its own.
+[[nodiscard]] constexpr std::uint32_t GpuId(std::uint32_t vendor, std::uint32_t device) noexcept {
+    return (vendor & 0xFFFF) << 16 | (device & 0xFFFF);
+}
 
 // The pack each model is in.
 [[nodiscard]] std::wstring_view AiModelPack(AiModel model) noexcept;
@@ -85,7 +91,7 @@ struct AiAsking;
 // What it is sent stays in memory: neither side writes it anywhere.
 class AiHelperClient final : public AiJudge {
 public:
-    AiHelperClient(AiModel model, AiDevice device, std::chrono::milliseconds wait, std::size_t top);
+    AiHelperClient(AiModel model, AiDevice device, std::uint32_t gpu, std::chrono::milliseconds wait, std::size_t top);
 
     [[nodiscard]] std::size_t Top() const noexcept override { return top_; }
     [[nodiscard]] double Margin() const noexcept override { return kind_.margin; }
@@ -102,6 +108,7 @@ public:
 private:
     AiModel model_;
     AiDevice device_;
+    std::uint32_t gpu_;
     std::chrono::milliseconds wait_;
     std::size_t top_;
     AiModelKind kind_;
@@ -125,7 +132,7 @@ constexpr std::wstring_view kRuntimePack = L"ai-runtime";
 // the ai-runtime pack.
 [[nodiscard]] std::wstring HelperPath();
 
-constexpr std::uint32_t kMagic = 0x3241'4B54;  // "TKA2"
+constexpr std::uint32_t kMagic = 0x3341'4B54;  // "TKA3"
 // Score: Convert without the model's own writings.
 enum class Request : std::uint32_t { Convert = 0, Warm = 1, Stop = 2, Score = 3 };
 enum class Status : std::uint32_t { Ok = 0, NoModel = 1, TooLong = 2, Failed = 3 };
@@ -135,8 +142,8 @@ constexpr std::size_t kMaxMessage = 64 * 1024;
 // How many writings a model trained for conversion gives.
 constexpr std::size_t kWritten = 5;
 
-// Request: magic, Request, model (AiModel), device (AiDevice), the
-// context, the reading, count, then each sentence; each text its length and
+// Request: magic, Request, model (AiModel), device (AiDevice), the GPU
+// (GpuId, 0 for any), the context, the reading, count, then each sentence; each text its length and
 // UTF-16 code units. Reply: magic, Status, count, each ln p as a double,
 // then the writings' count and each writing (text, then its ln p).
 struct Asked {
@@ -146,6 +153,7 @@ struct Asked {
     std::wstring context;
     std::wstring reading;
     std::vector<std::wstring> sentences;
+    std::uint32_t gpu{0};
 };
 [[nodiscard]] std::vector<std::uint8_t> EncodeRequest(const Asked& asked);
 [[nodiscard]] std::optional<Asked> DecodeRequest(std::span<const std::uint8_t> message);

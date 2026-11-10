@@ -1702,11 +1702,12 @@ int main(int argc, char** argv) {
         else if (arg == "--ai" && i + 1 < argc) {
             const std::string_view which = argv[++i];
             const auto model = which == "strong" ? tekito::japanese::AiModel::Strong : tekito::japanese::AiModel::Light;
-            // TEKITO_AI_DEVICE=cpu|gpu (else auto).
+            // TEKITO_AI_DEVICE=cpu|gpu|npu (else auto).
             const char* device = std::getenv("TEKITO_AI_DEVICE");
             gAiJudge = tekito::japanese::ProcessAiJudge(
                 model, device && std::string_view(device) == "cpu"   ? tekito::japanese::AiDevice::Cpu
                        : device && std::string_view(device) == "gpu" ? tekito::japanese::AiDevice::Gpu
+                       : device && std::string_view(device) == "npu" ? tekito::japanese::AiDevice::Npu
                                                                       : tekito::japanese::AiDevice::Auto);
             if (!gAiJudge) {
                 std::cerr << "the " << which << " AI model is not installed\n";
