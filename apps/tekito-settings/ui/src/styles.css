@@ -323,6 +323,11 @@ kbd {
 .dialog::backdrop { background: rgba(0, 0, 0, 0.3); }
 .dialog-body h2 { font: 600 18px/1.3 var(--font-display); padding: 22px 24px 10px; }
 .dialog-message { padding: 0 24px 20px; }
+.recovery-code {
+  margin: 0 24px 20px; padding: 12px; border-radius: 6px; background: var(--subtle, rgba(127, 127, 127, 0.12));
+  font: 600 18px/1.4 ui-monospace, "Cascadia Mono", Consolas, monospace; letter-spacing: 0.06em; text-align: center;
+  user-select: all;
+}
 .dialog-actions {
   display: flex; gap: 8px; padding: 18px 24px; background: var(--window); border-top: 1px solid var(--line);
 }

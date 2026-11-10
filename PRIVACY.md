@@ -12,6 +12,7 @@ Settings what runs it on a GPU or an NPU.
 | Location | What is in it |
 | --- | --- |
 | `%LOCALAPPDATA%\TEKITO\user.db` (and `user.db-wal`, `user.db-shm` beside it) | Your settings, your dictionary, what TEKITO has learned from your choices, and your last 30 Japanese conversions while that is on |
+| `%LOCALAPPDATA%\TEKITO\user.key` | Only when you turn on **Encrypt your dictionary and learning**: the key that encrypts `user.db`, protected by Windows for your account and by your recovery code. The recovery code itself is not kept |
 | `%LOCALAPPDATA%\TEKITO\data` | The language data packs, and the AI model when you download one |
 | `%LOCALAPPDATA%\TEKITO\settings-webview` | The Settings window's browser cache |
 | `%TEMP%\TekitoTsf.log` | A diagnostic log, written only by trace builds or when `TEKITO_TSF_TRACE=1` is set |

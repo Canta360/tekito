@@ -10,7 +10,8 @@ repository and of the installer come under different terms.
 | Language data packs | The license of each source | `data/<pack>/NOTICE`, `data/<pack>/manifest.json` |
 | M PLUS 1 typeface | SIL Open Font License 1.1 | `assets/fonts/OFL.txt` |
 | Microsoft WebView2 SDK | Microsoft's BSD-style license | `third_party/webview2/LICENSE.txt` |
-| SQLite | Public domain | `third_party/sqlite/README.md` |
+| SQLite, as built by SQLite3 Multiple Ciphers | Public domain; MIT | `third_party/sqlite3mc/LICENSE` |
+| Monocypher | CC0 1.0 or BSD 2-Clause | `third_party/monocypher/LICENCE.md` |
 | Material Symbols icons in Settings | Apache License 2.0 | `third_party/material-symbols/LICENSE` |
 
 ## The source code

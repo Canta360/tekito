@@ -20,6 +20,7 @@ const detectedJapaneseKeyboard = new URLSearchParams(window.location.search).get
 function initialState() {
   return {
     postalCodes: { installed: false },
+    encryption: { wanted: false, encrypted: false },
     aiModels: { light: { installed: false, bytes: 358021668 }, strong: { installed: false, bytes: 1587553900 },
       runtime: { installed: false, bytes: 6000000, windowsMl: false, windowsMlBytes: 20000000, windowsMlDownloading: false },
       downloading: 0, error: "",
@@ -245,6 +246,13 @@ export function installMockHost() {
           const data = JSON.stringify({ type: "state.changed", state });
           listeners.forEach((listener) => listener({ data }));
         }, 2500);
+      } else if (type === "encryption.enable" || type === "encryption.renew") {
+        state.encryption = { wanted: true, encrypted: state.encryption.encrypted };
+        const data = JSON.stringify({ requestId, ok: true, error: "", state, code: "7K2M-Q9XA-3HPD-W8NB-5RTC-V6JE" });
+        window.setTimeout(() => listeners.forEach((listener) => listener({ data })), 60);
+        return;
+      } else if (type === "encryption.disable") {
+        state.encryption = { wanted: false, encrypted: state.encryption.encrypted };
       } else if (type === "aiRuntime.windowsMl") {
         state.aiModels = { ...state.aiModels, runtime: { ...state.aiModels.runtime, windowsMlDownloading: true } };
         window.setTimeout(() => {

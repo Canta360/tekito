@@ -82,6 +82,8 @@ $documents = [ordered]@{
     "third_party\webview2\LICENSE.txt" = Join-Path $repoRoot "third_party\webview2\LICENSE.txt"
     "third_party\webview2\NOTICE.txt" = Join-Path $repoRoot "third_party\webview2\NOTICE.txt"
     "third_party\material-symbols\LICENSE" = Join-Path $repoRoot "third_party\material-symbols\LICENSE"
+    "third_party\sqlite3mc\LICENSE" = Join-Path $repoRoot "third_party\sqlite3mc\LICENSE"
+    "third_party\monocypher\LICENCE.md" = Join-Path $repoRoot "third_party\monocypher\LICENCE.md"
 }
 $scripts = [ordered]@{
     "install.ps1" = Join-Path $PSScriptRoot "install.ps1"

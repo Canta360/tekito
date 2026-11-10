@@ -19,6 +19,7 @@
 #include "Dictionary/ExternalDictionaryProvider.h"
 #include "Core/InputStateMachine.h"
 #include "UserData/SqliteUserDictionaryRepository.h"
+#include "UserData/UserDataEncryption.h"
 #include "UserData/UserDictionaryFile.h"
 #include "UserData/DataPackValidation.h"
 #include "UserData/ImeDictionaryImport.h"
@@ -32,6 +33,8 @@
 #include <cstdlib>
 #include <filesystem>
 #include <iostream>
+#include <iterator>
+#include <windows.h>
 #include <fstream>
 #include <string>
 #include <unordered_set>
@@ -2510,6 +2513,75 @@ void TestRuntimeModeState() {
 
 }  // namespace
 
+
+// The user's database encrypted, read back, rescued with the recovery code,
+// and back to plain; never changed while another connection has it open.
+void TestUserDataEncryption() {
+    namespace fs = std::filesystem;
+    const fs::path folder = fs::temp_directory_path() / ("tekito-encryption-test-" + std::to_string(GetCurrentProcessId()));
+    std::error_code error;
+    fs::remove_all(folder, error);
+    fs::create_directories(folder);
+    const auto database = folder / L"user.db";
+    const auto contains = [](const fs::path& file, std::string_view text) {
+        std::ifstream in(file, std::ios::binary);
+        const std::string bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+        return bytes.find(text) != std::string::npos;
+    };
+    const auto remember = [&](const wchar_t* text) {
+        tekito::userdata::SqliteUserDictionaryRepository repository(database);
+        Require(repository.Open(), "the database opens");
+        tekito::userdata::RecentConversion conversion{0, L"himitsu", text, L"Japanese", 1};
+        Require(repository.AddRecentConversion(conversion, 30), "a conversion is kept");
+    };
+    const auto recalled = [&](const wchar_t* text) {
+        tekito::userdata::SqliteUserDictionaryRepository repository(database);
+        std::vector<tekito::userdata::RecentConversion> conversions;
+        return repository.Open() && repository.LoadRecentConversions(conversions) &&
+               std::any_of(conversions.begin(), conversions.end(), [&](const auto& c) { return c.text == text; });
+    };
+    remember(L"SECRETWORDONE");
+    Require(!tekito::userdata::DatabaseEncrypted(database), "a new database is plain");
+
+    const auto code = tekito::userdata::EnableEncryption(database);
+    Require(code && code->size() == 29, "turning encryption on gives a recovery code (24 symbols in groups of four)");
+    Require(tekito::userdata::DatabaseEncrypted(database), "with nothing else holding it, the database is encrypted at once");
+    Require(recalled(L"SECRETWORDONE"), "what was kept reads back through the system's key");
+    remember(L"SECRETWORDTWO");
+    Require(recalled(L"SECRETWORDTWO"), "and new things are kept encrypted too");
+    auto wal = database;
+    wal += L"-wal";
+    Require(!contains(database, "SECRETWORD") && !contains(wal, "SECRETWORD"), "the text is nowhere in the files");
+
+    const auto plain = folder / L"rescued.db";
+    Require(!tekito::userdata::RescueDatabase(database, tekito::userdata::UserKeyPath(database), "0000-0000-0000-0000-0000-0000",
+                                              plain),
+            "a wrong recovery code opens nothing");
+    std::string lower = *code;
+    std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    Require(tekito::userdata::RescueDatabase(database, tekito::userdata::UserKeyPath(database), lower, plain),
+            "the recovery code (in any case) rescues the database");
+    Require(!tekito::userdata::DatabaseEncrypted(plain), "into a plain database");
+    {
+        tekito::userdata::SqliteUserDictionaryRepository rescued(plain);
+        std::vector<tekito::userdata::RecentConversion> conversions;
+        Require(rescued.Open() && rescued.LoadRecentConversions(conversions) && conversions.size() == 2,
+                "with everything that was kept");
+    }
+
+    {
+        // Turned off while another connection has it: it stays encrypted
+        // until nothing does.
+        tekito::userdata::SqliteUserDictionaryRepository holder(database);
+        Require(holder.Open(), "a second process holds it");
+        Require(tekito::userdata::DisableEncryption(database), "encryption is turned off");
+        Require(tekito::userdata::DatabaseEncrypted(database), "but the database is not changed while it is held");
+    }
+    Require(recalled(L"SECRETWORDTWO"), "the next to open it alone makes it plain and reads it");
+    Require(!tekito::userdata::DatabaseEncrypted(database), "and it is plain");
+    fs::remove_all(folder, error);
+}
+
 int main() {
     TestRunTogether();
     TestFirstSpaceAndLiveCycle();
@@ -2540,6 +2612,7 @@ int main() {
     TestTypoModelBoundary();
     TestTargetTextCandidateDiagnostics();
     TestDictionaryServiceBoundary();
+    TestUserDataEncryption();
     TestLocalDataPackProviders();
     TestUserDictionaryImportExport();
     TestUserLearningStore();

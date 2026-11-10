@@ -24,6 +24,7 @@
 #include "UserData/PostalCodeImport.h"
 #include "UserData/RuntimeModeState.h"
 #include "UserData/UiLanguage.h"
+#include "UserData/UserDataEncryption.h"
 #include "UserData/UserDataRepository.h"
 #include "UserData/UserDictionaryFile.h"
 #include "assets/tekito_resource.h"
@@ -1321,6 +1322,7 @@ private:
         json += L",\"packs\":" + packs;
         json += L",\"postalCodes\":" + PostalCodesJson();
         json += L",\"aiModels\":" + AiModelsJson();
+        json += L",\"encryption\":" + EncryptionJson();
         json += L",\"appearance\":{\"accent\":\"" + AccentColorHex() + L"\",\"systemLanguage\":\"" +
                 std::wstring(tekito::userdata::UseJapaneseUi(0) ? L"ja" : L"en") + L"\"}}";
         return json;
@@ -1968,6 +1970,37 @@ private:
                 const bool exported = tekito::userdata::ExportUserDictionary(dictionary_, path);
                 Reply(requestId, exported, exported ? L"" : Text(L"The dictionary could not be exported.", L"辞書を書き出せませんでした。"));
             }
+        } else if (type == L"encryption.enable" || type == L"encryption.renew") {
+            // Settings lets go of the database first, so it changes now when
+            // no app typing with TEKITO has it open.
+            const auto path = tekito::userdata::DefaultUserDatabasePath();
+            if (repository_) repository_->Close();
+            const auto code = type == L"encryption.enable" ? tekito::userdata::EnableEncryption(path)
+                                                           : tekito::userdata::RenewRecoveryCode(path);
+            if (repository_) (void)repository_->Open();
+            std::wstring extra;
+            if (code) extra = L",\"code\":\"" + std::wstring(code->begin(), code->end()) + L"\"";
+            Reply(requestId, code.has_value(),
+                  code ? L"" : Text(L"The recovery code could not be made.", L"復旧コードを作れませんでした。"), extra);
+            PostState();
+        } else if (type == L"encryption.disable") {
+            const auto path = tekito::userdata::DefaultUserDatabasePath();
+            if (repository_) repository_->Close();
+            const bool done = tekito::userdata::DisableEncryption(path);
+            if (repository_) (void)repository_->Open();
+            Reply(requestId, done, done ? L"" : Text(L"Encryption could not be turned off.", L"暗号化をオフにできませんでした。"));
+            PostState();
+        } else if (type == L"encryption.copy") {
+            const bool copied = CopyToClipboard(hwnd_, message.String(L"code"));
+            Reply(requestId, copied, copied ? L"" : Text(L"The code could not be copied.", L"コードをコピーできませんでした。"));
+        } else if (type == L"encryption.save") {
+            const auto file = ChooseRecoveryCodeFile();
+            if (file.empty()) {
+                Reply(requestId, true);
+            } else {
+                const bool saved = SaveRecoveryCode(file, message.String(L"code"));
+                Reply(requestId, saved, saved ? L"" : Text(L"The code could not be saved.", L"コードを保存できませんでした。"));
+            }
         } else if (type == L"diagnostics.copy") {
             const auto text = Diagnostics();
             const bool copied = CopyToClipboard(hwnd_, text);
@@ -2265,6 +2298,43 @@ private:
         return {std::filesystem::path(buffer), japanese && dialog.nFilterIndex == 1};
     }
 
+    // Encryption of the user's database: asked for, and done.
+    static std::wstring EncryptionJson() {
+        const auto path = tekito::userdata::DefaultUserDatabasePath();
+        return std::wstring(L"{\"wanted\":") + (tekito::userdata::EncryptionWanted(path) ? L"true" : L"false") +
+               L",\"encrypted\":" + (tekito::userdata::DatabaseEncrypted(path) ? L"true" : L"false") + L"}";
+    }
+
+    std::filesystem::path ChooseRecoveryCodeFile() {
+        wchar_t buffer[MAX_PATH] = L"TEKITO recovery code";
+        OPENFILENAMEW dialog{sizeof(dialog)};
+        dialog.hwndOwner = hwnd_;
+        dialog.lpstrFile = buffer;
+        dialog.nMaxFile = MAX_PATH;
+        dialog.lpstrFilter = L"Text (*.txt)\0*.txt\0";
+        dialog.lpstrDefExt = L"txt";
+        dialog.lpstrTitle = Text(L"Save the recovery code", L"復旧コードを保存");
+        dialog.Flags = OFN_PATHMUSTEXIST | OFN_OVERWRITEPROMPT | OFN_NOCHANGEDIR;
+        return GetSaveFileNameW(&dialog) ? std::filesystem::path(buffer) : std::filesystem::path{};
+    }
+
+    // The code, and what it is for, in the user's language.
+    bool SaveRecoveryCode(const std::filesystem::path& file, const std::wstring& code) {
+        const std::wstring text = std::wstring(Text(L"TEKITO recovery code", L"TEKITO 復旧コード")) + L"\r\n\r\n" + code +
+                                  L"\r\n\r\n" +
+                                  Text(L"With this code, your dictionary, learning and settings can be recovered on another PC "
+                                       L"or after Windows is reinstalled. Keep it somewhere safe, away from this PC.",
+                                       L"このコードがあれば、別の PC や Windows の再インストール後でも、辞書・学習内容・設定を"
+                                       L"取り出せます。この PC 以外の安全な場所に保管してください。") +
+                                  L"\r\n";
+        const int size = WideCharToMultiByte(CP_UTF8, 0, text.c_str(), static_cast<int>(text.size()), nullptr, 0, nullptr, nullptr);
+        std::string utf8(static_cast<std::size_t>(size), '\0');
+        WideCharToMultiByte(CP_UTF8, 0, text.c_str(), static_cast<int>(text.size()), utf8.data(), size, nullptr, nullptr);
+        std::ofstream out(file, std::ios::binary | std::ios::trunc);
+        out.write(utf8.data(), static_cast<std::streamsize>(utf8.size()));
+        return static_cast<bool>(out);
+    }
+
     std::filesystem::path ChooseRomajiFile() {
         wchar_t buffer[MAX_PATH]{};
         OPENFILENAMEW dialog{sizeof(dialog)};
@@ -2488,6 +2558,27 @@ std::optional<int> EraseUserDataFromCommandLine() {
     return repository->EraseAll() ? 0 : 2;
 }
 
+// "--rescue <user.db> <user.key> <recovery code> <plain.db>": everything
+// readable from an encrypted database, with its recovery code, written to a
+// plain one (any PC; the files may come from another). 0 when written, 2
+// when the code does not open the key.
+std::optional<int> RescueFromCommandLine() {
+    int count = 0;
+    LPWSTR* arguments = CommandLineToArgvW(GetCommandLineW(), &count);
+    std::optional<int> result;
+    for (int i = 1; arguments && i + 4 < count; ++i) {
+        if (std::wstring_view(arguments[i]) != L"--rescue") continue;
+        const std::wstring code = arguments[i + 3];
+        result = tekito::userdata::RescueDatabase(arguments[i + 1], arguments[i + 2], std::string(code.begin(), code.end()),
+                                                  arguments[i + 4])
+                     ? 0
+                     : 2;
+        break;
+    }
+    if (arguments) LocalFree(arguments);
+    return result;
+}
+
 // "--install-ai light|strong" (the installer's, when the user chose AI):
 // downloads and installs the model, and what runs it, with no window, and
 // turns it on. 0 when it is installed, 3 when it could not be downloaded,
@@ -2520,6 +2611,7 @@ std::optional<int> InstallAiFromCommandLine() {
 int RunTekitoSettings(HINSTANCE instance) {
     if (const auto exported = ExportDictionariesFromCommandLine()) return *exported;
     if (const auto erased = EraseUserDataFromCommandLine()) return *erased;
+    if (const auto rescued = RescueFromCommandLine()) return *rescued;
     if (const auto installed = InstallAiFromCommandLine()) return *installed;
     const HRESULT comResult = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
     const bool comInitialized = SUCCEEDED(comResult);

@@ -3,10 +3,19 @@
 TEKITO includes or builds with the following third-party components. The
 corresponding source notices are kept under `third_party/` in this repository.
 
-## SQLite
+## SQLite and SQLite3 Multiple Ciphers
 
-The SQLite amalgamation is distributed under the SQLite public-domain terms.
-See `third_party/sqlite/README.md` and the notices in the amalgamation source.
+TEKITO keeps its user data with SQLite (public domain), as built by SQLite3
+Multiple Ciphers 2.5.1 (Copyright 2019-2026 Ulrich Telle, MIT License,
+`third_party/sqlite3mc/LICENSE`), which adds encryption of the database
+when the user turns it on. See `third_party/sqlite3mc/README.md`.
+
+## Monocypher
+
+Monocypher 4.0.2 (https://monocypher.org/) derives the key from the recovery
+code of an encrypted database and wraps the database's key with it. It is
+dedicated to the public domain under CC0 1.0, or licensed under the 2-clause
+BSD license, at your choice (`third_party/monocypher/LICENCE.md`).
 
 ## Microsoft WebView2
 

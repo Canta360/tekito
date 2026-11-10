@@ -104,9 +104,14 @@ add_library(tekito_userdata STATIC
     src/UserData/PostalCodeImport.cpp
     src/UserData/RuntimeModeState.cpp
     src/UserData/SqliteUserDictionaryRepository.cpp
+    src/UserData/UserDataEncryption.cpp
     src/UserData/UserDictionaryFile.cpp
+    third_party/monocypher/monocypher.c
 )
-target_link_libraries(tekito_userdata PUBLIC tekito_core tekito_sqlite bcrypt)
+# Monocypher (CC0 / BSD-2-Clause): Argon2id and XChaCha20-Poly1305 for the
+# recovery code of the user's encrypted database.
+target_include_directories(tekito_userdata PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/third_party/monocypher")
+target_link_libraries(tekito_userdata PUBLIC tekito_core tekito_sqlite bcrypt crypt32)
 
 add_library(tekito_dictionary STATIC
     src/Dictionary/DictionaryService.cpp

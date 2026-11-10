@@ -132,6 +132,7 @@ function App() {
   const [romaji, setRomaji] = useState([]);
   const [packs, setPacks] = useState([]);
   const [postalCodes, setPostalCodes] = useState({ installed: false });
+  const [encryption, setEncryption] = useState({ wanted: false, encrypted: false });
   const [aiModels, setAiModels] = useState({ light: { installed: false }, strong: { installed: false }, runtime: { installed: false },
     downloading: 0, error: "" });
   const [version, setVersion] = useState("");
@@ -158,6 +159,7 @@ function App() {
     setPacks(state.packs || []);
     if (state.postalCodes) setPostalCodes(state.postalCodes);
     if (state.aiModels) setAiModels(state.aiModels);
+    if (state.encryption) setEncryption(state.encryption);
     if (state.version) setVersion(state.version);
     if (state.appearance) setAppearance((value) => ({ ...value, ...state.appearance }));
   }, []);
@@ -310,7 +312,7 @@ function App() {
                 {current === "mixed" && <MixedPage {...pageProps} />}
                 {current === "auto" && <AutoPage {...pageProps} />}
                 {current === "ai" && <AiPage {...pageProps} aiModels={aiModels} />}
-                {current === "dictionary" && <DictionaryPage {...pageProps} japanese={japaneseInstalled} learning={learning}
+                {current === "dictionary" && <DictionaryPage {...pageProps} japanese={japaneseInstalled} learning={learning} encryption={encryption}
                   dictionary={dictionary} japaneseWords={japaneseWords} setModal={setModal} />}
                 {current === "samples" && <SamplesPage japaneseInstalled={japaneseInstalled} back={() => open("general")} />}
                 {current === "about" && <AboutPage {...pageProps} version={version} runtime={runtime} packs={packs} japanese={japaneseInstalled} />}
@@ -403,7 +405,7 @@ function searchIndex(t, pages, japaneseInstalled) {
     ["auto", a.spacelessAlways.title, true],
     ["ai", t.ai.title], ["ai", t.ai.device.title],
     ["dictionary", d.japaneseWords.title], ["dictionary", d.englishWords.title], ["dictionary", d.files.title],
-    ["dictionary", d.learn.title], ["dictionary", d.learned.title], ["dictionary", d.secret.title], ["dictionary", d.private.title],
+    ["dictionary", d.learn.title], ["dictionary", d.learned.title], ["dictionary", d.secret.title], ["dictionary", d.private.title], ["dictionary", d.encryption.title, true],
     ["about", t.about.report.title], ["about", t.about.bug.title], ["about", t.about.feature.title], ["about", t.about.releases.title],
     ["about", t.about.diagnostics], ["about", t.about.license],
   ];
@@ -1275,7 +1277,7 @@ function AutoPage({ settings, setSetting, showKeys }) {
 // ---------------------------------------------------------------------------
 // 辞書と学習
 
-function DictionaryPage({ settings, setSetting, runAction, setConfirm, japanese, learning, dictionary, japaneseWords, setModal }) {
+function DictionaryPage({ settings, setSetting, runAction, setConfirm, japanese, learning, dictionary, japaneseWords, setModal, encryption }) {
   const t = useText();
   const d = t.dictionary;
   const l = t.learningList;
@@ -1419,6 +1421,46 @@ function DictionaryPage({ settings, setSetting, runAction, setConfirm, japanese,
           <Toggle label={d.private.title} checked={settings.noLearningInPrivate} onChange={(value) => setSetting("noLearningInPrivate", value)} />
         </Row>
       </Card>
+      <Details id="dictionary" title={t.details}>
+        <EncryptionCard encryption={encryption} runAction={runAction} setConfirm={setConfirm} />
+      </Details>
+    </>
+  );
+}
+
+// Encryption of the user's database, and its recovery code (shown once,
+// when made).
+function EncryptionCard({ encryption, runAction, setConfirm }) {
+  const t = useText();
+  const e = t.dictionary.encryption;
+  const [code, setCode] = useState(null);
+  const showCode = (response) => { if (response.ok && response.code) setCode(response.code); };
+  const turnOn = async () => showCode(await runAction("encryption.enable", {}));
+  const turnOff = () => setConfirm({ title: e.offTitle, message: e.offBody, confirmLabel: e.off,
+    action: () => runAction("encryption.disable", {}) });
+  const renew = () => setConfirm({ title: e.renewTitle, message: e.renewBody, confirmLabel: e.renew,
+    action: async () => showCode(await runAction("encryption.renew", {})) });
+  const status = encryption.wanted ? (encryption.encrypted ? e.on : e.pendingOn)
+    : encryption.encrypted ? e.pendingOff : e.description;
+  return (
+    <>
+      <Card label={e.title}>
+        <Row icon="lock" title={e.title} description={status}
+          sub={encryption.wanted && (
+            <div className="row-sub-action"><Button variant="quiet" onClick={renew}>{e.renew}</Button></div>
+          )}>
+          <Toggle label={e.title} checked={encryption.wanted} onChange={(value) => (value ? turnOn() : turnOff())} />
+        </Row>
+      </Card>
+      <Dialog open={Boolean(code)} title={e.codeTitle} onClose={() => setCode(null)}>
+        <p className="dialog-message">{e.codeBody}</p>
+        <p className="recovery-code">{code}</p>
+        <div className="dialog-actions">
+          <Button onClick={() => runAction("encryption.copy", { code }, e.copied)}>{e.copy}</Button>
+          <Button onClick={() => runAction("encryption.save", { code })}>{e.save}</Button>
+          <Button variant="primary" onClick={() => setCode(null)}>{e.done}</Button>
+        </div>
+      </Dialog>
     </>
   );
 }

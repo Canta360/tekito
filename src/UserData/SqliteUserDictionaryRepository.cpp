@@ -1,4 +1,5 @@
 #include "UserData/SqliteUserDictionaryRepository.h"
+#include "UserData/UserDataEncryption.h"
 
 #include "sqlite3mc_amalgamation.h"
 
@@ -108,8 +109,16 @@ bool SqliteUserDictionaryRepository::Open() noexcept {
         return false;
     }
 
+    // Encrypted or plain as the user asked, when no other process has it
+    // open; then opened with its key when it is encrypted (or new and to be).
+    SettleEncryption(databasePath_);
+    std::error_code error;
+    const bool fresh = !std::filesystem::is_regular_file(databasePath_, error) ||
+                       std::filesystem::file_size(databasePath_, error) == 0;
+    const bool locked = fresh ? EncryptionWanted(databasePath_) : DatabaseEncrypted(databasePath_);
     sqlite3* database = nullptr;
-    if (sqlite3_open16(databasePath_.c_str(), &database) != SQLITE_OK) {
+    if (sqlite3_open16(databasePath_.c_str(), &database) != SQLITE_OK ||
+        (locked && !UnlockDatabase(database, databasePath_))) {
         if (database) sqlite3_close(database);
         return false;
     }
