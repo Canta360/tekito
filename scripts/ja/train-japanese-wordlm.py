@@ -190,7 +190,13 @@ def pretrain(args) -> None:
     vocab = int(tokens.max()) + 1
     import sentencepiece as spm
     vocab = max(vocab, spm.SentencePieceProcessor(model_file=str(out / "pieces.model")).get_piece_size())
+    if args.init:
+        # Going on from a model trained before (on other text), its shape kept.
+        saved = torch.load(args.init, map_location="cpu")
+        args.embed, args.hidden = saved["embed"], saved["hidden"]
     model = make_model(vocab, args.embed, args.hidden).to(dev)
+    if args.init:
+        model.load_state_dict(saved["model"])
     print(f"parameters {sum(p.numel() for p in model.parameters()):,} on {dev}")
     opt = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=0.01)
     steps_total = args.epochs * ((n - keep) // args.batch)
@@ -804,6 +810,7 @@ def main() -> int:
     t.add_argument("--log-every", type=int, default=2000)
     t.add_argument("--max-steps", type=int, default=0)
     t.add_argument("--amp", choices=["fp16", "bf16", "none"], default="bf16")
+    t.add_argument("--init", help="a pretrained.pt to go on from")
     f = sub.add_parser("finetune")
     f.add_argument("--out", required=True)
     f.add_argument("--lists", action="append", required=True)
