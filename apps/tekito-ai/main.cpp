@@ -485,8 +485,24 @@ private:
             } else {
                 const auto npus = NpuDevices();
                 if (npus.empty()) return;
-                // The NPU's driver keeps what it compiles, for the next time.
-                options.AppendExecutionProvider_V2(Environment(), npus, std::unordered_map<std::string, std::string>{});
+                // What OpenVINO compiles for the NPU is kept in the pack
+                // (npu-cache), so it goes with the model, not in the
+                // driver's own folder.
+                std::unordered_map<std::string, std::string> epOptions;
+                if (std::string_view(npus.front().EpName()) == "OpenVINOExecutionProvider") {
+                    const auto cache = directory / L"npu-cache";
+                    std::error_code error;
+                    std::filesystem::create_directories(cache, error);
+                    std::string path = Utf8(cache.wstring());
+                    std::replace(path.begin(), path.end(), '\\', '/');
+                    std::string escaped;
+                    for (const char c : path) {
+                        if (c == '"') escaped += '\\';
+                        escaped += c;
+                    }
+                    epOptions["load_config"] = R"({"NPU":{"CACHE_DIR":")" + escaped + R"("}})";
+                }
+                options.AppendExecutionProvider_V2(Environment(), npus, epOptions);
             }
             Graph prompt, score, scoreHead;
             for (auto [graph, name] : {std::pair{&prompt, L"body-1x64.onnx"}, std::pair{&score, L"body-10x32.onnx"},

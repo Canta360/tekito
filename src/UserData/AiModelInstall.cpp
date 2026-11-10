@@ -44,6 +44,15 @@ bool Unpack(const std::filesystem::path& zip, const std::filesystem::path& into)
 bool RemoveWhenFree(const std::filesystem::path& directory) {
     std::error_code error;
     for (int tries = 0; tries < 20; ++tries) {
+        // What the NPU's compiler keeps (npu-cache) is read-only.
+        for (auto it = std::filesystem::recursive_directory_iterator(directory, error);
+             !error && it != std::filesystem::recursive_directory_iterator(); it.increment(error)) {
+            const DWORD attributes = GetFileAttributesW(it->path().c_str());
+            if (attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_READONLY)) {
+                SetFileAttributesW(it->path().c_str(), attributes & ~FILE_ATTRIBUTE_READONLY);
+            }
+        }
+        error.clear();
         std::filesystem::remove_all(directory, error);
         if (!error || !std::filesystem::exists(directory, error)) return true;
         std::this_thread::sleep_for(std::chrono::milliseconds(250));
