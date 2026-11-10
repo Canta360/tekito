@@ -2401,6 +2401,21 @@ void TestWrittenForms(const RomajiTable& table, const MiniPack& pack) {
     Require(uefi.english && uefi.written == L"UEFI", "an acronym that reads as romaji is English (uefi: UEFI, not 上フィ)");
     RequireText(judge.Judge(L"line", 0, true).written, L"LINE", "line in Japanese is LINE");
     RequireText(judge.Judge(L"line", 2, false).written, L"line", "and line in an English sentence stays line");
+
+    // A word English writes with a hyphen, typed without it, stays as typed
+    // (either is right) and is offered with it, as written (usbc: USB-C).
+    struct HyphenScores final : tekito::IFrequencyProvider {
+        double Score(std::wstring_view word) const noexcept override {
+            return word == L"usb-c" ? 3.2 : word == L"hsbc" || word == L"usb" ? 3.0 : 0.0;
+        }
+    } hyphenScores;
+    tekito::japanese::ChunkJudge hyphens(table, converter, nullptr, hyphenScores, nullptr);
+    hyphens.SetWrittenForms(&forms);
+    const auto usbc = hyphens.Judge(L"usbc", 0, true);
+    Require(usbc.english && usbc.written == L"usbc", "usbc stays usbc (not a slip of HSBC)");
+    const auto offered = hyphens.Hyphenated(L"usbc");
+    Require(offered && *offered == L"USB-C", "and USB-C is offered for it");
+    Require(!hyphens.Hyphenated(L"hsbc"), "a word with no hyphenated form offers none");
 }
 
 // A loanword written in katakana as its romaji spells it (anime: アニメ)

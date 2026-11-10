@@ -123,6 +123,10 @@ public:
     [[nodiscard]] Judgement Judge(std::wstring_view keys, std::size_t englishBefore,
                                   bool japaneseInSentence = true, const EnglishSpelling* spelling = nullptr,
                                   std::wstring_view before = {}, bool englishSentences = true) const;
+    // The word English writes with a hyphen that `keys` (letters, no
+    // hyphen) are typed without one, as it is written (usbc: USB-C), to
+    // offer; nothing when there is none.
+    [[nodiscard]] std::optional<std::wstring> Hyphenated(std::wstring_view keys) const;
 
     // Japanese with English words typed into it without spaces
     // (reflectsareta: reflect + sareta, kyouhameetinggaarimasu: kyouha +

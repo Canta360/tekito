@@ -103,6 +103,31 @@ std::wstring ChunkJudge::AsName(std::wstring written, bool inJapanese) const {
     return written;
 }
 
+std::optional<std::wstring> ChunkJudge::Hyphenated(std::wstring_view keys) const {
+    // A short part after one in capitals is in capitals too (USB-C).
+    constexpr std::size_t kShortPart = 2;
+    if (keys.find(L'-') != std::wstring_view::npos) return std::nullopt;
+    for (std::size_t at = 1; at < keys.size(); ++at) {
+        std::wstring first(keys.substr(0, at)), second(keys.substr(at));
+        for (auto& c : first) c = static_cast<wchar_t>(std::towlower(c));
+        for (auto& c : second) c = static_cast<wchar_t>(std::towlower(c));
+        if (english_.Score(first + L'-' + second) < thresholds_.knownWord) continue;
+        const auto written = [&](const std::wstring& part) {
+            if (const auto form = forms_ ? forms_->Find(part) : std::nullopt) return form->written;
+            if (const auto named = names_ ? names_->WrittenAs(part) : std::nullopt) return *named;
+            return part;
+        };
+        const auto head = written(first);
+        auto tail = written(second);
+        const bool capitals = std::none_of(head.begin(), head.end(), [](wchar_t c) { return std::iswlower(c) != 0; });
+        if (capitals && tail.size() <= kShortPart) {
+            for (auto& c : tail) c = static_cast<wchar_t>(std::towupper(c));
+        }
+        return head + L'-' + tail;
+    }
+    return std::nullopt;
+}
+
 ChunkJudge::Judgement ChunkJudge::Judge(std::wstring_view keys, std::size_t englishBefore,
                                         bool japaneseInSentence, const EnglishSpelling* spelling,
                                         std::wstring_view before, bool englishSentences) const {
@@ -166,6 +191,14 @@ ChunkJudge::Judgement ChunkJudge::JudgeLanguage(std::wstring_view keys, std::siz
                       (c == L'c' && (i + 1 == keys.size() || keys[i + 1] != L'h'));
     }
     const double score = english_.Score(keys);
+    // Keys romaji cannot read that are a word English writes with a hyphen
+    // (usbc: USB-C) are that word typed so: English as typed, not a slip
+    // of another (HSBC); the hyphen is only offered (Hyphenated).
+    if (!readable && score < thresholds_.listedWord && Hyphenated(keys)) {
+        judgement.english = true;
+        judgement.word = true;
+        return judgement;
+    }
     judgement.word = score >= thresholds_.knownWord;
     // A well-known name, and how it is written (github: GitHub).
     bool name = false;

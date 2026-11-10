@@ -736,6 +736,21 @@ std::vector<Candidate> CandidateGenerator::Generate(std::wstring_view rawText,
             AddOriginal(output, seen, rawText);
         }
     }
+    // A word news text writes with a hyphen, typed without it (usbc:
+    // usb-c): either is right, so it stays as typed, not a slip of another
+    // word (hsbc), and the hyphen is offered right after it.
+    constexpr double kHyphenedWord = 2.5;
+    if (!exact && !keptAsTyped && lower.find(L'-') == std::wstring::npos) {
+        for (std::size_t at = 1; at < lower.size(); ++at) {
+            const std::wstring hyphened = lower.substr(0, at) + L"-" + lower.substr(at);
+            if (frequencyProvider_.Score(hyphened) < kHyphenedWord) continue;
+            keptAsTyped = true;
+            AddOriginal(output, seen, rawText);
+            AddUnique(output, seen, MatchCase(rawText, hyphened), SemanticLabel::None, false, 85.0, false,
+                      CandidatePolicySuggestOnly, CandidateSourceNone);
+            break;
+        }
+    }
     // A word's possessive (pitcher's) and British spellings of a word
     // (organise, caramelising, familiarisation) are words too.
     if ((!exact || exactHasWeakFrequency) && !keptAsTyped && !ranked.empty() && lower.size() > 4) {

@@ -1254,6 +1254,21 @@ void TestEnglishSpelling() {
     Require(spaceGives(L"check", EnglishVariety::British) == L"check", "a word British English also writes stays");
 }
 
+// A word English writes with a hyphen, typed without it: either is right,
+// so it stays as typed (usbc, not HSBC for a slip) and the hyphen is
+// offered (usb-c).
+void TestHyphenTypedWithout() {
+    const auto engine = tekito::CreateDefaultConversionEngine();
+    const tekito::SpaceBoundaryPolicy space;
+    tekito::ConversionRequest request;
+    request.rawText = L"usbc";
+    const auto candidates = engine->Convert(request).candidates;
+    const auto selected = space.SelectCorrection(L"usbc", candidates);
+    Require(!selected || candidates[*selected].text == L"usbc", "usbc stays as typed");
+    Require(std::any_of(candidates.begin(), candidates.end(), [](const auto& c) { return c.text == L"usb-c"; }),
+            "and usb-c is offered");
+}
+
 // A word typed twice, the next words, and Space twice for a period.
 void TestEnglishWritingOptions() {
     const auto engine = tekito::CreateDefaultConversionEngine();
@@ -2534,6 +2549,7 @@ int main() {
     TestImeDictionaryImport();
     TestEnglishWritingRules();
     TestEnglishWritingOptions();
+    TestHyphenTypedWithout();
     TestEnglishSpelling();
     TestRankingDataBoundaries();
     TestCompositeLexiconProvider();

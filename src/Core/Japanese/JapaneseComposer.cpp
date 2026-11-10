@@ -2725,6 +2725,10 @@ std::vector<PhraseCandidate> JapaneseComposer::EnglishCandidates(const std::wstr
         }
     }
     add(Keys(false), PhraseCandidate::Kind::English);
+    // The word written with a hyphen it was typed without (usbc: USB-C).
+    if (chunkJudge_) {
+        if (const auto hyphened = chunkJudge_->Hyphenated(Keys(false))) add(*hyphened, PhraseCandidate::Kind::English);
+    }
     // How it is written in katakana (ギットハブ), then as Japanese.
     // As written when a slip was put right (review: レビュー).
     if (loanwords_) {
