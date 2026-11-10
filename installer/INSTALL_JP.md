@@ -2,7 +2,7 @@
 
 ## インストーラーでインストールする
 
-`TEKITO-0.7.2-full-installer.exe` を実行してください。使用許諾に同意すると、インストールが始まります。
+`TEKITO-0.7.3-full-installer.exe` を実行してください。使用許諾に同意すると、インストールが始まります。
 
 - **日本語入力を追加する** を選択すると、日本語の辞書と言語データ（約 232 MB）が GitHub のリリースからダウンロードされ、チェックサムが照合されてからインストールされます。TEKITO は日本語のキーボード一覧に追加されます。
 - 日本語を選択しない場合は、英語のキーボード一覧に追加されます。日本語は、インストーラーを再度実行すると追加できます。
@@ -14,7 +14,7 @@
 
 ## ZIP から手動でインストールする
 
-`TEKITO-0.7.2-full.zip` を展開し、そのフォルダーで管理者として PowerShell を開いて、次のコマンドを実行してください。
+`TEKITO-0.7.3-full.zip` を展開し、そのフォルダーで管理者として PowerShell を開いて、次のコマンドを実行してください。
 
 ```powershell
 Set-ExecutionPolicy -Scope Process Bypass -Force
@@ -22,11 +22,11 @@ Set-ExecutionPolicy -Scope Process Bypass -Force
 .\install.ps1
 ```
 
-日本語も追加する場合は、`-Japanese $true` を指定してください。オフラインでインストールする場合は、同じリリースの `TEKITO-0.7.2-japanese-data.zip` を事前にダウンロードし、そのパスを指定してください（チェックサムも照合されます）。
+日本語も追加する場合は、`-Japanese $true` を指定してください。オフラインでインストールする場合は、同じリリースの `TEKITO-0.7.3-japanese-data.zip` を事前にダウンロードし、そのパスを指定してください（チェックサムも照合されます）。
 
 ```powershell
 .\install.ps1 -Japanese $true
-.\install.ps1 -JapaneseDataPath C:\Downloads\TEKITO-0.7.2-japanese-data.zip
+.\install.ps1 -JapaneseDataPath C:\Downloads\TEKITO-0.7.3-japanese-data.zip
 ```
 
 英語のキーボード一覧にも TEKITO を追加する場合は、`-KeepEnglishProfile $true` を指定してください。
