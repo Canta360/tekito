@@ -160,8 +160,10 @@ if (-not $installRoot.StartsWith($userRoot, [StringComparison]::OrdinalIgnoreCas
 # it is still TEKITO's folder.
 $hadExistingInstall = (Test-Path -LiteralPath (Join-Path $installRoot "install-manifest.json") -PathType Leaf) -or
     (Test-Path -LiteralPath (Join-Path $installRoot "TEKITO.exe") -PathType Leaf)
+# What an uninstall leaves behind counts as TEKITO's too: files apps still had
+# open, renamed *.old-* and deleted at the next sign-in.
 if ((Test-Path -LiteralPath $installRoot) -and -not $hadExistingInstall -and
-    @(Get-ChildItem -LiteralPath $installRoot -Force).Count -gt 0) {
+    @(Get-ChildItem -LiteralPath $installRoot -Force | Where-Object { $_.Name -notlike "*.old-*" }).Count -gt 0) {
     throw "InstallRoot must be empty or an existing TEKITO installation."
 }
 
