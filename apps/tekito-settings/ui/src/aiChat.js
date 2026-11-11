@@ -124,7 +124,9 @@ export async function think(ctx, question, level, lastApplied) {
     .sort((a, b) => b.score - a.score);
   const [best, second] = ranked;
   if (best.score - second.score < kSureMargin) {
-    return { kind: "choose", reply: c.choose, actions: [], show: ranked.slice(0, 3).map(({ type, id }) => ({ type, id })) };
+    // As many as are close to the first (two to five), to choose from.
+    const close = ranked.filter((target, i) => i < 5 && (i < 2 || best.score - target.score < kSureMargin * 2));
+    return { kind: "choose", reply: c.choose, actions: [], show: close.map(({ type, id }) => ({ type, id })) };
   }
   const found = { kind: "found", reply: c.found, actions: [], show: [{ type: best.type, id: best.id }] };
   if (best.type !== "setting") return found;
