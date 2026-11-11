@@ -358,7 +358,8 @@ function App() {
 
         <main className="content">
           <div className="page" key={`${current}-${visit}`}>
-            <h1 className="page-title">{t.pages[current]}</h1>
+            {/* Home is the box itself: its title only for screen readers. */}
+            <h1 className={`page-title ${current === "home" ? "visually-hidden" : ""}`}>{t.pages[current]}</h1>
             {connection.status !== "ready" ? (
               <Card className="state-card" role="status">
                 <b>{connection.status === "loading" ? t.loading.title : t.unavailable.title}</b>

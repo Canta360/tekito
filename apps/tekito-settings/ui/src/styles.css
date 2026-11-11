@@ -284,3 +284,13 @@ kbd {
 .choice-list.choice-list { width: max-content; min-width: 160px; max-width: 480px; overflow-x: hidden; }
 .linked-action { padding: 0 18px 10px 44px; margin-top: -4px; }
 .linked-action .fui-Button { color: var(--accent-text); font-weight: var(--fontWeightRegular); }
+
+/* Home as a messaging app (the page's padding is 28px above, 48px below). */
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.home { min-height: calc(100vh - 76px); display: flex; flex-direction: column; gap: 12px; }
+.home-box { width: 100%; max-width: 720px; margin: auto; display: grid; gap: 8px; }
+.home.is-chatting .home-box { margin: 0 auto; position: sticky; bottom: 0; padding: 8px 0 4px; background: var(--window); }
+.home .chat { width: 100%; max-width: 720px; margin: 0 auto; flex: 1; align-content: start; padding-top: 8px; }
+.home-search.home-search { width: 100%; border-radius: var(--borderRadiusXLarge); min-height: 52px; }
+.home-box-actions { display: inline-flex; align-items: center; gap: 4px; }
+.home-links { display: flex; justify-content: center; gap: 8px; }

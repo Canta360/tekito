@@ -104,9 +104,13 @@ export function HomePage({ ctx, aiReady }) {
     else if (found[0]) goTo(ctx, found[0]);
   };
 
+  // As a messaging app: the box alone in the middle, then the conversation
+  // above it and the box at the foot; the samples and All settings at the
+  // very bottom.
+  const chatting = aiReady && messages.length > 0;
   return (
-    <>
-      {aiReady && messages.length > 0 && (
+    <div className={`home ${chatting ? "is-chatting" : ""}`}>
+      {chatting && (
         <div className="chat" aria-live="polite">
           {messages.map((message, index) => (message.role === "user"
             ? <p key={index} className="bubble-user">{message.text}</p>
@@ -115,11 +119,18 @@ export function HomePage({ ctx, aiReady }) {
         </div>
       )}
 
+      <div className="home-box">
       <TextBox ref={input} className="home-search" size="large" aria-label={aiReady ? c.label : t.search}
         placeholder={aiReady ? (messages.length ? c.next : h.placeholderAi) : t.search}
         value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={onKeyDown}
         before={<Symbol name={aiReady ? "wand_stars" : "search"} size={20} />}
-        after={aiReady && messages.length > 0 ? <IconButton icon="add" label={c.newChat} onClick={() => setMessages([])} /> : undefined} />
+        after={aiReady ? (
+          <span className="home-box-actions">
+            {chatting && <IconButton icon="add" label={c.newChat} onClick={() => setMessages([])} />}
+            <Button variant="primary" shape="circular" size="small" icon="arrow_upward" aria-label={c.send} title={c.send}
+              disabled={!query.trim() || busy} onClick={send} />
+          </span>
+        ) : undefined} />
 
       {needle && found.length > 0 && (
         <Card label={t.search} className="home-results">
@@ -133,12 +144,13 @@ export function HomePage({ ctx, aiReady }) {
         </Card>
       )}
       {needle && found.length === 0 && !aiReady && <Card label={t.search} className="home-results"><p className="result-empty">{t.noResults}</p></Card>}
+      </div>
 
-      <Card label={t.pages.samples}>
-        <LinkRow icon="play_circle" title={t.pages.samples} description={t.samples.description} onClick={() => ctx.open("samples")} />
-        <LinkRow icon="checklist" title={t.pages.all} description={h.allDescription} onClick={() => ctx.open("all")} />
-      </Card>
-    </>
+      <nav className="home-links" aria-label={t.settings}>
+        <Button variant="quiet" icon="play_circle" onClick={() => ctx.open("samples")}>{t.pages.samples}</Button>
+        <Button variant="quiet" icon="checklist" onClick={() => ctx.open("all")}>{t.pages.all}</Button>
+      </nav>
+    </div>
   );
 }
 

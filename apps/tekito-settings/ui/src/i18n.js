@@ -74,7 +74,7 @@ const en = {
   special: { title: "Dates, symbols and sums as candidates", parts: ["Date and time", "Symbols", "Sums"], none: "Off" },
   slips: { capitalizedExample: "e.g. Cjicago → Chicago", spaceless: ["Off", "Common words", "All words"] },
   chat: {
-    label: "Ask AI", next: "Reply to AI", newChat: "New conversation", thinking: "Thinking", changes: "Changes", related: "Related",
+    label: "Ask AI", next: "Reply to AI", newChat: "New conversation", send: "Send", thinking: "Thinking", changes: "Changes", related: "Related",
     refused: "AI can't change this", undone: "Undone", on: "On", off: "Off", byGrade: "Up to a school year",
   },
   modes: {
@@ -485,7 +485,7 @@ const ja = {
   special: { title: "日付・記号・計算を候補に表示", parts: ["日付と時刻", "記号", "計算結果"], none: "表示しない" },
   slips: { capitalizedExample: "例：Cjicago → Chicago", spaceless: ["オフ", "よく使う語のみ", "すべての語"] },
   chat: {
-    label: "AI に聞く", next: "AI に返信", newChat: "新しい会話", thinking: "考えています", changes: "変更", related: "関連",
+    label: "AI に聞く", next: "AI に返信", newChat: "新しい会話", send: "送信", thinking: "考えています", changes: "変更", related: "関連",
     refused: "AI では変更できません", undone: "元に戻しました", on: "オン", off: "オフ", byGrade: "学年まで",
   },
   modes: {
