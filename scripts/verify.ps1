@@ -4,14 +4,17 @@
 param(
     [string]$BuildDir,
     [string]$CMakePath,
-    [string]$CTestPath
+    [string]$CTestPath,
+    # windows-x64-vs2022-debug where only Visual Studio 2022 is installed
+    # (GitHub's Windows runners).
+    [string]$Preset = "windows-x64-debug"
 )
 
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 $buildDir = if ($BuildDir) { [IO.Path]::GetFullPath($BuildDir) } else {
-    Join-Path $repoRoot "out\build\windows-x64-debug"
+    Join-Path $repoRoot "out\build\$Preset"
 }
 
 # CMake and CTest from PATH, or the copies Visual Studio installs.
@@ -59,7 +62,7 @@ Write-Host "ok  PowerShell scripts parse"
 Push-Location $repoRoot
 try {
     if (-not (Test-Path (Join-Path $buildDir "CMakeCache.txt"))) {
-        & $cmake --preset windows-x64-debug
+        & $cmake --preset $Preset
         if ($LASTEXITCODE -ne 0) { throw "CMake configure failed ($LASTEXITCODE)" }
     }
     & $cmake --build $buildDir --config Debug
