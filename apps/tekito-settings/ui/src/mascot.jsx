@@ -1,5 +1,7 @@
 // Home's companion: TEKITO's filled mark (assets/icons/symbols/
-// tekito-filled.svg) without the T, with white eyes. It answers with its eyes
+// tekito-filled.svg) without the T, in the app icon's colors
+// (assets/icons/Tekito.ico: light blue at the top left, blue, cyan at the
+// bottom right; the small ring cyan), with white eyes. It answers with its eyes
 // and how it moves:
 //   idle       floats and blinks, eyes open; its eyes on the pointer (`follow`)
 //   listening  the user is typing: eyes wider, on the box
@@ -55,7 +57,8 @@ function eyes(mood) {
 
 export function Mascot({ mood = "idle", size = 96, follow = false, label }) {
   const ref = useRef(null);
-  const cut = `mascot-cut-${useId().replace(/:/g, "")}`;
+  const id = useId().replace(/:/g, "");
+  const cut = `mascot-cut-${id}`;
   const [look, setLook] = useState({ x: 0, y: 0 });
   useEffect(() => {
     if (!follow || mood !== "idle") {
@@ -88,14 +91,30 @@ export function Mascot({ mood = "idle", size = 96, follow = false, label }) {
     <svg ref={ref} className={`mascot is-${mood}`} width={size} height={size} viewBox="60 60 800 800"
       role={label ? "img" : undefined} aria-label={label || undefined} aria-hidden={label ? undefined : true}>
       <defs>
+        <linearGradient id={`mascot-body-${id}`} x1="0.1" y1="0.05" x2="0.9" y2="0.95">
+          <stop offset="0" stopColor="#a6c8ff" />
+          <stop offset="0.3" stopColor="#3f88ff" />
+          <stop offset="0.55" stopColor="#0668ff" />
+          <stop offset="0.75" stopColor="#0590ff" />
+          <stop offset="1" stopColor="#00dcff" />
+        </linearGradient>
+        <radialGradient id={`mascot-sheen-${id}`} cx="0.18" cy="0.14" r="0.62">
+          <stop offset="0" stopColor="#ffffff" stopOpacity="0.6" />
+          <stop offset="1" stopColor="#ffffff" stopOpacity="0" />
+        </radialGradient>
+        <linearGradient id={`mascot-ring-${id}`} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#6fe8ff" />
+          <stop offset="1" stopColor="#10b6fe" />
+        </linearGradient>
         <mask id={cut} maskUnits="userSpaceOnUse" x="0" y="0" width="960" height="960">
           <rect width="960" height="960" fill="#fff" />
           <circle cx="709" cy="695" r="120" fill="#000" />
         </mask>
       </defs>
       <g className="mascot-body">
-        <path className="mascot-disc" d={kDisc} mask={`url(#${cut})`} />
-        <path className="mascot-small" d={kSmall} fillRule="evenodd" />
+        <path className="mascot-disc" d={kDisc} mask={`url(#${cut})`} fill={`url(#mascot-body-${id})`} />
+        <path d={kDisc} mask={`url(#${cut})`} fill={`url(#mascot-sheen-${id})`} />
+        <path className="mascot-small" d={kSmall} fillRule="evenodd" fill={`url(#mascot-ring-${id})`} />
         <g className="mascot-face" style={{ transform: `translate(${look.x}px, ${look.y}px)` }}>
           {eyes(mood)}
         </g>

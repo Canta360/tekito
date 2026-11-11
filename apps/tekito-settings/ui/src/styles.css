@@ -340,7 +340,6 @@ kbd {
 .mascot-body, .mascot-small, .mascot-face { transform-box: view-box; }
 .mascot-body { transform-origin: 450px 768px; }
 .mascot-small { transform-origin: 709px 695px; }
-.mascot-disc, .mascot-small { fill: var(--accent); }
 .mascot-face { fill: none; stroke: #ffffff; stroke-width: 30; stroke-linecap: round; stroke-linejoin: round; transition: transform 0.15s ease-out; }
 .mascot-face .mascot-white { fill: #ffffff; stroke: none; }
 .mascot.is-idle .mascot-body { animation: mascot-float 3.2s ease-in-out infinite; }
