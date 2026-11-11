@@ -310,3 +310,7 @@ kbd {
 .sidebar.is-rail .fui-NavItem { justify-content: center; padding-left: 0; padding-right: 0; }
 /* Fluent sets the drawer's width in its own style: the folded width wins here. */
 .sidebar.is-rail { --fui-Drawer--size: 64px !important; width: 64px !important; }
+/* Folded, the current page is shown by its icon's color, not Fluent's bar
+   (which would sit on the icon). */
+.sidebar.is-rail .fui-NavItem::after { display: none !important; }
+.sidebar.is-rail .fui-NavItem[aria-current="page"] .symbol { color: var(--accent-text); }
