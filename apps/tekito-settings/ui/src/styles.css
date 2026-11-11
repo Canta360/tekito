@@ -341,29 +341,27 @@ kbd {
 .mascot-body { transform-origin: 450px 790px; }
 .mascot-small { transform-origin: 709px 695px; }
 .mascot-ring, .mascot-small { fill: none; stroke: var(--accent); stroke-width: 28; stroke-linecap: round; }
-.mascot-face { fill: none; stroke: var(--ink); stroke-width: 22; stroke-linecap: round; stroke-linejoin: round; transition: transform 0.15s ease-out; }
-.mascot-face .mascot-dot { fill: var(--ink); stroke: none; }
+.mascot-face { fill: none; stroke: var(--ink); stroke-width: 20; stroke-linecap: round; stroke-linejoin: round; transition: transform 0.15s ease-out; }
+.mascot-face .mascot-white { fill: #ffffff; stroke: #1b1b1f; }
 .mascot.is-idle .mascot-body { animation: mascot-float 3.2s ease-in-out infinite; }
 .mascot.is-idle .mascot-small { animation: mascot-bob 3.2s ease-in-out 0.4s infinite; }
 .mascot.is-idle .mascot-open, .mascot.is-listening .mascot-open { animation: mascot-blink 4.6s infinite; }
-.mascot.is-listening .mascot-body { transform: scale(1.03, 0.97); transition: transform 0.25s var(--ease); }
+.mascot.is-listening .mascot-body { transform: scale(1.01, 0.99); transition: transform 0.25s var(--ease); }
 .mascot.is-searching .mascot-body { animation: mascot-sway 0.9s ease-in-out infinite alternate; }
 .mascot.is-searching .mascot-face { animation: mascot-scan 0.9s ease-in-out infinite alternate; }
 .mascot.is-searching .mascot-small { animation: mascot-pulse 0.9s ease-in-out infinite alternate; }
-.mascot.is-happy .mascot-body { animation: mascot-hop 0.55s cubic-bezier(0.3, 0, 0.3, 1) 3; }
-.mascot.is-unsure .mascot-body { transform: rotate(-10deg); transition: transform 0.4s var(--ease); }
-.mascot.is-down .mascot-body { transform: translateY(30px) scale(1.04, 0.94); transition: transform 0.5s var(--ease); }
-.mascot-spiral { stroke-width: 12; transform-box: view-box; animation: mascot-spin 1.6s linear infinite; }
-@keyframes mascot-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-40px); } }
-@keyframes mascot-bob { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(-12px, -22px); } }
+.mascot.is-happy .mascot-body { animation: mascot-hop 0.5s cubic-bezier(0.3, 0, 0.3, 1) 2; }
+.mascot.is-unsure .mascot-body { transform: rotate(-5deg); transition: transform 0.4s var(--ease); }
+.mascot.is-down .mascot-body { transform: translateY(10px) scale(1.02, 0.97); transition: transform 0.5s var(--ease); }
+@keyframes mascot-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-14px); } }
+@keyframes mascot-bob { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(-5px, -9px); } }
 @keyframes mascot-blink { 0%, 92%, 100% { transform: scaleY(1); } 95% { transform: scaleY(0.1); } }
-@keyframes mascot-sway { from { transform: rotate(-6deg) translateX(-16px); } to { transform: rotate(6deg) translateX(16px); } }
-@keyframes mascot-scan { from { transform: translateX(-50px); } to { transform: translateX(50px); } }
-@keyframes mascot-pulse { from { transform: scale(0.85); } to { transform: scale(1.12); } }
-@keyframes mascot-spin { from { transform: rotate(0deg); } to { transform: rotate(-360deg); } }
+@keyframes mascot-sway { from { transform: rotate(-2deg); } to { transform: rotate(2deg); } }
+@keyframes mascot-scan { from { transform: translateX(-18px); } to { transform: translateX(18px); } }
+@keyframes mascot-pulse { from { transform: scale(0.94); } to { transform: scale(1.06); } }
 @keyframes mascot-hop {
-  0% { transform: translateY(0) scale(1.08, 0.9); } 35% { transform: translateY(-120px) scale(0.94, 1.08); }
-  70% { transform: translateY(0) scale(1.1, 0.88); } 100% { transform: translateY(0) scale(1, 1); }
+  0% { transform: translateY(0) scale(1.03, 0.97); } 35% { transform: translateY(-44px) scale(0.97, 1.03); }
+  70% { transform: translateY(0) scale(1.04, 0.96); } 100% { transform: translateY(0) scale(1, 1); }
 }
 @media (prefers-reduced-motion: reduce) {
   .mascot *, .mascot { animation: none !important; transition: none !important; }
