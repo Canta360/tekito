@@ -33,6 +33,16 @@ export function ModeIcon({ id, size = 20, label }) {
   );
 }
 
+// TEKITO's name drawn in the icon's line (assets/icons/symbols/tekito-wordmark-line.svg),
+// for Settings' corner; About keeps the wordmark itself.
+export function LineWordmark({ height = 14 }) {
+  return (
+    <svg className="line-wordmark" height={height} width={(height * 628) / 120} viewBox="-10 -10 628 120" role="img" aria-label="TEKITO">
+      <g fill="none" stroke="currentColor" strokeWidth="11" strokeLinecap="round" strokeLinejoin="round"><path d="M0 0H96M48 0V100"/><path d="M216 0H126V100H216M126 50H206"/><path d="M246 0V100M334 0L252 60M280 40L338 100"/><path d="M368 0V100"/><path d="M398 0H494M446 0V100"/><circle cx="558" cy="50" r="50"/></g>
+    </svg>
+  );
+}
+
 // TEKITO's icon, single-color (assets/icons/symbols/tekito-outline.svg).
 export function TekitoSymbol({ size = 20 }) {
   return (

@@ -3,10 +3,7 @@ import { createRoot } from "react-dom/client";
 import { CapitataLogo } from "./CapitataLogo.jsx";
 import { hostRequest, onHostStateChanged } from "./host.js";
 import { messages, resolveLanguage, TextContext, useText } from "./i18n.js";
-import {
-  Button, Card, Check, ChoiceRow, Details, Dialog, Heading, Keycaps, LinkRow, ModeIcon, Row, Segmented, Select,
-  Slider, Symbol, Toggle, Wordmark,
-} from "./ui.jsx";
+import { Button, Card, Check, ChoiceRow, Details, Dialog, Heading, Keycaps, LinkRow, ModeIcon, Row, Segmented, Select, Slider, Symbol, Toggle, Wordmark, TekitoSymbol, LineWordmark } from "./ui.jsx";
 import "./styles.css";
 
 // The pages, in the order of the list. Japanese and Mix are there while
@@ -284,7 +281,7 @@ function App() {
     <TextContext.Provider value={t}>
       <div className="app">
         <aside className="sidebar">
-          <div className="brand"><img src="./assets/tekito.ico" alt="" /><Wordmark />{t.settings}</div>
+          <div className="brand"><TekitoSymbol size={20} /><LineWordmark height={13} />{t.settings}</div>
           <SettingsSearch pages={shownPages} open={open} japaneseInstalled={japaneseInstalled} />
           <nav aria-label={t.settings} style={{ display: "contents" }}>
             {shownPages.filter((id) => id !== "about").map((id) => (

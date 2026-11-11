@@ -67,6 +67,8 @@ ul { margin: 0; padding: 0; list-style: none; }
 .sidebar { padding: 14px 10px; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; }
 .brand { display: flex; align-items: center; gap: 10px; padding: 4px 12px 14px; color: var(--ink-2); font-size: 12px; }
 .brand > img { width: 20px; height: 20px; }
+.brand .line-wordmark { display: block; flex: none; }
+.brand .tekito-symbol, .brand .line-wordmark { color: var(--ink); }
 .search-box { position: relative; margin: 0 4px 10px; }
 .search-box input {
   width: 100%; padding: 6px 32px 6px 10px; border-radius: 6px; border: 1px solid var(--line);
