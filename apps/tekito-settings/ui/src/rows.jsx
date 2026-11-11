@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { useText } from "./i18n.js";
 import { Checkbox } from "@fluentui/react-components";
-import { Busy, Button, Check, IconButton, Keycaps, ModeIcon, Radios, Row, Segmented, SpinButton, Symbol, TextBox, Toggle } from "./ui.jsx";
+import { Busy, Button, Check, Dialog, IconButton, Keycaps, ModeIcon, Radios, Row, Segmented, SpinButton, Symbol, TextBox, Toggle } from "./ui.jsx";
 
 // The modes a setting applies to, as their icons after its name.
 export function ModeBadges({ ids }) {
@@ -64,7 +64,7 @@ export function LinkedToggle({ id, icon, title, description, keys, settings, set
     writeUnlinked(id, true);
     setUnlinked(true);
   };
-  const chainLabel = apart ? l.link(t.modeNames[first], t.modeNames[second]) : l.unlink;
+  // Said in words under the row: set apart for each mode, or the same again.
   return (
     <Row icon={icon} title={heading} description={description}
       sub={(
@@ -81,10 +81,13 @@ export function LinkedToggle({ id, icon, title, description, keys, settings, set
             </div>
           )}
           {sub}
+          <div className="linked-action">
+            <Button variant="quiet" size="small" icon={apart ? "link" : "link_off"} onClick={apart ? link : unlink}>
+              {apart ? l.link(t.modeNames[first], t.modeNames[second]) : l.unlink(t.modeNames[first], t.modeNames[second])}
+            </Button>
+          </div>
         </>
       )}>
-      <IconButton className={`chain ${apart ? "" : "is-linked"}`} icon={apart ? "link_off" : "link"} label={chainLabel}
-        onClick={apart ? link : unlink} />
       {!apart && <Toggle label={title} checked={settings[keys[first]]} onChange={setBoth} />}
     </Row>
   );
@@ -539,5 +542,40 @@ export function RowsRow({ settings, setSetting, title, description }) {
       <Segmented label={title} value={other || custom ? "other" : value}
         options={[[0, r.automatic], [5, "5"], [7, "7"], [9, "9"], ["other", r.other]]} onChange={choose} />
     </Row>
+  );
+}
+
+// Encryption of the user's database, and its recovery code (shown once,
+// when made).
+export function EncryptionRow({ encryption, runAction, setConfirm }) {
+  const t = useText();
+  const e = t.dictionary.encryption;
+  const [code, setCode] = useState(null);
+  const showCode = (response) => { if (response.ok && response.code) setCode(response.code); };
+  const turnOn = async () => showCode(await runAction("encryption.enable", {}));
+  const turnOff = () => setConfirm({ title: e.offTitle, message: e.offBody, confirmLabel: e.off,
+    action: () => runAction("encryption.disable", {}) });
+  const renew = () => setConfirm({ title: e.renewTitle, message: e.renewBody, confirmLabel: e.renew,
+    action: async () => showCode(await runAction("encryption.renew", {})) });
+  const status = encryption.wanted ? (encryption.encrypted ? e.on : e.pendingOn)
+    : encryption.encrypted ? e.pendingOff : e.description;
+  return (
+    <>
+      <Row icon="lock" title={e.title} description={status}
+          sub={encryption.wanted && (
+            <div className="row-sub-action"><Button variant="quiet" onClick={renew}>{e.renew}</Button></div>
+          )}>
+          <Toggle label={e.title} checked={encryption.wanted} onChange={(value) => (value ? turnOn() : turnOff())} />
+        </Row>
+      <Dialog open={Boolean(code)} title={e.codeTitle} onClose={() => setCode(null)}>
+        <p className="dialog-message">{e.codeBody}</p>
+        <p className="recovery-code">{code}</p>
+        <div className="dialog-actions">
+          <Button onClick={() => runAction("encryption.copy", { code }, e.copied)}>{e.copy}</Button>
+          <Button onClick={() => runAction("encryption.save", { code })}>{e.save}</Button>
+          <Button variant="primary" onClick={() => setCode(null)}>{e.done}</Button>
+        </div>
+      </Dialog>
+    </>
   );
 }

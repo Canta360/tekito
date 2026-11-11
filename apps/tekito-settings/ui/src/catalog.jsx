@@ -5,7 +5,7 @@ import React from "react";
 import { Card, Check, Details, Heading, Keycaps, LinkRow, Row, Segmented, Select, Slider, Toggle } from "./ui.jsx";
 import {
   AiModelRow, candidateRowsRange, ExcludedApps, kanjiStop, kanjiStops, LinkedToggle, ModeBadges, NumbersRow, PostalCodes, RowsRow, SpecialRow,
-  SwitchOrder, switchKeyCaps, wasFound, WidthsRow,
+  EncryptionRow, SwitchOrder, switchKeyCaps, wasFound, WidthsRow,
 } from "./rows.jsx";
 
 // The pages in the list's order; All settings and About sit at its foot.
@@ -291,6 +291,26 @@ export function catalog(ctx) {
       { detail: true }),
     toggle("typedForms", "candidates", "extra", "text_fields", j.typedForms, "japaneseTypedForms", { modes: ja, detail: true }),
 
+    // 辞書と学習 (the page draws its own; these are for All settings, search and AI)
+    {
+      id: "learn", page: "dictionary", group: "learning", keys: ["learningEnabled"], title: t.dictionary.learn.title,
+      render: () => (
+        <Row icon="school" title={t.dictionary.learn.title} description={t.dictionary.learn.description}>
+          <Toggle label={t.dictionary.learn.title} checked={s.learningEnabled}
+            onChange={async (value) => {
+              // One switch for everything learned from choices.
+              if (await set("learningEnabled", value) && Boolean(s.socialPersonalization) !== value) await set("socialPersonalization", value ? 1 : 0);
+            }} />
+        </Row>
+      ),
+    },
+    toggle("secret", "dictionary", "learning", "lock", t.dictionary.secret, "secretMode"),
+    toggle("private", "dictionary", "learning", "lock", t.dictionary.private, "noLearningInPrivate"),
+    {
+      id: "encryption", page: "dictionary", group: "learning", keys: [], title: t.dictionary.encryption.title, detail: true,
+      render: () => <EncryptionRow encryption={ctx.encryption} runAction={ctx.runAction} setConfirm={ctx.setConfirm} />,
+    },
+
     // キーと入力
     choice("keyboard", "keys", "keyboard", "keyboard_alt", g.keyboard, "keyboardType",
       [[0, g.keyboard.detect], [1, g.keyboard.japanese], [2, g.keyboard.us]]),
@@ -393,6 +413,7 @@ export function aiSpecs(ctx) {
     typedForms: ["japaneseTypedForms"], kanaInput: ["japaneseKanaInput", "japaneseKanaInputKey"], capsLock: ["japaneseIgnoreCapsLock"],
     numpad: ["japaneseNumpadDirect"], brackets: ["bracketPairs"], spaceless: ["spacelessEnglish", "spacelessEnglishAlways"],
     numbers: ["japaneseRoughNumbersKanji", "numberConversion"],
+    learn: ["learningEnabled"], secret: ["secretMode"], private: ["noLearningInPrivate"],
   })) {
     for (const key of keys) add(id, key, onOff);
   }

@@ -14,8 +14,7 @@ function otherEntries(t, japaneseInstalled) {
   const a = t.about;
   return [
     ...(japaneseInstalled ? [["dictionary", d.japaneseWords.title]] : []), ["dictionary", d.englishWords.title], ["dictionary", d.files.title],
-    ["dictionary", d.learn.title], ["dictionary", d.learned.title], ["dictionary", d.secret.title], ["dictionary", d.private.title],
-    ["dictionary", d.encryption.title, "dictionary"],
+    ["dictionary", d.learned.title],
     ...(japaneseInstalled ? [["about", a.report.title]] : []), ["about", a.bug.title], ["about", a.feature.title], ["about", a.releases.title],
     ["about", a.diagnostics], ["about", a.license], ["samples", t.pages.samples],
   ].map(([page, title, details]) => ({ page, title, details }));

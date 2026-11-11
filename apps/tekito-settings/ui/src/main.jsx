@@ -14,7 +14,7 @@ import {
 import { brandVariables, hueColor, tekitoTheme } from "./theme.js";
 import { CatalogPage, footPages, navIcons, navPages, pageGroups } from "./catalog.jsx";
 import { AllSettingsPage, HomePage } from "./home.jsx";
-import { KeyList } from "./rows.jsx";
+import { EncryptionRow, KeyList } from "./rows.jsx";
 import "./styles.css";
 
 // The pages, in the order of the list.
@@ -335,6 +335,7 @@ function App() {
     t, settings, setSetting, runAction, setConfirm, showKeys: setKeys, open, on, multi: japanese || mixed, japaneseInstalled,
     japaneseKeyboard, aiModels, postalCodes, openRomaji: () => open("romaji"), aiReady, chat: { messages: conversation, setMessages: setConversation },
     japaneseInstalling: Boolean(runtime.japaneseInstalling), japaneseDataBytes: runtime.japaneseDataBytes || 0,
+    encryption,
   };
   const pageProps = { settings, setSetting, runAction, setConfirm, showKeys: setKeys, open };
 
@@ -678,45 +679,10 @@ function DictionaryPage({ settings, setSetting, runAction, setConfirm, japanese,
         </Row>
       </Card>
       <Details id="dictionary" title={t.details}>
-        <EncryptionCard encryption={encryption} runAction={runAction} setConfirm={setConfirm} />
+        <Card label={t.dictionary.encryption.title}>
+          <EncryptionRow encryption={encryption} runAction={runAction} setConfirm={setConfirm} />
+        </Card>
       </Details>
-    </>
-  );
-}
-
-// Encryption of the user's database, and its recovery code (shown once,
-// when made).
-function EncryptionCard({ encryption, runAction, setConfirm }) {
-  const t = useText();
-  const e = t.dictionary.encryption;
-  const [code, setCode] = useState(null);
-  const showCode = (response) => { if (response.ok && response.code) setCode(response.code); };
-  const turnOn = async () => showCode(await runAction("encryption.enable", {}));
-  const turnOff = () => setConfirm({ title: e.offTitle, message: e.offBody, confirmLabel: e.off,
-    action: () => runAction("encryption.disable", {}) });
-  const renew = () => setConfirm({ title: e.renewTitle, message: e.renewBody, confirmLabel: e.renew,
-    action: async () => showCode(await runAction("encryption.renew", {})) });
-  const status = encryption.wanted ? (encryption.encrypted ? e.on : e.pendingOn)
-    : encryption.encrypted ? e.pendingOff : e.description;
-  return (
-    <>
-      <Card label={e.title}>
-        <Row icon="lock" title={e.title} description={status}
-          sub={encryption.wanted && (
-            <div className="row-sub-action"><Button variant="quiet" onClick={renew}>{e.renew}</Button></div>
-          )}>
-          <Toggle label={e.title} checked={encryption.wanted} onChange={(value) => (value ? turnOn() : turnOff())} />
-        </Row>
-      </Card>
-      <Dialog open={Boolean(code)} title={e.codeTitle} onClose={() => setCode(null)}>
-        <p className="dialog-message">{e.codeBody}</p>
-        <p className="recovery-code">{code}</p>
-        <div className="dialog-actions">
-          <Button onClick={() => runAction("encryption.copy", { code }, e.copied)}>{e.copy}</Button>
-          <Button onClick={() => runAction("encryption.save", { code })}>{e.save}</Button>
-          <Button variant="primary" onClick={() => setCode(null)}>{e.done}</Button>
-        </div>
-      </Dialog>
     </>
   );
 }

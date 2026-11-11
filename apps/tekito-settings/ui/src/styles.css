@@ -282,3 +282,5 @@ kbd {
 .order li.order-missing { background: transparent; border-style: dashed; padding: 6px 8px; }
 .order-missing .mode-icon { opacity: 0.45; }
 .choice-list.choice-list { width: max-content; min-width: 160px; max-width: 480px; overflow-x: hidden; }
+.linked-action { padding: 0 18px 10px 44px; margin-top: -4px; }
+.linked-action .fui-Button { color: var(--accent-text); font-weight: var(--fontWeightRegular); }
