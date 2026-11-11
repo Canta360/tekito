@@ -122,7 +122,7 @@ export function HomePage({ ctx, aiReady }) {
       <div className="home-box">
       {!chatting && (
         <div className="home-greeting">
-          <Mascot />
+          <Mascot follow />
           <p>{greeting}</p>
         </div>
       )}
@@ -189,8 +189,10 @@ function SettingsAiOffer({ ctx }) {
 function Reply({ ctx, message, update }) {
   const t = ctx.t;
   const c = t.chat;
-  if (message.status === "asking") return <div className="bubble-ai"><div className="answer-status"><Mascot searching size={56} />{c.thinking}</div></div>;
-  if (message.status === "failed") return <div className="bubble-ai"><p className="answer-status">{t.home.failed}</p></div>;
+  if (message.status === "asking") return <div className="bubble-ai"><div className="reply-text"><Mascot mood="searching" size={36} /><span className="answer-status">{c.thinking}</span></div></div>;
+  if (message.status === "failed") {
+    return <div className="bubble-ai"><div className="reply-text"><Mascot size={36} /><span className="answer-status">{t.home.failed}</span></div></div>;
+  }
   const specs = aiSpecs(ctx);
   // An easter egg once found is shown too (visible: found or on).
   const entries = catalog(ctx).filter((entry) => visible(entry, ctx));
@@ -212,7 +214,10 @@ function Reply({ ctx, message, update }) {
     (item.type === "page" && pages[item.id]));
   return (
     <div className="bubble-ai">
-      <p className="reply-text"><Symbol name="wand_stars" size={18} /><span>{message.text || (shown.length ? "" : t.home.nothing)}</span></p>
+      <div className="reply-text">
+        <Mascot mood={message.changes.some((change) => change.state === "applied") ? "happy" : "idle"} size={36} />
+        <span>{message.text || (shown.length ? "" : t.home.nothing)}</span>
+      </div>
       {message.changes.length > 0 && (
         <Card label={c.changes} className="changes">
           {message.changes.map((change, index) => {

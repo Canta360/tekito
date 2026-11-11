@@ -268,8 +268,11 @@ kbd {
   white-space: pre-wrap;
 }
 .bubble-ai { display: grid; gap: 8px; max-width: 100%; }
+/* AI's replies open with the companion, as a chat shows who speaks. */
 .reply-text { display: flex; gap: 10px; align-items: flex-start; line-height: var(--lineHeightBase400); }
-.reply-text > .symbol { color: var(--accent-text); margin-top: 3px; }
+.reply-text > .mascot { margin-top: -6px; }
+.reply-text > span { padding-top: 2px; }
+.reply-text > .answer-status { padding: 2px 0 0; }
 .change { display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 6px 12px 6px 16px; }
 .change + .change { border-top: 1px solid var(--line); }
 .change > .symbol { color: var(--positive); }
@@ -333,19 +336,16 @@ kbd {
 /* Home's companion and its greeting. */
 .home-greeting { display: grid; justify-items: center; gap: 10px; margin-bottom: 12px; color: var(--ink-2); text-align: center; }
 .home-greeting p { font-size: var(--fontSizeBase400); color: var(--ink); }
-.mascot { color: var(--ink-2); overflow: visible; }
-.mascot-tail { transform-origin: 62px 80px; animation: mascot-tail 2.6s ease-in-out infinite alternate; }
-.mascot-eyes { transform-origin: 48px 44px; animation: mascot-blink 4.8s infinite; }
-.mascot-glass { opacity: 0; transition: opacity 0.3s var(--ease); }
-.mascot.is-searching .mascot-glass { opacity: 1; transform-origin: 74px 38px; animation: mascot-look 1.4s ease-in-out infinite alternate; }
-.mascot.is-searching .mascot-head { transform-origin: 48px 56px; animation: mascot-tilt 1.4s ease-in-out infinite alternate; }
-.mascot.is-searching .mascot-eyes { animation: mascot-peek 1.4s ease-in-out infinite alternate; }
-.mascot.is-searching .mascot-tail { animation-duration: 0.9s; }
-@keyframes mascot-tail { from { transform: rotate(-8deg); } to { transform: rotate(10deg); } }
-@keyframes mascot-blink { 0%, 90%, 100% { transform: scaleY(1); } 94% { transform: scaleY(0.1); } }
-@keyframes mascot-look { from { transform: translate(-44px, 6px) rotate(-12deg); } to { transform: translate(0, 0) rotate(8deg); } }
-@keyframes mascot-tilt { from { transform: rotate(-7deg); } to { transform: rotate(6deg); } }
-@keyframes mascot-peek { from { transform: translateX(-3px); } to { transform: translateX(3px); } }
+.mascot { color: var(--ink); overflow: visible; flex: none; }
+.mascot-eyes { transition: transform 0.12s linear; }
+.mascot.is-idle .mascot-body { transform-origin: 48px 85px; animation: mascot-breathe 3.6s ease-in-out infinite; }
+.mascot.is-searching .mascot-body { transform-origin: 48px 85px; animation: mascot-sway 1.2s ease-in-out infinite alternate; }
+.mascot.is-searching .mascot-glass { transform-origin: 16px 60px; animation: mascot-look 1.2s ease-in-out infinite alternate; }
+.mascot.is-happy .mascot-body { transform-origin: 48px 85px; animation: mascot-hop 0.5s ease-out 2; }
+@keyframes mascot-breathe { 0%, 100% { transform: scale(1, 1); } 50% { transform: scale(1.02, 0.98); } }
+@keyframes mascot-sway { from { transform: rotate(-4deg); } to { transform: rotate(4deg); } }
+@keyframes mascot-look { from { transform: translate(-2px, 2px) rotate(-10deg); } to { transform: translate(4px, -4px) rotate(8deg); } }
+@keyframes mascot-hop { 0%, 100% { transform: translateY(0); } 40% { transform: translateY(-6px); } }
 .answer-status .mascot { flex: none; }
 @media (prefers-reduced-motion: reduce) {
   .mascot *, .mascot { animation: none !important; }

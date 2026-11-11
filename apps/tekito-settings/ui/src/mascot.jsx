@@ -1,30 +1,72 @@
-// Home's companion: a cat drawn in the same single line as Settings' icons
-// (the text color, the accent for its glass). Sitting, it blinks and its
-// tail sways; looking (`searching`), it peers left and right through a
-// magnifying glass. Still when the user asks Windows for less motion.
-import React from "react";
+// Home's companion: a round cat (the user's sketch), in Settings' single
+// line. Moods: "idle" (・ω・, its eyes on the pointer when `follow`),
+// "searching" (−ω−, a magnifying glass going side to side), "happy"
+// (content, after a change). Also the icon beside AI's replies. Still when
+// the user asks Windows for less motion.
+import React, { useEffect, useRef, useState } from "react";
 
-export function Mascot({ searching = false, size = 88, label }) {
+export function Mascot({ mood = "idle", size = 88, follow = false, label }) {
+  const ref = useRef(null);
+  const [look, setLook] = useState({ x: 0, y: 0 });
+  useEffect(() => {
+    if (!follow || mood !== "idle") return undefined;
+    let frame = 0;
+    const onMove = (event) => {
+      if (frame) return;
+      frame = window.requestAnimationFrame(() => {
+        frame = 0;
+        const box = ref.current?.getBoundingClientRect();
+        if (!box) return;
+        const dx = event.clientX - (box.left + box.width / 2);
+        const dy = event.clientY - (box.top + box.height * 0.58);
+        const distance = Math.hypot(dx, dy) || 1;
+        // Up to 3.5 of the drawing's units toward the pointer.
+        const reach = Math.min(1, distance / 160) * 3.5;
+        setLook({ x: (dx / distance) * reach, y: (dy / distance) * reach * 0.8 });
+      });
+    };
+    window.addEventListener("pointermove", onMove);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      if (frame) window.cancelAnimationFrame(frame);
+    };
+  }, [follow, mood]);
+
   return (
-    <svg className={`mascot ${searching ? "is-searching" : ""}`} width={size} height={size} viewBox="0 0 96 96"
+    <svg ref={ref} className={`mascot is-${mood}`} width={size} height={size} viewBox="0 0 96 96"
       role={label ? "img" : undefined} aria-label={label || undefined} aria-hidden={label ? undefined : true}>
-      <g fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-        <path className="mascot-tail" d="M62 80 C78 80 86 70 82 58 C80 52 74 52 74 58" />
-        <path d="M34 84 C30 70 34 58 48 58 C62 58 66 70 62 84 Z" />
-        <path d="M40 84 L40 76 M56 84 L56 76" />
-        <g className="mascot-head">
-          <path d="M28 44 L30 22 L41 31 Q48 29 55 31 L66 22 L68 44 Q68 60 48 60 Q28 60 28 44 Z" />
-          <g className="mascot-eyes" fill="currentColor" stroke="none">
-            <ellipse cx="40" cy="44" rx="2.4" ry="3" />
-            <ellipse cx="56" cy="44" rx="2.4" ry="3" />
+      <g fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round">
+        <g className="mascot-body">
+          {/* The ears on top, then the round body drawn as two strokes. */}
+          <path d="M31 33 Q33 24 39 30 L57 30 Q63 24 65 33" />
+          <path d="M29 37 C16 50 18 78 42 85" />
+          <path d="M67 37 C80 50 78 77 55 85 L50 85.6" />
+          {mood === "idle" && (
+            <g className="mascot-eyes" fill="currentColor" stroke="none" style={{ transform: `translate(${look.x}px, ${look.y}px)` }}>
+              <circle cx="38" cy="56" r="2.6" />
+              <circle cx="58" cy="56" r="2.6" />
+            </g>
+          )}
+          {mood === "searching" && (
+            <g className="mascot-eyes">
+              <path d="M34 56 L42 56 M54 56 L62 56" />
+            </g>
+          )}
+          {mood === "happy" && (
+            <g>
+              <path d="M33 51 L42 51 M54 51 L63 51" strokeWidth="2.6" />
+              <path d="M34 55 Q38 60 42 55 M54 55 Q58 60 62 55" />
+            </g>
+          )}
+          <path d="M43 62 Q45.5 66 48 62 Q50.5 66 53 62" strokeWidth="2.8" />
+        </g>
+        {mood === "searching" && (
+          <g className="mascot-glass">
+            <circle cx="16" cy="60" r="7" stroke="var(--accent-text, currentColor)" />
+            <path d="M21 66 L25 71" stroke="var(--accent-text, currentColor)" />
+            <path d="M25 74 L30 74 L30 70" strokeWidth="2.6" />
           </g>
-          <path d="M45 50 Q48 53 51 50" />
-          <path d="M24 46 L34 47 M24 52 L34 50 M72 46 L62 47 M72 52 L62 50" strokeWidth="2" />
-        </g>
-        <g className="mascot-glass">
-          <circle cx="74" cy="38" r="7.5" stroke="var(--accent-text, currentColor)" />
-          <path d="M79.5 43.5 L86 50" stroke="var(--accent-text, currentColor)" />
-        </g>
+        )}
       </g>
     </svg>
   );
