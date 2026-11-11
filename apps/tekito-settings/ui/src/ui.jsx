@@ -15,20 +15,30 @@ export function Symbol({ name, size = 20, className = "" }) {
 
 // The input modes' own icons (assets/icons), with the versions drawn for a
 // dark background.
-const modeImages = {
-  japanese: { image: "./assets/japanese.ico", imageDark: "./assets/japanese-dark.ico" },
-  mixed: { image: "./assets/mixed.ico" },
-  auto: { image: "./assets/auto.ico" },
-  direct: { image: "./assets/direct.ico", imageDark: "./assets/direct-dark.ico" },
+// The modes' icons, single-color in the text color as Settings' own icons
+// are (assets/icons/symbols; the letters from M PLUS 1).
+const modeShapes = {
+  japanese: <><path fill="currentColor" d="M365.9 719.6V409.1V130H415.1V409.1V719.6ZM155.7 279.8V236.8H804.3V279.8ZM560.9 784.9Q619.6 776.7 664 750Q708.3 723.3 733.2 682.4Q758 641.6 758 592.7Q758 537.7 726.8 497Q695.6 456.4 638.5 434.2Q581.4 412 503 412Q439.7 412 384.7 430.5Q329.7 449 288.4 482.4Q247.2 515.9 224.2 560Q201.2 604.2 201.2 655.9Q201.2 698.7 217.6 725.8Q234 752.9 260.3 753.3Q283.3 753.3 319 734.4Q354.8 715.5 397.7 682Q440.6 648.6 485.8 605.2Q530.9 561.9 573 512.8Q615.1 463.8 648.8 414.1L688.5 439.5Q649.9 496.6 603.8 549.9Q557.6 603.3 509.1 649.1Q460.7 694.9 413.7 729Q366.6 763.1 325.6 781.9Q284.5 800.8 254.2 800.8Q207.8 800.4 179.7 760.6Q151.6 720.8 151.6 657.2Q151.6 595.6 177.8 543.2Q204.1 490.9 251.1 451.5Q298.1 412.1 360.9 390.1Q423.8 368.1 496.4 368.1Q592.5 368.1 662.3 395.4Q732.1 422.7 770.3 473.2Q808.4 523.7 808.4 592.7Q808.4 652.6 778.5 702.9Q748.5 753.2 695.5 786.9Q642.6 820.6 574 830Z"/></>,
+  auto: <><path fill="currentColor" d="M111.7 840 370.3 180H450.2L708.3 840H643.8L410.9 231H409.1L176.2 840ZM223.7 650.1V595.9H596.7V650.1Z"/><path fill="none" stroke="currentColor" strokeWidth="36" strokeLinejoin="round" d="M800 110Q815 205 890 220Q815 235 800 330Q785 235 710 220Q785 205 800 110Z"/></>,
+  mixed: <><path fill="none" stroke="currentColor" strokeWidth="45" strokeLinejoin="round" d="M480 110Q530 430 850 480Q530 530 480 850Q430 530 110 480Q430 430 480 110Z"/></>,
+  direct: <><path fill="currentColor" d="M145.2 433.9V361.1H218V433.9ZM145.2 760V687.2H218V760ZM385.3 760V200H519.5Q666.8 200 740.8 270.2Q814.8 340.4 814.8 480Q814.8 619.6 740.8 689.8Q666.8 760 519.5 760ZM522.2 714Q604.3 714 657.8 688.5Q711.3 663 737.8 611Q764.3 559 764.3 480Q764.3 400.6 737.8 348.8Q711.3 297 657.8 271.5Q604.3 246 522.2 246H435.1V714Z"/></>,
 };
 
 export function ModeIcon({ id, size = 20, label }) {
-  const image = modeImages[id];
   return (
-    <picture className="mode-icon">
-      {image.imageDark && <source media="(prefers-color-scheme: dark)" srcSet={image.imageDark} />}
-      <img src={image.image} width={size} height={size} alt={label || ""} />
-    </picture>
+    <svg className="mode-icon" width={size} height={size} viewBox="0 0 960 960" role={label ? "img" : undefined}
+      aria-label={label || undefined} aria-hidden={label ? undefined : true}>
+      {modeShapes[id]}
+    </svg>
+  );
+}
+
+// TEKITO's icon, single-color (assets/icons/symbols/tekito-outline.svg).
+export function TekitoSymbol({ size = 20 }) {
+  return (
+    <svg className="tekito-symbol" width={size} height={size} viewBox="0 0 960 960" aria-hidden="true">
+      <g fill="none" stroke="currentColor" strokeWidth="45" strokeLinecap="round" strokeLinejoin="round"><path d="M582 763A340 340 0 1 1 770 565"/><path d="M300 360H600M250 462H650M482 470L402 650"/><circle cx="709" cy="695" r="82"/></g>
+    </svg>
   );
 }
 
