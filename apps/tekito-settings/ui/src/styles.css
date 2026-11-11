@@ -278,3 +278,6 @@ kbd {
 .number-line { display: flex; align-items: center; gap: 8px; padding: 0 18px 14px 52px; }
 .number-line .fui-SpinButton { width: 96px; }
 .number-line small { color: var(--ink-2); font-size: var(--fontSizeBase200); }
+.order-note { display: block; color: var(--ink-2); font-size: var(--fontSizeBase200); }
+.order li.order-missing { background: transparent; border-style: dashed; padding: 6px 8px; }
+.order-missing .mode-icon { opacity: 0.45; }

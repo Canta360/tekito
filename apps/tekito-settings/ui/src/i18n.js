@@ -77,6 +77,14 @@ const en = {
     label: "Ask AI", next: "Reply to AI", newChat: "New conversation", thinking: "Thinking", changes: "Changes", related: "Related",
     refused: "AI can't change this", undone: "Undone", on: "On", off: "Off", byGrade: "Up to a school year",
   },
+  modes: {
+    find: (name) => `${name} mode`, mixed: "Japanese and English without switching",
+    orderDescription: "The checked modes take turns with the switch key, in this order",
+    needsJapanese: "Need the Japanese data", add: "Add Japanese", adding: "Downloading",
+    addTitle: "Download the Japanese data?",
+    addBody: (bytes) => `${bytes ? `About ${Math.round(bytes / 1e6)} MB is downloaded from TEKITO's release on GitHub. ` : ""}Japanese and Mix become available.`,
+    download: "Download", added: "Japanese is added",
+  },
   aiControl: {
     title: "Settings AI may change",
     description: "When you ask on Home",
@@ -479,6 +487,14 @@ const ja = {
   chat: {
     label: "AI に聞く", next: "AI に返信", newChat: "新しい会話", thinking: "考えています", changes: "変更", related: "関連",
     refused: "AI では変更できません", undone: "元に戻しました", on: "オン", off: "オフ", byGrade: "学年まで",
+  },
+  modes: {
+    find: (name) => `${name}モード`, mixed: "日本語と英語を切り替えずに入力できます",
+    orderDescription: "チェックしたモードが、切り替えキーでこの順に切り替わります",
+    needsJapanese: "日本語のデータが必要です", add: "日本語を追加", adding: "ダウンロード中",
+    addTitle: "日本語のデータをダウンロードしますか？",
+    addBody: (bytes) => `${bytes ? `GitHub の TEKITO のリリースから約 ${Math.round(bytes / 1e6)} MB がダウンロードされます。` : ""}日本語とまぜ打ちのモードが使えるようになります。`,
+    download: "ダウンロード", added: "日本語を追加しました",
   },
   aiControl: {
     title: "AI による設定の変更",

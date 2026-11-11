@@ -176,7 +176,7 @@ function initialState() {
     mode: japaneseInstalled ? "japanese" : "auto",
     runtime: { tsf: "Loaded", dataPacks: "12 / 13", japaneseData: japaneseInstalled ? "6 / 6" : "0 / 6", japanese: japaneseInstalled,
       // "?keyboard=us": Windows reports a US keyboard.
-      japaneseKeyboard: detectedJapaneseKeyboard },
+      japaneseKeyboard: detectedJapaneseKeyboard, japaneseDataBytes: japaneseInstalled ? 0 : 92000000 },
     appearance: { accent: "#0078d4", systemLanguage: navigator.language.startsWith("ja") ? "ja" : "en" },
     learning: { enabled: true, count: 128 },
     learned: [
@@ -357,6 +357,16 @@ export function installMockHost() {
         const data = JSON.stringify({ requestId, ok: true, error: "", state, text: "2 語を追加しました。" });
         window.setTimeout(() => listeners.forEach((listener) => listener({ data })), 60);
         return;
+      }
+      if (type === "japaneseData.install") {
+        state.runtime = { ...state.runtime, japaneseInstalling: true };
+        window.setTimeout(() => {
+          state.runtime = { ...state.runtime, japanese: true, japaneseInstalling: false };
+          state.settings.japaneseEnabled = true;
+          state.mode = "japanese";
+          const data = JSON.stringify({ type: "state.changed", state });
+          listeners.forEach((listener) => listener({ data }));
+        }, 2500);
       }
       if (type === "settings.chat") {
         const data = JSON.stringify({ requestId, ok: true, error: "", state, ...fakeChat(message.messages || [], message.settings, message.level) });

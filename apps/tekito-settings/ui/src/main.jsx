@@ -334,6 +334,7 @@ function App() {
   const ctx = {
     t, settings, setSetting, runAction, setConfirm, showKeys: setKeys, open, on, multi: japanese || mixed, japaneseInstalled,
     japaneseKeyboard, aiModels, postalCodes, openRomaji: () => open("romaji"), aiReady, chat: { messages: conversation, setMessages: setConversation },
+    japaneseInstalling: Boolean(runtime.japaneseInstalling), japaneseDataBytes: runtime.japaneseDataBytes || 0,
   };
   const pageProps = { settings, setSetting, runAction, setConfirm, showKeys: setKeys, open };
 
@@ -365,7 +366,7 @@ function App() {
               </Card>
             ) : (
               <>
-                {current === "home" && <HomePage ctx={ctx} mode={mode} changeMode={changeMode} aiReady={aiReady} />}
+                {current === "home" && <HomePage ctx={ctx} aiReady={aiReady} />}
                 {pageGroups[current] && <CatalogPage page={current} ctx={ctx} />}
                 {current === "all" && <AllSettingsPage ctx={ctx} defaults={initialSettings} />}
                 {current === "dictionary" && <DictionaryPage {...pageProps} japanese={japaneseInstalled} learning={learning} encryption={encryption}

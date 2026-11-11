@@ -224,32 +224,45 @@ export const wasFound = (key) => {
 };
 
 // The switch key's round: the modes, each on or off, dragged into order.
-export function SwitchOrder({ settings, setSetting, modeOn }) {
+export function SwitchOrder({ settings, setSetting, japaneseInstalled, japaneseInstalling, addJapanese }) {
   const t = useText();
   const g = t.general;
-  const ids = orderIds(settings.switchOrder).filter((id) => modeOn[id]);
+  const m = t.modes;
+  // Every mode is listed. Checked: Japanese and Mix are used (off, they are
+  // not there at all); Auto and Direct, always there, go round with the
+  // switch key. Without the Japanese data, Japanese and Mix offer to add it.
+  const enabledKey = { japanese: "japaneseEnabled", mixed: "mixedTypingEnabled" };
+  const available = (id) => japaneseInstalled || !enabledKey[id];
+  const enabled = (id) => !enabledKey[id] || (japaneseInstalled && settings[enabledKey[id]] !== false && Boolean(settings[enabledKey[id]] ?? true));
+  const inRound = (id) => (settings.switchModes & modeBits[id]) !== 0;
+  const checked = (id) => enabled(id) && inRound(id);
+  const all = orderIds(settings.switchOrder);
+  const ids = all.filter(available);
+  const missing = all.filter((id) => !available(id));
+  const round = ids.filter(checked);
   const [dragging, setDragging] = useState(null);
   const [target, setTarget] = useState(null);
-  const inRound = (id) => (settings.switchModes & modeBits[id]) !== 0;
-  const round = ids.filter(inRound);
-  // Modes that are off keep their place in the order.
+  const check = async (id, value) => {
+    if (enabledKey[id]) await setSetting(enabledKey[id], value);
+    if (value && !inRound(id)) await setSetting("switchModes", settings.switchModes | modeBits[id]);
+    if (!value && !enabledKey[id]) await setSetting("switchModes", settings.switchModes & ~modeBits[id]);
+  };
+  // Modes not listed keep their place in the order.
   const move = (id, to) => {
-    const all = orderIds(settings.switchOrder);
-    const shown = all.filter((other) => modeOn[other]);
-    const from = shown.indexOf(id);
-    if (from < 0 || to < 0 || to >= shown.length || from === to) return;
-    const moved = [...shown];
+    const from = ids.indexOf(id);
+    if (from < 0 || to < 0 || to >= ids.length || from === to) return;
+    const moved = [...ids];
     moved.splice(from, 1);
     moved.splice(to, 0, id);
     let next = 0;
-    setSetting("switchOrder", orderValue(all.map((other) => (modeOn[other] ? moved[next++] : other))));
+    setSetting("switchOrder", orderValue(all.map((other) => (available(other) ? moved[next++] : other))));
   };
   return (
-    <Row icon="swap_horiz" title={g.order.title}
+    <Row icon="swap_horiz" title={g.order.title} description={m.orderDescription}
       sub={(
         <ul className="order" aria-label={g.order.title}>
           {ids.map((id, index) => (
-            <li key={id} draggable className={`${inRound(id) ? "" : "is-off"} ${dragging === id ? "is-dragging" : ""} ${target === id ? "is-target" : ""}`}
+            <li key={id} draggable className={`${checked(id) ? "" : "is-off"} ${dragging === id ? "is-dragging" : ""} ${target === id ? "is-target" : ""}`}
               onDragStart={(event) => { setDragging(id); event.dataTransfer.effectAllowed = "move"; }}
               onDragOver={(event) => { event.preventDefault(); setTarget(id); }}
               onDragLeave={() => setTarget(null)}
@@ -261,15 +274,24 @@ export function SwitchOrder({ settings, setSetting, modeOn }) {
                 if (event.key === "ArrowDown") { event.preventDefault(); move(id, index + 1); }
               }}>
               <span className="handle" aria-hidden="true"><Symbol name="drag_indicator" size={18} /></span>
-              <Checkbox aria-label={t.modeNames[id]} checked={inRound(id)}
-                onChange={(event, data) => setSetting("switchModes", data.checked ? settings.switchModes | modeBits[id] : settings.switchModes & ~modeBits[id])} />
+              <Checkbox aria-label={t.modeNames[id]} checked={checked(id)} onChange={(event, data) => check(id, Boolean(data.checked))} />
               <ModeIcon id={id} size={20} />
-              <span className="name">{t.modeNames[id]}</span>
+              <span className="name">{t.modeNames[id]}{id === "mixed" && <small className="order-note">{m.mixed}</small>}</span>
               <IconButton icon="keyboard_arrow_up" label={g.order.moveUp(t.modeNames[id])} disabled={index === 0} onClick={() => move(id, index - 1)} />
               <IconButton icon="keyboard_arrow_down" label={g.order.moveDown(t.modeNames[id])} disabled={index === ids.length - 1}
                 onClick={() => move(id, index + 1)} />
             </li>
           ))}
+          {missing.length > 0 && (
+            <li className="order-missing">
+              <span className="handle" />
+              {missing.map((id) => <ModeIcon key={id} id={id} size={20} />)}
+              <span className="name">{missing.map((id) => t.modeNames[id]).join("・")}<small className="order-note">{m.needsJapanese}</small></span>
+              {japaneseInstalling
+                ? <span className="row-status"><Busy />{m.adding}</span>
+                : <Button variant="primary" onClick={addJapanese}>{m.add}</Button>}
+            </li>
+          )}
         </ul>
       )}>
       <span className="cycle" aria-hidden="true">

@@ -88,6 +88,14 @@ export function catalog(ctx) {
     if (value > 0) await set("spacelessEnglishAlways", value === 2);
   };
 
+  // Japanese and Mix need the Japanese data: downloaded once the user agrees.
+  const addJapanese = () => ctx.setConfirm({
+    title: t.modes.addTitle,
+    message: t.modes.addBody(ctx.japaneseDataBytes),
+    confirmLabel: t.modes.download,
+    action: () => ctx.runAction("japaneseData.install", {}, t.modes.added),
+  });
+
   return [
     // 一般
     {
@@ -99,9 +107,12 @@ export function catalog(ctx) {
       ),
     },
     {
-      id: "switchOrder", page: "general", group: "switching", keys: ["switchOrder", "switchModes"], title: g.order.title,
-      show: on.japanese || on.mixed,
-      render: () => <SwitchOrder settings={s} setSetting={set} modeOn={on} />,
+      id: "switchOrder", page: "general", group: "switching", keys: ["switchOrder", "switchModes", "japaneseEnabled", "mixedTypingEnabled"],
+      title: g.order.title, find: [t.modes.find(t.modeNames.japanese), t.modes.find(t.modeNames.mixed), t.modes.add],
+      render: () => (
+        <SwitchOrder settings={s} setSetting={set} japaneseInstalled={ctx.japaneseInstalled} japaneseInstalling={ctx.japaneseInstalling}
+          addJapanese={addJapanese} />
+      ),
     },
     {
       id: "startMode", page: "general", group: "switching", keys: ["startMode"], title: g.startMode.title, detail: true,
@@ -384,6 +395,10 @@ export function aiSpecs(ctx) {
     numbers: ["japaneseRoughNumbersKanji", "numberConversion"],
   })) {
     for (const key of keys) add(id, key, onOff);
+  }
+  if (ctx.japaneseInstalled) {
+    add("switchOrder", "japaneseEnabled", onOff, { title: t.modes.find(t.modeNames.japanese) });
+    add("switchOrder", "mixedTypingEnabled", onOff, { title: t.modes.find(t.modeNames.mixed) });
   }
   add("switchKey", "toggleKey", [[1, g.switchKey.title], [2, "Ctrl + Space"], [3, "Ctrl + Shift + Space"], [0, g.switchKey.none]]);
   add("language", "uiLanguage", [[0, g.language.system], [1, "English"], [2, "日本語"]]);

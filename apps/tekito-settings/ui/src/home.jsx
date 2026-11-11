@@ -44,7 +44,7 @@ function remembered(message, specs, t) {
   return changes.length ? `${message.text} (${changes.join(", ")})` : message.text || "";
 }
 
-export function HomePage({ ctx, mode, changeMode, aiReady }) {
+export function HomePage({ ctx, aiReady }) {
   const t = ctx.t;
   const h = t.home;
   const c = t.chat;
@@ -105,12 +105,6 @@ export function HomePage({ ctx, mode, changeMode, aiReady }) {
     else if (found[0]) goTo(ctx, found[0]);
   };
 
-  const japanese = ctx.on.japanese;
-  const mixed = ctx.on.mixed;
-  const modes = ctx.japaneseInstalled ? ["japanese", "mixed", "auto", "direct"] : ["auto", "direct"];
-  const switchable = { japanese: "japaneseEnabled", mixed: "mixedTypingEnabled" };
-  const modeOn = { japanese, mixed, auto: true, direct: true };
-
   return (
     <>
       {aiReady && messages.length > 0 && (
@@ -140,27 +134,6 @@ export function HomePage({ ctx, mode, changeMode, aiReady }) {
         </Card>
       )}
       {needle && found.length === 0 && !aiReady && <Card label={t.search} className="home-results"><p className="result-empty">{t.noResults}</p></Card>}
-
-      <Heading>{h.modes}</Heading>
-      <div className="mode-cards">
-        {modes.map((id) => (
-          <div key={id} role="button" tabIndex={0} aria-pressed={mode === id}
-            className={`mode-card ${mode === id ? "is-current" : ""} ${modeOn[id] ? "" : "is-off"}`}
-            onClick={() => modeOn[id] && changeMode(id)}
-            onKeyDown={(event) => { if ((event.key === "Enter" || event.key === " ") && modeOn[id]) { event.preventDefault(); changeMode(id); } }}>
-            <span className="mode-card-icon"><ModeIcon id={id} size={32} /></span>
-            <span className="mode-card-name">
-              {t.modeNames[id]}
-              {switchable[id] && (
-                <span onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
-                  <Toggle label={t.modeNames[id]} checked={modeOn[id]} onChange={(value) => ctx.setSetting(switchable[id], value)} />
-                </span>
-              )}
-            </span>
-            <small>{mode === id ? t.inUse : ""}</small>
-          </div>
-        ))}
-      </div>
 
       <Card label={t.pages.samples}>
         <LinkRow icon="play_circle" title={t.pages.samples} description={t.samples.description} onClick={() => ctx.open("samples")} />
