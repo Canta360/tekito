@@ -176,7 +176,10 @@ export function Segmented({ value, options, onChange, label }) {
   const current = options.find(([optionValue]) => optionValue === value) || options[0];
   const text = (option) => (typeof option[1] === "string" ? option[1] : option[2] || "");
   return (
+    // The list as wide as its longest choice (never scrolled sideways), not
+    // as narrow as the box.
     <Dropdown className="choice" aria-label={label} value={text(current)} selectedOptions={[optionKey(current[0])]}
+      positioning={{ matchTargetSize: undefined, align: "end" }} listbox={{ className: "choice-list" }}
       button={typeof current[1] === "string" ? undefined : { children: current[1] }}
       onOptionSelect={(event, data) => {
         const chosen = options.find(([optionValue]) => optionKey(optionValue) === data.optionValue);

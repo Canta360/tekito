@@ -281,3 +281,4 @@ kbd {
 .order-note { display: block; color: var(--ink-2); font-size: var(--fontSizeBase200); }
 .order li.order-missing { background: transparent; border-style: dashed; padding: 6px 8px; }
 .order-missing .mode-icon { opacity: 0.45; }
+.choice-list.choice-list { width: max-content; min-width: 160px; max-width: 480px; overflow-x: hidden; }
