@@ -12,6 +12,7 @@ import {
   LineWordmark,
 } from "./ui.jsx";
 import { brandVariables, hueColor, tekitoTheme } from "./theme.js";
+import { mascotRainbow } from "./mascot.jsx";
 import { CatalogPage, footPages, navIcons, navPages, pageGroups } from "./catalog.jsx";
 import { AllSettingsPage, HomePage } from "./home.jsx";
 import { EncryptionRow, KeyList } from "./rows.jsx";
@@ -250,7 +251,8 @@ function App() {
       const element = root.current;
       if (!element) return;
       const hue = Math.round(((performance.now() - started) / 4000) * 360) % 360;
-      const variables = brandVariables(hueColor(hue), dark);
+      // The companion (mascot.jsx) turns with it, from its own blue.
+      const variables = [...brandVariables(hueColor(hue), dark), ...mascotRainbow(hue)];
       for (const [name, value] of variables) element.style.setProperty(name, value);
       names = variables.map(([name]) => name);
     }, 50);

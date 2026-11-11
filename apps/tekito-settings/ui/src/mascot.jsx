@@ -55,6 +55,34 @@ function eyes(mood) {
   }
 }
 
+// The icon's colors, and its blue's hue.
+const kBodyStops = [[0, "#a6c8ff"], [0.3, "#3f88ff"], [0.55, "#0668ff"], [0.75, "#0590ff"], [1, "#00dcff"]];
+const kRingStops = [[0, "#6fe8ff"], [1, "#10b6fe"]];
+const kBlueHue = 216;
+
+function toHsl(hex) {
+  const [r, g, b] = [1, 3, 5].map((at) => parseInt(hex.slice(at, at + 2), 16) / 255);
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  const d = max - min;
+  if (d === 0) return [0, 0, l];
+  const s = d / (1 - Math.abs(2 * l - 1));
+  const h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return [h * 60, s, l];
+}
+
+// Rainbow: the companion's colors with their hues turned so its blue is
+// `hue` (the accent color's), as CSS variables for main.jsx to set.
+export function mascotRainbow(hue) {
+  const turned = (color) => {
+    const [h, s, l] = toHsl(color);
+    return `hsl(${Math.round((((h + hue - kBlueHue) % 360) + 360) % 360)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%)`;
+  };
+  return [...kBodyStops.map(([, color], i) => [`--mascot-${i}`, turned(color)]),
+    ...kRingStops.map(([, color], i) => [`--mascot-ring-${i}`, turned(color)])];
+}
+
 export function Mascot({ mood = "idle", size = 96, follow = false, label }) {
   const ref = useRef(null);
   const id = useId().replace(/:/g, "");
@@ -92,11 +120,10 @@ export function Mascot({ mood = "idle", size = 96, follow = false, label }) {
       role={label ? "img" : undefined} aria-label={label || undefined} aria-hidden={label ? undefined : true}>
       <defs>
         <linearGradient id={`mascot-body-${id}`} x1="0.1" y1="0.05" x2="0.9" y2="0.95">
-          <stop offset="0" stopColor="#a6c8ff" />
-          <stop offset="0.3" stopColor="#3f88ff" />
-          <stop offset="0.55" stopColor="#0668ff" />
-          <stop offset="0.75" stopColor="#0590ff" />
-          <stop offset="1" stopColor="#00dcff" />
+          {kBodyStops.map(([offset, color], i) => <stop key={offset} offset={offset} style={{ stopColor: `var(--mascot-${i}, ${color})` }} />)}
+        </linearGradient>
+        <linearGradient id={`mascot-ring-${id}`} x1="0" y1="0" x2="1" y2="1">
+          {kRingStops.map(([offset, color], i) => <stop key={offset} offset={offset} style={{ stopColor: `var(--mascot-ring-${i}, ${color})` }} />)}
         </linearGradient>
         <radialGradient id={`mascot-sheen-${id}`} cx="0.18" cy="0.14" r="0.62">
           <stop offset="0" stopColor="#ffffff" stopOpacity="0.6" />
