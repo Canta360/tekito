@@ -32,24 +32,20 @@ namespace tekito::userdata {
 }
 
 // What keys do that depends on the settings (japanese::TranslateKey).
-[[nodiscard]] inline japanese::KeyOptions JapaneseKeyOptions(const UserSettings& settings) noexcept {
+[[nodiscard]] inline japanese::KeyOptions JapaneseKeyOptions(const UserSettings& settings, bool mixed = false) noexcept {
     japanese::KeyOptions options;
-    options.fullWidthSpace = settings.japaneseSpaceWidth != 1;
+    options.fullWidthSpace = (mixed ? settings.mixSpaceWidth : settings.japaneseSpaceWidth) != 1;
     options.pageSize = JapanesePageSize(settings);
     return options;
 }
 
-// What Japanese mode and Mix each choose for themselves (`mixed`: Mix's).
-inline void ApplyModeSettings(japanese::JapaneseComposer& composer, const UserSettings& settings, bool mixed) {
+// What Japanese mode and Mix each choose for themselves (`mixed`: Mix's),
+// their ways of writing among them (UserSettings::StyleFor).
+inline void ApplyModeSettings(japanese::JapaneseComposer& composer, const UserSettings& all, bool mixed) {
+    const UserSettings settings = StyleFor(all, mixed);
     composer.SetPredictionEnabled(mixed ? settings.mixPredictionEnabled : settings.japanesePredictionEnabled);
     composer.SetEmojiOnFirstPage(mixed ? settings.mixFirstPageSymbol : settings.japaneseFirstPageSymbol);
     composer.SetPageSize(JapanesePageSize(settings));
-}
-
-// The user's settings on `composer`; `learning` is used only while learning
-// is on. `mixed`: for Mix (ApplyModeSettings).
-inline void ApplyJapaneseSettings(japanese::JapaneseComposer& composer, const UserSettings& settings,
-                                  japanese::JapaneseLearningStore* learning, bool mixed = false) {
     composer.SetPunctuationStyle(
         static_cast<japanese::PunctuationStyle>(std::clamp(settings.japanesePunctuation, 0, 3)));
     composer.SetHalfWidthDigits(settings.japaneseDigitWidth != 1);
@@ -60,23 +56,34 @@ inline void ApplyJapaneseSettings(japanese::JapaneseComposer& composer, const Us
     composer.SetNumberStyle(static_cast<japanese::JapaneseComposer::NumberStyle>(std::clamp(settings.japaneseNumberStyle, 0, 5)));
     composer.SetHalfWidthSymbols(settings.japaneseSymbolWidth == 1);
     composer.SetHalfWidthLetters(settings.japaneseLetterWidth == 1);
+    composer.SetSentenceCheck(settings.japaneseSentenceCheck);
+    composer.SetSlipAutoApply(settings.japaneseSlipAutoApply);
+    composer.SetTypedForms(settings.japaneseTypedForms);
+    composer.SetKanjiVariants(settings.japaneseKanjiVariants);
+    composer.SetNotationLevel(std::clamp(settings.japaneseNotationLevel, 1, 5));
+    composer.SetLiveRefine(settings.japaneseLiveRefine);
+}
+
+// Japanese is spaced from English next to it when it is committed.
+[[nodiscard]] inline bool SpacesEnglish(const UserSettings& settings, bool mixed) noexcept {
+    return mixed ? settings.mixEnglishSpacing : settings.japaneseEnglishSpacing;
+}
+
+// The user's settings on `composer`; `learning` is used only while learning
+// is on. `mixed`: for Mix (ApplyModeSettings).
+inline void ApplyJapaneseSettings(japanese::JapaneseComposer& composer, const UserSettings& settings,
+                                  japanese::JapaneseLearningStore* learning, bool mixed = false) {
     composer.SetLearning(settings.learningEnabled ? learning : nullptr);
     composer.SetLiveConversion(settings.japaneseLiveConversion);
-    composer.SetSentenceCheck(settings.japaneseSentenceCheck);
     // The text service applies the AI's answer once it comes (TakeAiAnswer).
     composer.SetAiJudge(japanese::ProcessAiJudge(
                             static_cast<japanese::AiModel>(std::clamp(settings.japaneseSentenceModel, 0, 2)),
                             static_cast<japanese::AiDevice>(std::clamp(settings.japaneseAiDevice, 0, 3)),
                             static_cast<std::uint32_t>(settings.japaneseAiGpu)),
                         false);
-    composer.SetSlipAutoApply(settings.japaneseSlipAutoApply);
-    composer.SetTypedForms(settings.japaneseTypedForms);
-    composer.SetKanjiVariants(settings.japaneseKanjiVariants);
-    composer.SetNotationLevel(std::clamp(settings.japaneseNotationLevel, 1, 5));
     composer.SetSingleVowelKana(settings.mixSingleVowelKana);
     composer.SetEnglishCorrection(settings.mixCorrection);
     composer.SetSpacelessEnglish(settings.spacelessEnglish);
-    composer.SetLiveRefine(settings.japaneseLiveRefine);
     composer.SetMixLiveConversion(settings.mixLiveConversion);
     composer.SetMixAi(settings.mixAi, 2.0);
     composer.SetSpecialConversions(&SpecialConversions::Installed(), SpecialOptionsFor(settings));

@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { useText } from "./i18n.js";
 import { Checkbox } from "@fluentui/react-components";
-import { Busy, Button, Check, Dialog, IconButton, Keycaps, ModeIcon, Radios, Row, Segmented, SpinButton, Symbol, TextBox, Toggle } from "./ui.jsx";
+import { Busy, Button, Check, Dialog, IconButton, Keycaps, ModeIcon, Radios, Row, Segmented, SpinButton, Symbol, Tabs, TextBox, Toggle } from "./ui.jsx";
 
 // The modes a setting applies to, as their icons after its name.
 export function ModeBadges({ ids }) {
@@ -378,7 +378,7 @@ export function NumbersRow({ settings, setSetting, options, onChange, badges = n
 // Bytes as the download dialog states them (230 MB, 1.3 GB).
 export const downloadSize = (bytes) => (bytes >= 1e9 ? `${(bytes / 1e9).toFixed(1)} GB` : `${Math.round(bytes / 1e6)} MB`);
 
-export function AiModelRow({ settings, setSetting, runAction, setConfirm, aiModels }) {
+export function AiModelRow({ settings, setSetting, runAction, setConfirm, aiModels, badges = null }) {
   const t = useText();
   const a = t.ai;
   const keys = ["", "light", "strong"];
@@ -429,7 +429,7 @@ export function AiModelRow({ settings, setSetting, runAction, setConfirm, aiMode
   };
   return (
     <>
-    <Row icon="wand_stars" title={a.title}
+    <Row icon="wand_stars" title={<>{a.title}{badges}</>}
       description={(
         <>
           {downloading ? "" : aiModels.error || a.description}
@@ -576,6 +576,62 @@ export function EncryptionRow({ encryption, runAction, setConfirm }) {
           <Button variant="primary" onClick={() => setCode(null)}>{e.done}</Button>
         </div>
       </Dialog>
+    </>
+  );
+}
+
+// Mix's own key for each of Japanese mode's ways of writing
+// (UserSettings::kMixStyleNumbers, kMixStyleSwitches).
+export const mixPairs = {
+  japanesePunctuation: "mixPunctuation", japaneseDigitWidth: "mixDigitWidth", japaneseNumberStyle: "mixNumberStyle",
+  japaneseKanjiRange: "mixKanjiRange", japaneseKanjiGrade: "mixKanjiGrade", japaneseSymbolWidth: "mixSymbolWidth",
+  japaneseLetterWidth: "mixLetterWidth", japaneseSpaceWidth: "mixSpaceWidth", japaneseNotationLevel: "mixNotationLevel",
+  japaneseRoughNumbersKanji: "mixRoughNumbersKanji", japaneseKanjiNames: "mixKanjiNames", japaneseKanjiVariants: "mixKanjiVariants",
+  japaneseSentenceCheck: "mixSentenceCheck", japaneseSlipAutoApply: "mixSlipAutoApply", japaneseTypedForms: "mixTypedForms",
+  japaneseLiveRefine: "mixLiveRefine", japaneseEnglishSpacing: "mixEnglishSpacing",
+};
+
+// A row of Japanese mode's ways of writing that Mix also has. Linked, its
+// control sets both; set apart, tabs choose whose values it shows and sets.
+// `render(settings, setSetting)` draws the row with the values to show.
+export function LinkedStyle({ id, keys, settings, setSetting, on, render }) {
+  const t = useText();
+  const l = t.linked;
+  const pairs = keys.filter((key) => mixPairs[key]);
+  const both = on.japanese && on.mixed;
+  const [unlinked, setUnlinked] = useState(() => readUnlinked(id));
+  const [mode, setMode] = useState("japanese");
+  const differ = pairs.some((key) => settings[key] !== settings[mixPairs[key]]);
+  const apart = both && (unlinked || differ);
+  const editing = !both ? (on.japanese ? "japanese" : "mixed") : apart ? mode : "japanese";
+  const shown = editing === "mixed" ? { ...settings, ...Object.fromEntries(pairs.map((key) => [key, settings[mixPairs[key]]])) } : settings;
+  const set = async (key, value) => {
+    const mixKey = mixPairs[key];
+    if (!mixKey) return setSetting(key, value);
+    if (both && !apart) return (await setSetting(key, value)) && setSetting(mixKey, value);
+    return setSetting(editing === "mixed" ? mixKey : key, value);
+  };
+  const link = async () => {
+    writeUnlinked(id, false);
+    setUnlinked(false);
+    for (const key of pairs) if (settings[key] !== settings[mixPairs[key]]) await setSetting(mixPairs[key], settings[key]);
+  };
+  const unlink = () => {
+    writeUnlinked(id, true);
+    setUnlinked(true);
+  };
+  const tab = (id2) => <span className="mode-tab"><ModeIcon id={id2} size={16} />{t.modeNames[id2]}</span>;
+  return (
+    <>
+      {render(shown, set)}
+      {both && (
+        <div className="linked-strip">
+          {apart && <Tabs size="small" label={l.whose} value={mode} options={[["japanese", tab("japanese")], ["mixed", tab("mixed")]]} onChange={setMode} />}
+          <Button variant="quiet" size="small" icon={apart ? "link" : "link_off"} onClick={apart ? link : unlink}>
+            {apart ? l.link(t.modeNames.japanese, t.modeNames.mixed) : l.unlink(t.modeNames.japanese, t.modeNames.mixed)}
+          </Button>
+        </div>
+      )}
     </>
   );
 }

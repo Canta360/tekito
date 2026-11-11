@@ -192,9 +192,9 @@ export function Segmented({ value, options, onChange, label }) {
 export const Select = Segmented;
 
 // Views of one list (All settings: every setting, or the changed ones).
-export function Tabs({ value, options, onChange, label }) {
+export function Tabs({ value, options, onChange, label, size }) {
   return (
-    <TabList aria-label={label} selectedValue={optionKey(value)}
+    <TabList aria-label={label} size={size} selectedValue={optionKey(value)}
       onTabSelect={(event, data) => onChange(options.find(([optionValue]) => optionKey(optionValue) === data.value)[0])}>
       {options.map(([optionValue, name]) => <Tab key={optionKey(optionValue)} value={optionKey(optionValue)}>{name}</Tab>)}
     </TabList>

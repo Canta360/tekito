@@ -227,6 +227,8 @@ bool SqliteUserDictionaryRepository::LoadSettings(UserSettings& settings) const 
     // start_mode over restore_last_input_mode.
     bool switchModesSaved = false;
     bool startModeSaved = false;
+    // Mix's ways of writing saved apart from Japanese mode's.
+    bool mixStyleSaved = false;
     bool restoreLast = true;
     if (!database_) return false;
 
@@ -246,6 +248,23 @@ bool SqliteUserDictionaryRepository::LoadSettings(UserSettings& settings) const 
             break;
         }
         const int value = sqlite3_column_int(statement, 1);
+        bool mixStyle = false;
+        for (const auto& number : kMixStyleNumbers) {
+            if (std::strcmp(key, number.stored) == 0) {
+                loaded.*(number.mix) = std::clamp(value, number.min, number.max);
+                mixStyle = true;
+            }
+        }
+        for (const auto& on : kMixStyleSwitches) {
+            if (std::strcmp(key, on.stored) == 0) {
+                loaded.*(on.mix) = value != 0;
+                mixStyle = true;
+            }
+        }
+        if (mixStyle) {
+            mixStyleSaved = true;
+            continue;
+        }
         if (std::strcmp(key, "default_input_mode") == 0) {
             loaded.defaultInputMode = value == static_cast<int>(InputMode::Direct)
                                           ? InputMode::Direct
@@ -449,6 +468,8 @@ bool SqliteUserDictionaryRepository::LoadSettings(UserSettings& settings) const 
     }
     // As typed is the style the digit width gives.
     if (loaded.japaneseNumberStyle == 0) loaded.japaneseNumberStyle = loaded.japaneseDigitWidth + 1;
+    // Mix wrote as Japanese mode did until it had its own.
+    if (!mixStyleSaved) CopyJapaneseStyleToMix(loaded);
 
     if (success) {
         statement = nullptr;
@@ -584,6 +605,10 @@ bool SqliteUserDictionaryRepository::SaveSettings(const UserSettings& settings) 
     saveValue("japanese_numpad_direct", settings.japaneseNumpadDirect ? 1 : 0);
     saveValue("mixed_typing_enabled", settings.mixedTypingEnabled ? 1 : 0);
     saveValue("japanese_english_spacing", settings.japaneseEnglishSpacing ? 1 : 0);
+    for (const auto& number : kMixStyleNumbers) {
+        saveValue(number.stored, std::clamp(settings.*(number.mix), number.min, number.max));
+    }
+    for (const auto& on : kMixStyleSwitches) saveValue(on.stored, settings.*(on.mix) ? 1 : 0);
     if (statement) sqlite3_finalize(statement);
     statement = nullptr;
 

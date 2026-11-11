@@ -193,6 +193,8 @@ void SetUpComposer(Testbed& bed) {
     bed.composer.SetTable(ja::ProcessRomajiTable());
     ja::AttachJapaneseData(bed.composer);
     // Learning is kept for this session only: nothing is written back.
+    // The testbed sets Japanese mode's ways of writing; Mix writes as it does.
+    tekito::userdata::CopyJapaneseStyleToMix(bed.settings);
     tekito::userdata::ApplyJapaneseSettings(bed.composer, bed.settings, &bed.learning);
     bed.composer.SetUserDictionary(bed.userWords.Empty() ? nullptr : &bed.userWords);
     bed.postalCodes = ja::ProcessPostalCodes();
@@ -1313,6 +1315,7 @@ int RunScript(Testbed& bed, const std::filesystem::path& script, const std::file
             if (found == std::end(kSettings)) return 3;
             s.*(found->field) = on;
             const bool mixed = bed.composer.MixedTyping();
+            tekito::userdata::CopyJapaneseStyleToMix(s);
             tekito::userdata::ApplyJapaneseSettings(bed.composer, s, &bed.learning, mixed);
         } else if (command == L"speed") {
             speed = std::max(1, _wtoi(rest.c_str()));

@@ -198,6 +198,25 @@ struct UserSettings {
     // Mix's own choices of what Japanese mode also has.
     bool mixPredictionEnabled{true};
     bool mixFirstPageSymbol{true};
+    // Mix's own copies of Japanese mode's ways of writing (kMixStyleNumbers,
+    // kMixStyleSwitches): Japanese mode's until the user sets them apart.
+    int mixPunctuation{0};
+    int mixDigitWidth{0};
+    int mixNumberStyle{1};
+    int mixKanjiRange{0};
+    int mixKanjiGrade{6};
+    int mixSymbolWidth{0};
+    int mixLetterWidth{1};
+    int mixSpaceWidth{0};
+    int mixNotationLevel{3};
+    bool mixRoughNumbersKanji{true};
+    bool mixKanjiNames{false};
+    bool mixKanjiVariants{true};
+    bool mixSentenceCheck{true};
+    bool mixSlipAutoApply{true};
+    bool mixTypedForms{true};
+    bool mixLiveRefine{true};
+    bool mixEnglishSpacing{false};
     // Mix: a vowel typed alone (i) is kana (い) first, not the letter (I).
     bool mixSingleVowelKana{true};
     // Mix: Space puts a slip in an English word right (teh: the), as Auto
@@ -280,6 +299,62 @@ struct UserSettings {
     std::array<std::pair<InputMode, int>, 4> modes{};
     for (int i = 3; i >= 0; --i, order /= 10) modes[static_cast<std::size_t>(i)] = kModes[order % 10 - 1];
     return modes;
+}
+
+// Mix's ways of writing beside Japanese mode's: the name each is stored
+// under, Settings' name for it, Mix's field, Japanese mode's, and (numbers)
+// its range.
+struct MixStyleNumber {
+    const char* stored;
+    const wchar_t* name;
+    int UserSettings::*mix;
+    int UserSettings::*japanese;
+    int min;
+    int max;
+};
+struct MixStyleSwitch {
+    const char* stored;
+    const wchar_t* name;
+    bool UserSettings::*mix;
+    bool UserSettings::*japanese;
+};
+inline constexpr MixStyleNumber kMixStyleNumbers[] = {
+    {"mix_punctuation", L"mixPunctuation", &UserSettings::mixPunctuation, &UserSettings::japanesePunctuation, 0, 3},
+    {"mix_digit_width", L"mixDigitWidth", &UserSettings::mixDigitWidth, &UserSettings::japaneseDigitWidth, 0, 2},
+    {"mix_number_style", L"mixNumberStyle", &UserSettings::mixNumberStyle, &UserSettings::japaneseNumberStyle, 1, 5},
+    {"mix_kanji_range", L"mixKanjiRange", &UserSettings::mixKanjiRange, &UserSettings::japaneseKanjiRange, 0, 3},
+    {"mix_kanji_grade", L"mixKanjiGrade", &UserSettings::mixKanjiGrade, &UserSettings::japaneseKanjiGrade, 1, 6},
+    {"mix_symbol_width", L"mixSymbolWidth", &UserSettings::mixSymbolWidth, &UserSettings::japaneseSymbolWidth, 0, 1},
+    {"mix_letter_width", L"mixLetterWidth", &UserSettings::mixLetterWidth, &UserSettings::japaneseLetterWidth, 0, 1},
+    {"mix_space_width", L"mixSpaceWidth", &UserSettings::mixSpaceWidth, &UserSettings::japaneseSpaceWidth, 0, 2},
+    {"mix_notation_level", L"mixNotationLevel", &UserSettings::mixNotationLevel, &UserSettings::japaneseNotationLevel, 1, 5},
+};
+inline constexpr MixStyleSwitch kMixStyleSwitches[] = {
+    {"mix_rough_numbers_kanji", L"mixRoughNumbersKanji", &UserSettings::mixRoughNumbersKanji, &UserSettings::japaneseRoughNumbersKanji},
+    {"mix_kanji_names", L"mixKanjiNames", &UserSettings::mixKanjiNames, &UserSettings::japaneseKanjiNames},
+    {"mix_kanji_variants", L"mixKanjiVariants", &UserSettings::mixKanjiVariants, &UserSettings::japaneseKanjiVariants},
+    {"mix_sentence_check", L"mixSentenceCheck", &UserSettings::mixSentenceCheck, &UserSettings::japaneseSentenceCheck},
+    {"mix_slip_auto_apply", L"mixSlipAutoApply", &UserSettings::mixSlipAutoApply, &UserSettings::japaneseSlipAutoApply},
+    {"mix_typed_forms", L"mixTypedForms", &UserSettings::mixTypedForms, &UserSettings::japaneseTypedForms},
+    {"mix_live_refine", L"mixLiveRefine", &UserSettings::mixLiveRefine, &UserSettings::japaneseLiveRefine},
+    {"mix_english_spacing", L"mixEnglishSpacing", &UserSettings::mixEnglishSpacing, &UserSettings::japaneseEnglishSpacing},
+};
+
+// Mix's ways of writing made Japanese mode's (settings saved before Mix had
+// its own, and the testbed's, which sets Japanese mode's).
+inline void CopyJapaneseStyleToMix(UserSettings& settings) noexcept {
+    for (const auto& number : kMixStyleNumbers) settings.*(number.mix) = settings.*(number.japanese);
+    for (const auto& on : kMixStyleSwitches) settings.*(on.mix) = settings.*(on.japanese);
+}
+
+// Japanese mode's ways of writing, or Mix's (`mixed`), in Japanese mode's
+// fields: what the composer and the keys are set from.
+[[nodiscard]] inline UserSettings StyleFor(const UserSettings& settings, bool mixed) {
+    if (!mixed) return settings;
+    UserSettings style = settings;
+    for (const auto& number : kMixStyleNumbers) style.*(number.japanese) = settings.*(number.mix);
+    for (const auto& on : kMixStyleSwitches) style.*(on.japanese) = settings.*(on.mix);
+    return style;
 }
 
 // The mode UserSettings::startMode names; `last` for 0.

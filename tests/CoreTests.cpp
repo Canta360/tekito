@@ -2308,6 +2308,8 @@ void TestSqliteUserSettingsRepository() {
     source.advancedSettings = true;
     source.japanesePredictionEnabled = false;
     source.candidateRows = 15;
+    source.mixPunctuation = 2;
+    source.mixKanjiVariants = false;
     source.aiSettingsControl = 2;
     source.meaningsEnabled = false;
     source.japaneseSwitchOrder = 2;
@@ -2383,7 +2385,7 @@ void TestSqliteUserSettingsRepository() {
                 loaded.japaneseProfileEnglishMode == tekito::InputMode::Direct &&
                 loaded.japaneseSpaceWidth == 2 && loaded.japanesePunctuation == 3 && loaded.japaneseDigitWidth == 1 && loaded.japaneseSymbolWidth == 1 && loaded.advancedSettings &&
                 !loaded.japanesePredictionEnabled &&
-                loaded.candidateRows == 15 && loaded.aiSettingsControl == 2 && !loaded.meaningsEnabled && loaded.japaneseSwitchOrder == 2 &&
+                loaded.candidateRows == 15 && loaded.aiSettingsControl == 2 && loaded.mixPunctuation == 2 && !loaded.mixKanjiVariants && !loaded.meaningsEnabled && loaded.japaneseSwitchOrder == 2 &&
                     !loaded.japaneseEnabled && !loaded.modeIndicatorEnabled,
             "settings repository restores the keyboard and Japanese settings");
     Require(!loaded.dateConversion && !loaded.numberConversion && !loaded.symbolConversion &&
@@ -2435,6 +2437,42 @@ void TestSqliteUserSettingsRepository() {
         Require(migrated.size() == 1 && migrated.front().surface == L"菜" &&
                     migrated.front().action == tekito::japanese::UserWordAction::First,
                 "its words are given first");
+        std::filesystem::remove(oldPath);
+    }
+
+    {
+        // Settings saved before Mix had its own ways of writing: Mix takes
+        // Japanese mode's; Japanese mode's or Mix's is what each one uses.
+        const auto oldPath = std::filesystem::temp_directory_path() / L"tekito-old-mix-style.db";
+        std::filesystem::remove(oldPath);
+        tekito::userdata::UserSettings saved;
+        saved.japanesePunctuation = 3;
+        saved.japaneseKanjiVariants = false;
+        {
+            tekito::userdata::SqliteUserDictionaryRepository repository(oldPath);
+            Require(repository.Open() && repository.SaveSettings(saved), "settings for the Mix test are saved");
+        }
+        sqlite3* database = nullptr;
+        Require(sqlite3_open16(oldPath.c_str(), &database) == SQLITE_OK &&
+                    sqlite3_exec(database, "DELETE FROM settings WHERE key IN "
+                                           "('mix_punctuation','mix_kanji_variants','mix_digit_width','mix_number_style',"
+                                           "'mix_kanji_range','mix_kanji_grade','mix_symbol_width','mix_letter_width',"
+                                           "'mix_space_width','mix_notation_level','mix_rough_numbers_kanji','mix_kanji_names',"
+                                           "'mix_sentence_check','mix_slip_auto_apply','mix_typed_forms','mix_live_refine',"
+                                           "'mix_english_spacing');",
+                                 nullptr, nullptr, nullptr) == SQLITE_OK,
+                "Mix's ways of writing are taken out, as before Mix had them");
+        sqlite3_close(database);
+        tekito::userdata::UserSettings migrated;
+        {
+            tekito::userdata::SqliteUserDictionaryRepository repository(oldPath);
+            Require(repository.Open() && repository.LoadSettings(migrated), "the older settings load");
+        }
+        Require(migrated.mixPunctuation == 3 && !migrated.mixKanjiVariants, "Mix writes as Japanese mode did");
+        migrated.mixPunctuation = 1;
+        Require(tekito::userdata::StyleFor(migrated, false).japanesePunctuation == 3 &&
+                    tekito::userdata::StyleFor(migrated, true).japanesePunctuation == 1,
+                "Japanese mode and Mix each write their own way");
         std::filesystem::remove(oldPath);
     }
 

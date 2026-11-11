@@ -393,7 +393,7 @@ bool TextService::TranslateJapaneseKey(WPARAM wParam, KeyInput& input) {
         input.type = KeyInput::Type::EndComposition;
         return true;
     }
-    japanese::KeyOptions options = userdata::JapaneseKeyOptions(userSettings_);
+    japanese::KeyOptions options = userdata::JapaneseKeyOptions(userSettings_, mode_ == InputMode::Mixed);
     options.pageSize = japanesePage_;
     const auto command = japanese::TranslateKey(
         japanese_,
@@ -754,7 +754,7 @@ HRESULT TextService::WriteJapaneseCommit(ITfContext* context, TfEditCookie editC
     // Mix: Japanese after English takes back the space typed after it,
     // unless Settings spaces English from Japanese.
     const bool takeSpace = japanese_.TakeSpaceBefore();
-    if (userSettings_.japaneseEnglishSpacing && !text.empty()) {
+    if (userdata::SpacesEnglish(userSettings_, mode_ == InputMode::Mixed) && !text.empty()) {
         text = japanese::JapaneseComposer::SpacedEnglish(CommitContext(context, editCookie), text);
     } else if (takeSpace && !text.empty()) {
         TakeBackSpaceBefore(context, editCookie);

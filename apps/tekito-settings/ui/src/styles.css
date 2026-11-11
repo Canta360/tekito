@@ -324,3 +324,8 @@ kbd {
 .row-text { flex: 1 1 220px; }
 .row-control, .row-value { margin-left: auto; max-width: 100%; }
 .slider { max-width: 100%; }
+/* A row's link between Japanese mode's and Mix's values: tabs for whose,
+   then the way to link or set apart. */
+.linked-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 0 18px 10px 44px; margin-top: -6px; }
+.linked-strip .fui-Button { color: var(--accent-text); font-weight: var(--fontWeightRegular); }
+.mode-tab { display: inline-flex; align-items: center; gap: 6px; }

@@ -4,7 +4,8 @@
 import React from "react";
 import { Card, Check, Details, Heading, Keycaps, LinkRow, Row, Segmented, Select, Slider, Toggle } from "./ui.jsx";
 import {
-  AiModelRow, candidateRowsRange, ExcludedApps, kanjiStop, kanjiStops, LinkedToggle, ModeBadges, NumbersRow, PostalCodes, RowsRow, SpecialRow,
+  AiModelRow, candidateRowsRange, ExcludedApps, kanjiStop, kanjiStops, LinkedStyle, LinkedToggle, mixPairs, ModeBadges, NumbersRow,
+  PostalCodes, RowsRow, SpecialRow,
   EncryptionRow, SwitchOrder, switchKeyCaps, wasFound, WidthsRow,
 } from "./rows.jsx";
 
@@ -69,19 +70,26 @@ export function catalog(ctx) {
     return [value, <Keycaps keys={caps} />, caps.join(" + ")];
   }).concat([[0, g.switchKey.none]]);
   const gpus = ctx.aiModels.gpus || [];
-  const stop = kanjiStop(s);
-  const setKanji = async (value) => {
+  const setKanji = (put) => async (value) => {
     if (value <= 6) {
-      await set("japaneseKanjiRange", 3);
-      await set("japaneseKanjiGrade", value);
+      await put("japaneseKanjiRange", 3);
+      await put("japaneseKanjiGrade", value);
     } else {
-      await set("japaneseKanjiRange", value === 7 ? 2 : 0);
+      await put("japaneseKanjiRange", value === 7 ? 2 : 0);
     }
   };
-  const setNumbers = async (value) => {
-    await set("japaneseNumberStyle", value);
-    if (value <= 3) await set("japaneseDigitWidth", value - 1);
+  const setNumbers = (put) => async (value) => {
+    await put("japaneseNumberStyle", value);
+    if (value <= 3) await put("japaneseDigitWidth", value - 1);
   };
+  // Japanese mode's ways of writing, with Mix's beside them.
+  const styled = (entry) => ({
+    ...entry,
+    keys: [...entry.keys, ...entry.keys.map((key) => mixPairs[key]).filter(Boolean)],
+    render: () => <LinkedStyle id={entry.id} keys={entry.keys} settings={s} setSetting={set} on={on} render={entry.draw} />,
+  });
+  const styledToggle = (id, page, group, icon, text, key, opts = {}) =>
+    linked(id, page, group, icon, text, { japanese: key, mixed: mixPairs[key] }, opts);
   const spaceless = !s.spacelessEnglish ? 0 : s.spacelessEnglishAlways ? 2 : 1;
   const setSpaceless = async (value) => {
     await set("spacelessEnglish", value > 0);
@@ -147,18 +155,19 @@ export function catalog(ctx) {
 
     // 変換
     linked("live", "conversion", "convert", "bolt", j.live, { japanese: "japaneseLiveConversion", mixed: "mixLiveConversion" }, {
-      keys: ["japaneseLiveRefine"],
+      keys: ["japaneseLiveRefine", "mixLiveRefine"],
       sub: () => (s.japaneseLiveConversion || s.mixLiveConversion) && (
-        <Check label={j.live.refine} checked={s.japaneseLiveRefine} onChange={(value) => set("japaneseLiveRefine", value)} />
+        <Check label={j.live.refine} checked={s.japaneseLiveRefine}
+          onChange={async (value) => { await set("japaneseLiveRefine", value); await set("mixLiveRefine", value); }} />
       ),
     }),
-    toggle("sentenceCheck", "conversion", "convert", "notes", j.sentenceCheck, "japaneseSentenceCheck", { modes: ja, detail: true }),
+    styledToggle("sentenceCheck", "conversion", "convert", "notes", j.sentenceCheck, "japaneseSentenceCheck", { detail: true }),
     choice("singleVowel", "conversion", "convert", "text_format", m.singleVowel, "mixSingleVowelKana",
       [[true, m.singleVowel.kana], [false, m.singleVowel.letter]], { modes: ["mixed"], detail: true }),
     {
       id: "aiModel", page: "conversion", group: "ai", keys: ["japaneseSentenceModel", "japaneseAiDevice"], title: t.ai.title, modes: ja,
       render: () => (
-        <AiModelRow settings={s} setSetting={set} runAction={ctx.runAction} setConfirm={ctx.setConfirm} aiModels={ctx.aiModels} />
+        <AiModelRow settings={s} setSetting={set} runAction={ctx.runAction} setConfirm={ctx.setConfirm} aiModels={ctx.aiModels} badges={badges(ja)} />
       ),
     },
     choice("aiControl", "conversion", "ai", "tune", t.aiControl, "aiSettingsControl",
@@ -189,7 +198,7 @@ export function catalog(ctx) {
       { modes: ["auto"], detail: true }),
 
     // 入力ミスの修正
-    toggle("slipAutoApply", "slips", "japanese", "spellcheck", j.slipAutoApply, "japaneseSlipAutoApply", { modes: ja }),
+    styledToggle("slipAutoApply", "slips", "japanese", "spellcheck", j.slipAutoApply, "japaneseSlipAutoApply"),
     linked("englishCorrection", "slips", "english", "spellcheck", a.correction, { mixed: "mixCorrection", auto: "correctionEnabled" }, {
       keys: ["capitalizedCorrection"],
       sub: () => s.correctionEnabled && (
@@ -211,39 +220,50 @@ export function catalog(ctx) {
     toggle("recheck", "slips", "english", "undo", a.recheck, "recheckPreviousWord", { modes: ["auto"], detail: true }),
 
     // 表記
-    choice("punctuation", "notation", "japanese", "edit_note", j.punctuation, "japanesePunctuation",
-      [[0, "、。"], [1, "，．"], [2, "，。"], [3, "、．"]], { modes: ja }),
-    {
-      id: "numbers", page: "notation", group: "japanese", modes: ja, title: j.numbers.title,
-      keys: ["japaneseNumberStyle", "japaneseDigitWidth", "japaneseRoughNumbersKanji", "numberConversion"],
-      render: () => (
-        <NumbersRow settings={s} setSetting={set} onChange={setNumbers} badges={badges(ja)}
-          options={j.numbers.options.map(([name, example], index) => [index + 1, name, example])} />
-      ),
-    },
-    {
-      id: "widths", page: "notation", group: "japanese", modes: ja, title: t.widths.title,
-      keys: ["japaneseLetterWidth", "japaneseSymbolWidth", "japaneseSpaceWidth"],
-      render: () => <WidthsRow settings={s} setSetting={set} badges={badges(ja)} />,
-    },
-    {
-      id: "kanji", page: "notation", group: "japanese", modes: ja, title: j.kanji.title,
-      keys: ["japaneseKanjiRange", "japaneseKanjiGrade", "japaneseKanjiNames"],
-      render: () => (
-        <Row icon={<span className="row-glyph" aria-hidden="true">漢</span>} title={head(j.kanji.title, ja)} description={j.kanji.description}
-          sub={stop < 8 && (
-            <Check label={j.kanji.names} example={j.kanji.namesExample} checked={s.japaneseKanjiNames}
-              onChange={(value) => set("japaneseKanjiNames", value)} />
-          )}>
-          <span style={{ display: "grid", gap: 4 }}>
-            <Slider label={j.kanji.title} value={stop} stops={kanjiStops.map((value, index) => [value, j.kanji.stops[index]])} onChange={setKanji} />
-            <small className="muted">{j.kanji.examples[stop - 1]}</small>
-          </span>
+    styled({
+      id: "punctuation", page: "notation", group: "japanese", modes: ja, title: j.punctuation.title, keys: ["japanesePunctuation"],
+      draw: (shown, put) => (
+        <Row icon="edit_note" title={head(j.punctuation.title, ja)}>
+          <Segmented label={j.punctuation.title} value={shown.japanesePunctuation} options={[[0, "、。"], [1, "，．"], [2, "，。"], [3, "、．"]]}
+            onChange={(value) => put("japanesePunctuation", value)} />
         </Row>
       ),
-    },
-    toggle("spacing", "notation", "japanese", "format_letter_spacing", j.spacing, "japaneseEnglishSpacing", { modes: ja, detail: true }),
-    toggle("kanjiVariants", "notation", "japanese", "ink_highlighter", j.kanjiVariants, "japaneseKanjiVariants", { modes: ja, detail: true }),
+    }),
+    styled({
+      id: "numbers", page: "notation", group: "japanese", modes: ja, title: j.numbers.title,
+      keys: ["japaneseNumberStyle", "japaneseDigitWidth", "japaneseRoughNumbersKanji", "numberConversion"],
+      draw: (shown, put) => (
+        <NumbersRow settings={shown} setSetting={put} onChange={setNumbers(put)} badges={badges(ja)}
+          options={j.numbers.options.map(([name, example], index) => [index + 1, name, example])} />
+      ),
+    }),
+    styled({
+      id: "widths", page: "notation", group: "japanese", modes: ja, title: t.widths.title,
+      keys: ["japaneseLetterWidth", "japaneseSymbolWidth", "japaneseSpaceWidth"],
+      draw: (shown, put) => <WidthsRow settings={shown} setSetting={put} badges={badges(ja)} />,
+    }),
+    styled({
+      id: "kanji", page: "notation", group: "japanese", modes: ja, title: j.kanji.title,
+      keys: ["japaneseKanjiRange", "japaneseKanjiGrade", "japaneseKanjiNames"],
+      draw: (shown, put) => {
+        const stop = kanjiStop(shown);
+        return (
+          <Row icon={<span className="row-glyph" aria-hidden="true">漢</span>} title={head(j.kanji.title, ja)} description={j.kanji.description}
+            sub={stop < 8 && (
+              <Check label={j.kanji.names} example={j.kanji.namesExample} checked={shown.japaneseKanjiNames}
+                onChange={(value) => put("japaneseKanjiNames", value)} />
+            )}>
+            <span style={{ display: "grid", gap: 4 }}>
+              <Slider label={j.kanji.title} value={stop} stops={kanjiStops.map((value, index) => [value, j.kanji.stops[index]])}
+                onChange={setKanji(put)} />
+              <small className="muted">{j.kanji.examples[stop - 1]}</small>
+            </span>
+          </Row>
+        );
+      },
+    }),
+    styledToggle("spacing", "notation", "japanese", "format_letter_spacing", j.spacing, "japaneseEnglishSpacing", { detail: true }),
+    styledToggle("kanjiVariants", "notation", "japanese", "ink_highlighter", j.kanjiVariants, "japaneseKanjiVariants", { detail: true }),
     toggle("period", "notation", "english", "keyboard_return", a.period, "periodOnEnter", { modes: en }),
     toggle("doubleSpace", "notation", "english", "space_bar", a.doubleSpace, "doubleSpacePeriod", { modes: ["auto"], detail: true }),
     toggle("smart", "notation", "english", "format_quote", a.smart, "smartPunctuation", { modes: ["auto"], detail: true }),
@@ -289,7 +309,7 @@ export function catalog(ctx) {
     },
     linked("firstPageSymbol", "candidates", "extra", "mood", j.firstPageSymbol, { japanese: "japaneseFirstPageSymbol", mixed: "mixFirstPageSymbol" },
       { detail: true }),
-    toggle("typedForms", "candidates", "extra", "text_fields", j.typedForms, "japaneseTypedForms", { modes: ja, detail: true }),
+    styledToggle("typedForms", "candidates", "extra", "text_fields", j.typedForms, "japaneseTypedForms", { detail: true }),
 
     // 辞書と学習 (the page draws its own; these are for All settings, search and AI)
     {
@@ -436,6 +456,14 @@ export function aiSpecs(ctx) {
   add("looks", "candidateWindowStyle", [[0, g.styles.glass], [1, g.styles.simple]]);
   add("rows", "candidateRows", [[0, g.rows.automatic], [5, "5"], [7, "7"], [9, "9"]], { range: candidateRowsRange, unit: g.rows.unit });
   add("keyboard", "keyboardType", [[0, g.keyboard.detect], [1, g.keyboard.japanese], [2, g.keyboard.us]]);
+  // Mix's own ways of writing, beside Japanese mode's: each named for its mode.
+  if (ctx.on.mixed) {
+    for (const [key, mixKey] of Object.entries(mixPairs)) {
+      if (!specs[key]) continue;
+      specs[mixKey] = { ...specs[key], mode: "mixed" };
+      if (ctx.on.japanese) specs[key] = { ...specs[key], mode: "japanese" };
+    }
+  }
   return specs;
 }
 

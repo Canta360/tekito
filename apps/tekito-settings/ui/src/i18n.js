@@ -70,6 +70,7 @@ const en = {
   linked: {
     link: (first, second) => `Use the same setting for ${first} and ${second}`,
     unlink: (first, second) => `Set ${first} and ${second} separately`,
+    whose: "Mode",
   },
   widths: { title: "Full-width and half-width", description: "e.g. half-width abc!?, full-width ａｂｃ！？", letters: "Letters", symbols: "Symbols", space: "Space" },
   special: { title: "Dates, symbols and sums as candidates", parts: ["Date and time", "Symbols", "Sums"], none: "Off" },
@@ -482,6 +483,7 @@ const ja = {
   linked: {
     link: (first, second) => `${first}と${second}で同じ設定にする`,
     unlink: (first, second) => `${first}と${second}で別々に設定する`,
+    whose: "設定するモード",
   },
   widths: { title: "全角と半角", description: "例：半角 abc!?、全角 ａｂｃ！？", letters: "英字", symbols: "記号", space: "スペース" },
   special: { title: "日付・記号・計算を候補に表示", parts: ["日付と時刻", "記号", "計算結果"], none: "表示しない" },

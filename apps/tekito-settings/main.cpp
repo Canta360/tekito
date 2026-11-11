@@ -1213,6 +1213,12 @@ private:
         json += settings_.mixPredictionEnabled ? L"true" : L"false";
         json += L",\"mixFirstPageSymbol\":";
         json += settings_.mixFirstPageSymbol ? L"true" : L"false";
+        for (const auto& number : tekito::userdata::kMixStyleNumbers) {
+            json += L",\"" + std::wstring(number.name) + L"\":" + std::to_wstring(settings_.*(number.mix));
+        }
+        for (const auto& on : tekito::userdata::kMixStyleSwitches) {
+            json += L",\"" + std::wstring(on.name) + L"\":" + (settings_.*(on.mix) ? L"true" : L"false");
+        }
         json += L",\"modeIndicatorEnabled\":";
         json += settings_.modeIndicatorEnabled ? L"true" : L"false";
         json += L",\"modeUnderlineColors\":";
@@ -1562,7 +1568,22 @@ private:
             else if (key == L"keyboardType") {
                 settings_.keyboardType = std::clamp(integerValue, 0, 2);
             }
-            else known = false;
+            else {
+                // Mix's ways of writing, apart from Japanese mode's.
+                known = false;
+                for (const auto& number : tekito::userdata::kMixStyleNumbers) {
+                    if (key == number.name) {
+                        settings_.*(number.mix) = std::clamp(integerValue, number.min, number.max);
+                        known = true;
+                    }
+                }
+                for (const auto& on : tekito::userdata::kMixStyleSwitches) {
+                    if (key == on.name) {
+                        settings_.*(on.mix) = value;
+                        known = true;
+                    }
+                }
+            }
             if (!known) {
                 settings_ = previous;
                 Reply(requestId, false, Text(L"Unknown setting or startup entry could not be updated.", L"この設定は変更できません。"));
