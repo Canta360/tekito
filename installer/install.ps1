@@ -196,6 +196,17 @@ try {
     Copy-Item -LiteralPath (Join-Path $SourceRoot "uninstall.ps1") $stagingRoot
     $uninstaller = Join-Path $SourceRoot "TekitoUninstall.exe"
     if (Test-Path -LiteralPath $uninstaller) { Copy-Item -LiteralPath $uninstaller $stagingRoot }
+    # Where this version's Japanese data is, for Settings to add Japanese
+    # later when it is installed without it.
+    if ($packageManifest -and ($packageManifest.PSObject.Properties.Name -contains "japanese_data")) {
+        $info = $packageManifest.japanese_data
+        [ordered]@{
+            url = [string]$info.url
+            sha256 = [string]$info.sha256
+            size = [int64]$info.size
+            packs = (@($info.packs) -join ",")
+        } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $stagingRoot "japanese-data.json") -Encoding UTF8
+    }
 
     # Data Packs first: if one cannot be replaced, the installed program is
     # left as it was.

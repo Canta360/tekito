@@ -119,7 +119,7 @@ export function catalog(ctx) {
       title: g.order.title, find: [t.modes.find(t.modeNames.japanese), t.modes.find(t.modeNames.mixed), t.modes.add],
       render: () => (
         <SwitchOrder settings={s} setSetting={set} japaneseInstalled={ctx.japaneseInstalled} japaneseInstalling={ctx.japaneseInstalling}
-          addJapanese={addJapanese} />
+          addJapanese={ctx.japaneseAddable ? addJapanese : null} japaneseError={ctx.japaneseDataError} />
       ),
     },
     {

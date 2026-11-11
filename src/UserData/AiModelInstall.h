@@ -1,7 +1,9 @@
 #pragma once
 
 #include <filesystem>
+#include <string>
 #include <string_view>
+#include <vector>
 
 namespace tekito::userdata {
 
@@ -16,6 +18,13 @@ enum class AiModelInstallError { None, Download, Checksum, Unpack, Invalid, InUs
 [[nodiscard]] AiModelInstallError InstallAiModelPack(const std::filesystem::path& zip, std::string_view sha256,
                                                      std::wstring_view packId,
                                                      const std::filesystem::path& dataRoot);
+
+// Unpacks `zip` (whose SHA-256 must be `sha256`) and puts each of the packs
+// `packIds` in it into `dataRoot`, in place of older copies (the Japanese
+// data, which Settings adds when TEKITO was installed without it).
+[[nodiscard]] AiModelInstallError InstallDataPacks(const std::filesystem::path& zip, std::string_view sha256,
+                                                   const std::vector<std::wstring>& packIds,
+                                                   const std::filesystem::path& dataRoot);
 
 // Takes the pack out of `dataRoot`; false when it could not be removed.
 [[nodiscard]] bool RemoveAiModelPack(std::wstring_view packId, const std::filesystem::path& dataRoot);

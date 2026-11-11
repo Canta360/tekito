@@ -227,7 +227,7 @@ export const wasFound = (key) => {
 };
 
 // The switch key's round: the modes, each on or off, dragged into order.
-export function SwitchOrder({ settings, setSetting, japaneseInstalled, japaneseInstalling, addJapanese }) {
+export function SwitchOrder({ settings, setSetting, japaneseInstalled, japaneseInstalling, addJapanese, japaneseError }) {
   const t = useText();
   const g = t.general;
   const m = t.modes;
@@ -289,10 +289,13 @@ export function SwitchOrder({ settings, setSetting, japaneseInstalled, japaneseI
             <li className="order-missing">
               <span className="handle" />
               {missing.map((id) => <ModeIcon key={id} id={id} size={20} />)}
-              <span className="name">{missing.map((id) => t.modeNames[id]).join("・")}<small className="order-note">{m.needsJapanese}</small></span>
+              <span className="name">
+                {missing.map((id) => t.modeNames[id]).join("・")}
+                <small className={`order-note ${japaneseError ? "problem" : ""}`}>{japaneseError || (addJapanese ? m.needsJapanese : m.bySetup)}</small>
+              </span>
               {japaneseInstalling
                 ? <span className="row-status"><Busy />{m.adding}</span>
-                : <Button variant="primary" onClick={addJapanese}>{m.add}</Button>}
+                : addJapanese && <Button variant="primary" onClick={addJapanese}>{m.add}</Button>}
             </li>
           )}
         </ul>

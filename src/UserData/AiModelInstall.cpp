@@ -91,6 +91,33 @@ AiModelInstallError InstallAiModelPack(const std::filesystem::path& zip, std::st
     return error ? AiModelInstallError::Unpack : AiModelInstallError::None;
 }
 
+AiModelInstallError InstallDataPacks(const std::filesystem::path& zip, std::string_view sha256,
+                                     const std::vector<std::wstring>& packIds, const std::filesystem::path& dataRoot) {
+    if (packIds.empty()) return AiModelInstallError::Invalid;
+    if (FileSha256(zip) != sha256) return AiModelInstallError::Checksum;
+    std::error_code error;
+    std::filesystem::create_directories(dataRoot, error);
+    const auto unpacked = dataRoot / L"japanese-data.download";
+    const auto done = [&](AiModelInstallError result) {
+        std::error_code ignored;
+        std::filesystem::remove_all(unpacked, ignored);
+        return result;
+    };
+    if (!Unpack(zip, unpacked)) return done(AiModelInstallError::Unpack);
+    // Every pack checked before any is put in place.
+    for (const auto& packId : packIds) {
+        DataPackStatus status;
+        if (!ValidateDataPack(unpacked / packId, status) || status.packId != packId) return done(AiModelInstallError::Invalid);
+    }
+    for (const auto& packId : packIds) {
+        const auto target = dataRoot / packId;
+        if (std::filesystem::exists(target, error) && !RemoveWhenFree(target)) return done(AiModelInstallError::InUse);
+        std::filesystem::rename(unpacked / packId, target, error);
+        if (error) return done(AiModelInstallError::Unpack);
+    }
+    return done(AiModelInstallError::None);
+}
+
 bool RemoveAiModelPack(std::wstring_view packId, const std::filesystem::path& dataRoot) {
     const auto target = dataRoot / std::wstring(packId);
     std::error_code error;

@@ -384,6 +384,7 @@ function App() {
     t, settings, setSetting, runAction, setConfirm, showKeys: setKeys, open, on, multi: japanese || mixed, japaneseInstalled,
     japaneseKeyboard, aiModels, postalCodes, openRomaji: () => open("romaji"), aiReady, chat: { messages: conversation, setMessages: setConversation },
     japaneseInstalling: Boolean(runtime.japaneseInstalling), japaneseDataBytes: runtime.japaneseDataBytes || 0,
+    japaneseAddable: runtime.japaneseAddable !== false, japaneseDataError: runtime.japaneseDataError || "",
     encryption,
   };
   const pageProps = { settings, setSetting, runAction, setConfirm, showKeys: setKeys, open };

@@ -46,6 +46,7 @@
 #include <cwctype>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <map>
 #include <memory>
 #include <optional>
@@ -112,6 +113,12 @@ constexpr UINT kAiNpuPrepared = WM_APP + 3;
 // Windows ML's runtime installed, or not (wParam: AiModelInstallError,
 // lParam: the device it was for).
 constexpr UINT kAiWindowsMlInstalled = WM_APP + 4;
+// The Japanese data downloaded and installed (wParam: AiModelInstallError).
+constexpr UINT kJapaneseDataInstalled = WM_APP + 5;
+// TEKITO's two keyboards in Windows' language list, as setup adds them
+// (installer/install.ps1): English, and Japanese, which also types English.
+constexpr wchar_t kEnglishTip[] = L"0409:{6F67E5C8-A873-4B69-8EC3-26DF00F642F1}{8D99240A-5C9C-4ED8-8DE4-85F21DF23763}";
+constexpr wchar_t kJapaneseTip[] = L"0411:{6F67E5C8-A873-4B69-8EC3-26DF00F642F1}{2876747C-FA52-4CCC-B308-F406190F8CDE}";
 
 // The GPUs the AI model can run on (DirectML's adapters, not software
 // ones), each once: japanese::GpuId and its name.
@@ -548,6 +555,19 @@ std::filesystem::path ExecutableDirectory() {
     return length == 0 || length == MAX_PATH
                ? std::filesystem::path{}
                : std::filesystem::path(path, path + length).parent_path();
+}
+
+// Adds a keyboard to the user's language list, or (`remove`) takes it out,
+// as Windows' language settings do (input.dll's InstallLayoutOrTip).
+bool ChangeKeyboard(const wchar_t* tip, bool remove) {
+    using InstallLayoutOrTipFunction = BOOL(WINAPI*)(LPCWSTR, DWORD);
+    constexpr DWORD kUninstall = 0x00000001;
+    const HMODULE input = LoadLibraryExW(L"input.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
+    if (!input) return false;
+    const auto install = reinterpret_cast<InstallLayoutOrTipFunction>(GetProcAddress(input, "InstallLayoutOrTip"));
+    const bool changed = install && install(tip, remove ? kUninstall : 0) != FALSE;
+    FreeLibrary(input);
+    return changed;
 }
 
 std::filesystem::path WebViewUserDataDirectory() {
@@ -1320,7 +1340,15 @@ private:
                 tsf + L"\",\"dataPacks\":\"" + dataPackSummary_ + L"\",\"japaneseData\":\"" +
                 japaneseDataSummary_ + L"\",\"japanese\":" + (japaneseAvailable_ ? L"true" : L"false") +
                 L",\"japaneseKeyboard\":" +
-                (tekito::userdata::UsesJapaneseKeyboard(settings_.keyboardType) ? L"true" : L"false") + L"},\"learning\":{\"enabled\":";
+                (tekito::userdata::UsesJapaneseKeyboard(settings_.keyboardType) ? L"true" : L"false");
+        if (!japaneseAvailable_) {
+            // What adding Japanese downloads, when Settings can.
+            const auto info = ReadJapaneseDataInfo();
+            json += L",\"japaneseDataBytes\":" + std::to_wstring(info ? info->bytes : 0) + L",\"japaneseAddable\":" +
+                    (info ? L"true" : L"false") + L",\"japaneseInstalling\":" + (japaneseInstalling_ ? L"true" : L"false") +
+                    L",\"japaneseDataError\":\"" + JsonEscape(japaneseDataError_) + L"\"";
+        }
+        json += L"},\"learning\":{\"enabled\":";
         json += settings_.learningEnabled ? L"true" : L"false";
         json += L",\"count\":" + std::to_wstring(learning_.Entries().size() + learning_.PreferenceCount()) + L"},\"dictionary\":";
         json += DictionaryJson();
@@ -1681,6 +1709,30 @@ private:
             std::thread([hwnd = hwnd_, download, root = AiDataRoot()] {
                 download->error = DownloadAiModel(download->model, root);
                 if (!PostMessageW(hwnd, kAiModelInstalled, 0, reinterpret_cast<LPARAM>(download))) delete download;
+            }).detach();
+            Reply(requestId, true);
+            PostState();
+        } else if (type == L"japaneseData.install") {
+            // The user agreed to download the Japanese data (Settings' dialog).
+            const auto info = ReadJapaneseDataInfo();
+            if (japaneseInstalling_ || japaneseAvailable_ || !info) {
+                Reply(requestId, false, Text(L"Japanese can be added by running setup again.",
+                                             L"日本語はセットアップからも追加できます。もう一度セットアップを実行してください。"));
+                return;
+            }
+            japaneseInstalling_ = true;
+            japaneseDataError_.clear();
+            std::thread([hwnd = hwnd_, info = *info, root = AiDataRoot()] {
+                wchar_t folder[MAX_PATH]{};
+                GetTempPathW(MAX_PATH, folder);
+                const auto file = std::filesystem::path(folder) /
+                                  (L"tekito-japanese-data-" + std::to_wstring(GetCurrentProcessId()) + L".zip");
+                const auto error = FAILED(URLDownloadToFileW(nullptr, info.url.c_str(), file.c_str(), 0, nullptr))
+                                       ? tekito::userdata::AiModelInstallError::Download
+                                       : tekito::userdata::InstallDataPacks(file, info.sha256, info.packs, root);
+                std::error_code ignored;
+                std::filesystem::remove(file, ignored);
+                PostMessageW(hwnd, kJapaneseDataInstalled, static_cast<WPARAM>(error), 0);
             }).detach();
             Reply(requestId, true);
             PostState();
@@ -2071,6 +2123,10 @@ private:
             self->FinishWindowsMlInstall(static_cast<tekito::userdata::AiModelInstallError>(wParam), static_cast<int>(lParam));
             return 0;
         }
+        if (message == kJapaneseDataInstalled) {
+            self->FinishJapaneseDataInstall(static_cast<tekito::userdata::AiModelInstallError>(wParam));
+            return 0;
+        }
         if (message == kAiNpuPrepared) {
             self->FinishNpuPrepare(wParam != 0);
             return 0;
@@ -2157,6 +2213,70 @@ private:
     static std::filesystem::path AiDataRoot() { return tekito::ExternalLexiconProvider::DataPackRoot(); }
 
     // The model is used as soon as it is installed.
+    // The Japanese data this build installs, as setup left it beside
+    // TEKITO.exe (japanese-data.json): where it is, its SHA-256, its size and
+    // its packs. Not there (setup from before, or a build of one's own):
+    // Japanese is added by setup only.
+    struct JapaneseDataInfo {
+        std::wstring url;
+        std::string sha256;
+        unsigned long long bytes{0};
+        std::vector<std::wstring> packs;
+    };
+    static std::optional<JapaneseDataInfo> ReadJapaneseDataInfo() {
+        std::ifstream in(ExecutableDirectory() / L"japanese-data.json", std::ios::binary);
+        if (!in) return std::nullopt;
+        std::string bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+        if (bytes.rfind("\xEF\xBB\xBF", 0) == 0) bytes.erase(0, 3);
+        const int length = MultiByteToWideChar(CP_UTF8, 0, bytes.data(), static_cast<int>(bytes.size()), nullptr, 0);
+        std::wstring text(static_cast<std::size_t>(std::max(length, 0)), L'\0');
+        if (length > 0) MultiByteToWideChar(CP_UTF8, 0, bytes.data(), static_cast<int>(bytes.size()), text.data(), length);
+        const auto json = WebMessage::Parse(text);
+        JapaneseDataInfo info;
+        info.url = json.String(L"url");
+        const auto sha = json.String(L"sha256");
+        for (const wchar_t c : sha) info.sha256 += static_cast<char>(std::towupper(c));
+        info.bytes = static_cast<unsigned long long>(std::max<std::int64_t>(json.Number(L"size"), 0));
+        const auto packs = json.String(L"packs");
+        for (std::size_t start = 0; start <= packs.size();) {
+            const auto end = std::min(packs.find(L',', start), packs.size());
+            if (end > start) info.packs.push_back(packs.substr(start, end - start));
+            start = end + 1;
+        }
+        // Only TEKITO's releases, over HTTPS.
+        if (info.url.rfind(L"https://github.com/Canta360/tekito/releases/download/", 0) != 0 || info.sha256.size() != 64 ||
+            info.packs.empty()) {
+            return std::nullopt;
+        }
+        return info;
+    }
+
+    // The Japanese data in place: TEKITO's Japanese keyboard added (its
+    // English one taken out, as setup does: the Japanese one types English
+    // too), and Japanese turned on.
+    void FinishJapaneseDataInstall(tekito::userdata::AiModelInstallError error) {
+        japaneseInstalling_ = false;
+        using tekito::userdata::AiModelInstallError;
+        dataPacksJson_.clear();
+        (void)DataPacksJson();
+        if (error == AiModelInstallError::None && japaneseAvailable_) {
+            japaneseDataError_.clear();
+            if (ChangeKeyboard(kJapaneseTip, false)) (void)ChangeKeyboard(kEnglishTip, true);
+            settings_.japaneseEnabled = true;
+            (void)SaveSettings();
+        } else {
+            japaneseDataError_ = error == AiModelInstallError::Download
+                                     ? Text(L"The Japanese data could not be downloaded. Check the connection and try again.",
+                                            L"日本語のデータをダウンロードできませんでした。接続を確認して、もう一度お試しください。")
+                                 : error == AiModelInstallError::InUse
+                                     ? Text(L"The Japanese data could not be put in place. Close the apps you type in and try again.",
+                                            L"日本語のデータを配置できませんでした。入力中のアプリを閉じてから、もう一度お試しください。")
+                                     : Text(L"The downloaded Japanese data was damaged. Try again.",
+                                            L"ダウンロードした日本語のデータが壊れていました。もう一度お試しください。");
+        }
+        PostState();
+    }
+
     void FinishAiModelInstall(std::unique_ptr<AiModelDownload> download) {
         aiDownloading_ = 0;
         using tekito::userdata::AiModelInstallError;
@@ -2527,6 +2647,8 @@ private:
     // The NPU being made ready, and why it (or Windows ML) last could not be.
     bool npuPreparing_{false};
     bool windowsMlDownloading_{false};
+    bool japaneseInstalling_{false};
+    std::wstring japaneseDataError_;
     std::wstring npuError_;
     EventRegistrationToken navigationToken_{};
     std::wstring dataPackSummary_{L"Unavailable"};

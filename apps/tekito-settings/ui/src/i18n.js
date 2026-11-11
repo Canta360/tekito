@@ -82,9 +82,9 @@ const en = {
   modes: {
     find: (name) => `${name} mode`, mixed: "Japanese and English without switching",
     orderDescription: "The checked modes take turns with the switch key, in this order",
-    needsJapanese: "Need the Japanese data", add: "Add Japanese", adding: "Downloading",
+    needsJapanese: "Need the Japanese data", bySetup: "Added by running setup again", add: "Add Japanese", adding: "Downloading",
     addTitle: "Download the Japanese data?",
-    addBody: (bytes) => `${bytes ? `About ${Math.round(bytes / 1e6)} MB is downloaded from TEKITO's release on GitHub. ` : ""}Japanese and Mix become available.`,
+    addBody: (bytes) => `${bytes ? `About ${Math.round(bytes / 1e6)} MB is downloaded from TEKITO's release on GitHub. ` : ""}Japanese and Mix become available, and Windows' language settings get TEKITO as a Japanese keyboard.`,
     download: "Download", added: "Japanese is added",
   },
   aiControl: {
@@ -495,9 +495,9 @@ const ja = {
   modes: {
     find: (name) => `${name}モード`, mixed: "日本語と英語を切り替えずに入力できます",
     orderDescription: "チェックしたモードが、切り替えキーでこの順に切り替わります",
-    needsJapanese: "日本語のデータが必要です", add: "日本語を追加", adding: "ダウンロード中",
+    needsJapanese: "日本語のデータが必要です", bySetup: "セットアップをもう一度実行すると追加できます", add: "日本語を追加", adding: "ダウンロード中",
     addTitle: "日本語のデータをダウンロードしますか？",
-    addBody: (bytes) => `${bytes ? `GitHub の TEKITO のリリースから約 ${Math.round(bytes / 1e6)} MB がダウンロードされます。` : ""}日本語とまぜ打ちのモードが使えるようになります。`,
+    addBody: (bytes) => `${bytes ? `GitHub の TEKITO のリリースから約 ${Math.round(bytes / 1e6)} MB がダウンロードされます。` : ""}日本語とまぜ打ちのモードが使えるようになり、Windows の言語設定には TEKITO が日本語のキーボードとして追加されます。`,
     download: "ダウンロード", added: "日本語を追加しました",
   },
   aiControl: {
