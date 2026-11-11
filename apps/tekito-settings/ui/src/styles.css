@@ -340,9 +340,9 @@ kbd {
 .mascot-body, .mascot-small, .mascot-face, .mascot-open { transform-box: view-box; }
 .mascot-body { transform-origin: 450px 790px; }
 .mascot-small { transform-origin: 709px 695px; }
-.mascot-ring, .mascot-small { fill: none; stroke: var(--accent); stroke-width: 28; stroke-linecap: round; }
-.mascot-face { fill: none; stroke: var(--ink); stroke-width: 20; stroke-linecap: round; stroke-linejoin: round; transition: transform 0.15s ease-out; }
-.mascot-face .mascot-white { fill: #ffffff; stroke: #1b1b1f; }
+.mascot-disc, .mascot-small { fill: var(--accent); }
+.mascot-face { fill: none; stroke: #ffffff; stroke-width: 34; stroke-linecap: round; stroke-linejoin: round; transition: transform 0.15s ease-out; }
+.mascot-face .mascot-white { fill: #ffffff; stroke: none; }
 .mascot.is-idle .mascot-body { animation: mascot-float 3.2s ease-in-out infinite; }
 .mascot.is-idle .mascot-small { animation: mascot-bob 3.2s ease-in-out 0.4s infinite; }
 .mascot.is-idle .mascot-open, .mascot.is-listening .mascot-open { animation: mascot-blink 4.6s infinite; }

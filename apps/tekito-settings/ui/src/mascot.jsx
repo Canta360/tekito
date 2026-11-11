@@ -1,6 +1,6 @@
-// Home's companion: TEKITO's outline mark (assets/icons/symbols/
-// tekito-outline.svg) in a thinner line, without the T, with eyes. It answers
-// with its eyes and how it moves:
+// Home's companion: TEKITO's filled mark (assets/icons/symbols/
+// tekito-filled.svg) without the T, with white eyes. It answers with its eyes
+// and how it moves:
 //   idle       floats and blinks, eyes open; its eyes on the pointer (`follow`)
 //   listening  the user is typing: eyes wider, on the box
 //   searching  AI is looking: half-shut eyes going side to side as it sways
@@ -10,11 +10,11 @@
 // Its moves are small.
 // Also the icon beside AI's replies. Still for those who ask Windows for
 // less motion.
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useId, useRef, useState } from "react";
 
-// The mark's circle (center 450, 450; radius 340) and its small ring.
-const kRing = "M582 763A340 340 0 1 1 770 565";
-const kDot = { cx: 709, cy: 695, r: 82 };
+// The mark: a disc (center 450, 450; radius 362) with room cut around its
+// small ring (center 709, 695; 108 across the outside, a 44 hole).
+const kSmall = "M709 587a108 108 0 1 0 0.01 0ZM709 651a44 44 0 1 1 -0.01 0Z";
 // Large white eyes, as wide apart as the user drew them.
 const kEyes = [298, 602];
 const kEyeY = 430;
@@ -50,6 +50,7 @@ function eye(mood, cx) {
 
 export function Mascot({ mood = "idle", size = 96, follow = false, label }) {
   const ref = useRef(null);
+  const cut = `mascot-cut-${useId().replace(/:/g, "")}`;
   const [look, setLook] = useState({ x: 0, y: 0 });
   useEffect(() => {
     if (!follow || mood !== "idle") {
@@ -81,9 +82,15 @@ export function Mascot({ mood = "idle", size = 96, follow = false, label }) {
   return (
     <svg ref={ref} className={`mascot is-${mood}`} width={size} height={size} viewBox="60 60 800 800"
       role={label ? "img" : undefined} aria-label={label || undefined} aria-hidden={label ? undefined : true}>
+      <defs>
+        <mask id={cut} maskUnits="userSpaceOnUse" x="0" y="0" width="960" height="960">
+          <rect width="960" height="960" fill="#fff" />
+          <circle cx="709" cy="695" r="150" fill="#000" />
+        </mask>
+      </defs>
       <g className="mascot-body">
-        <path className="mascot-ring" d={kRing} />
-        <circle className="mascot-small" cx={kDot.cx} cy={kDot.cy} r={kDot.r} />
+        <circle className="mascot-disc" cx="450" cy="450" r="362" mask={`url(#${cut})`} />
+        <path className="mascot-small" d={kSmall} fillRule="evenodd" />
         <g className="mascot-face" style={{ transform: `translate(${look.x}px, ${look.y}px)` }}>
           {kEyes.map((cx) => <g key={cx}>{eye(mood, cx)}</g>)}
         </g>
