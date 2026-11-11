@@ -4,6 +4,7 @@
 // すべての設定: every setting on one page, or only those changed.
 import React, { useEffect, useRef, useState } from "react";
 import { think } from "./aiChat.js";
+import { Mascot } from "./mascot.jsx";
 import { aiSpecs, catalog, changeAllowed, navPages, valueName, visible } from "./catalog.jsx";
 import { keyGroups, ModeBadges, revealHidden } from "./rows.jsx";
 import { Busy, Button, Card, Heading, IconButton, Keycaps, LinkRow, ModeIcon, Symbol, Tabs, TextBox, Toggle } from "./ui.jsx";
@@ -102,6 +103,11 @@ export function HomePage({ ctx, aiReady }) {
   // above it and the box at the foot; the samples and All settings at the
   // very bottom.
   const chatting = aiReady && messages.length > 0;
+  // A greeting picked afresh each time Home opens.
+  const [greeting] = useState(() => {
+    const lines = aiReady ? h.greetingsAi : h.greetings;
+    return lines[Math.floor(Math.random() * lines.length)];
+  });
   return (
     <div className={`home ${chatting ? "is-chatting" : ""}`}>
       {chatting && (
@@ -114,6 +120,12 @@ export function HomePage({ ctx, aiReady }) {
       )}
 
       <div className="home-box">
+      {!chatting && (
+        <div className="home-greeting">
+          <Mascot />
+          <p>{greeting}</p>
+        </div>
+      )}
       <TextBox ref={input} className="home-search" size="large" aria-label={aiReady ? c.label : t.search}
         placeholder={aiReady ? (messages.length ? c.next : h.placeholderAi) : t.search}
         value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={onKeyDown}
@@ -177,7 +189,7 @@ function SettingsAiOffer({ ctx }) {
 function Reply({ ctx, message, update }) {
   const t = ctx.t;
   const c = t.chat;
-  if (message.status === "asking") return <div className="bubble-ai"><div className="answer-status"><Busy />{c.thinking}</div></div>;
+  if (message.status === "asking") return <div className="bubble-ai"><div className="answer-status"><Mascot searching size={56} />{c.thinking}</div></div>;
   if (message.status === "failed") return <div className="bubble-ai"><p className="answer-status">{t.home.failed}</p></div>;
   const specs = aiSpecs(ctx);
   // An easter egg once found is shown too (visible: found or on).

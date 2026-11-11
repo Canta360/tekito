@@ -329,3 +329,24 @@ kbd {
 .linked-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 0 18px 10px 44px; margin-top: -6px; }
 .linked-strip .fui-Button { color: var(--accent-text); font-weight: var(--fontWeightRegular); }
 .mode-tab { display: inline-flex; align-items: center; gap: 6px; }
+
+/* Home's companion and its greeting. */
+.home-greeting { display: grid; justify-items: center; gap: 10px; margin-bottom: 12px; color: var(--ink-2); text-align: center; }
+.home-greeting p { font-size: var(--fontSizeBase400); color: var(--ink); }
+.mascot { color: var(--ink-2); overflow: visible; }
+.mascot-tail { transform-origin: 62px 80px; animation: mascot-tail 2.6s ease-in-out infinite alternate; }
+.mascot-eyes { transform-origin: 48px 44px; animation: mascot-blink 4.8s infinite; }
+.mascot-glass { opacity: 0; transition: opacity 0.3s var(--ease); }
+.mascot.is-searching .mascot-glass { opacity: 1; transform-origin: 74px 38px; animation: mascot-look 1.4s ease-in-out infinite alternate; }
+.mascot.is-searching .mascot-head { transform-origin: 48px 56px; animation: mascot-tilt 1.4s ease-in-out infinite alternate; }
+.mascot.is-searching .mascot-eyes { animation: mascot-peek 1.4s ease-in-out infinite alternate; }
+.mascot.is-searching .mascot-tail { animation-duration: 0.9s; }
+@keyframes mascot-tail { from { transform: rotate(-8deg); } to { transform: rotate(10deg); } }
+@keyframes mascot-blink { 0%, 90%, 100% { transform: scaleY(1); } 94% { transform: scaleY(0.1); } }
+@keyframes mascot-look { from { transform: translate(-44px, 6px) rotate(-12deg); } to { transform: translate(0, 0) rotate(8deg); } }
+@keyframes mascot-tilt { from { transform: rotate(-7deg); } to { transform: rotate(6deg); } }
+@keyframes mascot-peek { from { transform: translateX(-3px); } to { transform: translateX(3px); } }
+.answer-status .mascot { flex: none; }
+@media (prefers-reduced-motion: reduce) {
+  .mascot *, .mascot { animation: none !important; }
+}

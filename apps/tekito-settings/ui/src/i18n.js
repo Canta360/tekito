@@ -66,6 +66,9 @@ const en = {
     undo: "Undo",
     openIn: (page) => `Open ${page}`,
     allDescription: "Every setting on one page, or only the ones you changed",
+    greetingsAi: ["Which setting would you like to change?", "Anything about typing that bothers you?",
+      "Tell me what you would like, in your own words.", "What shall we tidy up today?", "Anything that did not go as you meant?"],
+    greetings: ["Search settings by name.", "Which setting are you looking for?", "Type a setting's name to find it."],
   },
   linked: {
     link: (first, second) => `Use the same setting for ${first} and ${second}`,
@@ -76,7 +79,7 @@ const en = {
   special: { title: "Dates, symbols and sums as candidates", parts: ["Date and time", "Symbols", "Sums"], none: "Off" },
   slips: { capitalizedExample: "e.g. Cjicago → Chicago", spaceless: ["Off", "Common words", "All words"] },
   chat: {
-    label: "Ask AI", next: "Reply to AI", newChat: "New conversation", send: "Send", thinking: "Thinking", changes: "Changes", related: "Related",
+    label: "Ask AI", next: "Reply to AI", newChat: "New conversation", send: "Send", thinking: "Looking", changes: "Changes", related: "Related",
     refused: "AI can't change this", undone: "Undone", on: "On", off: "Off", byGrade: "Up to a school year",
     choose: "These settings may be what you mean. Change the one that fits.", found: "This setting changes that.",
     changed: (title, label) => `Set ${title} to “${label}”.`, already: (title, label) => `${title} is already “${label}”.`,
@@ -492,6 +495,9 @@ const ja = {
     undo: "元に戻す",
     openIn: (page) => `${page}を開く`,
     allDescription: "すべての設定を1ページで確認できます。変更した設定だけに絞り込めます",
+    greetingsAi: ["どの設定を変えますか？", "入力で気になっていることはありますか？", "困っていることを、そのまま書いてください。",
+      "今日はどこを整えましょうか。", "思いどおりにいかなかったことはありますか？"],
+    greetings: ["設定を名前で探せます。", "どの設定をお探しですか？", "探したい設定の名前を入力してください。"],
   },
   linked: {
     link: (first, second) => `${first}と${second}で同じ設定にする`,
@@ -502,7 +508,7 @@ const ja = {
   special: { title: "日付・記号・計算を候補に表示", parts: ["日付と時刻", "記号", "計算結果"], none: "表示しない" },
   slips: { capitalizedExample: "例：Cjicago → Chicago", spaceless: ["オフ", "よく使う語のみ", "すべての語"] },
   chat: {
-    label: "AI に聞く", next: "AI に返信", newChat: "新しい会話", send: "送信", thinking: "考えています", changes: "変更", related: "関連",
+    label: "AI に聞く", next: "AI に返信", newChat: "新しい会話", send: "送信", thinking: "探しています", changes: "変更", related: "関連",
     refused: "AI では変更できません", undone: "元に戻しました", on: "オン", off: "オフ", byGrade: "学年まで",
     choose: "当てはまりそうな設定です。合うものを変更してください。", found: "この設定で変更できます。",
     changed: (title, label) => `${title}を「${label}」にしました。`, already: (title, label) => `${title}はすでに「${label}」です。`,
