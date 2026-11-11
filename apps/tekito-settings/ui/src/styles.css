@@ -270,7 +270,7 @@ kbd {
 .bubble-ai { display: grid; gap: 8px; max-width: 100%; }
 /* AI's replies open with the companion, as a chat shows who speaks. */
 .reply-text { display: flex; gap: 10px; align-items: flex-start; line-height: var(--lineHeightBase400); }
-.reply-text > .mascot { margin-top: -6px; }
+.reply-text > .mascot { margin-top: -8px; }
 .reply-text > span { padding-top: 2px; }
 .reply-text > .answer-status { padding: 2px 0 0; }
 .change { display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 6px 12px 6px 16px; }
@@ -333,20 +333,42 @@ kbd {
 .linked-strip .fui-Button { color: var(--accent-text); font-weight: var(--fontWeightRegular); }
 .mode-tab { display: inline-flex; align-items: center; gap: 6px; }
 
-/* Home's companion and its greeting. */
+/* Home's companion (mascot.jsx) and its greeting. */
 .home-greeting { display: grid; justify-items: center; gap: 10px; margin-bottom: 12px; color: var(--ink-2); text-align: center; }
 .home-greeting p { font-size: var(--fontSizeBase400); color: var(--ink); }
-.mascot { color: var(--ink); overflow: visible; flex: none; }
-.mascot-eyes { transition: transform 0.12s linear; }
-.mascot.is-idle .mascot-body { transform-origin: 48px 85px; animation: mascot-breathe 3.6s ease-in-out infinite; }
-.mascot.is-searching .mascot-body { transform-origin: 48px 85px; animation: mascot-sway 1.2s ease-in-out infinite alternate; }
-.mascot.is-searching .mascot-glass { transform-origin: 16px 60px; animation: mascot-look 1.2s ease-in-out infinite alternate; }
-.mascot.is-happy .mascot-body { transform-origin: 48px 85px; animation: mascot-hop 0.5s ease-out 2; }
-@keyframes mascot-breathe { 0%, 100% { transform: scale(1, 1); } 50% { transform: scale(1.02, 0.98); } }
-@keyframes mascot-sway { from { transform: rotate(-4deg); } to { transform: rotate(4deg); } }
-@keyframes mascot-look { from { transform: translate(-2px, 2px) rotate(-10deg); } to { transform: translate(4px, -4px) rotate(8deg); } }
-@keyframes mascot-hop { 0%, 100% { transform: translateY(0); } 40% { transform: translateY(-6px); } }
-.answer-status .mascot { flex: none; }
+.mascot {
+  --mascot-light: color-mix(in srgb, var(--accent) 12%, #ffffff);
+  --mascot-mid: color-mix(in srgb, var(--accent) 55%, #ffffff);
+  --mascot-dark: color-mix(in srgb, var(--accent) 85%, #000000);
+  --mascot-eye: #1b1b1f;
+  --mascot-cheek: color-mix(in srgb, #ff7a8a 45%, transparent);
+  --mascot-shadow: color-mix(in srgb, var(--ink) 14%, transparent);
+  overflow: visible; flex: none;
+}
+.mascot-ball, .mascot-shadow, .mascot-eye, .mascot-face { transform-box: view-box; }
+.mascot-ball { transform-origin: 48px 80px; }
+.mascot-shadow { transform-origin: 48px 88px; }
+.mascot-face { transition: transform 0.15s ease-out; }
+.mascot.is-idle .mascot-ball { animation: mascot-float 3.2s ease-in-out infinite; }
+.mascot.is-idle .mascot-shadow { animation: mascot-shadow 3.2s ease-in-out infinite; }
+.mascot.is-idle .mascot-eye, .mascot.is-listening .mascot-eye { animation: mascot-blink 4.6s infinite; }
+.mascot.is-listening .mascot-ball { transform: scale(1.03, 0.97); transition: transform 0.25s var(--ease); }
+.mascot.is-searching .mascot-ball { animation: mascot-sway 0.9s ease-in-out infinite alternate; }
+.mascot.is-searching .mascot-face { animation: mascot-scan 0.9s ease-in-out infinite alternate; }
+.mascot.is-happy .mascot-ball { animation: mascot-hop 0.55s cubic-bezier(0.3, 0, 0.3, 1) 3; }
+.mascot.is-happy .mascot-shadow { animation: mascot-hop-shadow 0.55s cubic-bezier(0.3, 0, 0.3, 1) 3; }
+.mascot.is-unsure .mascot-ball { transform: rotate(-12deg); transition: transform 0.4s var(--ease); }
+.mascot.is-down .mascot-ball { transform: translateY(4px) scale(1.05, 0.92); transition: transform 0.5s var(--ease); }
+@keyframes mascot-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+@keyframes mascot-shadow { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(0.85); opacity: 0.7; } }
+@keyframes mascot-blink { 0%, 92%, 100% { transform: scaleY(1); } 95% { transform: scaleY(0.12); } }
+@keyframes mascot-sway { from { transform: rotate(-7deg) translateX(-2px); } to { transform: rotate(7deg) translateX(2px); } }
+@keyframes mascot-scan { from { transform: translateX(-6px); } to { transform: translateX(6px); } }
+@keyframes mascot-hop {
+  0% { transform: translateY(0) scale(1.08, 0.9); } 35% { transform: translateY(-14px) scale(0.94, 1.08); }
+  70% { transform: translateY(0) scale(1.1, 0.88); } 100% { transform: translateY(0) scale(1, 1); }
+}
+@keyframes mascot-hop-shadow { 0%, 70%, 100% { transform: scale(1); } 35% { transform: scale(0.7); opacity: 0.6; } }
 @media (prefers-reduced-motion: reduce) {
-  .mascot *, .mascot { animation: none !important; }
+  .mascot *, .mascot { animation: none !important; transition: none !important; }
 }

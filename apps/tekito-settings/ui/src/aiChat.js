@@ -144,7 +144,7 @@ export async function think(ctx, question, level, lastApplied) {
   const ranked = targets.map((target, i) => ({ ...target, score: scores[i] + kOverlapWeight * overlap(question, target.text + target.title) }))
     .sort((a, b) => b.score - a.score);
   const [best, second] = ranked;
-  if (best.score < kNothingFits) return { kind: "help", reply: c.nothingFits, actions: [], show: [] };
+  if (best.score < kNothingFits) return { kind: "nothing", reply: c.nothingFits, actions: [], show: [] };
   if (best.score - second.score < kSureMargin) {
     // As many as are close to the first (two to five), to choose from.
     const close = ranked.filter((target, i) => i < 5 && (i < 2 || best.score - target.score < kSureMargin * 2));

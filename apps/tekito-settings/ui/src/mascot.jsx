@@ -1,15 +1,24 @@
-// Home's companion: a round cat (the user's sketch), in Settings' single
-// line. Moods: "idle" (・ω・, its eyes on the pointer when `follow`),
-// "searching" (−ω−, a magnifying glass going side to side), "happy"
-// (content, after a change). Also the icon beside AI's replies. Still when
-// the user asks Windows for less motion.
-import React, { useEffect, useRef, useState } from "react";
+// Home's companion: a ball in the Windows accent color, shaded to look
+// round, with eyes. It answers with its face and how it moves:
+//   idle       floats and blinks; its eyes on the pointer (`follow`)
+//   listening  the user is typing: it looks at the box
+//   searching  AI is looking: its eyes go side to side as it sways
+//   happy      a setting was changed: it hops, eyes ^ ^
+//   unsure     it could not tell which setting: it tilts, one eye bigger
+//   down       AI did not answer: it sags, eyes half shut
+// Also the icon beside AI's replies. Still for those who ask Windows for
+// less motion.
+import React, { useEffect, useId, useRef, useState } from "react";
 
-export function Mascot({ mood = "idle", size = 88, follow = false, label }) {
+export function Mascot({ mood = "idle", size = 96, follow = false, label }) {
   const ref = useRef(null);
+  const id = useId().replace(/:/g, "");
   const [look, setLook] = useState({ x: 0, y: 0 });
   useEffect(() => {
-    if (!follow || mood !== "idle") return undefined;
+    if (!follow || mood !== "idle") {
+      setLook({ x: 0, y: mood === "listening" ? 3 : 0 });
+      return undefined;
+    }
     let frame = 0;
     const onMove = (event) => {
       if (frame) return;
@@ -18,10 +27,10 @@ export function Mascot({ mood = "idle", size = 88, follow = false, label }) {
         const box = ref.current?.getBoundingClientRect();
         if (!box) return;
         const dx = event.clientX - (box.left + box.width / 2);
-        const dy = event.clientY - (box.top + box.height * 0.58);
+        const dy = event.clientY - (box.top + box.height / 2);
         const distance = Math.hypot(dx, dy) || 1;
-        // Up to 3.5 of the drawing's units toward the pointer.
-        const reach = Math.min(1, distance / 160) * 3.5;
+        // Up to 5 of the drawing's units toward the pointer.
+        const reach = Math.min(1, distance / 180) * 5;
         setLook({ x: (dx / distance) * reach, y: (dy / distance) * reach * 0.8 });
       });
     };
@@ -32,41 +41,42 @@ export function Mascot({ mood = "idle", size = 88, follow = false, label }) {
     };
   }, [follow, mood]);
 
+  const eye = (cx) => {
+    if (mood === "happy") return <path key={cx} d={`M${cx - 5} 50 Q${cx} 42 ${cx + 5} 50`} fill="none" stroke="var(--mascot-eye)" strokeWidth="3.4" strokeLinecap="round" />;
+    if (mood === "down") return <path key={cx} d={`M${cx - 5} 48 Q${cx} 53 ${cx + 5} 48`} fill="none" stroke="var(--mascot-eye)" strokeWidth="3.2" strokeLinecap="round" />;
+    const big = mood === "unsure" && cx > 48 ? 1.25 : mood === "listening" ? 1.1 : 1;
+    return (
+      <g key={cx} className="mascot-eye" style={{ transformOrigin: `${cx}px 48px` }}>
+        <ellipse cx={cx} cy="48" rx={4.2 * big} ry={6 * big} fill="var(--mascot-eye)" />
+        <circle cx={cx + 1.4} cy={45.6} r={1.5 * big} fill="#fff" opacity="0.9" />
+      </g>
+    );
+  };
+
   return (
     <svg ref={ref} className={`mascot is-${mood}`} width={size} height={size} viewBox="0 0 96 96"
       role={label ? "img" : undefined} aria-label={label || undefined} aria-hidden={label ? undefined : true}>
-      <g fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round">
-        <g className="mascot-body">
-          {/* The ears on top, then the round body drawn as two strokes. */}
-          <path d="M31 33 Q33 24 39 30 L57 30 Q63 24 65 33" />
-          <path d="M29 37 C16 50 18 78 42 85" />
-          <path d="M67 37 C80 50 78 77 55 85 L50 85.6" />
-          {mood === "idle" && (
-            <g className="mascot-eyes" fill="currentColor" stroke="none" style={{ transform: `translate(${look.x}px, ${look.y}px)` }}>
-              <circle cx="38" cy="56" r="2.6" />
-              <circle cx="58" cy="56" r="2.6" />
-            </g>
-          )}
-          {mood === "searching" && (
-            <g className="mascot-eyes">
-              <path d="M34 56 L42 56 M54 56 L62 56" />
-            </g>
-          )}
-          {mood === "happy" && (
-            <g>
-              <path d="M33 51 L42 51 M54 51 L63 51" strokeWidth="2.6" />
-              <path d="M34 55 Q38 60 42 55 M54 55 Q58 60 62 55" />
-            </g>
-          )}
-          <path d="M43 62 Q45.5 66 48 62 Q50.5 66 53 62" strokeWidth="2.8" />
+      <defs>
+        <radialGradient id={`ball-${id}`} cx="0.36" cy="0.3" r="0.78">
+          <stop offset="0" style={{ stopColor: "var(--mascot-light)" }} />
+          <stop offset="0.55" style={{ stopColor: "var(--mascot-mid)" }} />
+          <stop offset="1" style={{ stopColor: "var(--mascot-dark)" }} />
+        </radialGradient>
+        <radialGradient id={`shine-${id}`} cx="0.5" cy="0.5" r="0.5">
+          <stop offset="0" stopColor="#fff" stopOpacity="0.85" />
+          <stop offset="1" stopColor="#fff" stopOpacity="0" />
+        </radialGradient>
+      </defs>
+      <ellipse className="mascot-shadow" cx="48" cy="88" rx="22" ry="4" fill="var(--mascot-shadow)" />
+      <g className="mascot-ball">
+        <circle cx="48" cy="48" r="32" fill={`url(#ball-${id})`} />
+        <ellipse cx="36" cy="30" rx="12" ry="7" fill={`url(#shine-${id})`} transform="rotate(-25 36 30)" />
+        <g className="mascot-face" style={{ transform: `translate(${look.x}px, ${look.y}px)` }}>
+          {eye(39)}
+          {eye(57)}
+          <ellipse cx="31" cy="58" rx="5" ry="2.6" fill="var(--mascot-cheek)" />
+          <ellipse cx="65" cy="58" rx="5" ry="2.6" fill="var(--mascot-cheek)" />
         </g>
-        {mood === "searching" && (
-          <g className="mascot-glass">
-            <circle cx="16" cy="60" r="7" stroke="var(--accent-text, currentColor)" />
-            <path d="M21 66 L25 71" stroke="var(--accent-text, currentColor)" />
-            <path d="M25 74 L30 74 L30 70" strokeWidth="2.6" />
-          </g>
-        )}
       </g>
     </svg>
   );

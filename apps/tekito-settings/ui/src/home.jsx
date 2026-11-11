@@ -90,7 +90,7 @@ export function HomePage({ ctx, aiReady }) {
         : c.cannot;
     }
     setMessages((list) => list.map((message, index) => (index === at
-      ? { role: "assistant", status: "done", text: reply, changes, show: answer.show || [] } : message)));
+      ? { role: "assistant", status: "done", kind: answer.kind, text: reply, changes, show: answer.show || [] } : message)));
   };
   const onKeyDown = (event) => {
     if (event.key === "Escape") setQuery("");
@@ -122,7 +122,7 @@ export function HomePage({ ctx, aiReady }) {
       <div className="home-box">
       {!chatting && (
         <div className="home-greeting">
-          <Mascot follow />
+          <Mascot follow mood={needle ? "listening" : "idle"} />
           <p>{greeting}</p>
         </div>
       )}
@@ -189,9 +189,9 @@ function SettingsAiOffer({ ctx }) {
 function Reply({ ctx, message, update }) {
   const t = ctx.t;
   const c = t.chat;
-  if (message.status === "asking") return <div className="bubble-ai"><div className="reply-text"><Mascot mood="searching" size={36} /><span className="answer-status">{c.thinking}</span></div></div>;
+  if (message.status === "asking") return <div className="bubble-ai"><div className="reply-text"><Mascot mood="searching" size={40} /><span className="answer-status">{c.thinking}</span></div></div>;
   if (message.status === "failed") {
-    return <div className="bubble-ai"><div className="reply-text"><Mascot size={36} /><span className="answer-status">{t.home.failed}</span></div></div>;
+    return <div className="bubble-ai"><div className="reply-text"><Mascot mood="down" size={40} /><span className="answer-status">{t.home.failed}</span></div></div>;
   }
   const specs = aiSpecs(ctx);
   // An easter egg once found is shown too (visible: found or on).
@@ -215,7 +215,8 @@ function Reply({ ctx, message, update }) {
   return (
     <div className="bubble-ai">
       <div className="reply-text">
-        <Mascot mood={message.changes.some((change) => change.state === "applied") ? "happy" : "idle"} size={36} />
+        <Mascot size={40} mood={message.kind === "egg" || message.changes.some((change) => change.state === "applied") ? "happy"
+          : message.kind === "choose" || message.kind === "nothing" ? "unsure" : "idle"} />
         <span>{message.text || (shown.length ? "" : t.home.nothing)}</span>
       </div>
       {message.changes.length > 0 && (
