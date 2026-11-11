@@ -210,7 +210,7 @@ tekito::userdata::AiModelInstallError DownloadAiPack(const AiModelInfo& pack, co
 // one is already there.
 constexpr AiModelInfo kSettingsAi{
     L"settings-ai", L"https://github.com/Canta360/tekito/releases/download/ai-models-3/TEKITO-settings-ai.zip",
-    "47C7118E888D9DF37656601ED41E8F946BD8CBF15A7A003C98FD6DEF0FBFB9E0", 358020784ull};
+    "8099BB4BF9266F6C96EFBD875DAD28DE231E40A14220D62DFAA54CC621307FA8", 357791102ull};
 
 // Home's AI, asked how likely each text reads after what the user asked for
 // (`prompt`) against after nothing (`base`): ln p(text | prompt) - ln p(text
@@ -222,10 +222,11 @@ struct ScoredAsk {
     bool ok{false};
 };
 std::optional<std::vector<double>> ScoreTexts(const std::wstring& prompt, const std::wstring& base,
-                                              const std::vector<std::wstring>& texts) {
+                                              const std::vector<std::wstring>& texts, tekito::japanese::AiDevice device,
+                                              std::uint32_t gpu) {
     static std::mutex cacheMutex;
     static std::map<std::wstring, double> baseCache;
-    const tekito::japanese::AiHelperClient client(tekito::japanese::AiModel::Settings, tekito::japanese::AiDevice::Cpu, 0,
+    const tekito::japanese::AiHelperClient client(tekito::japanese::AiModel::Settings, device, gpu,
                                                   std::chrono::milliseconds(60'000), tekito::japanese::aihelper::kMaxSentences);
     // ln p of each text after `context`, asked a pipe-full at a time.
     const auto after = [&](const std::wstring& context, const std::vector<std::wstring>& asked)
@@ -1813,8 +1814,15 @@ private:
                 return;
             }
             auto* ask = new ScoredAsk{std::wstring(requestId)};
-            std::thread([hwnd = hwnd_, ask, prompt = message.String(L"prompt"), base = message.String(L"base"), lines] {
-                if (auto scores = ScoreTexts(prompt, base, lines)) {
+            // Where the user's AI runs; the GPU or the NPU only with Windows ML.
+            const auto root = AiDataRoot();
+            const int chosen = std::clamp(settings_.japaneseAiDevice, 0, 3);
+            const auto device = chosen >= 2 && tekito::userdata::AiRuntimeHasWindowsMl(root)
+                                    ? static_cast<tekito::japanese::AiDevice>(chosen)
+                                    : tekito::japanese::AiDevice::Cpu;
+            std::thread([hwnd = hwnd_, ask, prompt = message.String(L"prompt"), base = message.String(L"base"), lines, device,
+                         gpu = static_cast<std::uint32_t>(settings_.japaneseAiGpu)] {
+                if (auto scores = ScoreTexts(prompt, base, lines, device, gpu)) {
                     ask->scores = std::move(*scores);
                     ask->ok = true;
                 }

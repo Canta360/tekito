@@ -84,8 +84,10 @@ ONNX and quantized to 8 bits.
         "source": "LiquidAI/LFM2.5-350M-Base (https://huggingface.co/LiquidAI/LFM2.5-350M-Base)",
         "language": "mul",
         "type": "settings-ai-model",
-        # Not trained for conversion: reads text alone.
-        "manifest": {"prompt": "plain"},
+        # Not trained for conversion: reads text alone; scored 10 texts of up
+        # to 64 tokens at a time on a GPU or an NPU (exported --shape 10x64).
+        "files": ["model.onnx", "body-10x64.onnx", "head-640.onnx", "head.onnx", "model.data", "vocab.txt", "merges.txt"],
+        "manifest": {"prompt": "plain", "score_graph": "body-10x64.onnx", "score_head": "head-640.onnx"},
         "notice": """LFM2.5-350M-Base by Liquid AI
 (https://huggingface.co/LiquidAI/LFM2.5-350M-Base), under the LFM Open
 License v1.0 (LICENSE). Modified by TEKITO: exported to ONNX and quantized
@@ -119,7 +121,8 @@ def build(pack: str, source: Path, out: Path, version: str) -> None:
     if directory.exists():
         shutil.rmtree(directory)
     directory.mkdir(parents=True)
-    for name in MODEL_FILES:
+    files = spec.get("files", MODEL_FILES)
+    for name in files:
         shutil.copyfile(source / name, directory / name)
     shutil.copyfile(source / "LICENSE", directory / "LICENSE")
     (directory / "NOTICE").write_text(spec["notice"], encoding="utf-8", newline="\n")
@@ -133,7 +136,7 @@ def build(pack: str, source: Path, out: Path, version: str) -> None:
         "format": "onnx",
         "file": "model.onnx",
         "sha256": {"file": sha256(directory / "model.onnx"), "model.data": sha256(directory / "model.data")},
-        "files": MODEL_FILES,
+        "files": files,
         "license": "LFM Open License v1.0",
         "license_file": "LICENSE",
         "source": spec["source"],
@@ -141,7 +144,7 @@ def build(pack: str, source: Path, out: Path, version: str) -> None:
     }
     manifest.update(spec.get("manifest", {}))
     (directory / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8", newline="\n")
-    write_zip(out, pack, directory, ["manifest.json"] + MODEL_FILES + ["LICENSE", "NOTICE"], stored=True)
+    write_zip(out, pack, directory, ["manifest.json"] + files + ["LICENSE", "NOTICE"], stored=True)
 
 
 CRT = ["msvcp140.dll", "vcruntime140.dll", "vcruntime140_1.dll"]

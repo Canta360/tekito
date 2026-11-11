@@ -83,6 +83,9 @@ enum class AiDevice : int { Auto = 0, Cpu = 1, Gpu = 2, Npu = 3 };
 struct AiModelKind {
     bool writes{false};  // trained for conversion: reads the reading, writes
     double margin{6.0};  // AiJudge::Margin
+    // The fixed-shape graphs it is scored with on a GPU or an NPU.
+    std::wstring scoreGraph{L"body-10x32.onnx"};
+    std::wstring scoreHead{L"head-320.onnx"};
 };
 [[nodiscard]] AiModelKind ReadAiModelKind(AiModel model);
 

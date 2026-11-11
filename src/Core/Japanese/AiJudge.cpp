@@ -168,6 +168,14 @@ AiModelKind ReadAiModelKind(AiModel model) {
     // "prompt": "tekito-reading-v1" marks a model trained for conversion;
     // "margin": its own (ln p).
     kind.writes = manifest.find("\"tekito-reading-v1\"") != std::string::npos;
+    // "score_graph", "score_head": its fixed graphs, when not 10 x 32.
+    for (auto [key, name] : {std::pair{"\"score_graph\"", &kind.scoreGraph}, std::pair{"\"score_head\"", &kind.scoreHead}}) {
+        const auto at = manifest.find(key);
+        const auto open = at == std::string::npos ? at : manifest.find('"', manifest.find(':', at) + 1);
+        const auto close = open == std::string::npos ? open : manifest.find('"', open + 1);
+        if (close != std::string::npos) *name = std::wstring(manifest.begin() + static_cast<std::ptrdiff_t>(open) + 1,
+                                                             manifest.begin() + static_cast<std::ptrdiff_t>(close));
+    }
     if (const auto at = manifest.find("\"margin\""); at != std::string::npos) {
         const auto colon = manifest.find(':', at);
         if (colon != std::string::npos) kind.margin = std::strtod(manifest.c_str() + colon + 1, nullptr);

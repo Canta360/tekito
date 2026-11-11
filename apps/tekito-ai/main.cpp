@@ -424,7 +424,10 @@ public:
         loaded_ = which;
         device_ = device;
         gpu_ = gpu;
-        writes_ = ReadAiModelKind(which).writes;
+        const auto kind = ReadAiModelKind(which);
+        writes_ = kind.writes;
+        scoreGraph_ = kind.scoreGraph;
+        scoreHead_Name_ = kind.scoreHead;
         if (device == AiDevice::Gpu || device == AiDevice::Npu) {
             loading_ = std::thread([this, directory, device, gpu] { LoadFixed(directory, device, gpu); });
         }
@@ -509,7 +512,7 @@ private:
                 options.AppendExecutionProvider_V2(Environment(), npus, epOptions);
             }
             Graph score, scoreHead;
-            for (auto [graph, name] : {std::pair{&score, L"body-10x32.onnx"}, std::pair{&scoreHead, L"head-320.onnx"}}) {
+            for (auto [graph, name] : {std::pair{&score, scoreGraph_}, std::pair{&scoreHead, scoreHead_Name_}}) {
                 if (stop_) return;
                 graph->Open(directory / name, options);
             }
@@ -528,8 +531,9 @@ private:
     // Where OpenVINO keeps what it compiles for the NPU: npu-cache/<layout>
     // in the pack, so it goes with the model; what an earlier layout of the
     // graphs left there is removed (read-only, as the compiler writes it).
-    static std::filesystem::path NpuCache(const std::filesystem::path& pack) {
-        constexpr wchar_t kLayout[] = L"score-10x32";
+    std::filesystem::path NpuCache(const std::filesystem::path& pack) const {
+        // The layout: the scoring graph's shape (body-10x32 → score-10x32).
+        const std::wstring kLayout = L"score-" + std::filesystem::path(scoreGraph_).stem().wstring().substr(5);
         const auto root = pack / L"npu-cache";
         std::error_code error;
         for (const auto& entry : std::filesystem::directory_iterator(root, error)) {
@@ -724,17 +728,36 @@ private:
     AiDevice device_{AiDevice::Auto};
     std::uint32_t gpu_{0};
     bool writes_{false};
+    // The pack's fixed graphs (AiModelKind).
+    std::wstring scoreGraph_{L"body-10x32.onnx"};
+    std::wstring scoreHead_Name_{L"head-320.onnx"};
     Prompt promptRead_;
 };
 
-std::vector<std::uint8_t> Answer(Model& model, std::span<const std::uint8_t> message, bool& stop) {
+// The conversion model, and Settings' (its own, so asking in Settings does
+// not unload the one typing uses); Settings' is let go a few minutes after
+// it was last asked.
+struct Models {
+    Model conversion;
+    Model settings;
+    std::chrono::steady_clock::time_point settingsAsked{};
+};
+constexpr auto kSettingsIdle = std::chrono::minutes(3);
+
+std::vector<std::uint8_t> Answer(Models& models, std::span<const std::uint8_t> message, bool& stop) {
     const auto asked = aihelper::DecodeRequest(message);
     if (!asked) return aihelper::EncodeReply(aihelper::Status::Failed);
     if (asked->request == aihelper::Request::Stop) {
-        model.Unload();
+        models.conversion.Unload();
+        models.settings.Unload();
         stop = true;
         return aihelper::EncodeReply(aihelper::Status::Ok);
     }
+    const auto now = std::chrono::steady_clock::now();
+    const bool forSettings = asked->model == AiModel::Settings;
+    if (forSettings) models.settingsAsked = now;
+    else if (now - models.settingsAsked > kSettingsIdle) models.settings.Unload();
+    Model& model = forSettings ? models.settings : models.conversion;
     if (!model.Load(asked->model, asked->device, asked->gpu)) return aihelper::EncodeReply(aihelper::Status::NoModel);
     if (asked->request == aihelper::Request::Warm) return aihelper::EncodeReply(aihelper::Status::Ok);
     const auto answer = model.Convert(*asked);
@@ -796,7 +819,7 @@ int Serve() {
     HANDLE pipe = CreatePipe(name, true);
     if (pipe == INVALID_HANDLE_VALUE) return 0;
     HANDLE event = CreateEventW(nullptr, TRUE, FALSE, nullptr);
-    Model model;
+    Models models;
     std::vector<std::uint8_t> message(aihelper::kMaxMessage);
     constexpr DWORD kReadWait = 2000;
     bool stop = false;
@@ -812,7 +835,7 @@ int Serve() {
         ResetEvent(event);
         const BOOL read = ReadFile(pipe, message.data(), static_cast<DWORD>(message.size()), nullptr, &overlapped);
         if (Wait(pipe, overlapped, read, kReadWait, done)) {
-            const auto reply = Answer(model, std::span<const std::uint8_t>(message.data(), done), stop);
+            const auto reply = Answer(models, std::span<const std::uint8_t>(message.data(), done), stop);
             overlapped = {};
             overlapped.hEvent = event;
             ResetEvent(event);

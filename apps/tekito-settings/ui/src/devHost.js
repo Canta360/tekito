@@ -83,7 +83,7 @@ function initialState() {
     postalCodes: { installed: false },
     encryption: { wanted: false, encrypted: false },
     aiModels: { light: { installed: aiInstalled, bytes: 358021668 }, strong: { installed: false, bytes: 1587553900 },
-      settings: { installed: aiInstalled && new URLSearchParams(window.location.search).get("settingsai") !== "0", bytes: 358020784 },
+      settings: { installed: aiInstalled && new URLSearchParams(window.location.search).get("settingsai") !== "0", bytes: 357791102 },
       runtime: { installed: aiInstalled, bytes: 6000000, windowsMl: false, windowsMlBytes: 20000000, windowsMlDownloading: false },
       downloading: 0, error: "",
       gpus: [{ id: 268566271, name: "AMD Radeon RX 7600" }, { id: -2142881189, name: "Intel(R) Arc(TM) Graphics" }],
