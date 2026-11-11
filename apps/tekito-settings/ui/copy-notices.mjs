@@ -10,6 +10,7 @@ const target = join(here, "public", "notices");
 const files = {
   "THIRD_PARTY_NOTICES.md": "THIRD_PARTY_NOTICES.md",
   "material-symbols-LICENSE.txt": "third_party/material-symbols/LICENSE",
+  "fluentui-LICENSES.txt": "third_party/fluentui/LICENSES.txt",
   "OFL.txt": "assets/fonts/OFL.txt",
   "webview2-LICENSE.txt": "third_party/webview2/LICENSE.txt",
   "webview2-NOTICE.txt": "third_party/webview2/NOTICE.txt",

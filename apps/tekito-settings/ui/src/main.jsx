@@ -1,9 +1,17 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import {
+  Checkbox, Field, FluentProvider, NavDrawer, NavDrawerBody, NavDrawerFooter, NavDrawerHeader, NavItem, Toast, Toaster, ToastTitle,
+  useToastController,
+} from "@fluentui/react-components";
 import { createRoot } from "react-dom/client";
 import { CapitataLogo } from "./CapitataLogo.jsx";
 import { hostRequest, onHostStateChanged } from "./host.js";
 import { messages, resolveLanguage, TextContext, useText } from "./i18n.js";
-import { Button, Card, Details, Dialog, Heading, Keycaps, LinkRow, ModeIcon, Row, Symbol, Toggle, Wordmark, TekitoSymbol, LineWordmark } from "./ui.jsx";
+import {
+  Button, Card, Details, Dialog, Heading, IconButton, Keycaps, LinkRow, ModeIcon, Row, Segmented, Symbol, TextBox, Toggle, Wordmark, TekitoSymbol,
+  LineWordmark,
+} from "./ui.jsx";
+import { brandVariables, hueColor, tekitoTheme } from "./theme.js";
 import { CatalogPage, footPages, navIcons, navPages, pageGroups } from "./catalog.jsx";
 import { AllSettingsPage, HomePage } from "./home.jsx";
 import { KeyList } from "./rows.jsx";
@@ -131,7 +139,6 @@ function App() {
   const [modal, setModal] = useState(null);
   const [confirm, setConfirm] = useState(null);
   const [keys, setKeys] = useState(null);
-  const [notice, setNotice] = useState(null);
   // Home's conversation with AI, kept while Settings is open.
   const [conversation, setConversation] = useState([]);
 
@@ -173,31 +180,47 @@ function App() {
     return onHostStateChanged(applyState);
   }, [reload, applyState]);
 
+  // Fluent 2's theme in Windows' accent color, light or dark as Windows is.
+  const [dark, setDark] = useState(() => Boolean(window.matchMedia?.("(prefers-color-scheme: dark)").matches));
   useEffect(() => {
-    document.documentElement.style.setProperty("--accent", appearance.accent);
+    const query = window.matchMedia?.("(prefers-color-scheme: dark)");
+    if (!query) return undefined;
+    const changed = (event) => setDark(event.matches);
+    query.addEventListener("change", changed);
+    return () => query.removeEventListener("change", changed);
+  }, []);
+  const theme = useMemo(() => tekitoTheme(appearance.accent, dark), [appearance.accent, dark]);
+  // Rainbow: the brand colors go round the hues, set on the page's root
+  // (not the theme, so nothing is drawn again for it).
+  const root = useRef(null);
+  useEffect(() => {
     if (!settings.rainbowAccent) return undefined;
     const started = performance.now();
+    let names = [];
     const timer = window.setInterval(() => {
+      const element = root.current;
+      if (!element) return;
       const hue = Math.round(((performance.now() - started) / 4000) * 360) % 360;
-      document.documentElement.style.setProperty("--accent", `hsl(${hue} 85% 45%)`);
+      const variables = brandVariables(hueColor(hue), dark);
+      for (const [name, value] of variables) element.style.setProperty(name, value);
+      names = variables.map(([name]) => name);
     }, 50);
     return () => {
       window.clearInterval(timer);
-      document.documentElement.style.setProperty("--accent", appearance.accent);
+      for (const name of names) root.current?.style.removeProperty(name);
     };
-  }, [appearance.accent, settings.rainbowAccent]);
+  }, [dark, settings.rainbowAccent]);
 
   useEffect(() => {
     document.documentElement.lang = t.lang;
     document.title = `TEKITO ${t.settings}`;
   }, [t]);
 
-  const showNotice = (message, tone = "positive") => setNotice({ message, tone, key: Date.now() });
-  useEffect(() => {
-    if (!notice) return undefined;
-    const timer = window.setTimeout(() => setNotice(null), 2400);
-    return () => window.clearTimeout(timer);
-  }, [notice]);
+  // Notices are Fluent's toasts.
+  const toaster = useId();
+  const { dispatchToast } = useToastController(toaster);
+  const showNotice = (message, tone = "positive") => dispatchToast(<Toast><ToastTitle>{message}</ToastTitle></Toast>,
+    { intent: tone === "negative" ? "error" : "success", timeout: 2400, position: "bottom" });
 
   const setSetting = async (key, value) => {
     const previous = settings[key];
@@ -316,15 +339,20 @@ function App() {
 
   return (
     <TextContext.Provider value={t}>
+      <FluentProvider theme={theme} className="provider" ref={root}>
       <div className="app">
-        <aside className="sidebar">
-          <div className="brand"><TekitoSymbol size={20} /><LineWordmark height={13} />{t.settings}</div>
-          <nav aria-label={t.settings} style={{ display: "contents" }}>
-            {navPages.map((id) => <NavItem key={id} id={id} current={current === id} onClick={() => open(id)} />)}
-            <span className="nav-spacer" />
-            {footPages.map((id) => <NavItem key={id} id={id} current={current === id} onClick={() => open(id)} />)}
-          </nav>
-        </aside>
+        <NavDrawer open type="inline" className="sidebar" aria-label={t.settings} selectedValue={current}
+          onNavItemSelect={(event, data) => open(data.value)}>
+          <NavDrawerHeader>
+            <div className="brand"><TekitoSymbol size={20} /><LineWordmark height={13} />{t.settings}</div>
+          </NavDrawerHeader>
+          <NavDrawerBody>
+            {navPages.map((id) => <PageItem key={id} id={id} />)}
+          </NavDrawerBody>
+          <NavDrawerFooter>
+            {footPages.map((id) => <PageItem key={id} id={id} />)}
+          </NavDrawerFooter>
+        </NavDrawer>
 
         <main className="content">
           <div className="page" key={`${current}-${visit}`}>
@@ -368,20 +396,16 @@ function App() {
           {keys && <KeyList japaneseKeyboard={japaneseKeyboard} settings={settings} japanese={japanese} />}
           <div className="dialog-actions"><Button variant="primary" onClick={() => setKeys(null)}>{t.close}</Button></div>
         </Dialog>
-        {notice && <div key={notice.key} className={`toast ${notice.tone}`} role="status" aria-live="polite">{notice.message}</div>}
+        <Toaster toasterId={toaster} />
       </div>
+      </FluentProvider>
     </TextContext.Provider>
   );
 }
 
-function NavItem({ id, current, onClick }) {
+function PageItem({ id }) {
   const t = useText();
-  return (
-    <button type="button" className={`nav-item ${current ? "is-current" : ""}`} aria-current={current ? "page" : undefined} onClick={onClick}>
-      <Symbol name={navIcons[id]} size={18} />
-      {t.pages[id]}
-    </button>
-  );
+  return <NavItem value={id} icon={<Symbol name={navIcons[id]} size={20} />}>{t.pages[id]}</NavItem>;
 }
 
 // The English words' six engine policies come down to three behaviors.
@@ -480,9 +504,9 @@ function RomajiTable({ romaji, runAction, setConfirm, back }) {
           sub={(
             <>
               <form className="inline-form" onSubmit={add}>
-                <input aria-label={r.keys} placeholder={r.keys} value={keys} onChange={(event) => setKeys(event.target.value)} />
-                <input aria-label={r.kana} placeholder={r.kana} value={kana} disabled={unused} onChange={(event) => setKana(event.target.value)} />
-                <label><input type="checkbox" checked={unused} onChange={(event) => setUnused(event.target.checked)} />{r.unused}</label>
+                <TextBox aria-label={r.keys} placeholder={r.keys} value={keys} onChange={(event) => setKeys(event.target.value)} />
+                <TextBox aria-label={r.kana} placeholder={r.kana} value={kana} disabled={unused} onChange={(event) => setKana(event.target.value)} />
+                <Checkbox checked={unused} label={r.unused} onChange={(event, data) => setUnused(Boolean(data.checked))} />
                 <Button variant="primary" type="submit">{t.add}</Button>
               </form>
               <ul className="list" aria-label={r.title}>
@@ -491,10 +515,7 @@ function RomajiTable({ romaji, runAction, setConfirm, back }) {
                     <span className="reading">{row.input}</span>
                     <span className="text">{row.output || r.unused}</span>
                     {row.standard && <span className="tag">{r.standard(row.standard)}</span>}
-                    <button type="button" className="icon-btn" aria-label={r.removeLabel(row.input)}
-                      onClick={() => runAction("romaji.delete", { input: row.input }, r.removed)}>
-                      <Symbol name="close" size={18} />
-                    </button>
+                    <IconButton icon="close" label={r.removeLabel(row.input)} onClick={() => runAction("romaji.delete", { input: row.input }, r.removed)} />
                   </li>
                 ))}
               </ul>
@@ -569,11 +590,9 @@ function DictionaryPage({ settings, setSetting, runAction, setConfirm, japanese,
                       <button type="button" className="text" style={{ border: 0, background: "none", textAlign: "left", padding: 0 }}
                         onClick={() => setModal({ japanese: true, mode: "edit", word })}>{word.surface}</button>
                       <span className="tag">{word.action === "suppress" ? t.japaneseWords.actions.suppress.label : t.japaneseWords.kinds[word.kind] || word.kind}</span>
-                      <button type="button" className="icon-btn" aria-label={t.words.removeLabel(word.surface)}
+                      <IconButton icon="close" label={t.words.removeLabel(word.surface)}
                         onClick={() => askDelete(t.japaneseWords.removeTitle, t.japaneseWords.removeMessage(word.surface),
-                          () => runAction("japaneseWords.delete", { reading: word.reading, surface: word.surface }, t.japaneseWords.removed))}>
-                        <Symbol name="close" size={18} />
-                      </button>
+                          () => runAction("japaneseWords.delete", { reading: word.reading, surface: word.surface }, t.japaneseWords.removed))} />
                     </li>
                   ))}
                 </ul>
@@ -588,7 +607,8 @@ function DictionaryPage({ settings, setSetting, runAction, setConfirm, japanese,
             <>
               {dictionary.length > 5 && (
                 <div className="list-search">
-                  <input aria-label={t.words.search} placeholder={t.words.search} value={query} onChange={(event) => setQuery(event.target.value)} />
+                  <TextBox aria-label={t.words.search} placeholder={t.words.search} value={query} onChange={(event) => setQuery(event.target.value)}
+                    before={<Symbol name="search" size={18} />} />
                 </div>
               )}
               <ul className="list" aria-label={d.englishWords.title}>
@@ -600,11 +620,9 @@ function DictionaryPage({ settings, setSetting, runAction, setConfirm, japanese,
                         onClick={() => setModal({ mode: "edit", entry })}>{entry.raw}</button>
                       <span className="text">{action === "keep" ? "" : entry.candidate}</span>
                       <span className="tag">{t.actions[action].label}</span>
-                      <button type="button" className="icon-btn" aria-label={t.words.removeLabel(entry.raw)}
+                      <IconButton icon="close" label={t.words.removeLabel(entry.raw)}
                         onClick={() => askDelete(t.words.removeTitle, t.words.removeMessage(entry.raw),
-                          () => runAction("dictionary.delete", { id: entry.id }, t.words.removed))}>
-                        <Symbol name="close" size={18} />
-                      </button>
+                          () => runAction("dictionary.delete", { id: entry.id }, t.words.removed))} />
                     </li>
                   );
                 })}
@@ -630,7 +648,8 @@ function DictionaryPage({ settings, setSetting, runAction, setConfirm, japanese,
             <>
               {learned.length > 5 && (
                 <div className="list-search">
-                  <input aria-label={l.search} placeholder={l.search} value={learnedQuery} onChange={(event) => setLearnedQuery(event.target.value)} />
+                  <TextBox aria-label={l.search} placeholder={l.search} value={learnedQuery} onChange={(event) => setLearnedQuery(event.target.value)}
+                    before={<Symbol name="search" size={18} />} />
                 </div>
               )}
               <ul className="list" aria-label={l.title}>
@@ -639,9 +658,7 @@ function DictionaryPage({ settings, setSetting, runAction, setConfirm, japanese,
                     <span className="reading">{item.key}</span>
                     <span className="text">{item.value}</span>
                     <span className="tag">{l.how[item.how](item.count)}</span>
-                    <button type="button" className="icon-btn" aria-label={l.forgetLabel(item.value || item.key)} onClick={() => forgetLearned(item)}>
-                      <Symbol name="close" size={18} />
-                    </button>
+                    <IconButton icon="close" label={l.forgetLabel(item.value || item.key)} onClick={() => forgetLearned(item)} />
                   </li>
                 ))}
               </ul>
@@ -776,9 +793,7 @@ function AboutPage({ settings, setSetting, runAction, version, runtime, packs, j
                       {item.mode === "Mix" && <span className="tag">{t.modeNames.mixed}</span>}
                       <span className="actions">
                         <Button onClick={() => runAction("recent.report", { id: item.id }, a.report.opened)}>{a.report.report}</Button>
-                        <button type="button" className="icon-btn" aria-label={t.learningList.forgetLabel(item.text)} onClick={() => forgetRecent(item.id)}>
-                          <Symbol name="close" size={18} />
-                        </button>
+                        <IconButton icon="close" label={t.learningList.forgetLabel(item.text)} onClick={() => forgetRecent(item.id)} />
                       </span>
                     </li>
                   ))}
@@ -820,6 +835,7 @@ function AboutPage({ settings, setSetting, runAction, version, runtime, packs, j
         {notice && (notice.plain ? <pre className="license-text plain" tabIndex={0} lang="en">{notice.text}</pre> : <LicenseText text={notice.text} />)}
         {notice && !notice.plain && (
           <div className="notice-links">
+            <Button onClick={() => openNotice("fluentui-LICENSES.txt", "Fluent UI — MIT License", true)}>Fluent UI</Button>
             <Button onClick={() => openNotice("material-symbols-LICENSE.txt", "Material Symbols — Apache License 2.0", true)}>Material Symbols</Button>
             <Button onClick={() => openNotice("OFL.txt", "M PLUS 1 — SIL Open Font License 1.1", true)}>M PLUS 1</Button>
             <Button onClick={() => openNotice("webview2-LICENSE.txt", "Microsoft WebView2", true)}>WebView2</Button>
@@ -881,14 +897,18 @@ function DictionaryForm({ entry, onSave, onCancel }) {
   };
   return (
     <form className="form" onSubmit={submit}>
-      <label className="field"><span>{t.words.whenITypeLabel}</span><input autoFocus value={value.raw} placeholder={t.words.whenITypePlaceholder} onChange={(event) => setValue({ ...value, raw: event.target.value })} /></label>
-      <div className="field">
-        <span>{t.words.actionLabel}</span>
+      <Field label={t.words.whenITypeLabel}>
+        <TextBox autoFocus value={value.raw} placeholder={t.words.whenITypePlaceholder} onChange={(event) => setValue({ ...value, raw: event.target.value })} />
+      </Field>
+      <Field label={t.words.actionLabel} hint={t.actions[value.action].help}>
         <Segmented label={t.words.actionLabel} value={value.action} options={Object.keys(actionPolicies).map((key) => [key, t.actions[key].label])}
           onChange={(action) => setValue({ ...value, action })} />
-        <small className="field-help">{t.actions[value.action].help}</small>
-      </div>
-      {!keep && <label className="field"><span>{t.words.changeToLabel}</span><input value={value.candidate} placeholder={t.words.changeToPlaceholder} onChange={(event) => setValue({ ...value, candidate: event.target.value })} /></label>}
+      </Field>
+      {!keep && (
+        <Field label={t.words.changeToLabel}>
+          <TextBox value={value.candidate} placeholder={t.words.changeToPlaceholder} onChange={(event) => setValue({ ...value, candidate: event.target.value })} />
+        </Field>
+      )}
       <div className="dialog-actions">
         <Button type="submit" variant="primary" disabled={!valid}>{t.save}</Button>
         <Button onClick={onCancel}>{t.cancel}</Button>
@@ -919,30 +939,24 @@ function JapaneseWordForm({ word, onSave, onCancel }) {
   };
   return (
     <form className="form" onSubmit={submit}>
-      <label className="field">
-        <span>{w.readingLabel}</span>
-        <input autoFocus value={value.reading} placeholder={w.readingPlaceholder} lang="ja"
+      <Field label={w.readingLabel} validationState={reading && !readingOk ? "error" : "none"}
+        validationMessage={reading && !readingOk ? w.readingInvalid : undefined} hint={reading && !readingOk ? undefined : w.readingHelp}>
+        <TextBox autoFocus value={value.reading} placeholder={w.readingPlaceholder} lang="ja"
           onChange={(event) => setValue({ ...value, reading: event.target.value })} />
-        <small className="field-help">{reading && !readingOk ? w.readingInvalid : w.readingHelp}</small>
-      </label>
-      <label className="field">
-        <span>{w.surfaceLabel}</span>
-        <input value={value.surface} placeholder={w.surfacePlaceholder} lang="ja"
+      </Field>
+      <Field label={w.surfaceLabel}>
+        <TextBox value={value.surface} placeholder={w.surfacePlaceholder} lang="ja"
           onChange={(event) => setValue({ ...value, surface: event.target.value })} />
-      </label>
-      <div className="field">
-        <span>{w.actionLabel}</span>
+      </Field>
+      <Field label={w.actionLabel} hint={w.actions[value.action].help}>
         <Segmented label={w.actionLabel} value={value.action} options={japaneseActions.map((action) => [action, w.actions[action].label])}
           onChange={(action) => setValue({ ...value, action })} />
-        <small className="field-help">{w.actions[value.action].help}</small>
-      </div>
+      </Field>
       {value.action !== "suppress" && (
-        <label className="field">
-          <span>{w.kindLabel}</span>
-          <select value={value.kind} onChange={(event) => setValue({ ...value, kind: event.target.value })}>
-            {japaneseKinds.map((kind) => <option key={kind} value={kind}>{w.kinds[kind]}</option>)}
-          </select>
-        </label>
+        <Field label={w.kindLabel}>
+          <Segmented label={w.kindLabel} value={value.kind} options={japaneseKinds.map((kind) => [kind, w.kinds[kind]])}
+            onChange={(kind) => setValue({ ...value, kind })} />
+        </Field>
       )}
       <div className="dialog-actions">
         <Button type="submit" variant="primary" disabled={!valid}>{t.save}</Button>

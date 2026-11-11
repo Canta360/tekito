@@ -1,4 +1,8 @@
-import React, { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import React, { useState } from "react";
+import {
+  Button as FluentButton, Checkbox, Dialog as FluentDialog, DialogBody, DialogContent, DialogSurface, DialogTitle, Dropdown, Input,
+  Option, ProgressBar, Radio, RadioGroup, Slider as FluentSlider, SpinButton, Switch, Tab, TabList,
+} from "@fluentui/react-components";
 import { symbols } from "./symbols.js";
 
 // ---------------------------------------------------------------------------
@@ -92,42 +96,26 @@ export function LinkRow({ icon, title, description, onClick, external = false })
   );
 }
 
-// A row whose choice opens below it, the current one named in the row.
-export function ChoiceRow({ icon, title, description, value, options, onChange }) {
-  const [open, setOpen] = useState(false);
-  const id = useId();
-  const current = options.find(([optionValue]) => optionValue === value) || options[0];
+// A check under a row, for a choice that belongs to it.
+export function Check({ checked, onChange, label, example, disabled = false }) {
   return (
-    <div className="row-block">
-      <button type="button" className="row is-link" aria-expanded={open} aria-controls={id} onClick={() => setOpen(!open)}>
-        <RowIcon icon={icon} />
-        <span className="row-text"><span className="row-title">{title}</span>{description && <small>{description}</small>}</span>
-        <span className="row-value">{current[1]}{current[2] && <small>{current[2]}</small>}</span>
-        <Symbol name={open ? "keyboard_arrow_up" : "keyboard_arrow_down"} size={18} className="row-chevron" />
-      </button>
-      {open && (
-        <div className="row-panel" id={id} role="radiogroup" aria-label={title}>
-          {options.map(([optionValue, name, example]) => (
-            <label key={optionValue} className="radio">
-              <input type="radio" name={id} checked={optionValue === value} onChange={() => onChange(optionValue)} />
-              <span className="radio-name">{name}</span>
-              {example && <small>{example}</small>}
-            </label>
-          ))}
-        </div>
-      )}
+    <div className="check">
+      <Checkbox checked={Boolean(checked)} disabled={disabled} onChange={(event, data) => onChange(Boolean(data.checked))}
+        label={<>{label}{example && <small className="check-example">{example}</small>}</>} />
     </div>
   );
 }
 
-// A check under a row, for a choice that belongs to it.
-export function Check({ checked, onChange, label, example, disabled = false }) {
+// Radio choices with an example after each name: [value, name, example].
+export function Radios({ value, options, onChange, label }) {
   return (
-    <label className="check">
-      <input type="checkbox" checked={Boolean(checked)} disabled={disabled} onChange={(event) => onChange(event.target.checked)} />
-      <span>{label}</span>
-      {example && <small>{example}</small>}
-    </label>
+    <RadioGroup aria-label={label} value={String(value)}
+      onChange={(event, data) => onChange(options.find(([optionValue]) => String(optionValue) === data.value)[0])}>
+      {options.map(([optionValue, name, example]) => (
+        <Radio key={String(optionValue)} value={String(optionValue)}
+          label={<span className="radio-label"><span className="radio-name">{name}</span>{example && <small>{example}</small>}</span>} />
+      ))}
+    </RadioGroup>
   );
 }
 
@@ -151,10 +139,10 @@ export function Details({ id, title, children }) {
   };
   return (
     <div className="details">
-      <button type="button" className="details-head" aria-expanded={open} onClick={toggle}>
+      <FluentButton appearance="transparent" className="details-head" aria-expanded={open} onClick={toggle}
+        icon={<Symbol name={open ? "keyboard_arrow_up" : "keyboard_arrow_down"} size={18} />} iconPosition="after">
         {title}
-        <Symbol name={open ? "keyboard_arrow_up" : "keyboard_arrow_down"} size={18} />
-      </button>
+      </FluentButton>
       {open && <div className="details-body">{children}</div>}
     </div>
   );
@@ -175,74 +163,48 @@ export function Heading({ children }) {
 }
 
 // ---------------------------------------------------------------------------
-// Controls.
+// Controls: Fluent 2's own (@fluentui/react-components).
 
 export function Toggle({ checked, onChange, label, disabled = false }) {
-  return (
-    <button type="button" role="switch" className="switch" aria-checked={Boolean(checked)} aria-label={label}
-      disabled={disabled} onClick={() => onChange(!checked)}>
-      <span className="switch-knob" />
-    </button>
-  );
+  return <Switch className="toggle" checked={Boolean(checked)} disabled={disabled} aria-label={label} onChange={(event, data) => onChange(data.checked)} />;
 }
 
-// Segmented control: names only; the chosen one sits on a raised thumb.
+// A choice from a few: Fluent's dropdown. Options are [value, name] or,
+// where the name is not text (keycaps), [value, name, text].
+const optionKey = (value) => String(value);
 export function Segmented({ value, options, onChange, label }) {
-  const index = Math.max(0, options.findIndex(([optionValue]) => optionValue === value));
-  const ref = useRef(null);
-  const [thumb, setThumb] = useState(null);
-  useLayoutEffect(() => {
-    const group = ref.current;
-    if (!group) return undefined;
-    const measure = () => {
-      const chosen = group.querySelectorAll("button")[index];
-      if (chosen) setThumb({ left: chosen.offsetLeft, width: chosen.offsetWidth });
-    };
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(group);
-    return () => observer.disconnect();
-  }, [index, options.length]);
-  const onKeyDown = (event) => {
-    const delta = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
-    if (!delta) return;
-    event.preventDefault();
-    onChange(options[(index + delta + options.length) % options.length][0]);
-    const group = event.currentTarget;
-    window.requestAnimationFrame(() => group.querySelector('[aria-checked="true"]')?.focus());
-  };
+  const current = options.find(([optionValue]) => optionValue === value) || options[0];
+  const text = (option) => (typeof option[1] === "string" ? option[1] : option[2] || "");
   return (
-    <div ref={ref} className="segmented" role="radiogroup" aria-label={label} onKeyDown={onKeyDown}>
-      {thumb && <span className="segmented-thumb" style={{ left: thumb.left, width: thumb.width }} />}
-      {options.map(([optionValue, optionLabel]) => (
-        <button key={optionValue} type="button" role="radio" aria-checked={optionValue === value}
-          tabIndex={optionValue === value ? 0 : -1} onClick={() => onChange(optionValue)}>
-          {optionLabel}
-        </button>
-      ))}
-    </div>
+    <Dropdown className="choice" aria-label={label} value={text(current)} selectedOptions={[optionKey(current[0])]}
+      button={typeof current[1] === "string" ? undefined : { children: current[1] }}
+      onOptionSelect={(event, data) => {
+        const chosen = options.find(([optionValue]) => optionKey(optionValue) === data.optionValue);
+        if (chosen && chosen[0] !== value) onChange(chosen[0]);
+      }}>
+      {options.map((option) => <Option key={optionKey(option[0])} value={optionKey(option[0])} text={text(option)}>{option[1]}</Option>)}
+    </Dropdown>
+  );
+}
+export const Select = Segmented;
+
+// Views of one list (All settings: every setting, or the changed ones).
+export function Tabs({ value, options, onChange, label }) {
+  return (
+    <TabList aria-label={label} selectedValue={optionKey(value)}
+      onTabSelect={(event, data) => onChange(options.find(([optionValue]) => optionKey(optionValue) === data.value)[0])}>
+      {options.map(([optionValue, name]) => <Tab key={optionKey(optionValue)} value={optionKey(optionValue)}>{name}</Tab>)}
+    </TabList>
   );
 }
 
-export function Select({ value, options, onChange, label }) {
-  return (
-    <span className="select">
-      <select aria-label={label} value={value} onChange={(event) => onChange(Number(event.target.value))}>
-        {options.map(([optionValue, name]) => <option key={optionValue} value={optionValue}>{name}</option>)}
-      </select>
-      <Symbol name="keyboard_arrow_down" size={18} />
-    </span>
-  );
-}
-
-// A slider over named stops (`stops`: [value, name]).
+// A slider over named stops (`stops`: [value, name]), the names under it.
 export function Slider({ value, stops, onChange, label }) {
   const index = Math.max(0, stops.findIndex(([stopValue]) => stopValue === value));
   return (
     <span className="slider">
-      <input type="range" min={0} max={stops.length - 1} step={1} value={index} aria-label={label}
-        aria-valuetext={stops[index][1]} style={{ "--fill": `${(index / (stops.length - 1)) * 100}%` }}
-        onChange={(event) => onChange(stops[Number(event.target.value)][0])} />
+      <FluentSlider min={0} max={stops.length - 1} step={1} value={index} aria-label={label} aria-valuetext={stops[index][1]}
+        onChange={(event, data) => onChange(stops[data.value][0])} />
       <span className="slider-stops">
         {stops.map(([stopValue, name], i) => (
           <span key={stopValue} className={i === index ? "is-current" : ""} style={{ "--at": i / (stops.length - 1) }}>{name}</span>
@@ -252,13 +214,36 @@ export function Slider({ value, stops, onChange, label }) {
   );
 }
 
+// variant: "primary", "quiet" (subtle), "danger" (primary, in red), or
+// the standard button.
 export function Button({ icon, children, variant = "", className = "", type = "button", ...props }) {
+  const appearance = variant === "primary" || variant === "danger" ? "primary" : variant === "quiet" ? "subtle" : "secondary";
   return (
-    <button type={type} className={`btn ${variant} ${className}`} {...props}>
-      {icon && <Symbol name={icon} size={18} />}
-      {children && <span>{children}</span>}
-    </button>
+    <FluentButton type={type} appearance={appearance} className={`${variant === "danger" ? "is-danger" : ""} ${className}`}
+      icon={icon ? <Symbol name={icon} size={18} /> : undefined} {...props}>
+      {children}
+    </FluentButton>
   );
+}
+
+// A button that is only an icon, named for screen readers and on hover.
+export function IconButton({ icon, label, className = "", ...props }) {
+  return (
+    <FluentButton appearance="subtle" size="small" className={className} icon={<Symbol name={icon} size={18} />}
+      aria-label={label} title={label} {...props} />
+  );
+}
+
+// Fluent's text box; `before` and `after` sit inside it.
+export function TextBox({ before, after, ...props }) {
+  return <Input contentBefore={before} contentAfter={after} {...props} />;
+}
+
+export { SpinButton };
+
+// Work under way, its end not known.
+export function Busy() {
+  return <ProgressBar className="progress" thickness="medium" />;
 }
 
 // Keys as keycaps, the same everywhere keys are shown.
@@ -267,17 +252,14 @@ export function Keycaps({ keys }) {
 }
 
 export function Dialog({ open, title, onClose, children, wide = false }) {
-  const ref = useRef(null);
-  useEffect(() => {
-    const dialog = ref.current;
-    if (!dialog) return;
-    if (open && !dialog.open) dialog.showModal();
-    if (!open && dialog.open) dialog.close();
-  }, [open]);
   return (
-    <dialog ref={ref} className={`dialog ${wide ? "wide" : ""}`} onCancel={(event) => { event.preventDefault(); onClose(); }}
-      onClick={(event) => { if (event.target === ref.current) onClose(); }}>
-      {open && <div className="dialog-body"><h2>{title}</h2>{children}</div>}
-    </dialog>
+    <FluentDialog open={open} onOpenChange={(event, data) => { if (!data.open) onClose(); }}>
+      <DialogSurface className={wide ? "dialog-wide" : "dialog"}>
+        <DialogBody>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogContent className="dialog-content">{children}</DialogContent>
+        </DialogBody>
+      </DialogSurface>
+    </FluentDialog>
   );
 }

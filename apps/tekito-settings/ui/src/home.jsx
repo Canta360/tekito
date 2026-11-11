@@ -6,7 +6,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { hostRequest } from "./host.js";
 import { aiSpecs, catalog, changeAllowed, navPages, valueName, visible } from "./catalog.jsx";
 import { keyGroups, ModeBadges, revealHidden } from "./rows.jsx";
-import { Button, Card, Heading, Keycaps, LinkRow, ModeIcon, Segmented, Symbol, Toggle } from "./ui.jsx";
+import { Busy, Button, Card, Heading, IconButton, Keycaps, LinkRow, ModeIcon, Symbol, Tabs, TextBox, Toggle } from "./ui.jsx";
 
 // Settings outside the catalog that the box also finds: [page, name].
 function otherEntries(t, japaneseInstalled) {
@@ -122,16 +122,11 @@ export function HomePage({ ctx, mode, changeMode, aiReady }) {
         </div>
       )}
 
-      <div className="home-search">
-        <Symbol name={aiReady ? "wand_stars" : "search"} size={20} />
-        <input ref={input} aria-label={aiReady ? c.label : t.search} placeholder={aiReady ? (messages.length ? c.next : h.placeholderAi) : t.search}
-          value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={onKeyDown} />
-        {aiReady && messages.length > 0 && (
-          <button type="button" className="icon-btn new-chat" title={c.newChat} aria-label={c.newChat} onClick={() => setMessages([])}>
-            <Symbol name="add" size={18} />
-          </button>
-        )}
-      </div>
+      <TextBox ref={input} className="home-search" size="large" aria-label={aiReady ? c.label : t.search}
+        placeholder={aiReady ? (messages.length ? c.next : h.placeholderAi) : t.search}
+        value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={onKeyDown}
+        before={<Symbol name={aiReady ? "wand_stars" : "search"} size={20} />}
+        after={aiReady && messages.length > 0 ? <IconButton icon="add" label={c.newChat} onClick={() => setMessages([])} /> : undefined} />
 
       {needle && found.length > 0 && (
         <Card label={t.search} className="home-results">
@@ -180,7 +175,7 @@ export function HomePage({ ctx, mode, changeMode, aiReady }) {
 function Reply({ ctx, message, update }) {
   const t = ctx.t;
   const c = t.chat;
-  if (message.status === "asking") return <div className="bubble-ai"><p className="answer-status"><span className="progress" />{c.thinking}</p></div>;
+  if (message.status === "asking") return <div className="bubble-ai"><p className="answer-status"><Busy />{c.thinking}</p></div>;
   if (message.status === "failed") return <div className="bubble-ai"><p className="answer-status">{t.home.failed}</p></div>;
   const specs = aiSpecs(ctx);
   const entries = catalog(ctx).filter((entry) => !entry.hidden && visible(entry, ctx));
@@ -270,7 +265,7 @@ export function AllSettingsPage({ ctx, defaults }) {
   return (
     <>
       <div className="filter-bar">
-        <Segmented label={t.pages.all} value={changedOnly} options={[[false, all.every], [true, all.changed(count)]]} onChange={setChangedOnly} />
+        <Tabs label={t.pages.all} value={changedOnly} options={[[false, all.every], [true, all.changed(count)]]} onChange={setChangedOnly} />
       </div>
       {navPages.filter((page) => shown.some((entry) => entry.page === page)).map((page) => (
         <React.Fragment key={page}>

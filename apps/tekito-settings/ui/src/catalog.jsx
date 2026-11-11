@@ -64,7 +64,10 @@ export function catalog(ctx) {
   const startModes = [[0, g.startMode.last]].concat(
     (ctx.japaneseInstalled ? [[1, "japanese"], [2, "mixed"]] : []).concat([[3, "auto"], [4, "direct"]])
       .filter(([, mode]) => on[mode]).map(([value, mode]) => [value, t.modeNames[mode]]));
-  const toggleKeys = [1, 2, 3].map((value) => [value, <Keycaps keys={switchKeyCaps(value, ctx.japaneseKeyboard, t)} />]).concat([[0, g.switchKey.none]]);
+  const toggleKeys = [1, 2, 3].map((value) => {
+    const caps = switchKeyCaps(value, ctx.japaneseKeyboard, t);
+    return [value, <Keycaps keys={caps} />, caps.join(" + ")];
+  }).concat([[0, g.switchKey.none]]);
   const gpus = ctx.aiModels.gpus || [];
   const stop = kanjiStop(s);
   const setKanji = async (value) => {

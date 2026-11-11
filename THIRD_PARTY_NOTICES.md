@@ -52,6 +52,16 @@ Platforms, Inc. and affiliates), licensed under the MIT License:
 Vite and its React plugin are used only to build the page and are not
 shipped.
 
+## Fluent UI
+
+The Settings page is built with Fluent UI React v9
+(`@fluentui/react-components` 9.75.0, Copyright Microsoft Corporation, MIT
+License) and bundles the libraries it uses: Griffel, Tabster, Floating UI,
+keyborg and others under the MIT License, `@swc/helpers` under the Apache
+License 2.0, and `tslib` under the 0BSD license. Each one's license text is
+in `third_party/fluentui/LICENSES.txt` (shipped with Settings, and in
+Settings → About → Third-party notices).
+
 ## Material Symbols
 
 The icons in Settings are Material Symbols (Rounded, weight 300; Copyright

@@ -2,7 +2,8 @@
 // pages, Home's answers and All settings (catalog.jsx).
 import React, { useState } from "react";
 import { useText } from "./i18n.js";
-import { Button, Check, Keycaps, ModeIcon, Row, Segmented, Symbol, Toggle } from "./ui.jsx";
+import { Checkbox } from "@fluentui/react-components";
+import { Busy, Button, Check, IconButton, Keycaps, ModeIcon, Radios, Row, Segmented, SpinButton, Symbol, TextBox, Toggle } from "./ui.jsx";
 
 // The modes a setting applies to, as their icons after its name.
 export function ModeBadges({ ids }) {
@@ -82,10 +83,8 @@ export function LinkedToggle({ id, icon, title, description, keys, settings, set
           {sub}
         </>
       )}>
-      <button type="button" className={`icon-btn chain ${apart ? "" : "is-linked"}`} title={chainLabel} aria-label={chainLabel}
-        onClick={apart ? link : unlink}>
-        <Symbol name={apart ? "link_off" : "link"} size={18} />
-      </button>
+      <IconButton className={`chain ${apart ? "" : "is-linked"}`} icon={apart ? "link_off" : "link"} label={chainLabel}
+        onClick={apart ? link : unlink} />
       {!apart && <Toggle label={title} checked={settings[keys[first]]} onChange={setBoth} />}
     </Row>
   );
@@ -262,16 +261,13 @@ export function SwitchOrder({ settings, setSetting, modeOn }) {
                 if (event.key === "ArrowDown") { event.preventDefault(); move(id, index + 1); }
               }}>
               <span className="handle" aria-hidden="true"><Symbol name="drag_indicator" size={18} /></span>
-              <input type="checkbox" aria-label={t.modeNames[id]} checked={inRound(id)}
-                onChange={(event) => setSetting("switchModes", event.target.checked ? settings.switchModes | modeBits[id] : settings.switchModes & ~modeBits[id])} />
+              <Checkbox aria-label={t.modeNames[id]} checked={inRound(id)}
+                onChange={(event, data) => setSetting("switchModes", data.checked ? settings.switchModes | modeBits[id] : settings.switchModes & ~modeBits[id])} />
               <ModeIcon id={id} size={20} />
               <span className="name">{t.modeNames[id]}</span>
-              <button type="button" className="icon-btn" aria-label={g.order.moveUp(t.modeNames[id])} disabled={index === 0} onClick={() => move(id, index - 1)}>
-                <Symbol name="keyboard_arrow_up" size={18} />
-              </button>
-              <button type="button" className="icon-btn" aria-label={g.order.moveDown(t.modeNames[id])} disabled={index === ids.length - 1} onClick={() => move(id, index + 1)}>
-                <Symbol name="keyboard_arrow_down" size={18} />
-              </button>
+              <IconButton icon="keyboard_arrow_up" label={g.order.moveUp(t.modeNames[id])} disabled={index === 0} onClick={() => move(id, index - 1)} />
+              <IconButton icon="keyboard_arrow_down" label={g.order.moveDown(t.modeNames[id])} disabled={index === ids.length - 1}
+                onClick={() => move(id, index + 1)} />
             </li>
           ))}
         </ul>
@@ -302,14 +298,12 @@ export function ExcludedApps({ settings, runAction }) {
               {settings.excludedApps.map((app) => (
                 <li key={app}>
                   <span className="text">{app}</span>
-                  <button type="button" className="icon-btn" aria-label={e.remove(app)} onClick={() => runAction("excludedApps.remove", { name: app })}>
-                    <Symbol name="close" size={18} />
-                  </button>
+                  <IconButton icon="close" label={e.remove(app)} onClick={() => runAction("excludedApps.remove", { name: app })} />
                 </li>
               ))}
             </ul>
             <form className="inline-form" onSubmit={add}>
-              <input aria-label={e.placeholder} placeholder={e.placeholder} value={name} onChange={(event) => setName(event.target.value)} />
+              <TextBox aria-label={e.placeholder} placeholder={e.placeholder} value={name} onChange={(event) => setName(event.target.value)} />
               <Button type="submit" disabled={!name.trim()}>{t.add}</Button>
             </form>
           </>
@@ -343,14 +337,8 @@ export function NumbersRow({ settings, setSetting, options, onChange, badges = n
         <Symbol name={open ? "keyboard_arrow_up" : "keyboard_arrow_down"} size={18} className="row-chevron" />
       </button>
       {open && (
-        <div className="row-panel" role="radiogroup" aria-label={j.numbers.title}>
-          {options.map(([value, name, example]) => (
-            <label key={value} className="radio">
-              <input type="radio" name="numbers" checked={value === style} onChange={() => onChange(value)} />
-              <span className="radio-name">{name}</span>
-              <small>{example}</small>
-            </label>
-          ))}
+        <div className="row-panel">
+          <Radios label={j.numbers.title} value={style} options={options} onChange={onChange} />
           <span className="row-panel-line" />
           <Check label={j.numbers.rough} example={j.numbers.roughExample} checked={settings.japaneseRoughNumbersKanji}
             onChange={(value) => setSetting("japaneseRoughNumbersKanji", value)} />
@@ -420,7 +408,7 @@ export function AiModelRow({ settings, setSetting, runAction, setConfirm, aiMode
       description={(
         <>
           {downloading ? "" : aiModels.error || a.description}
-          {downloading > 0 && <span className="row-status"><span className="progress" />{a.downloading}</span>}
+          {downloading > 0 && <span className="row-status"><Busy />{a.downloading}</span>}
         </>
       )}
       sub={current > 0 && !downloading && (
@@ -436,7 +424,7 @@ export function AiModelRow({ settings, setSetting, runAction, setConfirm, aiMode
         description={(
           <>
             {busy ? "" : aiModels.npuError || (device === 3 ? a.device.npuFirst : a.device.description)}
-            {busy && <span className="row-status"><span className="progress" />
+            {busy && <span className="row-status"><Busy />
               {aiModels.runtime?.windowsMlDownloading ? a.device.downloading : a.device.preparing}</span>}
           </>
         )}>
@@ -477,7 +465,7 @@ export function PostalCodes({ postalCodes, runAction, setConfirm }) {
       description={(
         <>
           {postalCodes.installed && !busy ? p.installed(year, month, postalCodes.count) : p.description}
-          {busy && <span className="row-status"><span className="progress" />{p.downloading}</span>}
+          {busy && <span className="row-status"><Busy />{p.downloading}</span>}
         </>
       )}>
       <Toggle label={p.title} checked={postalCodes.installed || busy} disabled={busy} onChange={turn} />
@@ -515,8 +503,13 @@ export function RowsRow({ settings, setSetting, title, description }) {
     <Row icon="format_list_numbered" title={title} description={description}
       sub={(other || custom) && (
         <div className="number-line">
-          <input type="number" min={min} max={max} aria-label={title} value={draft} onChange={(event) => setDraft(event.target.value)}
-            onBlur={commit} onKeyDown={(event) => { if (event.key === "Enter") commit(); }} />
+          <SpinButton min={min} max={max} aria-label={title} value={Number(draft)}
+            onChange={(event, data) => {
+              const rows = Math.round(data.value ?? Number(data.displayValue));
+              if (!Number.isFinite(rows)) return;
+              setDraft(String(rows));
+              if (rows >= min && rows <= max) setSetting("candidateRows", rows);
+            }} />
           <span>{r.unit}</span>
           <small>{r.range(min, max)}</small>
         </div>
