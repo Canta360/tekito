@@ -147,7 +147,23 @@ function App() {
       return true;
     }
   });
+  // A narrow window folds it on its own (unfolded there by the corner, for
+  // the moment only).
+  const [narrow, setNarrow] = useState(() => Boolean(window.matchMedia?.("(max-width: 760px)").matches));
+  const [narrowOpen, setNarrowOpen] = useState(false);
+  useEffect(() => {
+    const query = window.matchMedia?.("(max-width: 760px)");
+    if (!query) return undefined;
+    const changed = (event) => { setNarrow(event.matches); setNarrowOpen(false); };
+    query.addEventListener("change", changed);
+    return () => query.removeEventListener("change", changed);
+  }, []);
+  const listOpen = narrow ? narrowOpen : navOpen;
   const toggleNav = () => {
+    if (narrow) {
+      setNarrowOpen(!narrowOpen);
+      return;
+    }
     setNavOpen(!navOpen);
     try {
       window.localStorage.setItem("tekito.nav", navOpen ? "0" : "1");
@@ -359,19 +375,19 @@ function App() {
     <TextContext.Provider value={t}>
       <FluentProvider theme={theme} className="provider" ref={root}>
       <div className="app">
-        <NavDrawer open type="inline" className={`sidebar ${navOpen ? "" : "is-rail"}`} aria-label={t.settings} selectedValue={current}
+        <NavDrawer open type="inline" className={`sidebar ${listOpen ? "" : "is-rail"}`} aria-label={t.settings} selectedValue={current}
           onNavItemSelect={(event, data) => open(data.value)}>
           <NavDrawerHeader>
-            <button type="button" className="brand" aria-expanded={navOpen} aria-label={t.menu} title={t.menu} onClick={toggleNav}>
+            <button type="button" className="brand" aria-expanded={listOpen} aria-label={t.menu} title={t.menu} onClick={toggleNav}>
               <TekitoSymbol size={20} />
-              {navOpen && <><LineWordmark height={13} />{t.settings}</>}
+              {listOpen && <><LineWordmark height={13} />{t.settings}</>}
             </button>
           </NavDrawerHeader>
           <NavDrawerBody>
-            {navPages.map((id) => <PageItem key={id} id={id} rail={!navOpen} />)}
+            {navPages.map((id) => <PageItem key={id} id={id} rail={!listOpen} />)}
           </NavDrawerBody>
           <NavDrawerFooter>
-            {footPages.map((id) => <PageItem key={id} id={id} rail={!navOpen} />)}
+            {footPages.map((id) => <PageItem key={id} id={id} rail={!listOpen} />)}
           </NavDrawerFooter>
         </NavDrawer>
 

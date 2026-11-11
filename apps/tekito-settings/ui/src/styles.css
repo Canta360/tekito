@@ -314,3 +314,13 @@ kbd {
    (which would sit on the icon). */
 .sidebar.is-rail .fui-NavItem::after { display: none !important; }
 .sidebar.is-rail .fui-NavItem[aria-current="page"] .symbol { color: var(--accent-text); }
+/* The TEKITO corner lined up with the pages below it: the same side padding
+   as the list's body, and its icon where theirs are. */
+.sidebar .fui-NavDrawerHeader.fui-NavDrawerHeader { padding-left: 10px; padding-right: 4px; }
+
+/* Narrow windows: a control that no longer fits beside its name goes under
+   it, on the right; a slider takes the width there is. */
+.row { flex-wrap: wrap; row-gap: 8px; }
+.row-text { flex: 1 1 220px; }
+.row-control, .row-value { margin-left: auto; max-width: 100%; }
+.slider { max-width: 100%; }
