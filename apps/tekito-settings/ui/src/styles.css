@@ -291,6 +291,7 @@ kbd {
 .home-box { width: 100%; max-width: 720px; margin: auto; display: grid; gap: 8px; }
 .home.is-chatting .home-box { margin: 0 auto; position: sticky; bottom: 0; padding: 8px 0 4px; background: var(--window); }
 .home .chat { width: 100%; max-width: 720px; margin: 0 auto; flex: 1; align-content: start; padding-top: 8px; }
-.home-search.home-search { width: 100%; border-radius: var(--borderRadiusXLarge); min-height: 52px; }
+/* Fluent's own corners: its focus line is drawn for them. */
+.home-search.home-search { width: 100%; min-height: 48px; }
 .home-box-actions { display: inline-flex; align-items: center; gap: 4px; }
 .home-links { display: flex; justify-content: center; gap: 8px; }
