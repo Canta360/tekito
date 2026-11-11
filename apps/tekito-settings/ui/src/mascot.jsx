@@ -14,11 +14,14 @@ import React, { useEffect, useId, useRef, useState } from "react";
 import { eyeShapes, tear } from "./companionEyes.js";
 
 // The mark: a disc (center 450, 450; radius 362) with room cut around its
-// small ring (center 709, 695; 108 across the outside, a 44 hole).
-const kSmall = "M709 587a108 108 0 1 0 0.01 0ZM709 651a44 44 0 1 1 -0.01 0Z";
+// small ring (center 709, 695), the ring a little smaller than the mark's
+// (86 across the outside, a 35 hole; the mark's 108 and 44).
+const kSmall = "M709 609a86 86 0 1 0 0.01 0ZM709 660a35 35 0 1 1 -0.01 0Z";
 // Large white eyes (companionEyes.js), as wide apart as the user drew them.
 const kEyes = [298, 602];
 const kEyeY = 430;
+// companionEyes.js's shapes made larger.
+const kEyeScale = 1.15;
 
 // One shape for both eyes; the right one mirrored. `scale` and `drop` per
 // eye: [left, right].
@@ -26,7 +29,7 @@ function pair(name, { scale = [1, 1], drop = [0, 0], className = "" } = {}) {
   const shape = eyeShapes[name];
   return kEyes.map((cx, i) => (
     <path key={`${name}${cx}`} className={shape.line ? `mascot-line ${className}` : `mascot-white ${className}`} d={shape.fill || shape.line}
-      transform={`translate(${cx} ${kEyeY + drop[i]}) scale(${(i ? -1 : 1) * scale[i]} ${scale[i]})`} />
+      transform={`translate(${cx} ${kEyeY + drop[i]}) scale(${(i ? -1 : 1) * scale[i] * kEyeScale} ${scale[i] * kEyeScale})`} />
   ));
 }
 
@@ -37,7 +40,7 @@ function eyes(mood) {
     case "searching":
       return pair("half");
     case "down":
-      return [...pair("sad"), <path key="tear" className="mascot-white" d={tear} transform={`translate(${kEyes[1]} ${kEyeY})`} />];
+      return [...pair("sad"), <path key="tear" className="mascot-white" d={tear} transform={`translate(${kEyes[1]} ${kEyeY}) scale(${kEyeScale})`} />];
     case "unsure":
       // The right one smaller and lower.
       return pair("open", { scale: [1, 0.72], drop: [0, 18] });
@@ -85,7 +88,7 @@ export function Mascot({ mood = "idle", size = 96, follow = false, label }) {
       <defs>
         <mask id={cut} maskUnits="userSpaceOnUse" x="0" y="0" width="960" height="960">
           <rect width="960" height="960" fill="#fff" />
-          <circle cx="709" cy="695" r="150" fill="#000" />
+          <circle cx="709" cy="695" r="120" fill="#000" />
         </mask>
       </defs>
       <g className="mascot-body">
