@@ -2307,7 +2307,8 @@ void TestSqliteUserSettingsRepository() {
     source.japaneseSymbolWidth = 1;
     source.advancedSettings = true;
     source.japanesePredictionEnabled = false;
-    source.candidateRows = 7;
+    source.candidateRows = 15;
+    source.aiSettingsControl = 2;
     source.meaningsEnabled = false;
     source.japaneseSwitchOrder = 2;
     source.japaneseEnabled = false;
@@ -2382,7 +2383,7 @@ void TestSqliteUserSettingsRepository() {
                 loaded.japaneseProfileEnglishMode == tekito::InputMode::Direct &&
                 loaded.japaneseSpaceWidth == 2 && loaded.japanesePunctuation == 3 && loaded.japaneseDigitWidth == 1 && loaded.japaneseSymbolWidth == 1 && loaded.advancedSettings &&
                 !loaded.japanesePredictionEnabled &&
-                loaded.candidateRows == 7 && !loaded.meaningsEnabled && loaded.japaneseSwitchOrder == 2 &&
+                loaded.candidateRows == 15 && loaded.aiSettingsControl == 2 && !loaded.meaningsEnabled && loaded.japaneseSwitchOrder == 2 &&
                     !loaded.japaneseEnabled && !loaded.modeIndicatorEnabled,
             "settings repository restores the keyboard and Japanese settings");
     Require(!loaded.dateConversion && !loaded.numberConversion && !loaded.symbolConversion &&

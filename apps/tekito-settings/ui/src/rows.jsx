@@ -484,3 +484,45 @@ export function PostalCodes({ postalCodes, runAction, setConfirm }) {
     </Row>
   );
 }
+
+// 1ページの候補数: the usual numbers, or any from 3 to 20 (UserSettings::
+// kMinCandidateRows..kMaxCandidateRows).
+export const candidateRowsRange = [3, 20];
+const standardRows = [0, 5, 7, 9];
+export function RowsRow({ settings, setSetting, title, description }) {
+  const t = useText();
+  const r = t.general.rows;
+  const value = settings.candidateRows;
+  const custom = !standardRows.includes(value);
+  const [other, setOther] = useState(custom);
+  const [draft, setDraft] = useState(String(custom ? value : 12));
+  const [min, max] = candidateRowsRange;
+  const commit = () => {
+    const rows = Math.round(Number(draft));
+    if (rows >= min && rows <= max) setSetting("candidateRows", rows);
+    else setDraft(String(custom ? value : 12));
+  };
+  const choose = (choice) => {
+    if (choice === "other") {
+      setOther(true);
+      commit();
+    } else {
+      setOther(false);
+      setSetting("candidateRows", choice);
+    }
+  };
+  return (
+    <Row icon="format_list_numbered" title={title} description={description}
+      sub={(other || custom) && (
+        <div className="number-line">
+          <input type="number" min={min} max={max} aria-label={title} value={draft} onChange={(event) => setDraft(event.target.value)}
+            onBlur={commit} onKeyDown={(event) => { if (event.key === "Enter") commit(); }} />
+          <span>{r.unit}</span>
+          <small>{r.range(min, max)}</small>
+        </div>
+      )}>
+      <Segmented label={title} value={other || custom ? "other" : value}
+        options={[[0, r.automatic], [5, "5"], [7, "7"], [9, "9"], ["other", r.other]]} onChange={choose} />
+    </Row>
+  );
+}

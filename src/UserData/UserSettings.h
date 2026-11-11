@@ -39,8 +39,16 @@ struct UserSettings {
     // (opaque panel with a flat selection row).
     int candidateWindowStyle{0};
     // Rows in the candidate list: 0 = automatic (English shows 5, then 10
-    // once paged; Japanese 9), or a fixed 5, 7 or 9.
+    // once paged; Japanese 9), or a fixed number from kMinCandidateRows to
+    // kMaxCandidateRows (Settings offers 5, 7 and 9; the rest by number).
+    // The number keys choose the first nine.
+    static constexpr int kMinCandidateRows = 3;
+    static constexpr int kMaxCandidateRows = 20;
     int candidateRows{0};
+    // What AI may change when asked in Settings' Home: 0 = it only suggests
+    // (the user applies), 1 = it changes settings to the values Settings
+    // offers, 2 = also to any value in a setting's range.
+    int aiSettingsControl{1};
     // The candidate list shows what the highlighted word means, in a pane
     // beside it (the japanese-slang, japanese-wiktionary, japanese-wordnet
     // and dictionary-display packs).
@@ -236,6 +244,10 @@ struct UserSettings {
     // rainbow (Settings and the candidate list), and each key typed meows.
     bool rainbowAccent{false};
     bool catSounds{false};
+
+    [[nodiscard]] static constexpr int ValidCandidateRows(int rows) noexcept {
+        return rows >= kMinCandidateRows && rows <= kMaxCandidateRows ? rows : 0;
+    }
     // The last Japanese conversions are kept (in user.db, the newest 30,
     // none from private windows) for Settings to list and report.
     bool keepRecentConversions{true};

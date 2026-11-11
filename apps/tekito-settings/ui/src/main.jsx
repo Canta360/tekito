@@ -36,6 +36,7 @@ const initialSettings = {
   socialPersonalization: 1,
   candidateWindowStyle: 0,
   candidateRows: 0,
+  aiSettingsControl: 1,
   meaningsEnabled: true,
   meaningsInUiLanguage: true,
   mixPredictionEnabled: true,
@@ -131,6 +132,8 @@ function App() {
   const [confirm, setConfirm] = useState(null);
   const [keys, setKeys] = useState(null);
   const [notice, setNotice] = useState(null);
+  // Home's conversation with AI, kept while Settings is open.
+  const [conversation, setConversation] = useState([]);
 
   const t = messages[resolveLanguage(settings.uiLanguage, appearance.systemLanguage)];
   const japaneseInstalled = Boolean(runtime.japanese);
@@ -307,7 +310,7 @@ function App() {
   const japaneseKeyboard = Boolean(runtime.japaneseKeyboard);
   const ctx = {
     t, settings, setSetting, runAction, setConfirm, showKeys: setKeys, open, on, multi: japanese || mixed, japaneseInstalled,
-    japaneseKeyboard, aiModels, postalCodes, openRomaji: () => open("romaji"),
+    japaneseKeyboard, aiModels, postalCodes, openRomaji: () => open("romaji"), aiReady, chat: { messages: conversation, setMessages: setConversation },
   };
   const pageProps = { settings, setSetting, runAction, setConfirm, showKeys: setKeys, open };
 

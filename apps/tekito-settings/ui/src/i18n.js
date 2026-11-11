@@ -73,6 +73,15 @@ const en = {
   widths: { title: "Full-width and half-width", description: "e.g. half-width abc!?, full-width ａｂｃ！？", letters: "Letters", symbols: "Symbols", space: "Space" },
   special: { title: "Dates, symbols and sums as candidates", parts: ["Date and time", "Symbols", "Sums"], none: "Off" },
   slips: { capitalizedExample: "e.g. Cjicago → Chicago", spaceless: ["Off", "Common words", "All words"] },
+  chat: {
+    label: "Ask AI", next: "Reply to AI", newChat: "New conversation", thinking: "Thinking", changes: "Changes", related: "Related",
+    refused: "AI can't change this", undone: "Undone", on: "On", off: "Off", byGrade: "Up to a school year",
+  },
+  aiControl: {
+    title: "Settings AI may change",
+    description: "When you ask on Home",
+    options: ["Suggest only", "Settings' choices", "Any value in range"],
+  },
   all: { every: "All", changed: (n) => `Changed (${n})`, reset: "Reset to default", none: "No settings are changed." },
 
   general: {
@@ -81,7 +90,10 @@ const en = {
     indicator: { title: "Show the mode", description: "Briefly shows the mode where you type after switching.", onFocus: "Also when moving to another field or app" },
     candidates: "Candidate list",
     styles: { glass: "Glass", simple: "Simple" },
-    rows: { title: "Candidates per page", description: "Automatic shows 5 in English and 9 in Japanese.", automatic: "Automatic" },
+    rows: {
+      title: "Candidates per page", description: "Automatic shows 5 in English and 9 in Japanese.", automatic: "Automatic", other: "Other",
+      unit: "rows", range: (min, max) => `${min} to ${max}. Number keys choose the first nine.`,
+    },
     meanings: { title: "Meanings", description: "Shows what the selected candidate means, beside the list." },
     meaningsLanguage: { title: "Japanese meanings in English", description: "e.g. 会議 → meeting" },
     switching: "Switching",
@@ -464,6 +476,15 @@ const ja = {
   widths: { title: "全角と半角", description: "例：半角 abc!?、全角 ａｂｃ！？", letters: "英字", symbols: "記号", space: "スペース" },
   special: { title: "日付・記号・計算を候補に表示", parts: ["日付と時刻", "記号", "計算結果"], none: "表示しない" },
   slips: { capitalizedExample: "例：Cjicago → Chicago", spaceless: ["オフ", "よく使う語のみ", "すべての語"] },
+  chat: {
+    label: "AI に聞く", next: "AI に返信", newChat: "新しい会話", thinking: "考えています", changes: "変更", related: "関連",
+    refused: "AI では変更できません", undone: "元に戻しました", on: "オン", off: "オフ", byGrade: "学年まで",
+  },
+  aiControl: {
+    title: "AI による設定の変更",
+    description: "ホームで頼んだときに、AI が変更できる範囲です",
+    options: ["提案のみ", "選択肢の範囲で変更", "数値も変更"],
+  },
   all: { every: "すべて", changed: (n) => `変更した設定（${n}）`, reset: "既定に戻す", none: "変更した設定はありません。" },
 
   general: {
@@ -472,7 +493,10 @@ const ja = {
     indicator: { title: "モードの表示", description: "切り替え時に、入力位置にモードが一時的に表示されます", onFocus: "入力欄やアプリを移ったときも表示" },
     candidates: "候補一覧",
     styles: { glass: "ガラス", simple: "シンプル" },
-    rows: { title: "1ページの候補数", description: "「自動」では、英語は5件、日本語は9件です", automatic: "自動" },
+    rows: {
+      title: "1ページの候補数", description: "「自動」では、英語は5件、日本語は9件です", automatic: "自動", other: "その他",
+      unit: "件", range: (min, max) => `${min}〜${max}件。数字キーで選べるのは9件目までです`,
+    },
     meanings: { title: "語の意味", description: "選択中の候補の意味が、候補一覧の横に表示されます" },
     meaningsLanguage: { title: "英単語の意味を日本語で表示", description: "例：meeting → 会議、ミーティング" },
     switching: "切り替え",

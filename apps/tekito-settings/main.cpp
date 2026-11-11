@@ -1206,6 +1206,7 @@ private:
         json += L",\"socialPersonalization\":" + std::to_wstring(settings_.socialPersonalization);
         json += L",\"candidateWindowStyle\":" + std::to_wstring(settings_.candidateWindowStyle);
         json += L",\"candidateRows\":" + std::to_wstring(settings_.candidateRows);
+        json += L",\"aiSettingsControl\":" + std::to_wstring(settings_.aiSettingsControl);
         json += L",\"japaneseSwitchOrder\":" + std::to_wstring(settings_.japaneseSwitchOrder);
         json += L",\"switchModes\":" + std::to_wstring(settings_.switchModes);
         json += L",\"mixPredictionEnabled\":";
@@ -1460,7 +1461,10 @@ private:
                 settings_.candidateWindowStyle = std::clamp(integerValue, 0, 1);
             }
             else if (key == L"candidateRows") {
-                settings_.candidateRows = integerValue == 5 || integerValue == 7 || integerValue == 9 ? integerValue : 0;
+                settings_.candidateRows = tekito::userdata::UserSettings::ValidCandidateRows(integerValue);
+            }
+            else if (key == L"aiSettingsControl") {
+                settings_.aiSettingsControl = std::clamp(integerValue, 0, 2);
             }
             else if (key == L"periodOnEnter") settings_.periodOnEnter = value;
             else if (key == L"nextWordPrediction") settings_.nextWordPrediction = value;

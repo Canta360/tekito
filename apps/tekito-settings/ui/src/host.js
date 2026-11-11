@@ -42,7 +42,11 @@ export function hostRequest(type, payload = {}, files = []) {
         text: response?.text || "",
         items: response?.items,
         code: response?.code || "",
-        answers: response?.answers,
+        // AI in Home's conversation: its words, the changes it asks for, and
+        // the settings, keys or pages it points to.
+        reply: response?.reply || "",
+        actions: response?.actions,
+        show: response?.show,
       });
     };
     if (!webview()) {

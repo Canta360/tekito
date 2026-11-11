@@ -400,3 +400,31 @@ kbd {
 .filter-bar { display: flex; }
 .heading-link { display: inline-flex; align-items: center; gap: 2px; border: 0; background: none; padding: 0; font: inherit; }
 .heading-link:hover { color: var(--accent); }
+
+/* Home's conversation with AI. */
+.chat { display: grid; gap: 12px; margin-bottom: 4px; }
+.bubble-user {
+  justify-self: end; max-width: 72%; padding: 8px 14px; border-radius: 14px 14px 4px 14px; background: var(--selected);
+  white-space: pre-wrap;
+}
+.bubble-ai { display: grid; gap: 8px; max-width: 100%; }
+.reply-text { display: flex; gap: 10px; align-items: flex-start; line-height: 1.6; }
+.reply-text > .symbol { color: var(--accent); margin-top: 3px; }
+.change { display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 6px 12px 6px 16px; }
+.change + .change { border-top: 1px solid var(--line); }
+.change > .symbol { color: var(--positive); }
+.change.is-suggested > .symbol { color: var(--accent); }
+.change.is-refused > .symbol, .change.is-undone > .symbol { color: var(--ink-3); }
+.change-name { flex: 1; min-width: 0; display: inline-flex; align-items: center; gap: 6px; }
+.change-name .mode-icon { color: var(--ink-3); }
+.change-values { display: inline-flex; align-items: center; gap: 4px; color: var(--ink-2); font-size: 13px; }
+.change.is-undone .change-values { text-decoration: line-through; }
+.change-note { color: var(--ink-2); font-size: 12px; }
+.home-search .new-chat { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); }
+.number-line { display: flex; align-items: center; gap: 8px; padding: 0 18px 14px 52px; font-size: 13px; }
+.number-line input {
+  width: 72px; padding: 4px 8px; border-radius: 5px; border: 1px solid var(--line); border-bottom-color: var(--track);
+  background: var(--raised); outline: none;
+}
+.number-line input:focus { border-bottom: 2px solid var(--accent); }
+.number-line small { color: var(--ink-2); font-size: 12px; }

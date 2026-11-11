@@ -1,8 +1,10 @@
-// ホーム: one box to find a setting, or to ask AI when AI is on; the modes
-// below it. すべての設定: every setting on one page, or only those changed.
+// ホーム: one box. With AI on, a conversation: AI changes settings as asked
+// (as far as UserSettings::aiSettingsControl lets it), each change shown
+// with a way back. Without AI, it finds settings by name. The modes below.
+// すべての設定: every setting on one page, or only those changed.
 import React, { useEffect, useRef, useState } from "react";
 import { hostRequest } from "./host.js";
-import { catalog, navPages, visible } from "./catalog.jsx";
+import { aiSpecs, catalog, changeAllowed, navPages, valueName, visible } from "./catalog.jsx";
 import { keyGroups, ModeBadges, revealHidden } from "./rows.jsx";
 import { Button, Card, Heading, Keycaps, LinkRow, ModeIcon, Segmented, Symbol, Toggle } from "./ui.jsx";
 
@@ -35,30 +37,71 @@ function goTo(ctx, entry) {
   ctx.open(entry.page, entry.id, entry.detail ? entry.page : entry.details);
 }
 
+// What AI said, for the next request: its words and the changes made.
+function remembered(message, specs, t) {
+  const changes = (message.changes || []).filter((change) => change.state === "applied")
+    .map((change) => `${change.key}=${JSON.stringify(change.value)}`);
+  return changes.length ? `${message.text} (${changes.join(", ")})` : message.text || "";
+}
+
 export function HomePage({ ctx, mode, changeMode, aiReady }) {
   const t = ctx.t;
   const h = t.home;
+  const c = t.chat;
   const [query, setQuery] = useState("");
-  const [answer, setAnswer] = useState(null);
+  const { messages, setMessages } = ctx.chat;
   const input = useRef(null);
-  useEffect(() => input.current?.focus(), []);
+  const end = useRef(null);
+  useEffect(() => { input.current?.focus(); }, []);
+  // Newer browsers' scrollIntoView returns a promise: nothing is returned here.
+  useEffect(() => { end.current?.scrollIntoView({ block: "nearest" }); }, [messages.length]);
   const needle = query.trim().toLowerCase();
   const found = needle ? findSettings(ctx, needle) : [];
-  const asked = answer && answer.query === query.trim();
-  const ask = async () => {
-    const asking = query.trim();
-    if (!asking) return;
-    setAnswer({ query: asking, status: "asking" });
-    // The model may name only these settings, by id.
-    const settings = catalog(ctx).filter((entry) => !entry.hidden && visible(entry, ctx))
-      .map((entry) => ({ id: entry.id, page: entry.page, title: entry.title }));
-    const response = await hostRequest("settings.ask", { query: asking, language: t.lang, settings });
-    setAnswer(response.ok ? { query: asking, status: "done", items: response.answers || [] } : { query: asking, status: "failed" });
+  const level = ctx.settings.aiSettingsControl ?? 1;
+  const busy = messages.some((message) => message.status === "asking");
+
+  const update = (index, change) => setMessages((list) => list.map((message, at) => (at === index ? { ...message, ...change(message) } : message)));
+  const send = async () => {
+    const text = query.trim();
+    if (!text || busy) return;
+    setQuery("");
+    const specs = aiSpecs(ctx);
+    const history = [...messages.filter((message) => message.status !== "failed"), { role: "user", text }];
+    const at = history.length;
+    setMessages([...history, { role: "assistant", status: "asking" }]);
+    const response = await hostRequest("settings.chat", {
+      language: t.lang,
+      level,
+      messages: history.map((message) => ({ role: message.role, text: message.role === "user" ? message.text : remembered(message, specs, t) })),
+      // The settings AI may name, with their values now and the values they take.
+      settings: Object.entries(specs).map(([key, spec]) => ({
+        key, setting: spec.title, mode: spec.mode, current: ctx.settings[key], values: spec.standard.map(([value, name]) => ({ value, name })),
+        range: spec.range,
+      })),
+      show: catalog(ctx).filter((entry) => !entry.hidden && visible(entry, ctx)).map((entry) => ({ id: entry.id, setting: entry.title })),
+    });
+    if (!response.ok) {
+      setMessages((list) => list.map((message, index) => (index === at ? { role: "assistant", status: "failed" } : message)));
+      return;
+    }
+    const changes = [];
+    for (const { key, value } of response.actions || []) {
+      const verdict = changeAllowed(specs[key], value, level);
+      const before = ctx.settings[key];
+      if (verdict === "apply") {
+        if (before === value) continue;
+        changes.push({ key, value, before, state: (await ctx.setSetting(key, value)) ? "applied" : "refused" });
+      } else {
+        changes.push({ key, value, before, state: verdict === "suggest" ? "suggested" : "refused" });
+      }
+    }
+    setMessages((list) => list.map((message, index) => (index === at
+      ? { role: "assistant", status: "done", text: response.reply || "", changes, show: response.show || [] } : message)));
   };
   const onKeyDown = (event) => {
-    if (event.key === "Escape") { setQuery(""); setAnswer(null); }
-    if (event.key !== "Enter") return;
-    if (aiReady) ask();
+    if (event.key === "Escape") setQuery("");
+    if (event.key !== "Enter" || event.nativeEvent.isComposing) return;
+    if (aiReady) send();
     else if (found[0]) goTo(ctx, found[0]);
   };
 
@@ -70,19 +113,28 @@ export function HomePage({ ctx, mode, changeMode, aiReady }) {
 
   return (
     <>
+      {aiReady && messages.length > 0 && (
+        <div className="chat" aria-live="polite">
+          {messages.map((message, index) => (message.role === "user"
+            ? <p key={index} className="bubble-user">{message.text}</p>
+            : <Reply key={index} ctx={ctx} message={message} update={(change) => update(index, change)} />))}
+          <div ref={end} />
+        </div>
+      )}
+
       <div className="home-search">
         <Symbol name={aiReady ? "wand_stars" : "search"} size={20} />
-        <input ref={input} aria-label={aiReady ? h.askLabel : t.search} placeholder={aiReady ? h.placeholderAi : t.search}
+        <input ref={input} aria-label={aiReady ? c.label : t.search} placeholder={aiReady ? (messages.length ? c.next : h.placeholderAi) : t.search}
           value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={onKeyDown} />
+        {aiReady && messages.length > 0 && (
+          <button type="button" className="icon-btn new-chat" title={c.newChat} aria-label={c.newChat} onClick={() => setMessages([])}>
+            <Symbol name="add" size={18} />
+          </button>
+        )}
       </div>
 
-      {needle && !asked && (
+      {needle && found.length > 0 && (
         <Card label={t.search} className="home-results">
-          {aiReady && (
-            <button type="button" className="result is-ask" onClick={ask}>
-              <Symbol name="wand_stars" size={18} /><span className="result-title">{h.ask(query.trim())}</span>
-            </button>
-          )}
           {found.map((entry) => (
             <button key={`${entry.page}-${entry.id || entry.title}`} type="button" className="result" onClick={() => goTo(ctx, entry)}>
               <Symbol name="search" size={18} />
@@ -90,11 +142,9 @@ export function HomePage({ ctx, mode, changeMode, aiReady }) {
               <small>{t.pages[entry.page]}</small>
             </button>
           ))}
-          {found.length === 0 && !aiReady && <p className="result-empty">{t.noResults}</p>}
         </Card>
       )}
-
-      {asked && <Answer ctx={ctx} answer={answer} />}
+      {needle && found.length === 0 && !aiReady && <Card label={t.search} className="home-results"><p className="result-empty">{t.noResults}</p></Card>}
 
       <Heading>{h.modes}</Heading>
       <div className="mode-cards">
@@ -125,15 +175,14 @@ export function HomePage({ ctx, mode, changeMode, aiReady }) {
   );
 }
 
-// AI's answer: the settings it names, as their own rows (with a change it
-// suggests, to apply or undo), keys, or a page that helps.
-function Answer({ ctx, answer }) {
+// One reply: AI's words, the changes it made or suggests, and the settings,
+// keys or pages it points to.
+function Reply({ ctx, message, update }) {
   const t = ctx.t;
-  const h = t.home;
-  if (answer.status === "asking") {
-    return <Card label={h.askLabel} className="answer"><p className="answer-status"><span className="progress" />{h.asking}</p></Card>;
-  }
-  if (answer.status === "failed") return <Card label={h.askLabel} className="answer"><p className="answer-status">{h.failed}</p></Card>;
+  const c = t.chat;
+  if (message.status === "asking") return <div className="bubble-ai"><p className="answer-status"><span className="progress" />{c.thinking}</p></div>;
+  if (message.status === "failed") return <div className="bubble-ai"><p className="answer-status">{t.home.failed}</p></div>;
+  const specs = aiSpecs(ctx);
   const entries = catalog(ctx).filter((entry) => !entry.hidden && visible(entry, ctx));
   const keys = Object.fromEntries(keyGroups(t, { japaneseKeyboard: ctx.japaneseKeyboard, settings: ctx.settings, japanese: ctx.on.japanese })
     .flatMap(([group, , rows]) => rows.map(([id, label, caps]) => [`${group}.${id}`, [label, caps]])));
@@ -143,55 +192,61 @@ function Answer({ ctx, answer }) {
     learned: ["history", t.dictionary.learned.title, "dictionary"],
     report: ["feedback", t.about.report.title, "about"],
   };
-  const items = (answer.items || []).filter((item) =>
+  const setChange = (index, state) => update((current) => ({
+    changes: current.changes.map((change, at) => (at === index ? { ...change, state } : change)),
+  }));
+  const undo = async (index, change) => { if (await ctx.setSetting(change.key, change.before)) setChange(index, "undone"); };
+  const apply = async (index, change) => { if (await ctx.setSetting(change.key, change.value)) setChange(index, "applied"); };
+  const shown = (message.show || []).filter((item) =>
     (item.type === "setting" && entries.some((entry) => entry.id === item.id)) || (item.type === "keys" && keys[item.id]) ||
     (item.type === "page" && pages[item.id]));
-  if (items.length === 0) return <Card label={h.askLabel} className="answer"><p className="answer-status">{h.nothing}</p></Card>;
   return (
-    <Card label={h.askLabel} className="answer">
-      {items.map((item) => {
-        if (item.type === "keys") {
-          const [label, caps] = keys[item.id];
-          return <div key={item.id} className="row-wrap"><div className="row-block"><div className="row"><span className="row-icon"><Symbol name="keyboard_command_key" /></span><span className="row-text"><span className="row-title">{label}</span></span><span className="row-control"><Keycaps keys={caps} /></span></div></div></div>;
-        }
-        if (item.type === "page") {
-          const [icon, title, page] = pages[item.id];
-          return <div key={item.id} className="row-wrap"><LinkRow icon={icon} title={title} description={t.pages[page]} onClick={() => ctx.open(page)} /></div>;
-        }
-        const entry = entries.find((one) => one.id === item.id);
-        return <AnswerSetting key={item.id} ctx={ctx} entry={entry} change={item.change} />;
-      })}
-    </Card>
-  );
-}
-
-function AnswerSetting({ ctx, entry, change }) {
-  const t = ctx.t;
-  const h = t.home;
-  const [before, setBefore] = useState(null);
-  const applied = before !== null;
-  // A change to one of two linked switches changes both while they agree.
-  const linked = entry.linkedKeys || [];
-  const together = linked.includes(change?.key) && linked.every((key) => ctx.settings[key] === ctx.settings[change.key]);
-  const changeKeys = together ? linked : [change?.key];
-  const apply = async () => {
-    const previous = Object.fromEntries(changeKeys.map((key) => [key, ctx.settings[key]]));
-    for (const key of changeKeys) await ctx.setSetting(key, change.value);
-    setBefore(previous);
-  };
-  const undo = async () => {
-    for (const [key, value] of Object.entries(before)) await ctx.setSetting(key, value);
-    setBefore(null);
-  };
-  const pending = change && !applied && ctx.settings[change.key] !== change.value;
-  return (
-    <div className="row-wrap">
-      {entry.render()}
-      <div className="answer-foot">
-        {pending && <Button variant="primary" onClick={apply}>{h.apply(change.label)}</Button>}
-        {applied && <Button onClick={undo}>{h.undo}</Button>}
-        <Button variant="quiet" onClick={() => ctx.open(entry.page, entry.id, entry.detail ? entry.page : undefined)}>{h.openIn(t.pages[entry.page])}</Button>
-      </div>
+    <div className="bubble-ai">
+      <p className="reply-text"><Symbol name="wand_stars" size={18} /><span>{message.text || (shown.length ? "" : t.home.nothing)}</span></p>
+      {message.changes.length > 0 && (
+        <Card label={c.changes} className="changes">
+          {message.changes.map((change, index) => {
+            const spec = specs[change.key];
+            const icon = { applied: "check", suggested: "lightbulb", undone: "undo", refused: "block" }[change.state];
+            return (
+              <div key={`${change.key}-${index}`} className={`change is-${change.state}`}>
+                <Symbol name={icon} size={18} />
+                <span className="change-name">{spec ? spec.title : change.key}{spec?.mode && <ModeIcon id={spec.mode} size={14} label={t.modeNames[spec.mode]} />}</span>
+                {spec && change.state !== "refused" && (
+                  <span className="change-values">{valueName(spec, change.before, t)}<Symbol name="chevron_right" size={14} />{valueName(spec, change.value, t)}</span>
+                )}
+                {change.state === "refused" && <span className="change-values">{c.refused}</span>}
+                {change.state === "applied" && <Button variant="quiet" onClick={() => undo(index, change)}>{t.home.undo}</Button>}
+                {change.state === "suggested" && <Button variant="primary" onClick={() => apply(index, change)}>{t.home.apply("")}</Button>}
+                {change.state === "undone" && <small className="change-note">{c.undone}</small>}
+              </div>
+            );
+          })}
+        </Card>
+      )}
+      {shown.length > 0 && (
+        <Card label={c.related}>
+          {shown.map((item) => {
+            if (item.type === "keys") {
+              const [label, caps] = keys[item.id];
+              return <div key={item.id} className="row-wrap"><div className="row-block"><div className="row"><span className="row-icon"><Symbol name="keyboard_command_key" /></span><span className="row-text"><span className="row-title">{label}</span></span><span className="row-control"><Keycaps keys={caps} /></span></div></div></div>;
+            }
+            if (item.type === "page") {
+              const [icon, title, page] = pages[item.id];
+              return <div key={item.id} className="row-wrap"><LinkRow icon={icon} title={title} description={t.pages[page]} onClick={() => ctx.open(page)} /></div>;
+            }
+            const entry = entries.find((one) => one.id === item.id);
+            return (
+              <div key={item.id} className="row-wrap">
+                {entry.render()}
+                <div className="answer-foot">
+                  <Button variant="quiet" onClick={() => ctx.open(entry.page, entry.id, entry.detail ? entry.page : undefined)}>{t.home.openIn(t.pages[entry.page])}</Button>
+                </div>
+              </div>
+            );
+          })}
+        </Card>
+      )}
     </div>
   );
 }
@@ -236,4 +291,3 @@ export function AllSettingsPage({ ctx, defaults }) {
     </>
   );
 }
-

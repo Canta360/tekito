@@ -4,7 +4,7 @@
 import React from "react";
 import { Card, Check, Details, Heading, Keycaps, LinkRow, Row, Segmented, Select, Slider, Toggle } from "./ui.jsx";
 import {
-  AiModelRow, ExcludedApps, kanjiStop, kanjiStops, LinkedToggle, ModeBadges, NumbersRow, PostalCodes, SpecialRow,
+  AiModelRow, candidateRowsRange, ExcludedApps, kanjiStop, kanjiStops, LinkedToggle, ModeBadges, NumbersRow, PostalCodes, RowsRow, SpecialRow,
   SwitchOrder, switchKeyCaps, wasFound, WidthsRow,
 } from "./rows.jsx";
 
@@ -147,6 +147,8 @@ export function catalog(ctx) {
         <AiModelRow settings={s} setSetting={set} runAction={ctx.runAction} setConfirm={ctx.setConfirm} aiModels={ctx.aiModels} />
       ),
     },
+    choice("aiControl", "conversion", "ai", "tune", t.aiControl, "aiSettingsControl",
+      t.aiControl.options.map((name, value) => [value, name]), { show: Boolean(ctx.aiReady) }),
     {
       id: "aiGpu", page: "conversion", group: "ai", keys: ["japaneseAiGpu"], title: t.ai.device.gpu, modes: ja, detail: true,
       show: (s.japaneseSentenceModel || 0) > 0 && ctx.aiModels.runtime?.windowsMl && s.japaneseAiDevice === 2 && gpus.length > 1,
@@ -250,7 +252,10 @@ export function catalog(ctx) {
         </div>
       ),
     },
-    choice("rows", "candidates", "list", "format_list_numbered", g.rows, "candidateRows", [[0, g.rows.automatic], [5, "5"], [7, "7"], [9, "9"]]),
+    {
+      id: "rows", page: "candidates", group: "list", keys: ["candidateRows"], title: g.rows.title,
+      render: () => <RowsRow settings={s} setSetting={set} title={g.rows.title} description={g.rows.description} />,
+    },
     toggle("meanings", "candidates", "list", "menu_book", g.meanings, "meaningsEnabled", {
       keys: ["meaningsInUiLanguage"],
       sub: () => s.meaningsEnabled && ctx.japaneseInstalled && (
@@ -329,4 +334,87 @@ export function CatalogPage({ page, ctx }) {
       {entries.some((entry) => entry.detail) && <Details id={page} title={t.details}>{section(true)}</Details>}
     </>
   );
+}
+
+// What AI may change, by key: the setting it belongs to, the values Settings
+// offers ([value, name]) and, for numbers, the range the setting takes.
+// Downloads, the AI's own settings, lists and the switch order are not here.
+export function aiSpecs(ctx) {
+  const { t } = ctx;
+  const g = t.general;
+  const j = t.japanese;
+  const a = t.auto;
+  const onOff = [[true, t.chat.on], [false, t.chat.off]];
+  const entries = Object.fromEntries(catalog(ctx).filter((entry) => !entry.hidden && visible(entry, ctx)).map((entry) => [entry.id, entry]));
+  const specs = {};
+  const w = t.widths;
+  // Keys that are a part of their row, by their own name.
+  const titles = {
+    japaneseLiveRefine: j.live.refine, modeBadgeOnFocus: g.indicator.onFocus, capitalizedCorrection: a.capitalized.title,
+    meaningsInUiLanguage: g.meaningsLanguage.title, dateConversion: g.date.title, symbolConversion: g.symbols.title,
+    calculatorEnabled: g.calculator.title, spacelessEnglishAlways: a.spacelessAlways.title, japaneseKanaInputKey: j.kanaInput.key,
+    numberConversion: j.numbers.other, japaneseRoughNumbersKanji: j.numbers.rough, japaneseLetterWidth: `${w.title}（${w.letters}）`,
+    japaneseSymbolWidth: `${w.title}（${w.symbols}）`, japaneseSpaceWidth: `${w.title}（${w.space}）`, japaneseKanjiNames: j.kanji.names,
+  };
+  // The mode a key of a linked pair is for.
+  const modeOf = {
+    japaneseLiveConversion: "japanese", mixLiveConversion: "mixed", japanesePredictionEnabled: "japanese", mixPredictionEnabled: "mixed",
+    japaneseFirstPageSymbol: "japanese", mixFirstPageSymbol: "mixed", mixCorrection: "mixed", correctionEnabled: "auto",
+  };
+  const add = (id, key, standard, extra = {}) => {
+    if (entries[id]) specs[key] = { id, title: titles[key] || entries[id].title, mode: modeOf[key], standard, ...extra };
+  };
+  const width = [[1, j.space.half], [0, j.space.full]];
+  for (const [id, keys] of Object.entries({
+    modePerApp: ["modePerApp"], indicator: ["modeIndicatorEnabled", "modeBadgeOnFocus"], underline: ["modeUnderlineColors"],
+    mixMarker: ["mixSettledMarker"], mixEnglishUnderline: ["mixEnglishUnderline"],
+    live: ["japaneseLiveConversion", "mixLiveConversion", "japaneseLiveRefine"], sentenceCheck: ["japaneseSentenceCheck"],
+    singleVowel: ["mixSingleVowelKana"], prediction: ["japanesePredictionEnabled", "mixPredictionEnabled"],
+    completion: ["completionEnabled"], nextWord: ["nextWordPrediction"], phonetic: ["japanesePhoneticSuggestionsEnabled"],
+    slipAutoApply: ["japaneseSlipAutoApply"], englishCorrection: ["mixCorrection", "correctionEnabled", "capitalizedCorrection"],
+    doubled: ["doubledWordCheck"], recheck: ["recheckPreviousWord"], spacing: ["japaneseEnglishSpacing"],
+    kanjiVariants: ["japaneseKanjiVariants"], period: ["periodOnEnter"], doubleSpace: ["doubleSpacePeriod"], smart: ["smartPunctuation"],
+    meanings: ["meaningsEnabled", "meaningsInUiLanguage"], candidateWindow: ["candidateWindowEnabled"],
+    special: ["dateConversion", "symbolConversion", "calculatorEnabled"], firstPageSymbol: ["japaneseFirstPageSymbol", "mixFirstPageSymbol"],
+    typedForms: ["japaneseTypedForms"], kanaInput: ["japaneseKanaInput", "japaneseKanaInputKey"], capsLock: ["japaneseIgnoreCapsLock"],
+    numpad: ["japaneseNumpadDirect"], brackets: ["bracketPairs"], spaceless: ["spacelessEnglish", "spacelessEnglishAlways"],
+    numbers: ["japaneseRoughNumbersKanji", "numberConversion"],
+  })) {
+    for (const key of keys) add(id, key, onOff);
+  }
+  add("switchKey", "toggleKey", [[1, g.switchKey.title], [2, "Ctrl + Space"], [3, "Ctrl + Shift + Space"], [0, g.switchKey.none]]);
+  add("language", "uiLanguage", [[0, g.language.system], [1, "English"], [2, "日本語"]]);
+  add("spelling", "englishSpelling", a.spelling.options.map((name, value) => [value, name]));
+  add("casual", "socialExpressionRange", a.casual.stops.map((name, value) => [value, name]));
+  add("punctuation", "japanesePunctuation", [[0, "、。"], [1, "，．"], [2, "，。"], [3, "、．"]]);
+  add("numbers", "japaneseNumberStyle", j.numbers.options.map(([name], index) => [index + 1, name]));
+  add("widths", "japaneseLetterWidth", width);
+  add("widths", "japaneseSymbolWidth", width);
+  add("widths", "japaneseSpaceWidth", width);
+  add("kanji", "japaneseKanjiRange", [[0, j.kanji.stops[7]], [2, j.kanji.stops[6]], [3, t.chat.byGrade]]);
+  add("kanji", "japaneseKanjiGrade", j.kanji.stops.slice(0, 6).map((name, index) => [index + 1, name]));
+  add("kanji", "japaneseKanjiNames", onOff);
+  add("looks", "candidateWindowStyle", [[0, g.styles.glass], [1, g.styles.simple]]);
+  add("rows", "candidateRows", [[0, g.rows.automatic], [5, "5"], [7, "7"], [9, "9"]], { range: candidateRowsRange, unit: g.rows.unit });
+  add("keyboard", "keyboardType", [[0, g.keyboard.detect], [1, g.keyboard.japanese], [2, g.keyboard.us]]);
+  return specs;
+}
+
+// A value as Settings names it.
+export function valueName(spec, value, t) {
+  const named = spec.standard.find(([standard]) => standard === value);
+  if (named) return named[1];
+  return spec.unit ? `${value} ${spec.unit}` : String(value);
+}
+
+// What may be done with one change AI asks for, at the user's level
+// (UserSettings::aiSettingsControl): "apply", "suggest" or "refuse".
+export function changeAllowed(spec, value, level) {
+  if (!spec) return "refuse";
+  const offered = spec.standard.some(([standard]) => standard === value);
+  const inRange = Boolean(spec.range) && Number.isInteger(value) && value >= spec.range[0] && value <= spec.range[1];
+  if (!offered && !inRange) return "refuse";
+  if (level === 0) return "suggest";
+  if (level === 1 && !offered) return "suggest";
+  return "apply";
 }
