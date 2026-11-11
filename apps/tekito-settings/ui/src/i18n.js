@@ -8,7 +8,7 @@ const count = (value) => value.toLocaleString("en-US");
 const en = {
   lang: "en",
   settings: "Settings",
-  menu: "Menu",
+  menu: "Show or fold the page list",
   pages: {
     home: "Home", general: "General", conversion: "Conversion", slips: "Typo fixes", notation: "Formatting", candidates: "Candidate list",
     keys: "Keys & typing", dictionary: "Dictionary & learning", all: "All settings", about: "About", samples: "Typing samples",
@@ -420,7 +420,7 @@ const en = {
 const ja = {
   lang: "ja",
   settings: "設定",
-  menu: "メニュー",
+  menu: "ページ一覧の表示を切り替え",
   pages: {
     home: "ホーム", general: "一般", conversion: "変換", slips: "入力ミスの修正", notation: "表記", candidates: "候補一覧",
     keys: "キーと入力", dictionary: "辞書と学習", all: "すべての設定", about: "情報", samples: "入力の見本",

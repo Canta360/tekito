@@ -40,7 +40,12 @@ ul { margin: 0; padding: 0; list-style: none; }
   font-size: var(--fontSizeBase300); line-height: var(--lineHeightBase300);
 }
 .app > .sidebar { height: 100vh; }
-.brand { display: flex; align-items: center; gap: 10px; padding: 6px 4px 4px; color: var(--ink-2); font-size: var(--fontSizeBase200); }
+.brand {
+  display: flex; align-items: center; gap: 10px; width: 100%; min-height: 40px; padding: 6px 10px; border: 0; border-radius: var(--borderRadiusMedium);
+  background: none; color: var(--ink-2); font: inherit; font-size: var(--fontSizeBase200); text-align: left; cursor: pointer;
+}
+.brand:hover { background: var(--colorSubtleBackgroundHover); }
+.brand:focus-visible { outline: 2px solid var(--colorStrokeFocus2); }
 .brand .line-wordmark { display: block; flex: none; }
 .brand .tekito-symbol, .brand .line-wordmark { color: var(--ink); }
 
@@ -295,10 +300,13 @@ kbd {
 .home-search.home-search { width: 100%; min-height: 48px; }
 .home-box-actions { display: inline-flex; align-items: center; gap: 4px; }
 .home-links { display: flex; justify-content: center; gap: 8px; }
-.brand .fui-Button { margin: -6px 2px -6px -6px; color: var(--ink); }
-/* Folded: the menu button where the list was, the page moved clear of it. */
-.content-bar { position: fixed; top: 10px; left: 10px; z-index: 3; }
-.app.nav-closed > .content { padding-left: 64px; }
+
 /* The page in the second column, the list (when shown) in the first. */
 .app > .sidebar { grid-column: 1; grid-row: 1; }
 .app > .content { grid-column: 2; grid-row: 1; }
+
+/* Folded to icons: the TEKITO icon and each page's, centered. */
+.sidebar.is-rail .brand { justify-content: center; padding: 6px 0; }
+.sidebar.is-rail .fui-NavItem { justify-content: center; padding-left: 0; padding-right: 0; }
+/* Fluent sets the drawer's width in its own style: the folded width wins here. */
+.sidebar.is-rail { --fui-Drawer--size: 64px !important; width: 64px !important; }

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import {
-  Checkbox, Field, FluentProvider, Hamburger, NavDrawer, NavDrawerBody, NavDrawerFooter, NavDrawerHeader, NavItem, Toast, Toaster, ToastTitle,
+  Checkbox, Field, FluentProvider, NavDrawer, NavDrawerBody, NavDrawerFooter, NavDrawerHeader, NavItem, Toast, Toaster, ToastTitle,
   useToastController,
 } from "@fluentui/react-components";
 import { createRoot } from "react-dom/client";
@@ -139,7 +139,7 @@ function App() {
   const [modal, setModal] = useState(null);
   const [confirm, setConfirm] = useState(null);
   const [keys, setKeys] = useState(null);
-  // The page list, folded away with the menu button (remembered).
+  // The page list: whole, or folded to its icons by its TEKITO corner (remembered).
   const [navOpen, setNavOpen] = useState(() => {
     try {
       return window.localStorage.getItem("tekito.nav") !== "0";
@@ -353,28 +353,29 @@ function App() {
     japaneseInstalling: Boolean(runtime.japaneseInstalling), japaneseDataBytes: runtime.japaneseDataBytes || 0,
     encryption,
   };
-  const menuButton = <Hamburger icon={<Symbol name="menu" size={20} />} aria-label={t.menu} title={t.menu} aria-expanded={navOpen} onClick={toggleNav} />;
   const pageProps = { settings, setSetting, runAction, setConfirm, showKeys: setKeys, open };
 
   return (
     <TextContext.Provider value={t}>
       <FluentProvider theme={theme} className="provider" ref={root}>
-      <div className={`app ${navOpen ? "" : "nav-closed"}`}>
-        <NavDrawer open={navOpen} type="inline" className="sidebar" surfaceMotion={null} aria-label={t.settings} selectedValue={current}
+      <div className="app">
+        <NavDrawer open type="inline" className={`sidebar ${navOpen ? "" : "is-rail"}`} aria-label={t.settings} selectedValue={current}
           onNavItemSelect={(event, data) => open(data.value)}>
           <NavDrawerHeader>
-            <div className="brand">{menuButton}<TekitoSymbol size={20} /><LineWordmark height={13} />{t.settings}</div>
+            <button type="button" className="brand" aria-expanded={navOpen} aria-label={t.menu} title={t.menu} onClick={toggleNav}>
+              <TekitoSymbol size={20} />
+              {navOpen && <><LineWordmark height={13} />{t.settings}</>}
+            </button>
           </NavDrawerHeader>
           <NavDrawerBody>
-            {navPages.map((id) => <PageItem key={id} id={id} />)}
+            {navPages.map((id) => <PageItem key={id} id={id} rail={!navOpen} />)}
           </NavDrawerBody>
           <NavDrawerFooter>
-            {footPages.map((id) => <PageItem key={id} id={id} />)}
+            {footPages.map((id) => <PageItem key={id} id={id} rail={!navOpen} />)}
           </NavDrawerFooter>
         </NavDrawer>
 
         <main className="content">
-          {!navOpen && <div className="content-bar">{menuButton}</div>}
           <div className="page" key={`${current}-${visit}`}>
             {/* Home is the box itself: its title only for screen readers. */}
             <h1 className={`page-title ${current === "home" ? "visually-hidden" : ""}`}>{t.pages[current]}</h1>
@@ -424,9 +425,15 @@ function App() {
   );
 }
 
-function PageItem({ id }) {
+// A page in the list; folded, its icon alone, named on hover.
+function PageItem({ id, rail }) {
   const t = useText();
-  return <NavItem value={id} icon={<Symbol name={navIcons[id]} size={20} />}>{t.pages[id]}</NavItem>;
+  return (
+    <NavItem value={id} icon={<Symbol name={navIcons[id]} size={20} />} aria-label={rail ? t.pages[id] : undefined}
+      title={rail ? t.pages[id] : undefined}>
+      {rail ? null : t.pages[id]}
+    </NavItem>
+  );
 }
 
 // The English words' six engine policies come down to three behaviors.
