@@ -4,47 +4,47 @@
 //   idle       floats and blinks, eyes open; its eyes on the pointer (`follow`)
 //   listening  the user is typing: eyes wider, on the box
 //   searching  AI is looking: half-shut eyes going side to side as it sways
-//   happy      a setting was changed: it hops, eyes ∩ ∩
+//   happy      a setting was changed: it hops, eyes the upper halves
 //   unsure     it could not tell which setting: it tilts, one eye smaller
 //   down       AI did not answer: it sags, eyes half shut and drooping, a drop
 // Its moves are small.
 // Also the icon beside AI's replies. Still for those who ask Windows for
 // less motion.
 import React, { useEffect, useId, useRef, useState } from "react";
+import { eyeShapes, tear } from "./companionEyes.js";
 
 // The mark: a disc (center 450, 450; radius 362) with room cut around its
 // small ring (center 709, 695; 108 across the outside, a 44 hole).
 const kSmall = "M709 587a108 108 0 1 0 0.01 0ZM709 651a44 44 0 1 1 -0.01 0Z";
-// Large white eyes, as wide apart as the user drew them.
+// Large white eyes (companionEyes.js), as wide apart as the user drew them.
 const kEyes = [298, 602];
 const kEyeY = 430;
-const kRx = 104;
-const kRy = 80;
 
-function eye(mood, cx) {
-  const y = kEyeY;
-  const left = cx < 450;
+// One shape for both eyes; the right one mirrored. `scale` and `drop` per
+// eye: [left, right].
+function pair(name, { scale = [1, 1], drop = [0, 0], className = "" } = {}) {
+  const shape = eyeShapes[name];
+  return kEyes.map((cx, i) => (
+    <path key={`${name}${cx}`} className={shape.line ? `mascot-line ${className}` : `mascot-white ${className}`} d={shape.fill || shape.line}
+      transform={`translate(${cx} ${kEyeY + drop[i]}) scale(${(i ? -1 : 1) * scale[i]} ${scale[i]})`} />
+  ));
+}
+
+function eyes(mood) {
   switch (mood) {
     case "happy":
-      return <path d={`M${cx - 86} ${y + 30}A86 74 0 0 1 ${cx + 86} ${y + 30}`} />;
+      return pair("happy");
     case "searching":
-      // Half shut: a level lid over the lower half.
-      return <path className="mascot-white" d={`M${cx - kRx} ${y - 6}H${cx + kRx}A${kRx} ${kRy} 0 0 1 ${cx - kRx} ${y - 6}Z`} />;
-    case "down": {
-      // Half shut and drooping outward, with a drop under the right eye.
-      const lid = left ? [y + 6, y - 22] : [y - 22, y + 6];
-      return (
-        <>
-          <path className="mascot-white" d={`M${cx - kRx} ${lid[0]}L${cx + kRx} ${lid[1]}A${kRx} ${kRy} 0 0 1 ${cx - kRx} ${lid[0]}Z`} />
-          {!left && <path className="mascot-white mascot-drop" d={`M${cx + 48} ${y + 62}C${cx + 50} ${y + 96} ${cx + 30} ${y + 100} ${cx + 30} ${y + 118}A20 20 0 0 0 ${cx + 70} ${y + 118}C${cx + 70} ${y + 100} ${cx + 52} ${y + 96} ${cx + 54} ${y + 58}`} />}
-        </>
-      );
-    }
+      return pair("half");
+    case "down":
+      return [...pair("sad"), <path key="tear" className="mascot-white" d={tear} transform={`translate(${kEyes[1]} ${kEyeY})`} />];
     case "unsure":
-      // One eye smaller and lower.
-      return <ellipse className="mascot-white" cx={cx} cy={left ? y : y + 18} rx={left ? kRx : kRx * 0.72} ry={left ? kRy : kRy * 0.72} />;
+      // The right one smaller and lower.
+      return pair("open", { scale: [1, 0.72], drop: [0, 18] });
     default:
-      return <ellipse className="mascot-white mascot-open" cx={cx} cy={y} rx={kRx} ry={mood === "listening" ? kRy + 8 : kRy} style={{ transformOrigin: `${cx}px ${y}px` }} />;
+      // Open, shut for a moment now and then.
+      return [...pair("open", { scale: mood === "listening" ? [1.08, 1.08] : [1, 1], className: "mascot-open" }),
+        ...pair("shut", { className: "mascot-shut" })];
   }
 }
 
@@ -92,7 +92,7 @@ export function Mascot({ mood = "idle", size = 96, follow = false, label }) {
         <circle className="mascot-disc" cx="450" cy="450" r="362" mask={`url(#${cut})`} />
         <path className="mascot-small" d={kSmall} fillRule="evenodd" />
         <g className="mascot-face" style={{ transform: `translate(${look.x}px, ${look.y}px)` }}>
-          {kEyes.map((cx) => <g key={cx}>{eye(mood, cx)}</g>)}
+          {eyes(mood)}
         </g>
       </g>
     </svg>

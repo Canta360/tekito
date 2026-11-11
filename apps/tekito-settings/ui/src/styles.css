@@ -337,15 +337,17 @@ kbd {
 .home-greeting { display: grid; justify-items: center; gap: 10px; margin-bottom: 12px; color: var(--ink-2); text-align: center; }
 .home-greeting p { font-size: var(--fontSizeBase400); color: var(--ink); }
 .mascot { overflow: visible; flex: none; }
-.mascot-body, .mascot-small, .mascot-face, .mascot-open { transform-box: view-box; }
+.mascot-body, .mascot-small, .mascot-face { transform-box: view-box; }
 .mascot-body { transform-origin: 450px 790px; }
 .mascot-small { transform-origin: 709px 695px; }
 .mascot-disc, .mascot-small { fill: var(--accent); }
-.mascot-face { fill: none; stroke: #ffffff; stroke-width: 34; stroke-linecap: round; stroke-linejoin: round; transition: transform 0.15s ease-out; }
+.mascot-face { fill: none; stroke: #ffffff; stroke-width: 30; stroke-linecap: round; stroke-linejoin: round; transition: transform 0.15s ease-out; }
 .mascot-face .mascot-white { fill: #ffffff; stroke: none; }
 .mascot.is-idle .mascot-body { animation: mascot-float 3.2s ease-in-out infinite; }
 .mascot.is-idle .mascot-small { animation: mascot-bob 3.2s ease-in-out 0.4s infinite; }
+.mascot-shut { opacity: 0; }
 .mascot.is-idle .mascot-open, .mascot.is-listening .mascot-open { animation: mascot-blink 4.6s infinite; }
+.mascot.is-idle .mascot-shut, .mascot.is-listening .mascot-shut { animation: mascot-blink-shut 4.6s infinite; }
 .mascot.is-listening .mascot-body { transform: scale(1.01, 0.99); transition: transform 0.25s var(--ease); }
 .mascot.is-searching .mascot-body { animation: mascot-sway 0.9s ease-in-out infinite alternate; }
 .mascot.is-searching .mascot-face { animation: mascot-scan 0.9s ease-in-out infinite alternate; }
@@ -355,7 +357,8 @@ kbd {
 .mascot.is-down .mascot-body { transform: translateY(10px) scale(1.02, 0.97); transition: transform 0.5s var(--ease); }
 @keyframes mascot-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-14px); } }
 @keyframes mascot-bob { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(-5px, -9px); } }
-@keyframes mascot-blink { 0%, 92%, 100% { transform: scaleY(1); } 95% { transform: scaleY(0.1); } }
+@keyframes mascot-blink { 0%, 92.9%, 96.1%, 100% { opacity: 1; } 93%, 96% { opacity: 0; } }
+@keyframes mascot-blink-shut { 0%, 92.9%, 96.1%, 100% { opacity: 0; } 93%, 96% { opacity: 1; } }
 @keyframes mascot-sway { from { transform: rotate(-2deg); } to { transform: rotate(2deg); } }
 @keyframes mascot-scan { from { transform: translateX(-18px); } to { transform: translateX(18px); } }
 @keyframes mascot-pulse { from { transform: scale(0.94); } to { transform: scale(1.06); } }
