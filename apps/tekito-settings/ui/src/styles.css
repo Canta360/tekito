@@ -336,39 +336,35 @@ kbd {
 /* Home's companion (mascot.jsx) and its greeting. */
 .home-greeting { display: grid; justify-items: center; gap: 10px; margin-bottom: 12px; color: var(--ink-2); text-align: center; }
 .home-greeting p { font-size: var(--fontSizeBase400); color: var(--ink); }
-.mascot {
-  --mascot-light: color-mix(in srgb, var(--accent) 12%, #ffffff);
-  --mascot-mid: color-mix(in srgb, var(--accent) 55%, #ffffff);
-  --mascot-dark: color-mix(in srgb, var(--accent) 85%, #000000);
-  --mascot-eye: #1b1b1f;
-  --mascot-cheek: color-mix(in srgb, #ff7a8a 45%, transparent);
-  --mascot-shadow: color-mix(in srgb, var(--ink) 14%, transparent);
-  overflow: visible; flex: none;
-}
-.mascot-ball, .mascot-shadow, .mascot-eye, .mascot-face { transform-box: view-box; }
-.mascot-ball { transform-origin: 48px 80px; }
-.mascot-shadow { transform-origin: 48px 88px; }
-.mascot-face { transition: transform 0.15s ease-out; }
-.mascot.is-idle .mascot-ball { animation: mascot-float 3.2s ease-in-out infinite; }
-.mascot.is-idle .mascot-shadow { animation: mascot-shadow 3.2s ease-in-out infinite; }
-.mascot.is-idle .mascot-eye, .mascot.is-listening .mascot-eye { animation: mascot-blink 4.6s infinite; }
-.mascot.is-listening .mascot-ball { transform: scale(1.03, 0.97); transition: transform 0.25s var(--ease); }
-.mascot.is-searching .mascot-ball { animation: mascot-sway 0.9s ease-in-out infinite alternate; }
+.mascot { overflow: visible; flex: none; }
+.mascot-body, .mascot-small, .mascot-face, .mascot-open { transform-box: view-box; }
+.mascot-body { transform-origin: 450px 790px; }
+.mascot-small { transform-origin: 709px 695px; }
+.mascot-ring, .mascot-small { fill: none; stroke: var(--accent); stroke-width: 28; stroke-linecap: round; }
+.mascot-face { fill: none; stroke: var(--ink); stroke-width: 22; stroke-linecap: round; stroke-linejoin: round; transition: transform 0.15s ease-out; }
+.mascot-face .mascot-dot { fill: var(--ink); stroke: none; }
+.mascot.is-idle .mascot-body { animation: mascot-float 3.2s ease-in-out infinite; }
+.mascot.is-idle .mascot-small { animation: mascot-bob 3.2s ease-in-out 0.4s infinite; }
+.mascot.is-idle .mascot-open, .mascot.is-listening .mascot-open { animation: mascot-blink 4.6s infinite; }
+.mascot.is-listening .mascot-body { transform: scale(1.03, 0.97); transition: transform 0.25s var(--ease); }
+.mascot.is-searching .mascot-body { animation: mascot-sway 0.9s ease-in-out infinite alternate; }
 .mascot.is-searching .mascot-face { animation: mascot-scan 0.9s ease-in-out infinite alternate; }
-.mascot.is-happy .mascot-ball { animation: mascot-hop 0.55s cubic-bezier(0.3, 0, 0.3, 1) 3; }
-.mascot.is-happy .mascot-shadow { animation: mascot-hop-shadow 0.55s cubic-bezier(0.3, 0, 0.3, 1) 3; }
-.mascot.is-unsure .mascot-ball { transform: rotate(-12deg); transition: transform 0.4s var(--ease); }
-.mascot.is-down .mascot-ball { transform: translateY(4px) scale(1.05, 0.92); transition: transform 0.5s var(--ease); }
-@keyframes mascot-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
-@keyframes mascot-shadow { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(0.85); opacity: 0.7; } }
-@keyframes mascot-blink { 0%, 92%, 100% { transform: scaleY(1); } 95% { transform: scaleY(0.12); } }
-@keyframes mascot-sway { from { transform: rotate(-7deg) translateX(-2px); } to { transform: rotate(7deg) translateX(2px); } }
-@keyframes mascot-scan { from { transform: translateX(-6px); } to { transform: translateX(6px); } }
+.mascot.is-searching .mascot-small { animation: mascot-pulse 0.9s ease-in-out infinite alternate; }
+.mascot.is-happy .mascot-body { animation: mascot-hop 0.55s cubic-bezier(0.3, 0, 0.3, 1) 3; }
+.mascot.is-unsure .mascot-body { transform: rotate(-10deg); transition: transform 0.4s var(--ease); }
+.mascot.is-down .mascot-body { transform: translateY(30px) scale(1.04, 0.94); transition: transform 0.5s var(--ease); }
+.mascot-spiral { stroke-width: 12; transform-box: view-box; animation: mascot-spin 1.6s linear infinite; }
+@keyframes mascot-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-40px); } }
+@keyframes mascot-bob { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(-12px, -22px); } }
+@keyframes mascot-blink { 0%, 92%, 100% { transform: scaleY(1); } 95% { transform: scaleY(0.1); } }
+@keyframes mascot-sway { from { transform: rotate(-6deg) translateX(-16px); } to { transform: rotate(6deg) translateX(16px); } }
+@keyframes mascot-scan { from { transform: translateX(-50px); } to { transform: translateX(50px); } }
+@keyframes mascot-pulse { from { transform: scale(0.85); } to { transform: scale(1.12); } }
+@keyframes mascot-spin { from { transform: rotate(0deg); } to { transform: rotate(-360deg); } }
 @keyframes mascot-hop {
-  0% { transform: translateY(0) scale(1.08, 0.9); } 35% { transform: translateY(-14px) scale(0.94, 1.08); }
+  0% { transform: translateY(0) scale(1.08, 0.9); } 35% { transform: translateY(-120px) scale(0.94, 1.08); }
   70% { transform: translateY(0) scale(1.1, 0.88); } 100% { transform: translateY(0) scale(1, 1); }
 }
-@keyframes mascot-hop-shadow { 0%, 70%, 100% { transform: scale(1); } 35% { transform: scale(0.7); opacity: 0.6; } }
 @media (prefers-reduced-motion: reduce) {
   .mascot *, .mascot { animation: none !important; transition: none !important; }
 }
