@@ -82,6 +82,10 @@ const en = {
     changed: (title, label) => `Set ${title} to “${label}”.`, already: (title, label) => `${title} is already “${label}”.`,
     suggest: (title, label) => `Suggested: ${title} to “${label}”. Apply to change it.`, cannot: "AI can't change this setting. Change it below.",
     undoneAll: "Put back as it was.",
+    eggs: {
+      cat: (on) => (on ? "Well spotted. The cat is here: it meows with each key you press." : "The cat is asleep now."),
+      rainbow: (on) => (on ? "Well spotted. The accent color goes round the rainbow now." : "The rainbow is over."),
+    },
     help: "I change TEKITO's settings for you. Say what bothers you or what you want, like “English gets corrected on its own” or “show more candidates”.",
     nothingFits: "I could not find a setting for that. Say what bothers you or what you want to change, like “show more candidates”.", needModel: (mb) => `Asking AI needs Settings' AI model (about ${mb} MB).`,
     download: "Download", downloadTitle: "Download Settings' AI model?",
@@ -504,6 +508,10 @@ const ja = {
     changed: (title, label) => `${title}を「${label}」にしました。`, already: (title, label) => `${title}はすでに「${label}」です。`,
     suggest: (title, label) => `${title}を「${label}」にする提案です。「適用」を押すと変更されます。`, cannot: "この設定は AI では変更できません。下から変更してください。",
     undoneAll: "元に戻しました。",
+    eggs: {
+      cat: (on) => (on ? "よく気付きましたね。ねこを呼びました。キーを押すたびに鳴きます。" : "ねこはおやすみです。"),
+      rainbow: (on) => (on ? "よく気付きましたね。アクセントカラーが虹色に変わり続けます。" : "虹はおしまいです。"),
+    },
     help: "TEKITO の設定を変更できます。「英語が勝手に直される」「候補をもっと出したい」のように、困っていることや変えたいことを書いてください。",
     nothingFits: "当てはまる設定が見つかりませんでした。「候補をもっと出したい」のように、困っていることや変えたいことを書いてください。", needModel: (mb) => `AI に頼むには、設定用の AI モデル（約 ${mb} MB）が必要です。`,
     download: "ダウンロード", downloadTitle: "設定用の AI モデルをダウンロードしますか？",

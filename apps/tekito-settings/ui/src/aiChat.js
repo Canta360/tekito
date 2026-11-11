@@ -7,7 +7,7 @@
 import { hostRequest } from "./host.js";
 import { aiDescriptions } from "./aiDescriptions.js";
 import { aiSpecs, catalog, valueName, visible } from "./catalog.jsx";
-import { mixPairs } from "./rows.jsx";
+import { mixPairs, revealHidden } from "./rows.jsx";
 
 // Word overlap's weight beside the model's score, and how far the first
 // choice must lead the second to be changed without asking.
@@ -101,6 +101,14 @@ async function decide(ctx, entry, question, level, lang) {
   return { key, value: best[0], keys: keysFor(ctx, entry, key) };
 }
 
+// The easter eggs, found by their names here as by search (with AI on,
+// Home's box asks AI, not search): turned on (or off when asked), and
+// shown on General from then on.
+const eggs = [
+  { id: "cat", key: "catSounds", names: /ねこ|猫|ネコ|にゃ|cats?|meow|kitty/i },
+  { id: "rainbow", key: "rainbowAccent", names: /レインボー|にじ|虹|rainbow/i },
+];
+
 // One request: { reply, actions: [{ key, value }], show: [{ type, id }], title, label }
 // or null when the model did not answer.
 export async function think(ctx, question, level, lastApplied) {
@@ -110,6 +118,12 @@ export async function think(ctx, question, level, lastApplied) {
   // "Put it back": the last changes undone.
   if (/元に戻|もとに戻|やっぱり|取り消|undo|revert|put it back/i.test(question) && lastApplied?.length) {
     return { kind: "undo", reply: c.undoneAll, actions: lastApplied.map((change) => ({ key: change.key, value: change.before })), show: [] };
+  }
+  const egg = eggs.find((one) => one.names.test(question));
+  if (egg) {
+    revealHidden(egg.id);
+    const value = !wantsOff.test(question);
+    return { kind: "egg", reply: c.eggs[egg.id](value), actions: [{ key: egg.key, value }], show: [{ type: "setting", id: egg.id }] };
   }
   // What it can do: said, not looked up.
   if (/何ができ|なにができ|できること|使い方|ヘルプ|what can you|help/i.test(question)) {

@@ -73,7 +73,8 @@ export function HomePage({ ctx, aiReady }) {
     for (const { key, value } of answer.actions) {
       const before = ctx.settings[key];
       if (before === value) continue;
-      const verdict = answer.kind === "undo" ? "apply" : changeAllowed(specs[key], value, level);
+      // Putting back, and the easter eggs, are not settings to ask about.
+      const verdict = answer.kind === "undo" || answer.kind === "egg" ? "apply" : changeAllowed(specs[key], value, level);
       if (verdict === "apply") {
         changes.push({ key, value, before, state: (await ctx.setSetting(key, value)) ? "applied" : "refused" });
       } else {
@@ -179,7 +180,8 @@ function Reply({ ctx, message, update }) {
   if (message.status === "asking") return <div className="bubble-ai"><div className="answer-status"><Busy />{c.thinking}</div></div>;
   if (message.status === "failed") return <div className="bubble-ai"><p className="answer-status">{t.home.failed}</p></div>;
   const specs = aiSpecs(ctx);
-  const entries = catalog(ctx).filter((entry) => !entry.hidden && visible(entry, ctx));
+  // An easter egg once found is shown too (visible: found or on).
+  const entries = catalog(ctx).filter((entry) => visible(entry, ctx));
   const keys = Object.fromEntries(keyGroups(t, { japaneseKeyboard: ctx.japaneseKeyboard, settings: ctx.settings, japanese: ctx.on.japanese })
     .flatMap(([group, , rows]) => rows.map(([id, label, caps]) => [`${group}.${id}`, [label, caps]])));
   const pages = {
@@ -202,7 +204,9 @@ function Reply({ ctx, message, update }) {
       {message.changes.length > 0 && (
         <Card label={c.changes} className="changes">
           {message.changes.map((change, index) => {
-            const spec = specs[change.key];
+            // A setting AI may not ask about (an easter egg): named as its row is.
+            const owner = entries.find((entry) => entry.keys.includes(change.key));
+            const spec = specs[change.key] || (owner && { title: owner.title, standard: [[true, c.on], [false, c.off]] });
             const icon = { applied: "check", suggested: "lightbulb", undone: "undo", refused: "block" }[change.state];
             return (
               <div key={`${change.key}-${index}`} className={`change is-${change.state}`}>
