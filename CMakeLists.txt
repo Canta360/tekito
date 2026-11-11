@@ -139,6 +139,7 @@ add_library(Tekito.Tsf SHARED
     src/Tsf/JapaneseKeyPress.cpp
     src/Tsf/TextServiceJapanese.cpp
     src/Tsf/ModeLangBarItem.cpp
+    src/Tsf/ModeMenu.cpp
     src/Tsf/Registration.cpp
     src/Tsf/TekitoGuids.cpp
     src/Tsf/TextService.cpp
@@ -284,6 +285,19 @@ if(TEKITO_BUILD_TESTS)
         ${TEKITO_WINDOWS_DEFINES} TEKITO_CANDIDATE_WINDOW_PREVIEW)
     target_compile_options(tekito_candidate_window_preview PRIVATE ${TEKITO_WARNINGS})
     target_link_libraries(tekito_candidate_window_preview PRIVATE
+        ole32 oleaut32 advapi32 user32 gdi32 ${TEKITO_CANDIDATE_WINDOW_LIBS})
+
+    # Shows the taskbar mode button's menu over a backdrop and screenshots it.
+    add_executable(tekito_mode_menu_preview
+        tests/visual/ModeMenuPreview.cpp
+        src/Tsf/ModeMenu.cpp
+        assets/tekito_tsf.rc
+    )
+    target_include_directories(tekito_mode_menu_preview PRIVATE src ${CMAKE_SOURCE_DIR})
+    target_compile_definitions(tekito_mode_menu_preview PRIVATE
+        ${TEKITO_WINDOWS_DEFINES} TEKITO_CANDIDATE_WINDOW_PREVIEW)
+    target_compile_options(tekito_mode_menu_preview PRIVATE ${TEKITO_WARNINGS})
+    target_link_libraries(tekito_mode_menu_preview PRIVATE
         ole32 oleaut32 advapi32 user32 gdi32 ${TEKITO_CANDIDATE_WINDOW_LIBS})
 
     # Records the frames of the README typing demo with the real engine.

@@ -1,6 +1,7 @@
 #include "Tsf/ModeLangBarItem.h"
 
 #include "Tsf/Diagnostics.h"
+#include "Tsf/ModeMenu.h"
 #include "Tsf/TekitoGuids.h"
 #include "assets/tekito_resource.h"
 
@@ -8,6 +9,8 @@
 #include <oleauto.h>
 #include <cwchar>
 #include <string>
+#include <utility>
+#include <vector>
 
 namespace tekito::tsf {
 namespace {
@@ -125,6 +128,33 @@ HRESULT ModeLangBarItem::OnClick(TfLBIClick click, POINT point, const RECT*) {
 }
 
 void ModeLangBarItem::ShowContextMenu(POINT point) {
+    // Clicking the button again closes the menu.
+    if (ModeMenu::IsOpen()) {
+        ModeMenu::Close();
+        return;
+    }
+    if (ModeMenu::Available()) {
+        using Kind = ModeMenuItem::Kind;
+        const auto mode = Mode();
+        std::vector<ModeMenuItem> items{
+            {Kind::Mode, kMenuAuto, L"Auto", IDI_AUTO, 0, mode == InputMode::Convert},
+            {Kind::Mode, kMenuDirect, L"Direct", IDI_DIRECT, 0, mode == InputMode::Direct},
+        };
+        if (JapaneseProfile()) items.push_back({Kind::Mode, kMenuJapanese, Text(L"Japanese", L"日本語"), IDI_JAPANESE, 0, mode == InputMode::Japanese});
+        if (MixedAvailable()) items.push_back({Kind::Mode, kMenuMixed, Text(L"Mix", L"まぜ打ち"), IDI_MIXED, 0, mode == InputMode::Mixed});
+        items.push_back({Kind::Separator});
+        // Segoe Fluent Icons: Hide (an eye struck through), Settings.
+        items.push_back({Kind::Toggle, kMenuSecret, Text(L"Secret mode", L"シークレットモード"), 0, 0xED1A, Secret()});
+        items.push_back({Kind::Command, kMenuSettings, Text(L"Settings", L"設定"), 0, 0xE713, false});
+        // Kept alive while the menu is open (it may be released meanwhile).
+        AddRef();
+        ModeMenu::Show(
+            instance_, std::move(items), [this](UINT id) { OnMenuSelect(id); },
+            [this](UINT id) { return id == kMenuSecret && Secret(); });
+        Release();
+        return;
+    }
+
     HMENU menu = CreatePopupMenu();
     if (!menu) return;
 
