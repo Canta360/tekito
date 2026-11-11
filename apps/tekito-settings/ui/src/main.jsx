@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import {
-  Checkbox, Field, FluentProvider, NavDrawer, NavDrawerBody, NavDrawerFooter, NavDrawerHeader, NavItem, Toast, Toaster, ToastTitle,
+  Checkbox, Field, FluentProvider, Hamburger, NavDrawer, NavDrawerBody, NavDrawerFooter, NavDrawerHeader, NavItem, Toast, Toaster, ToastTitle,
   useToastController,
 } from "@fluentui/react-components";
 import { createRoot } from "react-dom/client";
@@ -139,6 +139,22 @@ function App() {
   const [modal, setModal] = useState(null);
   const [confirm, setConfirm] = useState(null);
   const [keys, setKeys] = useState(null);
+  // The page list, folded away with the menu button (remembered).
+  const [navOpen, setNavOpen] = useState(() => {
+    try {
+      return window.localStorage.getItem("tekito.nav") !== "0";
+    } catch {
+      return true;
+    }
+  });
+  const toggleNav = () => {
+    setNavOpen(!navOpen);
+    try {
+      window.localStorage.setItem("tekito.nav", navOpen ? "0" : "1");
+    } catch {
+      // Remembering is a convenience only.
+    }
+  };
   // Home's conversation with AI, kept while Settings is open.
   const [conversation, setConversation] = useState([]);
 
@@ -337,16 +353,17 @@ function App() {
     japaneseInstalling: Boolean(runtime.japaneseInstalling), japaneseDataBytes: runtime.japaneseDataBytes || 0,
     encryption,
   };
+  const menuButton = <Hamburger icon={<Symbol name="menu" size={20} />} aria-label={t.menu} title={t.menu} aria-expanded={navOpen} onClick={toggleNav} />;
   const pageProps = { settings, setSetting, runAction, setConfirm, showKeys: setKeys, open };
 
   return (
     <TextContext.Provider value={t}>
       <FluentProvider theme={theme} className="provider" ref={root}>
-      <div className="app">
-        <NavDrawer open type="inline" className="sidebar" aria-label={t.settings} selectedValue={current}
+      <div className={`app ${navOpen ? "" : "nav-closed"}`}>
+        <NavDrawer open={navOpen} type="inline" className="sidebar" surfaceMotion={null} aria-label={t.settings} selectedValue={current}
           onNavItemSelect={(event, data) => open(data.value)}>
           <NavDrawerHeader>
-            <div className="brand"><TekitoSymbol size={20} /><LineWordmark height={13} />{t.settings}</div>
+            <div className="brand">{menuButton}<TekitoSymbol size={20} /><LineWordmark height={13} />{t.settings}</div>
           </NavDrawerHeader>
           <NavDrawerBody>
             {navPages.map((id) => <PageItem key={id} id={id} />)}
@@ -357,6 +374,7 @@ function App() {
         </NavDrawer>
 
         <main className="content">
+          {!navOpen && <div className="content-bar">{menuButton}</div>}
           <div className="page" key={`${current}-${visit}`}>
             {/* Home is the box itself: its title only for screen readers. */}
             <h1 className={`page-title ${current === "home" ? "visually-hidden" : ""}`}>{t.pages[current]}</h1>

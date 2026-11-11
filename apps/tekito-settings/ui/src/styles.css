@@ -295,3 +295,10 @@ kbd {
 .home-search.home-search { width: 100%; min-height: 48px; }
 .home-box-actions { display: inline-flex; align-items: center; gap: 4px; }
 .home-links { display: flex; justify-content: center; gap: 8px; }
+.brand .fui-Button { margin: -6px 2px -6px -6px; color: var(--ink); }
+/* Folded: the menu button where the list was, the page moved clear of it. */
+.content-bar { position: fixed; top: 10px; left: 10px; z-index: 3; }
+.app.nav-closed > .content { padding-left: 64px; }
+/* The page in the second column, the list (when shown) in the first. */
+.app > .sidebar { grid-column: 1; grid-row: 1; }
+.app > .content { grid-column: 2; grid-row: 1; }
