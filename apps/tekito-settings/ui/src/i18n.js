@@ -8,7 +8,11 @@ const count = (value) => value.toLocaleString("en-US");
 const en = {
   lang: "en",
   settings: "Settings",
-  pages: { general: "General", japanese: "Japanese", mixed: "Mix", auto: "Auto", ai: "AI", dictionary: "Dictionary & learning", about: "About", samples: "Typing samples" },
+  pages: {
+    home: "Home", general: "General", conversion: "Conversion", slips: "Typo fixes", notation: "Formatting", candidates: "Candidate list",
+    keys: "Keys & typing", dictionary: "Dictionary & learning", all: "All settings", about: "About", samples: "Typing samples",
+    romaji: "Romaji table", japanese: "Japanese", mixed: "Mix", auto: "Auto", ai: "AI",
+  },
   samples: {
     description: "Short clips of what each mode does",
     names: {
@@ -43,6 +47,33 @@ const en = {
 
   modeNames: { japanese: "Japanese", mixed: "Mix", auto: "Auto", direct: "Direct" },
   keyNames: { hankaku: "Hankaku/Zenkaku", henkan: "Henkan", muhenkan: "Muhenkan", hiragana: "Hiragana" },
+
+  groups: {
+    switching: "Switching", display: "While typing", apps: "Apps", general: "General", convert: "Conversion", ai: "AI",
+    predict: "Predictions", japanese: "Japanese", english: "English", look: "Look", list: "Display", extra: "Extra candidates",
+    keyboard: "Keyboard", typing: "Typing",
+  },
+  home: {
+    modes: "Input modes",
+    placeholderAi: "Describe what you want (e.g. stop correcting my English)",
+    askLabel: "Ask AI",
+    ask: (query) => `Ask AI: “${query}”`,
+    asking: "AI is looking for settings",
+    failed: "Couldn't ask AI.",
+    nothing: "No settings match.",
+    apply: (label) => (label ? `Apply: ${label}` : "Apply"),
+    undo: "Undo",
+    openIn: (page) => `Open ${page}`,
+    allDescription: "Every setting on one page, or only the ones you changed",
+  },
+  linked: {
+    link: (first, second) => `Use the same setting for ${first} and ${second}`,
+    unlink: "Set each mode separately",
+  },
+  widths: { title: "Full-width and half-width", description: "e.g. half-width abc!?, full-width ａｂｃ！？", letters: "Letters", symbols: "Symbols", space: "Space" },
+  special: { title: "Dates, symbols and sums as candidates", parts: ["Date and time", "Symbols", "Sums"], none: "Off" },
+  slips: { capitalizedExample: "e.g. Cjicago → Chicago", spaceless: ["Off", "Common words", "All words"] },
+  all: { every: "All", changed: (n) => `Changed (${n})`, reset: "Reset to default", none: "No settings are changed." },
 
   general: {
     switchKey: { title: "Switch key", none: "None" },
@@ -114,7 +145,7 @@ const en = {
       saved: "Saved.",
       removed: "Back to the standard row.",
       removeLabel: (keys) => `Remove ${keys}`,
-      back: "Japanese",
+      back: "Keys & typing",
     },
     postal: {
       title: "Postal codes to addresses",
@@ -368,7 +399,11 @@ const en = {
 const ja = {
   lang: "ja",
   settings: "設定",
-  pages: { general: "一般", japanese: "日本語", mixed: "まぜ打ち", auto: "Auto", ai: "AI", dictionary: "辞書と学習", about: "情報", samples: "入力の見本" },
+  pages: {
+    home: "ホーム", general: "一般", conversion: "変換", slips: "入力ミスの修正", notation: "表記", candidates: "候補一覧",
+    keys: "キーと入力", dictionary: "辞書と学習", all: "すべての設定", about: "情報", samples: "入力の見本",
+    romaji: "ローマ字表", japanese: "日本語", mixed: "まぜ打ち", auto: "Auto", ai: "AI",
+  },
   samples: {
     description: "各モードでできる入力を、短い動画で確認できます",
     names: {
@@ -403,6 +438,33 @@ const ja = {
 
   modeNames: { japanese: "日本語", mixed: "まぜ打ち", auto: "Auto", direct: "Direct" },
   keyNames: { hankaku: "半角/全角", henkan: "変換", muhenkan: "無変換", hiragana: "ひらがな" },
+
+  groups: {
+    switching: "切り替え", display: "入力中の表示", apps: "アプリ", general: "全般", convert: "変換", ai: "AI",
+    predict: "予測と補完", japanese: "日本語", english: "英語", look: "見た目", list: "表示", extra: "追加の候補",
+    keyboard: "キーボード", typing: "入力",
+  },
+  home: {
+    modes: "入力モード",
+    placeholderAi: "やりたいことを入力（例：英語が勝手に直される）",
+    askLabel: "AI に聞く",
+    ask: (query) => `「${query}」を AI に聞く`,
+    asking: "AI が設定を探しています",
+    failed: "AI に聞けませんでした。",
+    nothing: "当てはまる設定はありません。",
+    apply: (label) => (label ? `適用：${label}` : "適用"),
+    undo: "元に戻す",
+    openIn: (page) => `${page}を開く`,
+    allDescription: "すべての設定を1ページで確認できます。変更した設定だけに絞り込めます",
+  },
+  linked: {
+    link: (first, second) => `${first}と${second}で同じ設定にする`,
+    unlink: "モードごとに設定する",
+  },
+  widths: { title: "全角と半角", description: "例：半角 abc!?、全角 ａｂｃ！？", letters: "英字", symbols: "記号", space: "スペース" },
+  special: { title: "日付・記号・計算を候補に表示", parts: ["日付と時刻", "記号", "計算結果"], none: "表示しない" },
+  slips: { capitalizedExample: "例：Cjicago → Chicago", spaceless: ["オフ", "よく使う語のみ", "すべての語"] },
+  all: { every: "すべて", changed: (n) => `変更した設定（${n}）`, reset: "既定に戻す", none: "変更した設定はありません。" },
 
   general: {
     switchKey: { title: "切り替えキー", none: "なし" },
@@ -474,7 +536,7 @@ const ja = {
       saved: "保存しました。",
       removed: "標準の行に戻しました。",
       removeLabel: (keys) => `${keys} を削除`,
-      back: "日本語",
+      back: "キーと入力",
     },
     postal: {
       title: "郵便番号から住所に変換",

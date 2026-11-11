@@ -16,13 +16,32 @@ const japanesePackNames = [
 // "?japanese=0" shows Settings as without Japanese installed.
 const japaneseInstalled = new URLSearchParams(window.location.search).get("japanese") !== "0";
 const detectedJapaneseKeyboard = new URLSearchParams(window.location.search).get("keyboard") !== "us";
+// "?ai=1": the light AI model is there and chosen, so Home asks AI.
+const aiInstalled = new URLSearchParams(window.location.search).get("ai") === "1";
+
+// A stand-in for AI's answers to Home's box: a few requests as words to
+// look for, and what it would name for them (only ids it was given).
+const askRules = [
+  [/英語|英単語|english|correct/i, /直|修正|変え|correct|fix/i, [{ type: "setting", id: "englishCorrection", change: { key: "correctionEnabled", value: false, label: "オフ" } }, { type: "page", id: "englishWords" }]],
+  [/全角|半角|width|full/i, null, [{ type: "setting", id: "widths" }, { type: "setting", id: "numbers" }]],
+  [/カタカナ|katakana/i, null, [{ type: "keys", id: "japanese.kana" }]],
+  [/漢字|子ども|kanji/i, null, [{ type: "setting", id: "kanji" }]],
+  [/変な|おかしい|間違|wrong/i, null, [{ type: "page", id: "japaneseWords" }, { type: "page", id: "learned" }, { type: "page", id: "report" }]],
+  [/すぐ|勝手に変換|ライブ|live/i, null, [{ type: "setting", id: "live" }]],
+  [/ピリオド|period|句読点|、/i, null, [{ type: "setting", id: "punctuation" }, { type: "setting", id: "period" }]],
+  [/候補.*(多|少|数)|rows/i, null, [{ type: "setting", id: "rows" }]],
+];
+function fakeAnswers(query, ids) {
+  const rule = askRules.find(([first, second]) => first.test(query) && (!second || second.test(query)));
+  return (rule ? rule[2] : []).filter((item) => item.type !== "setting" || ids.has(item.id));
+}
 
 function initialState() {
   return {
     postalCodes: { installed: false },
     encryption: { wanted: false, encrypted: false },
-    aiModels: { light: { installed: false, bytes: 358021668 }, strong: { installed: false, bytes: 1587553900 },
-      runtime: { installed: false, bytes: 6000000, windowsMl: false, windowsMlBytes: 20000000, windowsMlDownloading: false },
+    aiModels: { light: { installed: aiInstalled, bytes: 358021668 }, strong: { installed: false, bytes: 1587553900 },
+      runtime: { installed: aiInstalled, bytes: 6000000, windowsMl: false, windowsMlBytes: 20000000, windowsMlDownloading: false },
       downloading: 0, error: "",
       gpus: [{ id: 268566271, name: "AMD Radeon RX 7600" }, { id: -2142881189, name: "Intel(R) Arc(TM) Graphics" }],
       npu: true, npuPreparing: false, npuError: "" },
@@ -90,7 +109,7 @@ function initialState() {
       japanesePredictionEnabled: true,
       japaneseLiveConversion: false,
       japaneseSentenceCheck: true,
-      japaneseSentenceModel: 0,
+      japaneseSentenceModel: aiInstalled ? 1 : 0,
       japaneseAiDevice: 0,
       japaneseAiGpu: 0,
       japaneseSlipAutoApply: true,
@@ -294,6 +313,12 @@ export function installMockHost() {
           { reading: "とうきょうえき", surface: "東京駅", kind: "place", action: "first" }];
         const data = JSON.stringify({ requestId, ok: true, error: "", state, text: "2 語を追加しました。" });
         window.setTimeout(() => listeners.forEach((listener) => listener({ data })), 60);
+        return;
+      }
+      if (type === "settings.ask") {
+        const answers = fakeAnswers(message.query, new Set((message.settings || []).map((entry) => entry.id)));
+        const data = JSON.stringify({ requestId, ok: true, error: "", state, answers });
+        window.setTimeout(() => listeners.forEach((listener) => listener({ data })), 700);
         return;
       }
       if (type === "license.get") {

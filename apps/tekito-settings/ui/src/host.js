@@ -42,6 +42,7 @@ export function hostRequest(type, payload = {}, files = []) {
         text: response?.text || "",
         items: response?.items,
         code: response?.code || "",
+        answers: response?.answers,
       });
     };
     if (!webview()) {

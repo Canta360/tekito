@@ -1,19 +1,27 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { CapitataLogo } from "./CapitataLogo.jsx";
 import { hostRequest, onHostStateChanged } from "./host.js";
 import { messages, resolveLanguage, TextContext, useText } from "./i18n.js";
-import { Button, Card, Check, ChoiceRow, Details, Dialog, Heading, Keycaps, LinkRow, ModeIcon, Row, Segmented, Select, Slider, Symbol, Toggle, Wordmark, TekitoSymbol, LineWordmark } from "./ui.jsx";
+import { Button, Card, Details, Dialog, Heading, Keycaps, LinkRow, ModeIcon, Row, Symbol, Toggle, Wordmark, TekitoSymbol, LineWordmark } from "./ui.jsx";
+import { CatalogPage, footPages, navIcons, navPages, pageGroups } from "./catalog.jsx";
+import { AllSettingsPage, HomePage } from "./home.jsx";
+import { KeyList } from "./rows.jsx";
 import "./styles.css";
 
-// The pages, in the order of the list. Japanese and Mix are there while
-// their mode is on; AI with Japanese, which it converts.
-const pageIds = ["general", "japanese", "mixed", "auto", "ai", "dictionary", "about"];
+// The pages, in the order of the list.
+const pageIds = [...navPages, ...footPages];
+// Pages opened from elsewhere (the list, or the setup's --page) that are
+// not in the list.
+const subPages = ["samples", "romaji"];
 // Links from before the pages were rearranged.
-const pageAliases = { switching: "general", candidates: "general", english: "auto", typing: "auto", special: "general" };
+const pageAliases = {
+  japanese: "conversion", mixed: "conversion", ai: "conversion", auto: "slips", switching: "general", english: "slips",
+  typing: "slips", special: "candidates",
+};
 
 // Mirrors the defaults in src/UserData/UserSettings.h; only shown until the
-// host's first reply arrives.
+// host's first reply arrives, and what All settings resets to.
 const initialSettings = {
   startMode: 0,
   switchOrder: 1234,
@@ -94,28 +102,13 @@ const initialSettings = {
   builtInExcludedApps: [],
 };
 
-// The modes in UserSettings::switchOrder's digits, and their switchModes bits.
-const orderDigits = { 1: "japanese", 2: "mixed", 3: "auto", 4: "direct" };
-const modeBits = { japanese: 1, mixed: 2, auto: 4, direct: 8 };
-const orderIds = (order) => String(order).split("").map((digit) => orderDigits[digit]).filter(Boolean);
-const orderValue = (ids) => Number(ids.map((id) => Object.keys(orderDigits).find((digit) => orderDigits[digit] === id)).join(""));
-
-// The English words' six engine policies come down to three behaviors.
-const actionPolicies = { replace: "Correct spelling", suggest: "Suggest alternative", keep: "Protect original" };
-function actionOf(policy) {
-  if (policy === "Protect original") return "keep";
-  if (policy === "Correct spelling" || policy === "Normalize") return "replace";
-  return "suggest";
-}
-
 function pageFromHash() {
   const id = window.location.hash.slice(1);
-  return pageAliases[id] || (pageIds.includes(id) || id === "samples" ? id : "general");
+  return pageAliases[id] || (pageIds.includes(id) || subPages.includes(id) ? id : "home");
 }
 
-// A file dropped anywhere but a drop area is ignored (WebView2 would
-// otherwise open it in place of Settings).
-for (const name of ["dragover", "drop"]) window.addEventListener(name, (event) => event.preventDefault());
+// The AI model files by japaneseSentenceModel.
+const aiModelKeys = ["", "light", "strong"];
 
 function App() {
   const [page, setPage] = useState(pageFromHash);
@@ -263,17 +256,58 @@ function App() {
     return response.ok;
   };
 
-  const shownPages = pageIds.filter((id) => (id !== "japanese" || japanese) && (id !== "mixed" || mixed) &&
-    (id !== "ai" || japaneseInstalled));
-  // 入力の見本 opens from 一般 and is not in the list.
-  const current = page === "samples" || shownPages.includes(page) ? page : "general";
+  const current = pageIds.includes(page) || subPages.includes(page) ? page : "home";
   // Each visit draws the page afresh, so one opened from search on the page
-  // already shown opens its 詳細 too.
+  // already shown opens its 詳細 too. A setting opened from Home is brought
+  // into view and marked for a moment.
   const [visit, setVisit] = useState(0);
-  const open = (id) => {
+  const [focusRow, setFocusRow] = useState(null);
+  const open = (id, rowId, details) => {
+    if (details) {
+      try {
+        window.localStorage.setItem(`tekito.details.${details}`, "1");
+      } catch {
+        // Opening 詳細 for it is a convenience only.
+      }
+    }
     setPage(id);
     setVisit((n) => n + 1);
-    document.querySelector(".content")?.scrollTo(0, 0);
+    setFocusRow(rowId || null);
+    if (!rowId) document.querySelector(".content")?.scrollTo(0, 0);
+  };
+  useEffect(() => {
+    if (!focusRow) return undefined;
+    const timer = window.setTimeout(() => {
+      const element = document.getElementById(`row-${focusRow}`);
+      if (element) {
+        element.scrollIntoView({ block: "center" });
+        element.classList.add("is-found");
+      }
+      setFocusRow(null);
+    }, 30);
+    return () => window.clearTimeout(timer);
+  }, [focusRow, visit]);
+  // Ctrl+F: Home's box, from any page.
+  useEffect(() => {
+    const onKeyDown = (event) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "f") {
+        event.preventDefault();
+        setPage("home");
+        setVisit((n) => n + 1);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  // AI answers Home's box once a model is chosen and there.
+  const chosenModel = settings.japaneseSentenceModel || 0;
+  const aiReady = chosenModel > 0 && Boolean(aiModels[aiModelKeys[chosenModel]]?.installed) && Boolean(aiModels.runtime?.installed);
+  const on = { japanese, mixed, auto: true, direct: true };
+  const japaneseKeyboard = Boolean(runtime.japaneseKeyboard);
+  const ctx = {
+    t, settings, setSetting, runAction, setConfirm, showKeys: setKeys, open, on, multi: japanese || mixed, japaneseInstalled,
+    japaneseKeyboard, aiModels, postalCodes, openRomaji: () => open("romaji"),
   };
   const pageProps = { settings, setSetting, runAction, setConfirm, showKeys: setKeys, open };
 
@@ -282,13 +316,10 @@ function App() {
       <div className="app">
         <aside className="sidebar">
           <div className="brand"><TekitoSymbol size={20} /><LineWordmark height={13} />{t.settings}</div>
-          <SettingsSearch pages={shownPages} open={open} japaneseInstalled={japaneseInstalled} />
           <nav aria-label={t.settings} style={{ display: "contents" }}>
-            {shownPages.filter((id) => id !== "about").map((id) => (
-              <NavItem key={id} id={id} current={current === id} onClick={() => open(id)} />
-            ))}
+            {navPages.map((id) => <NavItem key={id} id={id} current={current === id} onClick={() => open(id)} />)}
             <span className="nav-spacer" />
-            <NavItem id="about" current={current === "about"} onClick={() => open("about")} />
+            {footPages.map((id) => <NavItem key={id} id={id} current={current === id} onClick={() => open(id)} />)}
           </nav>
         </aside>
 
@@ -303,15 +334,13 @@ function App() {
               </Card>
             ) : (
               <>
-                {current === "general" && <GeneralPage {...pageProps} mode={mode} japaneseInstalled={japaneseInstalled}
-                  japaneseKeyboard={Boolean(runtime.japaneseKeyboard)} changeMode={changeMode} />}
-                {current === "japanese" && <JapanesePage {...pageProps} romaji={romaji} postalCodes={postalCodes} />}
-                {current === "mixed" && <MixedPage {...pageProps} />}
-                {current === "auto" && <AutoPage {...pageProps} />}
-                {current === "ai" && <AiPage {...pageProps} aiModels={aiModels} />}
+                {current === "home" && <HomePage ctx={ctx} mode={mode} changeMode={changeMode} aiReady={aiReady} />}
+                {pageGroups[current] && <CatalogPage page={current} ctx={ctx} />}
+                {current === "all" && <AllSettingsPage ctx={ctx} defaults={initialSettings} />}
                 {current === "dictionary" && <DictionaryPage {...pageProps} japanese={japaneseInstalled} learning={learning} encryption={encryption}
                   dictionary={dictionary} japaneseWords={japaneseWords} setModal={setModal} />}
-                {current === "samples" && <SamplesPage japaneseInstalled={japaneseInstalled} back={() => open("general")} />}
+                {current === "samples" && <SamplesPage japaneseInstalled={japaneseInstalled} back={() => open("home")} />}
+                {current === "romaji" && <RomajiTable romaji={romaji} runAction={runAction} setConfirm={setConfirm} back={() => open("keys")} />}
                 {current === "about" && <AboutPage {...pageProps} version={version} runtime={runtime} packs={packs} japanese={japaneseInstalled} />}
               </>
             )}
@@ -333,7 +362,7 @@ function App() {
           </div>
         </Dialog>
         <Dialog open={Boolean(keys)} title={t.keysTitle} onClose={() => setKeys(null)}>
-          {keys && <KeyList page={keys} japaneseKeyboard={Boolean(runtime.japaneseKeyboard)} settings={settings} japanese={japanese} />}
+          {keys && <KeyList japaneseKeyboard={japaneseKeyboard} settings={settings} japanese={japanese} />}
           <div className="dialog-actions"><Button variant="primary" onClick={() => setKeys(null)}>{t.close}</Button></div>
         </Dialog>
         {notice && <div key={notice.key} className={`toast ${notice.tone}`} role="status" aria-live="polite">{notice.message}</div>}
@@ -342,397 +371,27 @@ function App() {
   );
 }
 
-const navIcons = { general: "settings", ai: "wand_stars", dictionary: "menu_book", about: "info" };
-
 function NavItem({ id, current, onClick }) {
   const t = useText();
   return (
     <button type="button" className={`nav-item ${current ? "is-current" : ""}`} aria-current={current ? "page" : undefined} onClick={onClick}>
-      {navIcons[id] ? <Symbol name={navIcons[id]} size={18} /> : <ModeIcon id={id} size={18} />}
+      <Symbol name={navIcons[id]} size={18} />
       {t.pages[id]}
     </button>
   );
 }
 
-// Settings found only by searching for them by name: [page, name, under
-// 詳細, names that find it, key]. Once found they stay on the page.
-const hiddenSettings = (t) => [
-  ["general", t.general.rainbow.title, true, ["rainbow", "レインボー", "にじ", "虹"], "rainbow"],
-  ["general", t.general.cat.title, true, ["cat", "ねこ", "猫", "ネコ"], "cat"],
-];
-const revealHidden = (key) => {
-  try {
-    window.localStorage.setItem(`tekito.found.${key}`, "1");
-  } catch {
-    // Showing it again later is a convenience only.
-  }
-};
-const wasFound = (key) => {
-  try {
-    return window.localStorage.getItem(`tekito.found.${key}`) === "1";
-  } catch {
-    return false;
-  }
-};
-
-// The settings by name, for the search box: [page, name, under 詳細].
-function searchIndex(t, pages, japaneseInstalled) {
-  const g = t.general;
-  const j = t.japanese;
-  const m = t.mixed;
-  const a = t.auto;
-  const d = t.dictionary;
-  const entries = [
-    ["general", g.switchKey.title], ["general", g.order.title], ["general", g.indicator.title], ["general", g.candidates],
-    ["general", g.rows.title], ["general", g.meanings.title], ["general", g.startMode.title, true], ["general", g.modePerApp.title, true],
-    ["general", g.underline.title, true], ["general", g.keyboard.title, true], ["general", g.date.title, true],
-    ["general", g.symbols.title, true], ["general", g.calculator.title, true], ["general", g.candidateList.title, true],
-    ["general", g.brackets.title, true], ["general", g.language.title, true], ["general", g.excluded.title, true],
-    ["japanese", j.live.title], ["japanese", j.prediction.title], ["japanese", j.numbers.title], ["japanese", j.kanji.title],
-    ["japanese", j.romaji.title], ["japanese", j.postal.title], ["japanese", j.kanaInput.title, true], ["japanese", j.capsLock.title, true],
-    ["japanese", j.punctuation.title, true], ["japanese", j.space.title, true], ["japanese", j.letters.title, true],
-    ["japanese", j.symbols.title, true], ["japanese", j.spacing.title, true], ["japanese", j.slipAutoApply.title, true],
-    ["japanese", j.sentenceCheck.title, true], ["japanese", j.firstPageSymbol.title, true], ["japanese", j.typedForms.title, true],
-    ["japanese", j.kanjiVariants.title, true],
-    ["mixed", m.live.title], ["mixed", m.prediction.title], ["mixed", m.singleVowel.title], ["mixed", m.correction.title],
-    ["mixed", m.firstPageSymbol.title, true], ["mixed", m.marker.title, true], ["mixed", m.englishUnderline.title, true], ["mixed", m.spaceless.title, true],
-    ["auto", a.correction.title], ["auto", a.spelling.title], ["auto", a.completion.title], ["auto", a.next.title], ["auto", a.casual.title],
-    ["auto", a.doubled.title, true], ["auto", a.recheck.title, true], ["auto", a.phonetic.title, true], ["auto", a.period.title, true],
-    ["auto", a.doubleSpace.title, true], ["auto", a.smart.title, true], ["auto", a.spaceless.title, true],
-    ["auto", a.spacelessAlways.title, true],
-    ["ai", t.ai.title], ["ai", t.ai.device.title],
-    ["dictionary", d.japaneseWords.title], ["dictionary", d.englishWords.title], ["dictionary", d.files.title],
-    ["dictionary", d.learn.title], ["dictionary", d.learned.title], ["dictionary", d.secret.title], ["dictionary", d.private.title], ["dictionary", d.encryption.title, true],
-    ["about", t.about.report.title], ["about", t.about.bug.title], ["about", t.about.feature.title], ["about", t.about.releases.title],
-    ["about", t.about.diagnostics], ["about", t.about.license],
-  ];
-  return entries.filter(([page, title]) => pages.includes(page) &&
-    (japaneseInstalled || (title !== d.japaneseWords.title && title !== t.about.report.title)));
+// The English words' six engine policies come down to three behaviors.
+const actionPolicies = { replace: "Correct spelling", suggest: "Suggest alternative", keep: "Protect original" };
+function actionOf(policy) {
+  if (policy === "Protect original") return "keep";
+  if (policy === "Correct spelling" || policy === "Normalize") return "replace";
+  return "suggest";
 }
 
-function SettingsSearch({ pages, open, japaneseInstalled }) {
-  const t = useText();
-  const [query, setQuery] = useState("");
-  const needle = query.trim().toLowerCase();
-  const eggs = needle ? hiddenSettings(t).filter(([, , , names]) => names.includes(needle)) : [];
-  const results = needle
-    ? [...eggs, ...searchIndex(t, pages, japaneseInstalled).filter(([, title]) => title.toLowerCase().includes(needle))].slice(0, 8)
-    : [];
-  const go = ([page, , detailed, , egg]) => {
-    if (egg) revealHidden(egg);
-    if (detailed) {
-      try {
-        window.localStorage.setItem(`tekito.details.${page}`, "1");
-      } catch {
-        // Opening 詳細 for it is a convenience only.
-      }
-    }
-    setQuery("");
-    open(page);
-  };
-  return (
-    <div className="search-box">
-      <input aria-label={t.search} placeholder={t.search} value={query} onChange={(event) => setQuery(event.target.value)}
-        onKeyDown={(event) => { if (event.key === "Enter" && results[0]) go(results[0]); if (event.key === "Escape") setQuery(""); }} />
-      <Symbol name="search" size={16} />
-      {needle && (
-        <div className="search-results">
-          {results.length === 0 ? <p>{t.noResults}</p> : results.map((entry) => (
-            <button key={`${entry[0]}-${entry[1]}`} type="button" onClick={() => go(entry)}>
-              {entry[1]}<small>{t.pages[entry[0]]}</small>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// The keyboard's own switch key (UserSettings::toggleKey 1).
-const ownSwitchKey = (japaneseKeyboard, t) => (japaneseKeyboard ? [t.keyNames.hankaku] : ["Alt", "`"]);
-const switchKeyCaps = (toggleKey, japaneseKeyboard, t) =>
-  toggleKey === 1 ? ownSwitchKey(japaneseKeyboard, t)
-  : toggleKey === 2 ? ["Ctrl", "Space"]
-  : toggleKey === 3 ? ["Ctrl", "Shift", "Space"]
-  : null;
-
-function KeyList({ page, japaneseKeyboard, settings, japanese }) {
-  const t = useText();
-  const rows = [];
-  if (page === "general") {
-    const switchKey = switchKeyCaps(settings.toggleKey, japaneseKeyboard, t);
-    if (switchKey) rows.push([japanese ? t.modeKeys.switch : t.modeKeys.switchEnglish, switchKey]);
-    if (japanese && japaneseKeyboard) {
-      rows.push([t.modeKeys.henkan, [t.keyNames.henkan]], [t.modeKeys.muhenkan, [t.keyNames.muhenkan]], [t.modeKeys.hiragana, [t.keyNames.hiragana]]);
-    }
-    rows.push([t.modeKeys.taskbar, [t.modeKeys.taskbarButton]]);
-  } else if (page === "japanese") {
-    const k = t.japanese.keys;
-    rows.push([k.convert, ["Space"]], [k.phrases, ["←", "→"]], [k.resize, ["Shift", "←", "→"]], [k.predictions, ["Tab", "↓"]],
-      [k.kana, ["F6", "F7", "F8"]], [k.letters, ["F9", "F10"]], [k.ctrlForms, ["Ctrl", "U I O P T"]], [k.english, ["Shift", "A-Z"]],
-      [k.back, ["Esc"]], [k.undo, ["Ctrl", "Backspace"]], [k.forget, ["Ctrl", "Delete"]]);
-  } else {
-    const k = t.auto.keys;
-    rows.push([k.next, ["Space"]], [k.previous, ["Shift", "Space"]], [k.browse, ["Tab", "↑", "↓"]], [k.undo, ["Backspace"]], [k.keep, ["Esc"]]);
-  }
-  return (
-    <ul className="list key-list">
-      {rows.map(([label, caps]) => <li key={label}><span className="text">{label}</span><Keycaps keys={caps} /></li>)}
-    </ul>
-  );
-}
-
-function KeysCard({ page, showKeys }) {
-  const t = useText();
-  return <Card label={t.keysTitle}><LinkRow icon="keyboard_command_key" title={t.keysRow} onClick={() => showKeys(page)} /></Card>;
-}
-
-// ---------------------------------------------------------------------------
-// 一般: the modes, switching, the candidate list, and what applies to all.
-
-function GeneralPage({ settings, setSetting, runAction, showKeys, open, mode, changeMode, japaneseInstalled, japaneseKeyboard }) {
-  const t = useText();
-  const g = t.general;
-  const japanese = japaneseInstalled && settings.japaneseEnabled !== false;
-  const mixed = japaneseInstalled && Boolean(settings.mixedTypingEnabled);
-  const modes = japaneseInstalled ? ["japanese", "mixed", "auto", "direct"] : ["auto", "direct"];
-  const modeOn = { japanese, mixed, auto: true, direct: true };
-  const switchable = { japanese: "japaneseEnabled", mixed: "mixedTypingEnabled" };
-  const toggleKeys = [1, 2, 3].map((value) => [value, <Keycaps keys={switchKeyCaps(value, japaneseKeyboard, t)} />]).concat([[0, g.switchKey.none]]);
-  const today = new Date();
-  const pad = (value) => String(value).padStart(2, "0");
-  const japaneseDate = `${today.getFullYear()}/${pad(today.getMonth() + 1)}/${pad(today.getDate())}`;
-  const englishDate = today.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
-  const startModes = [[0, g.startMode.last]].concat(
-    (japaneseInstalled ? [[1, "japanese"], [2, "mixed"]] : []).concat([[3, "auto"], [4, "direct"]])
-      .filter(([, id]) => modeOn[id]).map(([value, id]) => [value, t.modeNames[id]]));
-  return (
-    <>
-      <div className="mode-cards">
-        {modes.map((id) => (
-          <div key={id} role="button" tabIndex={0} aria-pressed={mode === id}
-            className={`mode-card ${mode === id ? "is-current" : ""} ${modeOn[id] ? "" : "is-off"}`}
-            onClick={() => modeOn[id] && changeMode(id)}
-            onKeyDown={(event) => { if ((event.key === "Enter" || event.key === " ") && modeOn[id]) { event.preventDefault(); changeMode(id); } }}>
-            <span className="mode-card-icon"><ModeIcon id={id} size={32} /></span>
-            <span className="mode-card-name">
-              {t.modeNames[id]}
-              {switchable[id] && (
-                <span onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
-                  <Toggle label={t.modeNames[id]} checked={modeOn[id]} onChange={(value) => setSetting(switchable[id], value)} />
-                </span>
-              )}
-            </span>
-            <small>{mode === id ? t.inUse : ""}</small>
-          </div>
-        ))}
-      </div>
-
-      <Card label={g.switching}>
-        <Row icon="keyboard" title={g.switchKey.title}>
-          <Segmented label={g.switchKey.title} value={settings.toggleKey} options={toggleKeys} onChange={(value) => setSetting("toggleKey", value)} />
-        </Row>
-        {(japanese || mixed) && <SwitchOrder settings={settings} setSetting={setSetting} modeOn={modeOn} />}
-      </Card>
-
-      <Card label={g.indicator.title}>
-        <Row icon="tooltip" title={g.indicator.title} description={g.indicator.description}
-          sub={settings.modeIndicatorEnabled && (
-            <Check label={g.indicator.onFocus} checked={settings.modeBadgeOnFocus} onChange={(value) => setSetting("modeBadgeOnFocus", value)} />
-          )}>
-          <Toggle label={g.indicator.title} checked={settings.modeIndicatorEnabled} onChange={(value) => setSetting("modeIndicatorEnabled", value)} />
-        </Row>
-      </Card>
-
-      <Heading>{g.candidates}</Heading>
-      <div className="looks" role="radiogroup" aria-label={g.candidates}>
-        {["glass", "simple"].map((id, value) => (
-          <button key={id} type="button" role="radio" aria-checked={settings.candidateWindowStyle === value} className="look"
-            onClick={() => setSetting("candidateWindowStyle", value)}>
-            <picture>
-              <source media="(prefers-color-scheme: dark)" srcSet={`./assets/candidates/${id}-dark.png`} />
-              <img src={`./assets/candidates/${id}-light.png`} alt="" />
-            </picture>
-            {g.styles[id]}
-          </button>
-        ))}
-      </div>
-      <Card label={g.candidates}>
-        <Row icon="format_list_numbered" title={g.rows.title} description={g.rows.description}>
-          <Segmented label={g.rows.title} value={settings.candidateRows} options={[[0, g.rows.automatic], [5, "5"], [7, "7"], [9, "9"]]}
-            onChange={(value) => setSetting("candidateRows", value)} />
-        </Row>
-        <Row icon="menu_book" title={g.meanings.title} description={g.meanings.description}>
-          <Toggle label={g.meanings.title} checked={settings.meaningsEnabled} onChange={(value) => setSetting("meaningsEnabled", value)} />
-        </Row>
-        {settings.meaningsEnabled && japaneseInstalled && (
-          <Row icon="translate" title={g.meaningsLanguage.title} description={g.meaningsLanguage.description}>
-            <Toggle label={g.meaningsLanguage.title} checked={settings.meaningsInUiLanguage} onChange={(value) => setSetting("meaningsInUiLanguage", value)} />
-          </Row>
-        )}
-      </Card>
-
-      <Card label={t.pages.samples}>
-        <LinkRow icon="play_circle" title={t.pages.samples} description={t.samples.description} onClick={() => open("samples")} />
-      </Card>
-
-      <Details id="general" title={t.details}>
-        <Card label={g.switching}>
-          <Row icon="power_settings_new" title={g.startMode.title}>
-            <Select label={g.startMode.title} value={startModes.some(([value]) => value === settings.startMode) ? settings.startMode : 0}
-              options={startModes} onChange={(value) => setSetting("startMode", value)} />
-          </Row>
-          <Row icon="apps" title={g.modePerApp.title} description={g.modePerApp.description}>
-            <Toggle label={g.modePerApp.title} checked={settings.modePerApp} onChange={(value) => setSetting("modePerApp", value)} />
-          </Row>
-          <Row icon="format_underlined" title={g.underline.title} description={g.underline.description}>
-            <Toggle label={g.underline.title} checked={settings.modeUnderlineColors} onChange={(value) => setSetting("modeUnderlineColors", value)} />
-          </Row>
-          <Row icon="keyboard_alt" title={g.keyboard.title}>
-            <Segmented label={g.keyboard.title} value={settings.keyboardType}
-              options={[[0, g.keyboard.detect], [1, g.keyboard.japanese], [2, g.keyboard.us]]} onChange={(value) => setSetting("keyboardType", value)} />
-          </Row>
-        </Card>
-        <Card label={g.extra}>
-          <Row icon="calendar_today" title={g.date.title} description={g.date.description(japaneseDate, englishDate)}>
-            <Toggle label={g.date.title} checked={settings.dateConversion} onChange={(value) => setSetting("dateConversion", value)} />
-          </Row>
-          <Row icon="emoji_symbols" title={g.symbols.title} description={g.symbols.description}>
-            <Toggle label={g.symbols.title} checked={settings.symbolConversion} onChange={(value) => setSetting("symbolConversion", value)} />
-          </Row>
-          <Row icon="calculate" title={g.calculator.title} description={g.calculator.description}>
-            <Toggle label={g.calculator.title} checked={settings.calculatorEnabled} onChange={(value) => setSetting("calculatorEnabled", value)} />
-          </Row>
-          <Row icon="list_alt" title={g.candidateList.title}>
-            <Toggle label={g.candidateList.title} checked={settings.candidateWindowEnabled} onChange={(value) => setSetting("candidateWindowEnabled", value)} />
-          </Row>
-        </Card>
-        <Card label={g.general}>
-          <Row icon="data_object" title={g.brackets.title} description={g.brackets.description}>
-            <Toggle label={g.brackets.title} checked={settings.bracketPairs} onChange={(value) => setSetting("bracketPairs", value)} />
-          </Row>
-          <Row icon="language" title={g.language.title}>
-            <Segmented label={g.language.title} value={settings.uiLanguage} options={[[0, g.language.system], [1, "English"], [2, "日本語"]]}
-              onChange={(value) => setSetting("uiLanguage", value)} />
-          </Row>
-        </Card>
-        <ExcludedApps settings={settings} runAction={runAction} />
-        <KeysCard page="general" showKeys={showKeys} />
-        {(settings.rainbowAccent || settings.catSounds || wasFound("rainbow") || wasFound("cat")) && (
-          <Card label={g.rainbow.title}>
-            {(settings.rainbowAccent || wasFound("rainbow")) && (
-              <Row icon="palette" title={g.rainbow.title} description={g.rainbow.description}>
-                <Toggle label={g.rainbow.title} checked={settings.rainbowAccent} onChange={(value) => setSetting("rainbowAccent", value)} />
-              </Row>
-            )}
-            {(settings.catSounds || wasFound("cat")) && (
-              <Row icon="pets" title={g.cat.title} description={g.cat.description}>
-                <Toggle label={g.cat.title} checked={settings.catSounds} onChange={(value) => setSetting("catSounds", value)} />
-              </Row>
-            )}
-          </Card>
-        )}
-      </Details>
-    </>
-  );
-}
-
-// The switch key's round: the modes, each on or off, dragged into order.
-function SwitchOrder({ settings, setSetting, modeOn }) {
-  const t = useText();
-  const g = t.general;
-  const ids = orderIds(settings.switchOrder).filter((id) => modeOn[id]);
-  const [dragging, setDragging] = useState(null);
-  const [target, setTarget] = useState(null);
-  const inRound = (id) => (settings.switchModes & modeBits[id]) !== 0;
-  const round = ids.filter(inRound);
-  // Modes that are off keep their place in the order.
-  const move = (id, to) => {
-    const all = orderIds(settings.switchOrder);
-    const shown = all.filter((other) => modeOn[other]);
-    const from = shown.indexOf(id);
-    if (from < 0 || to < 0 || to >= shown.length || from === to) return;
-    const moved = [...shown];
-    moved.splice(from, 1);
-    moved.splice(to, 0, id);
-    let next = 0;
-    setSetting("switchOrder", orderValue(all.map((other) => (modeOn[other] ? moved[next++] : other))));
-  };
-  return (
-    <Row icon="swap_horiz" title={g.order.title}
-      sub={(
-        <ul className="order" aria-label={g.order.title}>
-          {ids.map((id, index) => (
-            <li key={id} draggable className={`${inRound(id) ? "" : "is-off"} ${dragging === id ? "is-dragging" : ""} ${target === id ? "is-target" : ""}`}
-              onDragStart={(event) => { setDragging(id); event.dataTransfer.effectAllowed = "move"; }}
-              onDragOver={(event) => { event.preventDefault(); setTarget(id); }}
-              onDragLeave={() => setTarget(null)}
-              onDrop={(event) => { event.preventDefault(); move(dragging, index); setDragging(null); setTarget(null); }}
-              onDragEnd={() => { setDragging(null); setTarget(null); }}
-              onKeyDown={(event) => {
-                if (!event.altKey) return;
-                if (event.key === "ArrowUp") { event.preventDefault(); move(id, index - 1); }
-                if (event.key === "ArrowDown") { event.preventDefault(); move(id, index + 1); }
-              }}>
-              <span className="handle" aria-hidden="true"><Symbol name="drag_indicator" size={18} /></span>
-              <input type="checkbox" aria-label={t.modeNames[id]} checked={inRound(id)}
-                onChange={(event) => setSetting("switchModes", event.target.checked ? settings.switchModes | modeBits[id] : settings.switchModes & ~modeBits[id])} />
-              <ModeIcon id={id} size={20} />
-              <span className="name">{t.modeNames[id]}</span>
-              <button type="button" className="icon-btn" aria-label={g.order.moveUp(t.modeNames[id])} disabled={index === 0} onClick={() => move(id, index - 1)}>
-                <Symbol name="keyboard_arrow_up" size={18} />
-              </button>
-              <button type="button" className="icon-btn" aria-label={g.order.moveDown(t.modeNames[id])} disabled={index === ids.length - 1} onClick={() => move(id, index + 1)}>
-                <Symbol name="keyboard_arrow_down" size={18} />
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}>
-      <span className="cycle" aria-hidden="true">
-        {round.map((id) => <React.Fragment key={id}><ModeIcon id={id} size={22} /><Symbol name="chevron_right" size={16} /></React.Fragment>)}
-        <Symbol name="repeat" size={18} />
-      </span>
-    </Row>
-  );
-}
-
-function ExcludedApps({ settings, runAction }) {
-  const t = useText();
-  const e = t.general.excluded;
-  const [name, setName] = useState("");
-  const add = async (event) => {
-    event.preventDefault();
-    if (!name.trim()) return;
-    const response = await runAction("excludedApps.add", { name: name.trim() });
-    if (response.ok) setName("");
-  };
-  return (
-    <Card label={e.title}>
-      <Row icon="block" title={e.title} description={e.description}
-        sub={(
-          <>
-            <ul className="list" aria-label={e.title}>
-              {settings.excludedApps.map((app) => (
-                <li key={app}>
-                  <span className="text">{app}</span>
-                  <button type="button" className="icon-btn" aria-label={e.remove(app)} onClick={() => runAction("excludedApps.remove", { name: app })}>
-                    <Symbol name="close" size={18} />
-                  </button>
-                </li>
-              ))}
-            </ul>
-            <form className="inline-form" onSubmit={add}>
-              <input aria-label={e.placeholder} placeholder={e.placeholder} value={name} onChange={(event) => setName(event.target.value)} />
-              <Button type="submit" disabled={!name.trim()}>{t.add}</Button>
-            </form>
-          </>
-        )}>
-        <Button onClick={() => runAction("excludedApps.browse", {})}>{e.choose}</Button>
-      </Row>
-    </Card>
-  );
-}
+// A file dropped anywhere but a drop area is ignored (WebView2 would
+// otherwise open it in place of Settings).
+for (const name of ["dragover", "drop"]) window.addEventListener(name, (event) => event.preventDefault());
 
 // ---------------------------------------------------------------------------
 // 日本語
@@ -762,7 +421,7 @@ function SamplesPage({ japaneseInstalled, back }) {
   const clip = (id) => `./samples/${id}-${theme}.mp4`;
   return (
     <>
-      <Button icon="chevron_left" variant="quiet" className="back" onClick={back}>{t.pages.general}</Button>
+      <Button icon="chevron_left" variant="quiet" className="back" onClick={back}>{t.pages.home}</Button>
       <div className="sample-tabs" role="tablist" aria-label={t.pages.samples}>
         {modes.map((id) => (
           <button key={id} type="button" role="tab" aria-selected={mode === id} className="sample-tab" onClick={() => setMode(id)}>
@@ -791,309 +450,6 @@ function SamplesPage({ japaneseInstalled, back }) {
         <div className="dialog-actions"><Button variant="primary" onClick={() => setShown(null)}>{t.close}</Button></div>
       </Dialog>
     </>
-  );
-}
-
-// The kanji slider's stops and the settings each stands for.
-const kanjiStops = [1, 2, 3, 4, 5, 6, 7, 8];
-function kanjiStop(settings) {
-  if (settings.japaneseKanjiRange === 3) return Math.min(Math.max(settings.japaneseKanjiGrade, 1), 6);
-  if (settings.japaneseKanjiRange === 0) return 8;
-  return 7;
-}
-
-function JapanesePage({ settings, setSetting, runAction, setConfirm, showKeys, romaji, postalCodes }) {
-  const t = useText();
-  const j = t.japanese;
-  const [romajiOpen, setRomajiOpen] = useState(false);
-  if (romajiOpen) return <RomajiTable romaji={romaji} runAction={runAction} setConfirm={setConfirm} back={() => setRomajiOpen(false)} />;
-  const stop = kanjiStop(settings);
-  const setKanji = async (value) => {
-    if (value <= 6) {
-      await setSetting("japaneseKanjiRange", 3);
-      await setSetting("japaneseKanjiGrade", value);
-    } else {
-      await setSetting("japaneseKanjiRange", value === 7 ? 2 : 0);
-    }
-  };
-  // Numbers: the style, with the matching width for the digits typed.
-  const setNumbers = async (value) => {
-    await setSetting("japaneseNumberStyle", value);
-    if (value <= 3) await setSetting("japaneseDigitWidth", value - 1);
-  };
-  const numberOptions = j.numbers.options.map(([name, example], index) => [index + 1, name, example]);
-  return (
-    <>
-      <Card label={j.live.title}>
-        <Row icon="bolt" title={j.live.title} description={j.live.description}
-          sub={settings.japaneseLiveConversion && (
-            <Check label={j.live.refine} checked={settings.japaneseLiveRefine} onChange={(value) => setSetting("japaneseLiveRefine", value)} />
-          )}>
-          <Toggle label={j.live.title} checked={settings.japaneseLiveConversion} onChange={(value) => setSetting("japaneseLiveConversion", value)} />
-        </Row>
-        <Row icon="lightbulb" title={j.prediction.title} description={j.prediction.description}>
-          <Toggle label={j.prediction.title} checked={settings.japanesePredictionEnabled} onChange={(value) => setSetting("japanesePredictionEnabled", value)} />
-        </Row>
-        <NumbersRow settings={settings} setSetting={setSetting} options={numberOptions} onChange={setNumbers} />
-        <Row icon={<span className="row-glyph" aria-hidden="true">漢</span>} title={j.kanji.title} description={j.kanji.description}
-          sub={stop < 8 && (
-            <Check label={j.kanji.names} example={j.kanji.namesExample} checked={settings.japaneseKanjiNames}
-              onChange={(value) => setSetting("japaneseKanjiNames", value)} />
-          )}>
-          <span style={{ display: "grid", gap: 4 }}>
-            <Slider label={j.kanji.title} value={stop} stops={kanjiStops.map((value, index) => [value, j.kanji.stops[index]])} onChange={setKanji} />
-            <small className="muted">{j.kanji.examples[stop - 1]}</small>
-          </span>
-        </Row>
-      </Card>
-      <Card label={j.romaji.title}>
-        <LinkRow icon="table" title={j.romaji.title} description={j.romaji.description} onClick={() => setRomajiOpen(true)} />
-        <PostalCodes postalCodes={postalCodes} runAction={runAction} setConfirm={setConfirm} />
-      </Card>
-
-      <Details id="japanese" title={t.details}>
-        <Card label={j.input}>
-          <Row icon="keyboard" title={j.kanaInput.title} description={j.kanaInput.description}
-            sub={<Check label={j.kanaInput.key} checked={settings.japaneseKanaInputKey} onChange={(value) => setSetting("japaneseKanaInputKey", value)} />}>
-            <Toggle label={j.kanaInput.title} checked={settings.japaneseKanaInput} onChange={(value) => setSetting("japaneseKanaInput", value)} />
-          </Row>
-          <Row icon="keyboard_capslock" title={j.capsLock.title}>
-            <Toggle label={j.capsLock.title} checked={settings.japaneseIgnoreCapsLock} onChange={(value) => setSetting("japaneseIgnoreCapsLock", value)} />
-          </Row>
-          <Row icon="dialpad" title={j.numpad.title} description={j.numpad.description}>
-            <Toggle label={j.numpad.title} checked={settings.japaneseNumpadDirect} onChange={(value) => setSetting("japaneseNumpadDirect", value)} />
-          </Row>
-        </Card>
-        <Card label={j.notation}>
-          <Row icon="edit_note" title={j.punctuation.title}>
-            <Segmented label={j.punctuation.title} value={settings.japanesePunctuation} options={[[0, "、。"], [1, "，．"], [2, "，。"], [3, "、．"]]}
-              onChange={(value) => setSetting("japanesePunctuation", value)} />
-          </Row>
-          <Row icon="space_bar" title={j.space.title}>
-            <Segmented label={j.space.title} value={settings.japaneseSpaceWidth === 1 ? 1 : 0} options={[[1, j.space.half], [0, j.space.full]]}
-              onChange={(value) => setSetting("japaneseSpaceWidth", value)} />
-          </Row>
-          <Row icon="abc" title={j.letters.title} description={j.letters.description}>
-            <Segmented label={j.letters.title} value={settings.japaneseLetterWidth} options={[[1, j.space.half], [0, j.space.full]]}
-              onChange={(value) => setSetting("japaneseLetterWidth", value)} />
-          </Row>
-          <Row icon="emoji_symbols" title={j.symbols.title} description={j.symbols.description}>
-            <Segmented label={j.symbols.title} value={settings.japaneseSymbolWidth} options={[[1, j.space.half], [0, j.space.full]]}
-              onChange={(value) => setSetting("japaneseSymbolWidth", value)} />
-          </Row>
-          <Row icon="format_letter_spacing" title={j.spacing.title} description={j.spacing.description}>
-            <Toggle label={j.spacing.title} checked={settings.japaneseEnglishSpacing} onChange={(value) => setSetting("japaneseEnglishSpacing", value)} />
-          </Row>
-        </Card>
-        <Card label={j.candidates}>
-          <Row icon="spellcheck" title={j.slipAutoApply.title} description={j.slipAutoApply.description}>
-            <Toggle label={j.slipAutoApply.title} checked={settings.japaneseSlipAutoApply} onChange={(value) => setSetting("japaneseSlipAutoApply", value)} />
-          </Row>
-          <Row icon="notes" title={j.sentenceCheck.title} description={j.sentenceCheck.description}>
-            <Toggle label={j.sentenceCheck.title} checked={settings.japaneseSentenceCheck} onChange={(value) => setSetting("japaneseSentenceCheck", value)} />
-          </Row>
-          <Row icon="mood" title={j.firstPageSymbol.title} description={j.firstPageSymbol.description}>
-            <Toggle label={j.firstPageSymbol.title} checked={settings.japaneseFirstPageSymbol} onChange={(value) => setSetting("japaneseFirstPageSymbol", value)} />
-          </Row>
-          <Row icon="text_fields" title={j.typedForms.title} description={j.typedForms.description}>
-            <Toggle label={j.typedForms.title} checked={settings.japaneseTypedForms} onChange={(value) => setSetting("japaneseTypedForms", value)} />
-          </Row>
-          <Row icon="ink_highlighter" title={j.kanjiVariants.title} description={j.kanjiVariants.description}>
-            <Toggle label={j.kanjiVariants.title} checked={settings.japaneseKanjiVariants} onChange={(value) => setSetting("japaneseKanjiVariants", value)} />
-          </Row>
-        </Card>
-        <KeysCard page="japanese" showKeys={showKeys} />
-      </Details>
-    </>
-  );
-}
-
-// 数字の変換: the style, and the checks that belong to numbers.
-function NumbersRow({ settings, setSetting, options, onChange }) {
-  const t = useText();
-  const j = t.japanese;
-  const [open, setOpen] = useState(false);
-  const style = Math.min(Math.max(settings.japaneseNumberStyle, 1), 5);
-  const current = options[style - 1];
-  return (
-    <div className="row-block">
-      <button type="button" className="row is-link" aria-expanded={open} onClick={() => setOpen(!open)}>
-        <span className="row-icon"><Symbol name="pin" /></span>
-        <span className="row-text"><span className="row-title">{j.numbers.title}</span><small>{j.numbers.description}</small></span>
-        <span className="row-value">{current[1]}<small>{current[2]}</small></span>
-        <Symbol name={open ? "keyboard_arrow_up" : "keyboard_arrow_down"} size={18} className="row-chevron" />
-      </button>
-      {open && (
-        <div className="row-panel" role="radiogroup" aria-label={j.numbers.title}>
-          {options.map(([value, name, example]) => (
-            <label key={value} className="radio">
-              <input type="radio" name="numbers" checked={value === style} onChange={() => onChange(value)} />
-              <span className="radio-name">{name}</span>
-              <small>{example}</small>
-            </label>
-          ))}
-          <span className="row-panel-line" />
-          <Check label={j.numbers.rough} example={j.numbers.roughExample} checked={settings.japaneseRoughNumbersKanji}
-            onChange={(value) => setSetting("japaneseRoughNumbersKanji", value)} />
-          <Check label={j.numbers.other} example={j.numbers.otherExample} checked={settings.numberConversion}
-            onChange={(value) => setSetting("numberConversion", value)} />
-        </div>
-      )}
-    </div>
-  );
-}
-
-// The AI model the sentence check also reads with: none, or one of two,
-// downloaded once the user agrees to it.
-// AI: the model that reads conversions again (downloaded with what runs
-// it), and where it runs.
-function AiPage({ settings, setSetting, runAction, setConfirm, aiModels }) {
-  const t = useText();
-  const d = t.ai.device;
-  const gpus = aiModels.gpus || [];
-  // Which GPU, once the AI model runs on one and there are several.
-  const pickGpu = (settings.japaneseSentenceModel || 0) > 0 && aiModels.runtime?.windowsMl && settings.japaneseAiDevice === 2 &&
-    gpus.length > 1;
-  return (
-    <>
-      <Card label={t.pages.ai}>
-        <AiModelRow settings={settings} setSetting={setSetting} runAction={runAction} setConfirm={setConfirm} aiModels={aiModels} />
-      </Card>
-      {pickGpu && (
-        <Details id="ai" title={t.details}>
-          <Card label={d.gpu}>
-            <Row icon="memory" title={d.gpu}>
-              <Select label={d.gpu} value={gpus.some((gpu) => gpu.id === settings.japaneseAiGpu) ? settings.japaneseAiGpu : 0}
-                options={[[0, d.auto], ...gpus.map((gpu) => [gpu.id, gpu.name])]}
-                onChange={(value) => setSetting("japaneseAiGpu", value)} />
-            </Row>
-          </Card>
-        </Details>
-      )}
-    </>
-  );
-}
-
-// Bytes as the download dialog states them (230 MB, 1.3 GB).
-const downloadSize = (bytes) => (bytes >= 1e9 ? `${(bytes / 1e9).toFixed(1)} GB` : `${Math.round(bytes / 1e6)} MB`);
-
-function AiModelRow({ settings, setSetting, runAction, setConfirm, aiModels }) {
-  const t = useText();
-  const a = t.ai;
-  const keys = ["", "light", "strong"];
-  const downloading = aiModels.downloading || 0;
-  // The model chosen, while it and what runs it are there (an older
-  // model's format is not: it is downloaded again).
-  const chosen = settings.japaneseSentenceModel || 0;
-  const current = chosen > 0 && aiModels[keys[chosen]]?.installed && aiModels.runtime?.installed ? chosen : 0;
-  // Where it runs: the GPU when the PC has one, the NPU only when it has one.
-  const devices = [[0, a.device.auto], [1, "CPU"]];
-  if ((aiModels.gpus || []).length > 0) devices.push([2, "GPU"]);
-  if (aiModels.npu) devices.push([3, "NPU"]);
-  const saved = settings.japaneseAiDevice || 0;
-  // The GPU or the NPU only once Windows ML is there: a choice saved
-  // without it (an older version's GPU) runs on the processor.
-  const device = devices.some(([value]) => value === saved) && (saved < 2 || aiModels.runtime?.windowsMl) ? saved : 0;
-  const busy = aiModels.npuPreparing || aiModels.runtime?.windowsMlDownloading;
-  const chooseDevice = (value) => {
-    if (busy) return;
-    // The GPU and the NPU need Windows ML: downloaded once the user agrees
-    // to Microsoft's terms, then used.
-    if (value >= 2 && !aiModels.runtime?.windowsMl) {
-      setConfirm({
-        title: a.device.dialogTitle,
-        message: a.device.dialogBody(downloadSize(aiModels.runtime?.windowsMlBytes || 0)),
-        confirmLabel: a.download,
-        action: () => runAction("aiRuntime.windowsMl", { device: value }),
-        link: { label: a.device.terms, keep: true, action: () => runAction("windowsMl.terms", {}) },
-      });
-      return;
-    }
-    setSetting("japaneseAiDevice", value);
-    if (value === 3) runAction("aiNpu.prepare", {});
-  };
-  const choose = (value) => {
-    if (downloading) return;
-    if (value === 0 || (aiModels[keys[value]]?.installed && aiModels.runtime?.installed)) {
-      setSetting("japaneseSentenceModel", value);
-      return;
-    }
-    setConfirm({
-      title: a.dialogTitle(a.names[value]),
-      message: a.dialogBody(downloadSize((aiModels[keys[value]]?.bytes || 0) +
-        (aiModels.runtime?.installed ? 0 : aiModels.runtime?.bytes || 0)), a.memory[value]),
-      confirmLabel: a.download,
-      action: () => runAction("aiModel.download", { model: value }),
-    });
-  };
-  return (
-    <>
-    <Row icon="wand_stars" title={a.title}
-      description={(
-        <>
-          {downloading ? "" : aiModels.error || a.description}
-          {downloading > 0 && <span className="row-status"><span className="progress" />{a.downloading}</span>}
-        </>
-      )}
-      sub={current > 0 && !downloading && (
-        <div className="row-sub-action">
-          <Button variant="quiet" onClick={() => runAction("aiModel.remove", { model: current }, a.removed)}>{a.remove}</Button>
-        </div>
-      )}>
-      <Segmented label={a.title} value={downloading || current} options={[[0, a.off], [1, a.names[1]], [2, a.names[2]]]}
-        onChange={choose} />
-    </Row>
-    {current > 0 && (
-      <Row icon="memory" title={a.device.title}
-        description={(
-          <>
-            {busy ? "" : aiModels.npuError || (device === 3 ? a.device.npuFirst : a.device.description)}
-            {busy && <span className="row-status"><span className="progress" />
-              {aiModels.runtime?.windowsMlDownloading ? a.device.downloading : a.device.preparing}</span>}
-          </>
-        )}>
-        <Segmented label={a.device.title} value={device} options={devices} onChange={chooseDevice} />
-      </Row>
-    )}
-    </>
-  );
-}
-
-// Postal codes to addresses: Japan Post's data, fetched only once the user
-// agrees to it, or taken from a file they downloaded.
-function PostalCodes({ postalCodes, runAction, setConfirm }) {
-  const t = useText();
-  const p = t.japanese.postal;
-  const [busy, setBusy] = useState(false);
-  const fetchData = async (type) => {
-    setBusy(true);
-    await runAction(type, {}, p.added);
-    setBusy(false);
-  };
-  const turn = (value) => {
-    if (!value) {
-      runAction("postalCodes.remove", {}, p.removed);
-      return;
-    }
-    setConfirm({
-      title: p.dialogTitle,
-      message: p.dialogBody,
-      confirmLabel: p.download,
-      action: () => fetchData("postalCodes.download"),
-      link: { label: p.useFile, action: () => fetchData("postalCodes.browse") },
-    });
-  };
-  const [year, month] = String(postalCodes.version || "").split(".");
-  return (
-    <Row icon="home_pin" title={p.title}
-      description={(
-        <>
-          {postalCodes.installed && !busy ? p.installed(year, month, postalCodes.count) : p.description}
-          {busy && <span className="row-status"><span className="progress" />{p.downloading}</span>}
-        </>
-      )}>
-      <Toggle label={p.title} checked={postalCodes.installed || busy} disabled={busy} onChange={turn} />
-    </Row>
   );
 }
 
@@ -1149,124 +505,6 @@ function RomajiTable({ romaji, runAction, setConfirm, back }) {
           })}>{r.reset}</Button>
         </Row>
       </Card>
-    </>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// まぜ打ち
-
-function MixedPage({ settings, setSetting }) {
-  const t = useText();
-  const m = t.mixed;
-  return (
-    <>
-      <Card label={t.pages.mixed}>
-        <Row icon="bolt" title={m.live.title} description={m.live.description}>
-          <Toggle label={m.live.title} checked={settings.mixLiveConversion} onChange={(value) => setSetting("mixLiveConversion", value)} />
-        </Row>
-        <Row icon="lightbulb" title={m.prediction.title}>
-          <Toggle label={m.prediction.title} checked={settings.mixPredictionEnabled} onChange={(value) => setSetting("mixPredictionEnabled", value)} />
-        </Row>
-        <Row icon="text_format" title={m.singleVowel.title} description={m.singleVowel.description}>
-          <Segmented label={m.singleVowel.title} value={settings.mixSingleVowelKana} options={[[true, m.singleVowel.kana], [false, m.singleVowel.letter]]}
-            onChange={(value) => setSetting("mixSingleVowelKana", value)} />
-        </Row>
-        <Row icon="spellcheck" title={m.correction.title} description={m.correction.description}>
-          <Toggle label={m.correction.title} checked={settings.mixCorrection} onChange={(value) => setSetting("mixCorrection", value)} />
-        </Row>
-      </Card>
-      <Details id="mixed" title={t.details}>
-        <Card label={m.firstPageSymbol.title}>
-          <Row icon="mood" title={m.firstPageSymbol.title} description={m.firstPageSymbol.description}>
-            <Toggle label={m.firstPageSymbol.title} checked={settings.mixFirstPageSymbol} onChange={(value) => setSetting("mixFirstPageSymbol", value)} />
-          </Row>
-          <Row icon="ink_highlighter" title={m.marker.title} description={m.marker.description}>
-            <Toggle label={m.marker.title} checked={settings.mixSettledMarker} onChange={(value) => setSetting("mixSettledMarker", value)} />
-          </Row>
-          <Row icon="format_underlined" title={m.englishUnderline.title} description={m.englishUnderline.description}>
-            <Toggle label={m.englishUnderline.title} checked={settings.mixEnglishUnderline}
-              onChange={(value) => setSetting("mixEnglishUnderline", value)} />
-          </Row>
-          <Row icon="space_bar" title={m.spaceless.title} description={m.spaceless.description}>
-            <Toggle label={m.spaceless.title} checked={settings.spacelessEnglish} onChange={(value) => setSetting("spacelessEnglish", value)} />
-          </Row>
-        </Card>
-        <Card label={m.shared.title}>
-          <Row icon="tune" title={m.shared.title} description={m.shared.description} />
-        </Card>
-      </Details>
-    </>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Auto
-
-function AutoPage({ settings, setSetting, showKeys }) {
-  const t = useText();
-  const a = t.auto;
-  return (
-    <>
-      <Card label={a.corrections}>
-        <Row icon="spellcheck" title={a.correction.title} description={a.correction.description}>
-          <Toggle label={a.correction.title} checked={settings.correctionEnabled} onChange={(value) => setSetting("correctionEnabled", value)} />
-        </Row>
-        <Row icon="flag" title={a.spelling.title} description={a.spelling.description}>
-          <Segmented label={a.spelling.title} value={settings.englishSpelling} options={a.spelling.options.map((name, value) => [value, name])}
-            onChange={(value) => setSetting("englishSpelling", value)} />
-        </Row>
-      </Card>
-      <Card label={a.candidates}>
-        <Row icon="short_text" title={a.completion.title} description={a.completion.description}>
-          <Toggle label={a.completion.title} checked={settings.completionEnabled} onChange={(value) => setSetting("completionEnabled", value)} />
-        </Row>
-        <Row icon="text_select_end" title={a.next.title} description={a.next.description}>
-          <Toggle label={a.next.title} checked={settings.nextWordPrediction} onChange={(value) => setSetting("nextWordPrediction", value)} />
-        </Row>
-        <Row icon="forum" title={a.casual.title} description={a.casual.description}>
-          <Slider label={a.casual.title} value={settings.socialExpressionRange} stops={a.casual.stops.map((name, value) => [value, name])}
-            onChange={(value) => setSetting("socialExpressionRange", value)} />
-        </Row>
-      </Card>
-      <Details id="auto" title={t.details}>
-        <Card label={a.corrections}>
-          <Row icon="repeat" title={a.doubled.title} description={a.doubled.description}>
-            <Toggle label={a.doubled.title} checked={settings.doubledWordCheck} onChange={(value) => setSetting("doubledWordCheck", value)} />
-          </Row>
-          <Row icon="undo" title={a.recheck.title} description={a.recheck.description}>
-            <Toggle label={a.recheck.title} checked={settings.recheckPreviousWord} onChange={(value) => setSetting("recheckPreviousWord", value)} />
-          </Row>
-          <Row icon="match_case" title={a.capitalized.title} description={a.capitalized.description}>
-            <Toggle label={a.capitalized.title} checked={settings.capitalizedCorrection} onChange={(value) => setSetting("capitalizedCorrection", value)} />
-          </Row>
-          <Row icon="space_bar" title={a.spaceless.title} description={a.spaceless.description}>
-            <Toggle label={a.spaceless.title} checked={settings.spacelessEnglish} onChange={(value) => setSetting("spacelessEnglish", value)} />
-          </Row>
-          <Row icon="space_bar" title={a.spacelessAlways.title} description={a.spacelessAlways.description}>
-            <Toggle label={a.spacelessAlways.title} checked={settings.spacelessEnglishAlways} disabled={!settings.spacelessEnglish}
-              onChange={(value) => setSetting("spacelessEnglishAlways", value)} />
-          </Row>
-        </Card>
-        <Card label={a.candidates}>
-          <Row icon="record_voice_over" title={a.phonetic.title} description={a.phonetic.description}>
-            <Toggle label={a.phonetic.title} checked={settings.japanesePhoneticSuggestionsEnabled}
-              onChange={(value) => setSetting("japanesePhoneticSuggestionsEnabled", value)} />
-          </Row>
-        </Card>
-        <Card label={a.punctuation}>
-          <Row icon="keyboard_return" title={a.period.title} description={a.period.description}>
-            <Toggle label={a.period.title} checked={settings.periodOnEnter} onChange={(value) => setSetting("periodOnEnter", value)} />
-          </Row>
-          <Row icon="space_bar" title={a.doubleSpace.title} description={a.doubleSpace.description}>
-            <Toggle label={a.doubleSpace.title} checked={settings.doubleSpacePeriod} onChange={(value) => setSetting("doubleSpacePeriod", value)} />
-          </Row>
-          <Row icon="format_quote" title={a.smart.title} description={a.smart.description}>
-            <Toggle label={a.smart.title} checked={settings.smartPunctuation} onChange={(value) => setSetting("smartPunctuation", value)} />
-          </Row>
-        </Card>
-        <KeysCard page="auto" showKeys={showKeys} />
-      </Details>
     </>
   );
 }

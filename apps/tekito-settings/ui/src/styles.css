@@ -362,3 +362,41 @@ kbd {
 }
 .sample-player { padding: 0 24px 18px; }
 .sample-player video { width: 100%; display: block; border-radius: 6px; border: 1px solid var(--line); }
+
+/* The catalog's rows: one wrap each, lined like rows, marked a moment when
+   opened from Home. */
+.row-wrap + .row-wrap { border-top: 1px solid var(--line); }
+.row-wrap.is-found { animation: found 1.6s var(--ease); }
+@keyframes found { from { background: color-mix(in srgb, var(--accent) 18%, transparent); } to { background: transparent; } }
+.mode-badges { display: inline-flex; gap: 3px; margin-left: 8px; vertical-align: -2px; color: var(--ink-3); }
+.mode-badges .mode-icon { width: 14px; height: 14px; }
+.chain { color: var(--ink-3); }
+.chain:not(.is-linked) { color: var(--ink); }
+.per-mode { padding: 0 18px 12px 52px; display: grid; gap: 4px; }
+.per-mode-row { display: flex; align-items: center; gap: 10px; padding: 4px 0; font-size: 14px; }
+.per-mode-row > span { flex: 1; }
+.panel-line { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 6px 0; }
+.key-heading { font-size: 13px; font-weight: 600; color: var(--ink-2); margin: 4px 24px 2px; }
+
+/* Home: one box, and what it finds or AI answers. */
+.home-search { position: relative; }
+.home-search > .symbol { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--ink-2); pointer-events: none; }
+.home-search input {
+  width: 100%; padding: 12px 16px 12px 44px; font-size: 15px; border-radius: 8px; border: 1px solid var(--line);
+  border-bottom-color: var(--track); background: var(--raised); outline: none;
+}
+.home-search input:focus { border-bottom: 2px solid var(--accent); padding-bottom: 11px; }
+.home-results { display: grid; padding: 4px; }
+.result {
+  display: flex; align-items: center; gap: 12px; padding: 9px 12px; border: 0; border-radius: 5px; background: none; text-align: left;
+}
+.result:hover, .result:focus-visible { background: var(--selected); }
+.result > .symbol { color: var(--ink-2); }
+.result-title { flex: 1; min-width: 0; }
+.result small { color: var(--ink-2); font-size: 12px; }
+.result.is-ask > .symbol { color: var(--accent); }
+.result-empty, .answer-status { padding: 12px 16px; color: var(--ink-2); font-size: 13px; display: flex; align-items: center; gap: 10px; }
+.answer-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 0 18px 12px; }
+.filter-bar { display: flex; }
+.heading-link { display: inline-flex; align-items: center; gap: 2px; border: 0; background: none; padding: 0; font: inherit; }
+.heading-link:hover { color: var(--accent); }
