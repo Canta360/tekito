@@ -6,6 +6,8 @@ ONNX Runtime), and a zip of each for Settings and the installer to download.
   build-japanese-ai-packs.py [--light DIR] [--strong DIR]
                              [--runtime DIR --windows-ml DIR --crt DIR] --out DIR
 
+--settings: LFM2.5-350M-Base itself, exported the same way, for Settings'
+Home (settings-ai).
 --light, --strong: a model exported by export-japanese-ai-onnx.py (--bits 8
 for --strong) from a train-japanese-ai-model.py run, with the base model's
 LICENSE copied into it (LFM2.5-350M-Base for --light, LFM2.5-1.2B-JP-202606
@@ -75,6 +77,21 @@ ONNX and quantized to 8 bits.
 
 """ + TRAINING,
     },
+    # Settings' Home: reads what the user asks for and which setting it
+    # means (by how likely each setting's description reads after it).
+    "settings-ai": {
+        "display_name": "Settings AI model",
+        "source": "LiquidAI/LFM2.5-350M-Base (https://huggingface.co/LiquidAI/LFM2.5-350M-Base)",
+        "language": "mul",
+        "type": "settings-ai-model",
+        # Not trained for conversion: reads text alone.
+        "manifest": {"prompt": "plain"},
+        "notice": """LFM2.5-350M-Base by Liquid AI
+(https://huggingface.co/LiquidAI/LFM2.5-350M-Base), under the LFM Open
+License v1.0 (LICENSE). Modified by TEKITO: exported to ONNX and quantized
+to 4 bits; not trained further.
+""",
+    },
 }
 
 
@@ -111,8 +128,8 @@ def build(pack: str, source: Path, out: Path, version: str) -> None:
         "display_name": spec["display_name"],
         "schema_version": 1,
         "version": version,
-        "language": "ja-JP",
-        "type": "japanese-ai-model",
+        "language": spec.get("language", "ja-JP"),
+        "type": spec.get("type", "japanese-ai-model"),
         "format": "onnx",
         "file": "model.onnx",
         "sha256": {"file": sha256(directory / "model.onnx"), "model.data": sha256(directory / "model.data")},
@@ -196,6 +213,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--light")
     parser.add_argument("--strong")
+    parser.add_argument("--settings", help="LFM2.5-350M-Base exported by export-japanese-ai-onnx.py")
     parser.add_argument("--runtime", help="the build's Release folder")
     parser.add_argument("--windows-ml", help="the Windows ML NuGet package's folder")
     parser.add_argument("--crt", help="VC/Redist/MSVC/<version>/x64/Microsoft.VC*.CRT in Visual Studio")
@@ -208,6 +226,8 @@ def main() -> int:
         build("japanese-ai-light", Path(args.light), out, args.version)
     if args.strong:
         build("japanese-ai-strong", Path(args.strong), out, args.version)
+    if args.settings:
+        build("settings-ai", Path(args.settings), out, args.version)
     if args.runtime:
         if not args.windows_ml or not args.crt:
             parser.error("--runtime needs --windows-ml and --crt")

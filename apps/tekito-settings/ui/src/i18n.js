@@ -78,6 +78,12 @@ const en = {
   chat: {
     label: "Ask AI", next: "Reply to AI", newChat: "New conversation", send: "Send", thinking: "Thinking", changes: "Changes", related: "Related",
     refused: "AI can't change this", undone: "Undone", on: "On", off: "Off", byGrade: "Up to a school year",
+    choose: "These settings may be what you mean. Change the one that fits.", found: "This setting changes that.",
+    changed: (title, label) => `Set ${title} to “${label}”.`, already: (title, label) => `${title} is already “${label}”.`,
+    suggest: (title, label) => `Suggested: ${title} to “${label}”. Apply to change it.`, cannot: "AI can't change this setting. Change it below.",
+    undoneAll: "Put back as it was.", needModel: (mb) => `Asking AI needs Settings' AI model (about ${mb} MB).`,
+    download: "Download", downloadTitle: "Download Settings' AI model?",
+    downloadBody: (mb) => `About ${mb} MB is downloaded from TEKITO's release on GitHub. It is Liquid AI's model (LFM Open License) and runs on this PC only.`,
   },
   modes: {
     find: (name) => `${name} mode`, mixed: "Japanese and English without switching",
@@ -492,6 +498,12 @@ const ja = {
   chat: {
     label: "AI に聞く", next: "AI に返信", newChat: "新しい会話", send: "送信", thinking: "考えています", changes: "変更", related: "関連",
     refused: "AI では変更できません", undone: "元に戻しました", on: "オン", off: "オフ", byGrade: "学年まで",
+    choose: "当てはまりそうな設定です。合うものを変更してください。", found: "この設定で変更できます。",
+    changed: (title, label) => `${title}を「${label}」にしました。`, already: (title, label) => `${title}はすでに「${label}」です。`,
+    suggest: (title, label) => `${title}を「${label}」にする提案です。「適用」を押すと変更されます。`, cannot: "この設定は AI では変更できません。下から変更してください。",
+    undoneAll: "元に戻しました。", needModel: (mb) => `AI に頼むには、設定用の AI モデル（約 ${mb} MB）が必要です。`,
+    download: "ダウンロード", downloadTitle: "設定用の AI モデルをダウンロードしますか？",
+    downloadBody: (mb) => `GitHub の TEKITO のリリースから約 ${mb} MB がダウンロードされます。Liquid AI のモデル（LFM Open License）で、この PC の中だけで動きます。`,
   },
   modes: {
     find: (name) => `${name}モード`, mixed: "日本語と英語を切り替えずに入力できます",

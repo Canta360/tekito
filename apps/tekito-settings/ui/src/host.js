@@ -45,6 +45,7 @@ export function hostRequest(type, payload = {}, files = []) {
         // AI in Home's conversation: its words, the changes it asks for, and
         // the settings, keys or pages it points to.
         reply: response?.reply || "",
+        scores: response?.scores,
         actions: response?.actions,
         show: response?.show,
       });

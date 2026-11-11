@@ -48,6 +48,7 @@
 #include <fstream>
 #include <iterator>
 #include <map>
+#include <mutex>
 #include <memory>
 #include <optional>
 #include <string>
@@ -115,6 +116,8 @@ constexpr UINT kAiNpuPrepared = WM_APP + 3;
 constexpr UINT kAiWindowsMlInstalled = WM_APP + 4;
 // The Japanese data downloaded and installed (wParam: AiModelInstallError).
 constexpr UINT kJapaneseDataInstalled = WM_APP + 5;
+// Home's AI has scored what the user asked for (lParam: a ScoredAsk).
+constexpr UINT kAiScored = WM_APP + 6;
 // TEKITO's two keyboards in Windows' language list, as setup adds them
 // (installer/install.ps1): English, and Japanese, which also types English.
 constexpr wchar_t kEnglishTip[] = L"0409:{6F67E5C8-A873-4B69-8EC3-26DF00F642F1}{8D99240A-5C9C-4ED8-8DE4-85F21DF23763}";
@@ -202,6 +205,63 @@ constexpr AiModelInfo kAiRuntimeWindowsMl{
 
 tekito::userdata::AiModelInstallError DownloadAiPack(const AiModelInfo& pack, const std::filesystem::path& root);
 
+// Settings' own model, for Home's AI (LFM2.5-350M-Base, not trained
+// further): downloaded with the first conversion model, or by itself when
+// one is already there.
+constexpr AiModelInfo kSettingsAi{
+    L"settings-ai", L"https://github.com/Canta360/tekito/releases/download/ai-models-3/TEKITO-settings-ai.zip",
+    "47C7118E888D9DF37656601ED41E8F946BD8CBF15A7A003C98FD6DEF0FBFB9E0", 358020784ull};
+
+// Home's AI, asked how likely each text reads after what the user asked for
+// (`prompt`) against after nothing (`base`): ln p(text | prompt) - ln p(text
+// | base), each setting's description by Settings' AI model. Asked from a
+// thread; the texts after `base`, the same each time, are kept.
+struct ScoredAsk {
+    std::wstring requestId;
+    std::vector<double> scores;
+    bool ok{false};
+};
+std::optional<std::vector<double>> ScoreTexts(const std::wstring& prompt, const std::wstring& base,
+                                              const std::vector<std::wstring>& texts) {
+    static std::mutex cacheMutex;
+    static std::map<std::wstring, double> baseCache;
+    const tekito::japanese::AiHelperClient client(tekito::japanese::AiModel::Settings, tekito::japanese::AiDevice::Cpu, 0,
+                                                  std::chrono::milliseconds(60'000), tekito::japanese::aihelper::kMaxSentences);
+    // ln p of each text after `context`, asked a pipe-full at a time.
+    const auto after = [&](const std::wstring& context, const std::vector<std::wstring>& asked)
+        -> std::optional<std::vector<double>> {
+        std::vector<double> scores;
+        for (std::size_t at = 0; at < asked.size(); at += tekito::japanese::aihelper::kMaxSentences) {
+            const auto end = std::min(asked.size(), at + tekito::japanese::aihelper::kMaxSentences);
+            const std::vector<std::wstring> part(asked.begin() + static_cast<std::ptrdiff_t>(at),
+                                                 asked.begin() + static_cast<std::ptrdiff_t>(end));
+            const auto answer = client.Convert(L"", part, context, false);
+            if (!answer) return std::nullopt;
+            scores.insert(scores.end(), answer->scores.begin(), answer->scores.end());
+        }
+        return scores;
+    };
+    std::vector<std::wstring> missing;
+    {
+        std::lock_guard lock(cacheMutex);
+        for (const auto& text : texts) {
+            if (!baseCache.contains(base + L'\x1F' + text)) missing.push_back(text);
+        }
+    }
+    if (!missing.empty()) {
+        const auto scored = after(base, missing);
+        if (!scored) return std::nullopt;
+        std::lock_guard lock(cacheMutex);
+        for (std::size_t i = 0; i < missing.size(); ++i) baseCache[base + L'\x1F' + missing[i]] = (*scored)[i];
+    }
+    const auto conditioned = after(prompt, texts);
+    if (!conditioned) return std::nullopt;
+    std::vector<double> scores;
+    std::lock_guard lock(cacheMutex);
+    for (std::size_t i = 0; i < texts.size(); ++i) scores.push_back((*conditioned)[i] - baseCache[base + L'\x1F' + texts[i]]);
+    return scores;
+}
+
 // Downloads what runs the models when it is not there yet, then `model`
 // (1 or 2), and installs them into `root`.
 tekito::userdata::AiModelInstallError DownloadAiModel(int model, const std::filesystem::path& root) {
@@ -211,6 +271,9 @@ tekito::userdata::AiModelInstallError DownloadAiModel(int model, const std::file
         const auto error = DownloadAiPack(*info, root);
         if (error != AiModelInstallError::None) return error;
     }
+    // Home's AI comes with the first model; without it, conversion is still
+    // there, and Home offers to download it.
+    if (!tekito::userdata::AiModelPackInstalled(kSettingsAi.pack, root)) (void)DownloadAiPack(kSettingsAi, root);
     return AiModelInstallError::None;
 }
 
@@ -1736,6 +1799,44 @@ private:
             }).detach();
             Reply(requestId, true);
             PostState();
+        } else if (type == L"ai.score") {
+            // Home's AI: the texts (one a line) scored after the user's words.
+            const auto texts = message.String(L"texts");
+            std::vector<std::wstring> lines;
+            for (std::size_t start = 0; start <= texts.size();) {
+                const auto end = std::min(texts.find(L'\n', start), texts.size());
+                if (end > start) lines.push_back(texts.substr(start, end - start));
+                start = end + 1;
+            }
+            if (lines.empty() || lines.size() > 256 || !SettingsAiReady()) {
+                Reply(requestId, false, Text(L"AI is not ready.", L"AI を使えません。"));
+                return;
+            }
+            auto* ask = new ScoredAsk{std::wstring(requestId)};
+            std::thread([hwnd = hwnd_, ask, prompt = message.String(L"prompt"), base = message.String(L"base"), lines] {
+                if (auto scores = ScoreTexts(prompt, base, lines)) {
+                    ask->scores = std::move(*scores);
+                    ask->ok = true;
+                }
+                if (!PostMessageW(hwnd, kAiScored, 0, reinterpret_cast<LPARAM>(ask))) delete ask;
+            }).detach();
+        } else if (type == L"settingsAi.download") {
+            // The user agreed to download Settings' AI model by itself.
+            if (aiDownloading_ || settingsAiDownloading_) {
+                Reply(requestId, false);
+                return;
+            }
+            settingsAiDownloading_ = true;
+            aiError_.clear();
+            std::thread([hwnd = hwnd_, root = AiDataRoot()] {
+                auto* download = new AiModelDownload{0};
+                download->error = tekito::userdata::AiRuntimeInstalled(root) ? tekito::userdata::AiModelInstallError::None
+                                                                            : DownloadAiPack(kAiRuntime, root);
+                if (download->error == tekito::userdata::AiModelInstallError::None) download->error = DownloadAiPack(kSettingsAi, root);
+                if (!PostMessageW(hwnd, kAiModelInstalled, 0, reinterpret_cast<LPARAM>(download))) delete download;
+            }).detach();
+            Reply(requestId, true);
+            PostState();
         } else if (type == L"aiRuntime.windowsMl") {
             // The user agreed to Microsoft's terms for the GPU or the NPU.
             const int device = static_cast<int>(message.Number(L"device"));
@@ -2135,6 +2236,20 @@ private:
             self->FinishWindowsMlInstall(static_cast<tekito::userdata::AiModelInstallError>(wParam), static_cast<int>(lParam));
             return 0;
         }
+        if (message == kAiScored) {
+            std::unique_ptr<ScoredAsk> ask(reinterpret_cast<ScoredAsk*>(lParam));
+            std::wstring scores = L",\"scores\":[";
+            for (std::size_t i = 0; i < ask->scores.size(); ++i) {
+                if (i) scores += L',';
+                wchar_t number[32];
+                swprintf_s(number, L"%.4f", ask->scores[i]);
+                scores += number;
+            }
+            scores += L']';
+            self->Reply(ask->requestId, ask->ok, ask->ok ? L"" : self->Text(L"AI did not answer.", L"AI から答えがありませんでした。"),
+                        ask->ok ? scores : std::wstring{});
+            return 0;
+        }
         if (message == kJapaneseDataInstalled) {
             self->FinishJapaneseDataInstall(static_cast<tekito::userdata::AiModelInstallError>(wParam));
             return 0;
@@ -2289,13 +2404,23 @@ private:
         PostState();
     }
 
+    // Settings' AI model and what runs it are there.
+    static bool SettingsAiReady() {
+        const auto root = AiDataRoot();
+        return tekito::userdata::AiModelPackInstalled(kSettingsAi.pack, root) && tekito::userdata::AiRuntimeInstalled(root);
+    }
+
     void FinishAiModelInstall(std::unique_ptr<AiModelDownload> download) {
         aiDownloading_ = 0;
+        settingsAiDownloading_ = false;
         using tekito::userdata::AiModelInstallError;
         switch (download->error) {
         case AiModelInstallError::None:
-            settings_.japaneseSentenceModel = download->model;
-            (void)SaveSettings();
+            // 0: Settings' own model alone.
+            if (download->model > 0) {
+                settings_.japaneseSentenceModel = download->model;
+                (void)SaveSettings();
+            }
             break;
         case AiModelInstallError::Download:
             aiError_ = Text(L"The AI model could not be downloaded. Check the connection and try again.",
@@ -2357,6 +2482,10 @@ private:
                     (tekito::userdata::AiModelPackInstalled(kAiModels[i].pack, AiDataRoot()) ? L"true" : L"false") +
                     L",\"bytes\":" + std::to_wstring(kAiModels[i].bytes) + L"}";
         }
+        json += std::wstring(L",\"settings\":{\"installed\":") +
+                (tekito::userdata::AiModelPackInstalled(kSettingsAi.pack, AiDataRoot()) ? L"true" : L"false") +
+                L",\"bytes\":" + std::to_wstring(kSettingsAi.bytes) + L",\"downloading\":" +
+                (settingsAiDownloading_ ? L"true" : L"false") + L"}";
         json += std::wstring(L",\"runtime\":{\"installed\":") +
                 (tekito::userdata::AiRuntimeInstalled(AiDataRoot()) ? L"true" : L"false") +
                 L",\"bytes\":" + std::to_wstring(kAiRuntime.bytes) + L",\"windowsMl\":" +
@@ -2660,6 +2789,7 @@ private:
     bool npuPreparing_{false};
     bool windowsMlDownloading_{false};
     bool japaneseInstalling_{false};
+    bool settingsAiDownloading_{false};
     std::wstring japaneseDataError_;
     std::wstring npuError_;
     EventRegistrationToken navigationToken_{};

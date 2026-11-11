@@ -153,6 +153,8 @@ std::wstring_view AiModelPack(AiModel model) noexcept {
         return L"japanese-ai-light";
     case AiModel::Strong:
         return L"japanese-ai-strong";
+    case AiModel::Settings:
+        return L"settings-ai";
     default:
         return {};
     }
@@ -390,7 +392,7 @@ std::optional<Asked> DecodeRequest(std::span<const std::uint8_t> message) {
         return std::nullopt;
     }
     if (request > static_cast<std::uint32_t>(Request::Score) || model < 1 ||
-        model > static_cast<std::uint32_t>(AiModel::Strong) || device > static_cast<std::uint32_t>(AiDevice::Npu) ||
+        model > static_cast<std::uint32_t>(AiModel::Settings) || device > static_cast<std::uint32_t>(AiDevice::Npu) ||
         count > kMaxSentences) {
         return std::nullopt;
     }

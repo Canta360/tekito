@@ -63,8 +63,9 @@ public:
     virtual void Warm() const {}
 };
 
-// The AI models Settings offers (UserSettings::japaneseSentenceModel).
-enum class AiModel : int { None = 0, Light = 1, Strong = 2 };
+// The AI models Settings offers (UserSettings::japaneseSentenceModel), and
+// Settings' own (settings-ai: reads what the user asks for on Home).
+enum class AiModel : int { None = 0, Light = 1, Strong = 2, Settings = 3 };
 // Where the helper runs a model (UserSettings::japaneseAiDevice): Auto is
 // the processor; the GPU or the NPU take over once their graphs are loaded
 // (an NPU compiles them the first time).

@@ -121,7 +121,9 @@ the Leipzig Corpora Collection's Japanese news. It holds no text from them.
 Downloaded only when the user chooses AI:
 
 - the models: Liquid AI's LFM2.5, fine-tuned by TEKITO, under the LFM Open
-  License v1.0 (each model pack's `LICENSE` and `NOTICE`);
+  License v1.0 (each model pack's `LICENSE` and `NOTICE`), and for asking
+  AI in Settings, LFM2.5-350M-Base as Liquid AI made it (the settings-ai
+  pack), under the same license;
 - what runs them: ONNX Runtime (Microsoft, MIT License) and the Microsoft
   Visual C++ runtime DLLs (Visual Studio license terms), with their notices
   in the runtime pack.

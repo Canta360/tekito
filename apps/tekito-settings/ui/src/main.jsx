@@ -376,13 +376,17 @@ function App() {
   }, []);
 
   // AI answers Home's box once a model is chosen and there.
+  // Home asks AI once Settings' AI model is there; with a conversion model
+  // and not it, Home offers to download it.
   const chosenModel = settings.japaneseSentenceModel || 0;
-  const aiReady = chosenModel > 0 && Boolean(aiModels[aiModelKeys[chosenModel]]?.installed) && Boolean(aiModels.runtime?.installed);
+  const conversionAi = chosenModel > 0 && Boolean(aiModels[aiModelKeys[chosenModel]]?.installed) && Boolean(aiModels.runtime?.installed);
+  const aiReady = Boolean(aiModels.settings?.installed) && Boolean(aiModels.runtime?.installed);
+  const settingsAiOffer = conversionAi && !aiReady;
   const on = { japanese, mixed, auto: true, direct: true };
   const japaneseKeyboard = Boolean(runtime.japaneseKeyboard);
   const ctx = {
     t, settings, setSetting, runAction, setConfirm, showKeys: setKeys, open, on, multi: japanese || mixed, japaneseInstalled,
-    japaneseKeyboard, aiModels, postalCodes, openRomaji: () => open("romaji"), aiReady, chat: { messages: conversation, setMessages: setConversation },
+    japaneseKeyboard, aiModels, postalCodes, openRomaji: () => open("romaji"), aiReady, settingsAiOffer, chat: { messages: conversation, setMessages: setConversation },
     japaneseInstalling: Boolean(runtime.japaneseInstalling), japaneseDataBytes: runtime.japaneseDataBytes || 0,
     japaneseAddable: runtime.japaneseAddable !== false, japaneseDataError: runtime.japaneseDataError || "",
     encryption,

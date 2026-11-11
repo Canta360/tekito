@@ -83,6 +83,7 @@ function initialState() {
     postalCodes: { installed: false },
     encryption: { wanted: false, encrypted: false },
     aiModels: { light: { installed: aiInstalled, bytes: 358021668 }, strong: { installed: false, bytes: 1587553900 },
+      settings: { installed: aiInstalled && new URLSearchParams(window.location.search).get("settingsai") !== "0", bytes: 358020784 },
       runtime: { installed: aiInstalled, bytes: 6000000, windowsMl: false, windowsMlBytes: 20000000, windowsMlDownloading: false },
       downloading: 0, error: "",
       gpus: [{ id: 268566271, name: "AMD Radeon RX 7600" }, { id: -2142881189, name: "Intel(R) Arc(TM) Graphics" }],
@@ -381,6 +382,25 @@ export function installMockHost() {
           state.runtime = { ...state.runtime, japanese: true, japaneseInstalling: false };
           state.settings.japaneseEnabled = true;
           state.mode = "japanese";
+          const data = JSON.stringify({ type: "state.changed", state });
+          listeners.forEach((listener) => listener({ data }));
+        }, 2500);
+      }
+      if (type === "ai.score") {
+        // A stand-in for Settings' AI model: letters each text shares with
+        // the request, beyond what it shares with no request.
+        const pairs = (text) => new Set([...text].map((ch, i, all) => ch + (all[i + 1] || "")).slice(0, -1));
+        const shared = (a, b) => [...pairs(b)].filter((pair) => pairs(a).has(pair)).length;
+        const scores = String(message.texts).split("\n").map((text) => 2 * (shared(message.prompt, text) - shared(message.base, text)));
+        const data = JSON.stringify({ requestId, ok: true, error: "", state, scores });
+        window.setTimeout(() => listeners.forEach((listener) => listener({ data })), 500);
+        return;
+      }
+      if (type === "settingsAi.download") {
+        state.aiModels = { ...state.aiModels, settings: { ...state.aiModels.settings, downloading: true } };
+        window.setTimeout(() => {
+          state.aiModels = { ...state.aiModels, settings: { ...state.aiModels.settings, installed: true, downloading: false },
+            runtime: { ...state.aiModels.runtime, installed: true } };
           const data = JSON.stringify({ type: "state.changed", state });
           listeners.forEach((listener) => listener({ data }));
         }, 2500);

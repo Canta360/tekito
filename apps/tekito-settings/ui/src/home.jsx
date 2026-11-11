@@ -3,7 +3,7 @@
 // with a way back. Without AI, it finds settings by name. The modes below.
 // すべての設定: every setting on one page, or only those changed.
 import React, { useEffect, useRef, useState } from "react";
-import { hostRequest } from "./host.js";
+import { think } from "./aiChat.js";
 import { aiSpecs, catalog, changeAllowed, navPages, valueName, visible } from "./catalog.jsx";
 import { keyGroups, ModeBadges, revealHidden } from "./rows.jsx";
 import { Busy, Button, Card, Heading, IconButton, Keycaps, LinkRow, ModeIcon, Symbol, Tabs, TextBox, Toggle } from "./ui.jsx";
@@ -36,13 +36,6 @@ function goTo(ctx, entry) {
   ctx.open(entry.page, entry.id, entry.detail ? entry.page : entry.details);
 }
 
-// What AI said, for the next request: its words and the changes made.
-function remembered(message, specs, t) {
-  const changes = (message.changes || []).filter((change) => change.state === "applied")
-    .map((change) => `${change.key}=${JSON.stringify(change.value)}`);
-  return changes.length ? `${message.text} (${changes.join(", ")})` : message.text || "";
-}
-
 export function HomePage({ ctx, aiReady }) {
   const t = ctx.t;
   const h = t.home;
@@ -68,34 +61,34 @@ export function HomePage({ ctx, aiReady }) {
     const history = [...messages.filter((message) => message.status !== "failed"), { role: "user", text }];
     const at = history.length;
     setMessages([...history, { role: "assistant", status: "asking" }]);
-    const response = await hostRequest("settings.chat", {
-      language: t.lang,
-      level,
-      messages: history.map((message) => ({ role: message.role, text: message.role === "user" ? message.text : remembered(message, specs, t) })),
-      // The settings AI may name, with their values now and the values they take.
-      settings: Object.entries(specs).map(([key, spec]) => ({
-        key, setting: spec.title, mode: spec.mode, current: ctx.settings[key], values: spec.standard.map(([value, name]) => ({ value, name })),
-        range: spec.range,
-      })),
-      show: catalog(ctx).filter((entry) => !entry.hidden && visible(entry, ctx)).map((entry) => ({ id: entry.id, setting: entry.title })),
-    });
-    if (!response.ok) {
+    // The changes the last reply made, for "put it back".
+    const lastApplied = [...messages].reverse().find((message) => message.role === "assistant" && message.changes?.some((change) => change.state === "applied"))
+      ?.changes.filter((change) => change.state === "applied");
+    const answer = await think(ctx, text, level, lastApplied);
+    if (!answer) {
       setMessages((list) => list.map((message, index) => (index === at ? { role: "assistant", status: "failed" } : message)));
       return;
     }
     const changes = [];
-    for (const { key, value } of response.actions || []) {
-      const verdict = changeAllowed(specs[key], value, level);
+    for (const { key, value } of answer.actions) {
       const before = ctx.settings[key];
+      if (before === value) continue;
+      const verdict = answer.kind === "undo" ? "apply" : changeAllowed(specs[key], value, level);
       if (verdict === "apply") {
-        if (before === value) continue;
         changes.push({ key, value, before, state: (await ctx.setSetting(key, value)) ? "applied" : "refused" });
       } else {
         changes.push({ key, value, before, state: verdict === "suggest" ? "suggested" : "refused" });
       }
     }
+    let reply = answer.reply;
+    if (answer.kind === "change") {
+      reply = changes.length === 0 ? c.already(answer.title, answer.label)
+        : changes.some((change) => change.state === "applied") ? c.changed(answer.title, answer.label)
+        : changes.some((change) => change.state === "suggested") ? c.suggest(answer.title, answer.label)
+        : c.cannot;
+    }
     setMessages((list) => list.map((message, index) => (index === at
-      ? { role: "assistant", status: "done", text: response.reply || "", changes, show: response.show || [] } : message)));
+      ? { role: "assistant", status: "done", text: reply, changes, show: answer.show || [] } : message)));
   };
   const onKeyDown = (event) => {
     if (event.key === "Escape") setQuery("");
@@ -144,6 +137,7 @@ export function HomePage({ ctx, aiReady }) {
         </Card>
       )}
       {needle && found.length === 0 && !aiReady && <Card label={t.search} className="home-results"><p className="result-empty">{t.noResults}</p></Card>}
+      {ctx.settingsAiOffer && <SettingsAiOffer ctx={ctx} />}
       </div>
 
       <nav className="home-links" aria-label={t.settings}>
@@ -154,12 +148,35 @@ export function HomePage({ ctx, aiReady }) {
   );
 }
 
+// With a conversion model and not Settings' own: the way to ask AI here.
+function SettingsAiOffer({ ctx }) {
+  const c = ctx.t.chat;
+  const mb = Math.round((ctx.aiModels.settings?.bytes || 0) / 1e6);
+  const downloading = Boolean(ctx.aiModels.settings?.downloading);
+  return (
+    <Card label={c.label} className="home-offer">
+      <div className="row">
+        <span className="row-icon"><Symbol name="wand_stars" /></span>
+        <span className="row-text"><span className="row-title">{c.needModel(mb)}</span></span>
+        <span className="row-control">
+          {downloading ? <span className="row-status"><Busy /></span> : (
+            <Button onClick={() => ctx.setConfirm({
+              title: c.downloadTitle, message: c.downloadBody(mb), confirmLabel: c.download,
+              action: () => ctx.runAction("settingsAi.download", {}),
+            })}>{c.download}</Button>
+          )}
+        </span>
+      </div>
+    </Card>
+  );
+}
+
 // One reply: AI's words, the changes it made or suggests, and the settings,
 // keys or pages it points to.
 function Reply({ ctx, message, update }) {
   const t = ctx.t;
   const c = t.chat;
-  if (message.status === "asking") return <div className="bubble-ai"><p className="answer-status"><Busy />{c.thinking}</p></div>;
+  if (message.status === "asking") return <div className="bubble-ai"><div className="answer-status"><Busy />{c.thinking}</div></div>;
   if (message.status === "failed") return <div className="bubble-ai"><p className="answer-status">{t.home.failed}</p></div>;
   const specs = aiSpecs(ctx);
   const entries = catalog(ctx).filter((entry) => !entry.hidden && visible(entry, ctx));
