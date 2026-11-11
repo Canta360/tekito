@@ -13,9 +13,11 @@
 import React, { useEffect, useId, useRef, useState } from "react";
 import { eyeShapes, tear } from "./companionEyes.js";
 
-// The mark: a disc (center 450, 450; radius 362) with room cut around its
-// small ring (center 709, 695), the ring a little smaller than the mark's
-// (86 across the outside, a 35 hole; the mark's 108 and 44).
+// The mark: a disc (center 450, 450; radius 362), its lower half a little
+// flattened so it does not look drawn with compasses, with room cut around
+// its small ring (center 709, 695), the ring a little smaller than the
+// mark's (86 across the outside, a 35 hole; the mark's 108 and 44).
+const kDisc = "M88 450A362 362 0 0 1 812 450C812 640 680 768 450 768C220 768 88 640 88 450Z";
 const kSmall = "M709 609a86 86 0 1 0 0.01 0ZM709 660a35 35 0 1 1 -0.01 0Z";
 // Large white eyes (companionEyes.js), as wide apart as the user drew them.
 const kEyes = [298, 602];
@@ -92,7 +94,7 @@ export function Mascot({ mood = "idle", size = 96, follow = false, label }) {
         </mask>
       </defs>
       <g className="mascot-body">
-        <circle className="mascot-disc" cx="450" cy="450" r="362" mask={`url(#${cut})`} />
+        <path className="mascot-disc" d={kDisc} mask={`url(#${cut})`} />
         <path className="mascot-small" d={kSmall} fillRule="evenodd" />
         <g className="mascot-face" style={{ transform: `translate(${look.x}px, ${look.y}px)` }}>
           {eyes(mood)}
