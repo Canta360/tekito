@@ -843,6 +843,9 @@ function AboutPage({ settings, setSetting, runAction, version, runtime, packs, j
         <LinkRow icon="folder" title={a.logs} onClick={() => runAction("logs.open", {})} />
         <LinkRow icon="gavel" title={a.license} onClick={openLicense} />
         <LinkRow icon="description" title={a.notices} onClick={() => openNotice("THIRD_PARTY_NOTICES.md", a.notices)} />
+        <Row icon="delete" title={a.uninstall.title} description={a.uninstall.description}>
+          <Button onClick={() => runAction("uninstall.open", {})}>{a.uninstall.button}</Button>
+        </Row>
       </Card>
 
       <Heading>{a.publisher}</Heading>

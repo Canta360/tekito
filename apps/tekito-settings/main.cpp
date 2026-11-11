@@ -2082,6 +2082,18 @@ private:
             const auto text = Diagnostics();
             const bool copied = CopyToClipboard(hwnd_, text);
             Reply(requestId, copied, copied ? L"" : Text(L"Diagnostics could not be copied.", L"診断情報をコピーできませんでした。"));
+        } else if (type == L"uninstall.open") {
+            // TEKITO's uninstaller (what Installed apps runs), which offers
+            // to export the words first; Settings closes as it starts.
+            // Without it (a build of one's own): Installed apps.
+            const auto uninstaller = ExecutableDirectory() / L"TekitoUninstall.exe";
+            std::error_code missing;
+            const bool there = std::filesystem::is_regular_file(uninstaller, missing);
+            const auto result = reinterpret_cast<INT_PTR>(there
+                ? ShellExecuteW(hwnd_, L"open", uninstaller.c_str(), nullptr, ExecutableDirectory().c_str(), SW_SHOWNORMAL)
+                : ShellExecuteW(hwnd_, L"open", L"ms-settings:appsfeatures", nullptr, nullptr, SW_SHOWNORMAL));
+            Reply(requestId, result > 32, result > 32 ? L"" : Text(L"The uninstaller could not be opened.", L"アンインストールを開始できませんでした。"));
+            if (result > 32 && there) PostMessageW(hwnd_, WM_CLOSE, 0, 0);
         } else if (type == L"logs.open") {
             const auto path = LogFolder();
             const auto result = path.empty() ? 0 : reinterpret_cast<INT_PTR>(ShellExecuteW(
