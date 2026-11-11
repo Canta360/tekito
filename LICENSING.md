@@ -8,11 +8,7 @@ repository and of the installer come under different terms.
 | Source code, build scripts and TEKITO's own data | Functional Source License 1.1, Apache 2.0 future license (FSL-1.1-ALv2) | `LICENSE.md` |
 | Installer and builds published by Capitata | TEKITO License Agreement | `installer/TEKITO_LICENSE.md` |
 | Language data packs | The license of each source | `data/<pack>/NOTICE`, `data/<pack>/manifest.json` |
-| M PLUS 1 typeface | SIL Open Font License 1.1 | `assets/fonts/OFL.txt` |
-| Microsoft WebView2 SDK | Microsoft's BSD-style license | `third_party/webview2/LICENSE.txt` |
-| SQLite, as built by SQLite3 Multiple Ciphers | Public domain; MIT | `third_party/sqlite3mc/LICENSE` |
-| Monocypher | CC0 1.0 or BSD 2-Clause | `third_party/monocypher/LICENCE.md` |
-| Material Symbols icons in Settings | Apache License 2.0 | `third_party/material-symbols/LICENSE` |
+| Third-party software, fonts, icons, sounds and the optional AI models | The license of each | `THIRD_PARTY_NOTICES.md` |
 
 ## The source code
 
@@ -25,19 +21,24 @@ studying it, and building your own copy for yourself are all fine.
 Each release becomes available under the Apache License 2.0 two years after
 it is published. From then on, that release is ordinary open source.
 
-The license covers no trademarks. "TEKITO", the TEKITO icons and the Capitata
-name and logo identify our builds; please do not use them for your own.
+The license covers no trademarks. The name TEKITO, the TEKITO icons and logo,
+and the Capitata name and logo identify our builds; please do not use them for
+your own.
 
 ## Builds from Capitata
 
 The installer we publish includes the English language data, and the
 Japanese data it downloads from the same release is part of that build. Both
-are covered by the TEKITO License Agreement, which the setup program shows before installing; each
-language data pack and third-party part in them stays under its own license
-(see below), which comes first where it gives you more rights. The agreement
-lets anyone install TEKITO on their own computers for personal, educational or
-commercial use. It does not limit what `LICENSE.md` lets you do with the
-source code.
+are covered by the TEKITO License Agreement, which the setup program shows
+before installing.
+
+Each language data pack and third-party part in a build keeps its own
+license. Where that license gives you more rights for that part, it applies
+instead of the agreement.
+
+The agreement lets anyone install TEKITO on their own computers for personal,
+educational or commercial use. It does not limit what `LICENSE.md` lets you do
+with the source code.
 
 ## Language data
 

@@ -1,6 +1,6 @@
 # TEKITO License Agreement
 
-Version 0.2 (preview) · Effective November 9, 2026
+Version 0.3 (preview) · Effective November 11, 2026
 
 This agreement is between you and Capitata (capitata.dev), the trade name under which the owner of the GitHub account Canta360 makes and distributes TEKITO. It covers TEKITO for Windows: the input method, TEKITO Settings, the setup program, the language data that comes with them (including the Japanese data the setup program downloads), their documentation, and updates we provide for this version. By installing or using TEKITO you accept this agreement. If you do not accept it, do not install or use TEKITO.
 
@@ -31,7 +31,7 @@ Unless the law allows it despite this agreement, you may not:
 
 Where the law gives you the right to study, reverse engineer, or adapt software for purposes such as interoperability, this agreement does not take that right away.
 
-The TEKITO source code is published separately under the Functional Source License 1.1 (see LICENSE.md in the TEKITO source repository). This agreement covers the builds and data we distribute; it does not limit what that license lets you do with the source code.
+The TEKITO source code is published separately under the Functional Source License 1.1, with the Apache License 2.0 as its future license (see LICENSE.md in the TEKITO source repository). This agreement covers the builds and data we distribute; it does not limit what that license lets you do with the source code.
 
 ## 3. Your text and your data
 
@@ -39,13 +39,15 @@ You own the text you type and anything you create with TEKITO, including your di
 
 TEKITO processes your typing on your computer to correct and suggest words and to convert romaji into Japanese. It stores your settings, your dictionary, and what it learns from your choices on your computer. It does not send your typing, your dictionary, or what it has learned over the network. Diagnostics you copy from TEKITO Settings never include what you type. You can clear learned data and remove your dictionary entries in TEKITO Settings at any time.
 
-Keep your own copy of anything you would not want to lose, such as an exported dictionary. Uninstalling TEKITO removes your data; it offers to export your dictionary first.
+Keep your own copy of anything you would not want to lose, such as an exported dictionary. If you turn on encryption of your dictionary and learning, also keep the recovery code TEKITO Settings shows you somewhere safe. We do not keep it: if Windows can no longer open the key (for example after Windows is reinstalled), the recovery code is the only way to read your data. Uninstalling TEKITO removes your data; it offers to export your dictionary first.
 
 ## 4. Language data and third-party parts
 
 TEKITO includes language data, fonts, and software from other people. Each of these stays under its own license, listed in THIRD_PARTY_NOTICES.md and in the NOTICE file of each language data pack. If one of those licenses gives you more rights for that part than this agreement does, that license applies to that part.
 
-TEKITO uses the M PLUS 1 typeface, licensed under the SIL Open Font License 1.1. TEKITO Settings uses the Microsoft Edge WebView2 Runtime, which is provided by Microsoft under its own terms. The optional AI models, which you can download in the setup program or in TEKITO Settings, are Liquid AI's models under the LFM Open License, and run with ONNX Runtime under the MIT License. To run them on a GPU or an NPU, TEKITO Settings downloads Microsoft's Windows ML, which is Microsoft's software under the Microsoft Software License Terms for the Windows ML Runtime, not under this agreement; you agree to those terms before it is downloaded.
+TEKITO uses the M PLUS 1 typeface, licensed under the SIL Open Font License 1.1. TEKITO Settings uses the Microsoft Edge WebView2 Runtime, which is provided by Microsoft under its own terms.
+
+The optional AI models, which you can download in the setup program or in TEKITO Settings, are Liquid AI's models under the LFM Open License, and run with ONNX Runtime under the MIT License. To run them on a GPU or an NPU, TEKITO Settings downloads Microsoft's Windows ML. It is Microsoft's software under the Microsoft Software License Terms for the Windows ML Runtime, not under this agreement, and you agree to those terms before it is downloaded.
 
 ## 5. Prices, editions, and updates
 
