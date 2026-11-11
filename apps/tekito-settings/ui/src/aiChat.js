@@ -13,6 +13,9 @@ import { mixPairs } from "./rows.jsx";
 // choice must lead the second to be changed without asking.
 const kOverlapWeight = 1.5;
 const kSureMargin = 4;
+// Below this, no setting fits the request at all (a right first choice
+// scores about 40, a loose one 15).
+const kNothingFits = 10;
 
 const prompts = {
   ja: { ask: (q) => `ユーザーの頼み：${q}\nこれに当てはまる設定：`, value: (q, title) => `ユーザーの頼み：${q}\n「${title}」を次にする：` },
@@ -108,6 +111,10 @@ export async function think(ctx, question, level, lastApplied) {
   if (/元に戻|もとに戻|やっぱり|取り消|undo|revert|put it back/i.test(question) && lastApplied?.length) {
     return { kind: "undo", reply: c.undoneAll, actions: lastApplied.map((change) => ({ key: change.key, value: change.before })), show: [] };
   }
+  // What it can do: said, not looked up.
+  if (/何ができ|なにができ|できること|使い方|ヘルプ|what can you|help/i.test(question)) {
+    return { kind: "help", reply: c.help, actions: [], show: [] };
+  }
   const described = aiDescriptions[lang];
   const targets = [
     ...catalog(ctx).filter((entry) => !entry.hidden && visible(entry, ctx) && described[entry.id])
@@ -123,6 +130,7 @@ export async function think(ctx, question, level, lastApplied) {
   const ranked = targets.map((target, i) => ({ ...target, score: scores[i] + kOverlapWeight * overlap(question, target.text + target.title) }))
     .sort((a, b) => b.score - a.score);
   const [best, second] = ranked;
+  if (best.score < kNothingFits) return { kind: "help", reply: c.nothingFits, actions: [], show: [] };
   if (best.score - second.score < kSureMargin) {
     // As many as are close to the first (two to five), to choose from.
     const close = ranked.filter((target, i) => i < 5 && (i < 2 || best.score - target.score < kSureMargin * 2));
