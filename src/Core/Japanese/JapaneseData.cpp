@@ -107,6 +107,7 @@ const JapaneseData* ProcessJapaneseData() {
             (void)loaded->dictionary.AddWords(ExternalLexiconProvider::PackDirectory(pack) / L"dictionary.bin");
         }
         loaded->converter = std::make_unique<JapaneseConverter>(loaded->dictionary, loaded->matrix);
+        (void)loaded->converter->LoadDependentParts(core / L"dependent-ids.txt");
         if (loaded->unusualReadings.Open(ExternalLexiconProvider::PackDirectory(L"japanese-jmdict") / L"unusual-readings.tsv")) {
             loaded->converter->SetUnusualReadings(&loaded->unusualReadings);
         }

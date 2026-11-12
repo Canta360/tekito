@@ -12,6 +12,8 @@
 #include "Core/Japanese/KanaText.h"
 #include "Core/Japanese/LanguageModel.h"
 #include "Core/Japanese/UnusualReadings.h"
+
+#include <fstream>
 #include "Core/Japanese/Notation.h"
 #include "Core/Japanese/TopicVectors.h"
 
@@ -695,12 +697,35 @@ std::int64_t CompoundBonus(const Lattice& lattice, const Node& left, const Node&
 // is read from the matrix: no phrase starts between `content` (a noun's
 // right id) and it.
 void PenalizeJoinedStart(Lattice& lattice, std::uint16_t context, const ConnectionMatrix& matrix,
-                         std::uint16_t content, std::int64_t penalty) {
-    if (context != 0 || penalty <= 0 || content == 0 || lattice.beginningAt.empty()) return;
+                         std::uint16_t content, std::int64_t penalty, std::int64_t dependentPenalty = 0,
+                         const std::vector<bool>* dependentParts = nullptr) {
+    if (context != 0 || (penalty <= 0 && dependentPenalty <= 0) || content == 0 || lattice.beginningAt.empty()) return;
+    // A suffix or dependent noun (化, 下 as in 近代化, 年下: Mozc puts a
+    // phrase break before them, and their own cost is low for following
+    // words), when the dictionary has the word as nothing else there (not
+    // 日, 目, 間, nouns too).
+    const auto dependent = [&](const Node& node) {
+        return !node.user && dependentParts && node.left < dependentParts->size() && (*dependentParts)[node.left];
+    };
+    std::vector<int> joined, dependents;
     for (const int k : lattice.beginningAt[0]) {
-        auto& node = lattice.nodes[static_cast<std::size_t>(k)];
+        const auto& node = lattice.nodes[static_cast<std::size_t>(k)];
         // One kana (へ, と, で): longer ones (ため, から) may well start one.
-        if (node.end - node.begin == 1 && !matrix.IsBoundary(content, node.left)) node.cost += penalty;
+        if (node.end - node.begin != 1) continue;
+        if (!matrix.IsBoundary(content, node.left)) joined.push_back(k);
+        else if (dependent(node)) dependents.push_back(k);
+    }
+    for (const int k : joined) lattice.nodes[static_cast<std::size_t>(k)].cost += penalty;
+    if (dependentPenalty <= 0) return;
+    for (const int k : dependents) {
+        auto& node = lattice.nodes[static_cast<std::size_t>(k)];
+        // The same written word (surfaces are pooled once per file).
+        const bool alsoOther = std::any_of(lattice.beginningAt[0].begin(), lattice.beginningAt[0].end(), [&](int other) {
+            const auto& o = lattice.nodes[static_cast<std::size_t>(other)];
+            return other != k && o.end == node.end && !o.user && !dependent(o) && o.word.surface == node.word.surface &&
+                   o.word.surfaceOffset == node.word.surfaceOffset && o.word.added == node.word.added;
+        });
+        if (!alsoOther) node.cost += dependentPenalty;
     }
 }
 
@@ -844,7 +869,8 @@ std::vector<Phrase> JapaneseConverter::Convert(std::wstring_view reading,
     Lattice lattice = BuildLattice(dictionary_, codes, fixedBoundary, reading, pairs ? model_ : nullptr, user,
                                          number_ ? &*number_ : nullptr, letters_ ? &*letters_ : nullptr, compounds_, compoundCost_,
                                          notation_, notationLevel_, notationCost_, unusualReadings_, unusualCost_, archaicCost_);
-    PenalizeJoinedStart(lattice, context, matrix_, startContent_, atSentenceStart_ ? startPenalty_ : 0);
+    PenalizeJoinedStart(lattice, context, matrix_, startContent_, atSentenceStart_ ? startPenalty_ : 0,
+                        atSentenceStart_ ? dependentStartPenalty_ : 0, &dependentParts_);
     if (edgeScorer_) {
         ScoreEdges(lattice, reading, context, dictionary_, matrix_, model_, weights_, *edgeScorer_, edgeContext_, edgeMargin_, edgeWeight_);
     }
@@ -1365,7 +1391,8 @@ std::vector<SentenceGuess> JapaneseConverter::BestSentences(std::wstring_view re
     Lattice lattice = BuildLattice(dictionary_, codes, noBoundary, reading, pairs ? model_ : nullptr, user,
                                          number_ ? &*number_ : nullptr, letters_ ? &*letters_ : nullptr, compounds_, compoundCost_,
                                          notation_, notationLevel_, notationCost_, unusualReadings_, unusualCost_, archaicCost_);
-    PenalizeJoinedStart(lattice, context, matrix_, startContent_, atSentenceStart_ ? startPenalty_ : 0);
+    PenalizeJoinedStart(lattice, context, matrix_, startContent_, atSentenceStart_ ? startPenalty_ : 0,
+                        atSentenceStart_ ? dependentStartPenalty_ : 0, &dependentParts_);
     if (edgeScorer_) {
         ScoreEdges(lattice, reading, context, dictionary_, matrix_, model_, weights_, *edgeScorer_, edgeContext_, edgeMargin_, edgeWeight_);
     }
@@ -1469,6 +1496,21 @@ std::optional<double> JapaneseConverter::PairFit(std::wstring_view before, std::
         return model_->PairPmi(LanguageModel::PairStart(left), word);
     }
     return std::nullopt;
+}
+
+bool JapaneseConverter::LoadDependentParts(const std::filesystem::path& file, std::int64_t penalty) {
+    dependentParts_.clear();
+    std::ifstream in(file, std::ios::binary);
+    if (!in) return false;
+    for (std::string line; std::getline(in, line);) {
+        if (line.empty() || line[0] == '#') continue;
+        const auto id = static_cast<std::size_t>(std::strtoul(line.c_str(), nullptr, 10));
+        if (id >= 1 << 16) continue;
+        if (id >= dependentParts_.size()) dependentParts_.resize(id + 1, false);
+        dependentParts_[id] = true;
+    }
+    dependentStartPenalty_ = dependentParts_.empty() ? 0 : penalty;
+    return !dependentParts_.empty();
 }
 
 std::optional<double> JapaneseConverter::WordCount(std::wstring_view text) const {

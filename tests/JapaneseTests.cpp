@@ -2468,6 +2468,14 @@ void TestWrittenForms(const RomajiTable& table, const MiniPack& pack) {
             "天 read あめ is archaic");
     Require(unusual.Find(L"え", L"餌") == tekito::japanese::UnusualReadings::Kind::Rare, "餌 read え is rare");
     Require(!unusual.Contains(L"あめ", L"飴") && !unusual.HasReading(L"てん"), "飴 read あめ, and 天 read てん, are not listed");
+
+    // The parts of speech of suffixes and dependent nouns, one id a line.
+    const auto partsFile = std::filesystem::temp_directory_path() / L"tekito-test-dependent-ids.txt";
+    std::ofstream(partsFile, std::ios::binary) << "1941\n1951\n";
+    tekito::japanese::JapaneseConverter parted(pack.dictionary, pack.matrix);
+    Require(parted.LoadDependentParts(partsFile), "a dependent-ids list written for the test loads");
+    Require(!parted.LoadDependentParts(partsFile.wstring() + L".missing"), "and a missing one does not");
+    std::filesystem::remove(partsFile, ignored);
     std::filesystem::remove(unusualFile, ignored);
 }
 

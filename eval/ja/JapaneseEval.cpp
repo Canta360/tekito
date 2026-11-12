@@ -105,6 +105,13 @@ void SetNumberWord(tekito::japanese::JapaneseConverter& converter, const std::fi
     if (const auto noun = parts.For(tekito::japanese::UserWordKind::Noun)) {
         const char* cost = std::getenv("TEKITO_EVAL_JOINED_START");
         converter.SetJoinedStart(noun->right, cost && *cost ? std::strtoll(cost, nullptr, 10) : 1000);
+        // A suffix or dependent noun first, as JapaneseData sets it up (the
+        // pack's dependent-ids.txt, 2000); TEKITO_EVAL_DEPENDENT_START=<cost> another (0: off).
+        if (converter.LoadDependentParts(pack / "dependent-ids.txt")) {
+            if (const char* dependent = std::getenv("TEKITO_EVAL_DEPENDENT_START"); dependent && *dependent) {
+                converter.SetDependentStart(std::strtoll(dependent, nullptr, 10));
+            }
+        }
     }
     // Names the sentence check leaves, as JapaneseData sets them up
     // (TEKITO_EVAL_NAME_PARTS=0: none).

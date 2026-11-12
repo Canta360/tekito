@@ -10,6 +10,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <filesystem>
 #include <vector>
 
 namespace tekito::japanese {
@@ -302,6 +303,12 @@ public:
         startContent_ = content;
         startPenalty_ = penalty;
     }
+    // And a word of one kana that is only a suffix or dependent noun there
+    // (化, 下: japanese-core's dependent-ids.txt, the parts of speech;
+    // scripts/ja/build-japanese-dependent-ids.py) costs `penalty` more
+    // (かに: 蟹, not 化に; 日, a noun too, stays). False: no list (off).
+    bool LoadDependentParts(const std::filesystem::path& file, std::int64_t penalty = 2000);
+    void SetDependentStart(std::int64_t penalty) noexcept { dependentStartPenalty_ = penalty; }
     // Whether what is converted next starts a sentence (the text before the
     // caret ends one, or there is none): only then does SetJoinedStart's
     // cost apply; typed into the middle of a sentence, a particle may well
@@ -410,6 +417,8 @@ private:
     std::function<bool(std::wstring_view)> knownLetters_;
     std::uint16_t startContent_{0};
     std::int64_t startPenalty_{0};
+    std::int64_t dependentStartPenalty_{0};
+    std::vector<bool> dependentParts_;
     mutable bool atSentenceStart_{true};
     std::uint16_t organizationPart_{0};
 };
