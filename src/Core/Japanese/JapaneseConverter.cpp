@@ -1408,9 +1408,14 @@ std::vector<SentenceGuess> JapaneseConverter::BestSentences(std::wstring_view re
         guess.cost = ending.cost;
         for (auto it = parts.rbegin(); it != parts.rend(); ++it) {
             const Node& node = nodes[*it];
-            // Where the phrases of this reading would break, by the rules.
-            if (it != parts.rbegin() && matrix_.IsBoundary(nodes[*std::prev(it)].right, node.left)) {
-                guess.breaks.push_back(node.begin);
+            // Where the phrases of this reading would break, by the rules (a
+            // number and its counter stay one, as in Convert).
+            if (it != parts.rbegin()) {
+                const Node& before = nodes[*std::prev(it)];
+                const bool counted = (before.numeral || before.numberValue > 0) &&
+                                     StartsWithCounter(reading.substr(node.begin, node.end - node.begin),
+                                                       NodeText(dictionary_, node, reading));
+                if (!counted && matrix_.IsBoundary(before.right, node.left)) guess.breaks.push_back(node.begin);
             }
             guess.text += NodeText(dictionary_, node, reading);
         }
