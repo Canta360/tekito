@@ -25,6 +25,7 @@ class EdgeScorer;
 class ConnectionMatrix;
 class JapaneseDictionary;
 class LanguageModel;
+class UnusualReadings;
 
 struct PhraseCandidate {
     // Special: a date, a number written another way, a symbol or a sum
@@ -163,6 +164,9 @@ public:
     // How long the longest word the language model knows at the start of
     // `text` is (差し支えのない: 4, 差し支え; 指し支えのない: 2, 指し).
     [[nodiscard]] std::size_t KnownLength(std::wstring_view text) const;
+    // How often the language model sees `text` written so (ln count), with
+    // whatever reading; nothing without a model or when it has none.
+    [[nodiscard]] std::optional<double> WordCount(std::wstring_view text) const;
     // How well `word` goes on from the end of `before` as one (映画 + 界:
     // 映画界), the language model's pointwise mutual information of the
     // pair, with the longest end of `before` it knows; nothing when it has
@@ -352,6 +356,13 @@ public:
         notationCost_ = cost;
     }
     void SetNotationLevel(int level) const noexcept { notationLevel_ = level; }
+    // Words read as their kanji are hardly read (天 read あめ, the
+    // japanese-jmdict pack's unusual-readings.tsv) cost `cost` more for that
+    // reading, so 飴 and 雨 come before 天; nullptr: off.
+    void SetUnusualReadings(const UnusualReadings* readings, std::int64_t cost = 1000) noexcept {
+        unusualReadings_ = readings;
+        unusualCost_ = cost;
+    }
     // The parts of speech (left ids) of names the sentence check leaves
     // (PhraseCandidate::name): organizations (東武, 西友) and the like.
     // `organization`: the part of organizations (0: none), written with
@@ -371,6 +382,8 @@ private:
     const JapaneseDictionary& dictionary_;
     const ConnectionMatrix& matrix_;
     const LanguageModel* model_{nullptr};
+    const UnusualReadings* unusualReadings_{nullptr};
+    std::int64_t unusualCost_{0};
     const TopicVectors* vectors_{nullptr};
     const EnglishTies* englishTies_{nullptr};
     const Collocations* collocations_{nullptr};

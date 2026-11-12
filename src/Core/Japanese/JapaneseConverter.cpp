@@ -11,6 +11,7 @@
 #include "Core/Japanese/JapaneseUserDictionary.h"
 #include "Core/Japanese/KanaText.h"
 #include "Core/Japanese/LanguageModel.h"
+#include "Core/Japanese/UnusualReadings.h"
 #include "Core/Japanese/Notation.h"
 #include "Core/Japanese/TopicVectors.h"
 
@@ -320,7 +321,8 @@ Lattice BuildLattice(const JapaneseDictionary& dictionary, const ReadingCodes& c
                      const JapaneseConverter::NumberWord* number, const JapaneseConverter::NumberWord* letters,
                      const Compounds* compounds, std::int64_t compoundCost,
                      const Notation* notation = nullptr, int notationLevel = Notation::kDefault,
-                     std::int64_t notationCost = 0) {
+                     std::int64_t notationCost = 0, const UnusualReadings* unusual = nullptr,
+                     std::int64_t unusualCost = 0) {
     const std::size_t n = codes.size();
     Lattice lattice;
     if (compounds && compoundCost > 0) lattice.compoundCost = compoundCost;
@@ -406,6 +408,11 @@ Lattice BuildLattice(const JapaneseDictionary& dictionary, const ReadingCodes& c
                 node.left = word.left;
                 node.right = word.right;
                 node.cost = word.cost + (word.spellingCorrection ? kSpellingCorrectionPenalty : 0);
+                // A word read as its kanji are hardly read (天 read あめ).
+                if (unusual && unusual->HasReading(reading.substr(i, length)) &&
+                    unusual->Contains(reading.substr(i, length), dictionary.Surface(word, reading.substr(i, length)))) {
+                    node.cost += unusualCost;
+                }
                 node.known = true;
                 node.word = word;
                 // A number and its counter the dictionary writes in kanji
@@ -833,7 +840,7 @@ std::vector<Phrase> JapaneseConverter::Convert(std::wstring_view reading,
     const bool pairs = model_ && (weights_.costPerNat > 0 || weights_.penaltyPerNat > 0);
     Lattice lattice = BuildLattice(dictionary_, codes, fixedBoundary, reading, pairs ? model_ : nullptr, user,
                                          number_ ? &*number_ : nullptr, letters_ ? &*letters_ : nullptr, compounds_, compoundCost_,
-                                         notation_, notationLevel_, notationCost_);
+                                         notation_, notationLevel_, notationCost_, unusualReadings_, unusualCost_);
     PenalizeJoinedStart(lattice, context, matrix_, startContent_, atSentenceStart_ ? startPenalty_ : 0);
     if (edgeScorer_) {
         ScoreEdges(lattice, reading, context, dictionary_, matrix_, model_, weights_, *edgeScorer_, edgeContext_, edgeMargin_, edgeWeight_);
@@ -1354,7 +1361,7 @@ std::vector<SentenceGuess> JapaneseConverter::BestSentences(std::wstring_view re
     const bool pairs = model_ && (weights_.costPerNat > 0 || weights_.penaltyPerNat > 0);
     Lattice lattice = BuildLattice(dictionary_, codes, noBoundary, reading, pairs ? model_ : nullptr, user,
                                          number_ ? &*number_ : nullptr, letters_ ? &*letters_ : nullptr, compounds_, compoundCost_,
-                                         notation_, notationLevel_, notationCost_);
+                                         notation_, notationLevel_, notationCost_, unusualReadings_, unusualCost_);
     PenalizeJoinedStart(lattice, context, matrix_, startContent_, atSentenceStart_ ? startPenalty_ : 0);
     if (edgeScorer_) {
         ScoreEdges(lattice, reading, context, dictionary_, matrix_, model_, weights_, *edgeScorer_, edgeContext_, edgeMargin_, edgeWeight_);
@@ -1461,6 +1468,11 @@ std::optional<double> JapaneseConverter::PairFit(std::wstring_view before, std::
     return std::nullopt;
 }
 
+std::optional<double> JapaneseConverter::WordCount(std::wstring_view text) const {
+    if (!model_ || text.empty()) return std::nullopt;
+    return model_->LogCount(text);
+}
+
 std::size_t JapaneseConverter::KnownLength(std::wstring_view text) const {
     if (!model_) return 0;
     constexpr std::size_t kLongest = 8;
@@ -1533,7 +1545,7 @@ std::optional<std::int64_t> JapaneseConverter::Cost(std::wstring_view reading, s
     const bool pairs = model_ && (weights_.costPerNat > 0 || weights_.penaltyPerNat > 0);
     Lattice lattice = BuildLattice(dictionary_, codes, noBoundary, reading, pairs ? model_ : nullptr, user,
                                          number_ ? &*number_ : nullptr, letters_ ? &*letters_ : nullptr, compounds_, compoundCost_,
-                                         notation_, notationLevel_, notationCost_);
+                                         notation_, notationLevel_, notationCost_, unusualReadings_, unusualCost_);
     const auto searched = SearchPath(lattice, n, context, matrix_, model_, weights_);
     if (searched.path.empty()) return std::nullopt;
     return searched.cost;
@@ -1548,7 +1560,7 @@ JapaneseConverter::LatticeExport JapaneseConverter::ExportLattice(std::wstring_v
     const bool pairs = model_ && (weights_.costPerNat > 0 || weights_.penaltyPerNat > 0);
     const Lattice lattice = BuildLattice(dictionary_, codes, noBoundary, reading, pairs ? model_ : nullptr, nullptr,
                                          number_ ? &*number_ : nullptr, letters_ ? &*letters_ : nullptr, compounds_, compoundCost_,
-                                         notation_, notationLevel_, notationCost_);
+                                         notation_, notationLevel_, notationCost_, unusualReadings_, unusualCost_);
     exported.words.reserve(lattice.nodes.size());
     for (const Node& node : lattice.nodes) {
         exported.words.push_back({node.begin, node.end, node.left, node.right, node.cost, node.known,
@@ -1578,7 +1590,7 @@ std::optional<PhraseCandidate> JapaneseConverter::Best(std::wstring_view reading
     // Quick on purpose: the language model is left out.
     Lattice lattice = BuildLattice(dictionary_, codes, noBoundary, reading, nullptr, user,
                                          number_ ? &*number_ : nullptr, letters_ ? &*letters_ : nullptr, compounds_, compoundCost_,
-                                         notation_, notationLevel_, notationCost_);
+                                         notation_, notationLevel_, notationCost_, unusualReadings_, unusualCost_);
     const auto& nodes = lattice.nodes;
     std::vector<std::int64_t> best(nodes.size(), kInfinity);
     std::vector<int> previous(nodes.size(), -1);

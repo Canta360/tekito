@@ -73,6 +73,7 @@ add_library(tekito_core STATIC
     src/Core/Japanese/SortedTsv.cpp
     src/Core/Japanese/TopicVectors.cpp
     src/Core/Japanese/WrittenForms.cpp
+    src/Core/Japanese/UnusualReadings.cpp
     src/Core/LexiconProvider.cpp
     src/Core/MisspellingProvider.cpp
     src/Core/PolicyEngine.cpp

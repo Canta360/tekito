@@ -8,6 +8,7 @@
 #include "Core/Japanese/ChunkJudge.h"
 #include "Core/Japanese/LetterOdds.h"
 #include "Core/Japanese/WrittenForms.h"
+#include "Core/Japanese/UnusualReadings.h"
 #include "Core/Japanese/JapaneseComposer.h"
 #include "Core/Japanese/JapaneseConverter.h"
 #include "Core/Japanese/JapaneseDictionary.h"
@@ -85,6 +86,7 @@ struct JapaneseData {
     WrittenForms writtenForms;
     WrittenForms englishNames;
     WrittenForms productNames;
+    UnusualReadings unusualReadings;
     LetterOdds letterOdds;
     std::uint16_t nounContext{0};
 };
@@ -105,6 +107,9 @@ const JapaneseData* ProcessJapaneseData() {
             (void)loaded->dictionary.AddWords(ExternalLexiconProvider::PackDirectory(pack) / L"dictionary.bin");
         }
         loaded->converter = std::make_unique<JapaneseConverter>(loaded->dictionary, loaded->matrix);
+        if (loaded->unusualReadings.Open(ExternalLexiconProvider::PackDirectory(L"japanese-jmdict") / L"unusual-readings.tsv")) {
+            loaded->converter->SetUnusualReadings(&loaded->unusualReadings);
+        }
         if (loaded->model.Open(ExternalLexiconProvider::PackDirectory(L"japanese-lm"))) {
             loaded->converter->SetLanguageModel(&loaded->model);
         }

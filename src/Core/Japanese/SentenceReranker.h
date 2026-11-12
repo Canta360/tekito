@@ -25,6 +25,10 @@ namespace tekito::japanese {
 class SentenceReranker final {
 public:
     bool Open(const std::filesystem::path& packDirectory);
+    // Up to how many characters the sentence model counts for less, in
+    // proportion (the pack's own setting; 0: never less).
+    [[nodiscard]] float RampChars() const noexcept { return rampChars_; }
+    void SetRampChars(float chars) noexcept { rampChars_ = chars; }
     [[nodiscard]] bool IsOpen() const noexcept { return vocab_ != 0; }
     // How many of the converter's sentences it chooses among.
     [[nodiscard]] std::size_t Top() const noexcept { return prior_.size(); }

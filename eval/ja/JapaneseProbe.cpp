@@ -375,6 +375,14 @@ int main(int argc, char** argv) {
                 }
             }
             std::cout << "  (" << checked.read.size() << ")\n";
+            // "features": each sentence's features as the check weighs them.
+            if (std::find_if(argv + 3, argv + argc, [](const char* a) { return std::string(a) == "features"; }) != argv + argc) {
+                for (std::size_t i = 0; i < checked.features.size() && i < rows; ++i) {
+                    std::cout << "    " << Narrow(checked.read[i]);
+                    for (const float f : checked.features[i]) std::cout << " " << std::fixed << std::setprecision(2) << f;
+                    std::cout << std::defaultfloat << "\n";
+                }
+            }
         }
     }
     return 0;

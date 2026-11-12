@@ -43,6 +43,7 @@
 #include "Core/Japanese/Compounds.h"
 #include "Core/ExternalLexiconProvider.h"
 #include "Core/Japanese/KanjiSets.h"
+#include "Core/Japanese/UnusualReadings.h"
 #include "Core/Japanese/JapaneseData.h"
 #include "Core/Japanese/JapaneseComposer.h"
 #include "Core/Japanese/JapaneseConverter.h"
@@ -503,6 +504,20 @@ bool gContextPrevious = false;
 // (japanese-names, japanese-jmdict).
 std::vector<std::filesystem::path> gAddedPacks;
 
+// Words read as their kanji are hardly read (天 read あめ), from the
+// japanese-jmdict pack among the installed ones (TEKITO_DATA_PACK_DIR), as
+// the input method reads them.
+const tekito::japanese::UnusualReadings* InstalledUnusualReadings() {
+    static const auto readings = [] {
+        auto loaded = std::make_unique<tekito::japanese::UnusualReadings>();
+        if (!loaded->Open(tekito::ExternalLexiconProvider::PackDirectory(L"japanese-jmdict") / L"unusual-readings.tsv")) {
+            loaded.reset();
+        }
+        return loaded;
+    }();
+    return readings.get();
+}
+
 int RunKeys(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary, const JapaneseConverter& converter,
             const std::filesystem::path& corpus, const std::filesystem::path& romaji,
             tekito::japanese::KeyConverter::Costs costs, std::size_t showMisses,
@@ -535,6 +550,13 @@ int RunKeys(const ConnectionMatrix& matrix, const JapaneseDictionary& dictionary
     // TEKITO_EVAL_SENTENCE_WEIGHTS=0: the sentence check without its learned weights.
     if (const char* weights = std::getenv("TEKITO_EVAL_SENTENCE_WEIGHTS"); weights && *weights == '0') {
         composer.SetSentenceWeights({.on = false});
+    }
+    // TEKITO_EVAL_SENTENCE_MARGIN=x: how much more than the first another
+    // sentence must weigh to be taken, instead of the learned margin.
+    if (const char* margin = std::getenv("TEKITO_EVAL_SENTENCE_MARGIN"); margin && *margin) {
+        tekito::japanese::JapaneseComposer::SentenceWeights weights;
+        weights.margin = std::strtof(margin, nullptr);
+        composer.SetSentenceWeights(weights);
     }
     // TEKITO_EVAL_WHOLES=N: how many whole texts with other phrase breaks
     // the sentence check reads too (the composer's default otherwise).
@@ -1035,6 +1057,8 @@ int RunChunks(const ConnectionMatrix& matrix, const JapaneseDictionary& dictiona
         std::cerr << "could not open the reranker at " << options.rerankerPack.string() << "\n";
         return 1;
     }
+    // TEKITO_EVAL_RAMP=chars: the sentence model's ramp instead of the pack's.
+    if (const char* ramp = std::getenv("TEKITO_EVAL_RAMP"); ramp && *ramp) reranker.SetRampChars(std::strtof(ramp, nullptr));
     if (reranker.IsOpen()) composer.SetSentenceReranker(&reranker);
     // --ai: the model chooses among the sentence's texts on Enter (--hold);
     // TEKITO_EVAL_MIX_AI_MARGIN=nats, TEKITO_EVAL_MIX_AI_NOTATION=0 lets it
@@ -1809,6 +1833,7 @@ int main(int argc, char** argv) {
         if (!wikimedia.empty()) (void)dictionary.AddWords(wikimedia / "dictionary.bin");
         for (const auto& more : gAddedPacks) (void)dictionary.AddWords(more / "dictionary.bin");
         JapaneseConverter converter(dictionary, matrix);
+        converter.SetUnusualReadings(InstalledUnusualReadings());
         if (model.IsOpen()) converter.SetLanguageModel(&model, weights);
         SetNumberWord(converter, pack);
         return RunDumpLattices(matrix, converter, dumpLattices, dumpOut, dumpShard, dumpShards, dumpMargin);
@@ -1827,6 +1852,7 @@ int main(int argc, char** argv) {
         if (!wikimedia.empty()) (void)dictionary.AddWords(wikimedia / "dictionary.bin");
         for (const auto& more : gAddedPacks) (void)dictionary.AddWords(more / "dictionary.bin");
         JapaneseConverter converter(dictionary, matrix);
+        converter.SetUnusualReadings(InstalledUnusualReadings());
         if (model.IsOpen()) converter.SetLanguageModel(&model, weights);
         if (topicVectors.IsOpen()) converter.SetTopicVectors(&topicVectors);
         if (englishTies.IsOpen()) converter.SetEnglishTies(&englishTies);
@@ -1854,7 +1880,8 @@ int main(int argc, char** argv) {
         }
         if (!wikimedia.empty()) (void)dictionary.AddWords(wikimedia / "dictionary.bin");
         for (const auto& more : gAddedPacks) (void)dictionary.AddWords(more / "dictionary.bin");
-        const JapaneseConverter converter(dictionary, matrix);
+        JapaneseConverter converter(dictionary, matrix);
+        converter.SetUnusualReadings(InstalledUnusualReadings());
         std::ifstream in(guessReadings, std::ios::binary);
         std::ofstream out(guessReadingsOut, std::ios::binary);
         std::string line;
@@ -1883,6 +1910,7 @@ int main(int argc, char** argv) {
         if (!wikimedia.empty()) (void)dictionary.AddWords(wikimedia / "dictionary.bin");
         for (const auto& more : gAddedPacks) (void)dictionary.AddWords(more / "dictionary.bin");
         JapaneseConverter converter(dictionary, matrix);
+        converter.SetUnusualReadings(InstalledUnusualReadings());
         if (model.IsOpen()) converter.SetLanguageModel(&model, weights);
         if (topicVectors.IsOpen()) converter.SetTopicVectors(&topicVectors);
         if (englishTies.IsOpen()) converter.SetEnglishTies(&englishTies);
@@ -1902,6 +1930,8 @@ int main(int argc, char** argv) {
             std::cerr << "could not open the reranker at " << rerankerPack.string() << "\n";
             return 1;
         }
+        // TEKITO_EVAL_RAMP=chars: the sentence model's ramp instead of the pack's.
+        if (const char* ramp = std::getenv("TEKITO_EVAL_RAMP"); ramp && *ramp) reranker.SetRampChars(std::strtof(ramp, nullptr));
         tekito::japanese::KanaSlips slips;
         if (!slipsPack.empty() && !slips.Open(slipsPack)) {
             std::cerr << "could not open the slip finder at " << slipsPack.string() << "\n";
@@ -1927,6 +1957,7 @@ int main(int argc, char** argv) {
     if (!wikimedia.empty()) (void)dictionary.AddWords(wikimedia / "dictionary.bin");
     for (const auto& more : gAddedPacks) (void)dictionary.AddWords(more / "dictionary.bin");
     JapaneseConverter converter(dictionary, matrix);
+    converter.SetUnusualReadings(InstalledUnusualReadings());
         if (model.IsOpen()) converter.SetLanguageModel(&model, weights);
         if (topicVectors.IsOpen()) converter.SetTopicVectors(&topicVectors);
         if (englishTies.IsOpen()) converter.SetEnglishTies(&englishTies);

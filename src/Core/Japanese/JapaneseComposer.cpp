@@ -1890,11 +1890,16 @@ void JapaneseComposer::AddTypedForms() {
         auto& candidates = phrase.candidates;
         // What the sentence check chose stays chosen as the list moves.
         const std::wstring chosen = phrase.selected < candidates.size() ? candidates[phrase.selected].text : std::wstring{};
-        // One or two kana (i, ki, ai): kanji outside 常用 and 人名用, the
-        // long tail of kanji read so, after the common ones.
-        if (typedReading && phrases_.size() == 1 && reading.size() <= 2 && kanjiSets_) {
-            std::stable_partition(candidates.begin(), candidates.end(),
-                                  [&](const PhraseCandidate& c) { return kanjiSets_->Common(c.text); });
+        // One or two kana (i, ki, ai): the long tail of kanji read so,
+        // outside 常用 and 人名用 and hardly written (獺, 鷽), after the
+        // others; words in such kanji that are written (嘘, 飴, 蜘蛛) stay
+        // where they are, and so does the first.
+        if (typedReading && phrases_.size() == 1 && reading.size() <= 2 && kanjiSets_ && candidates.size() > 1) {
+            constexpr double kWrittenCount = 3.5;  // ln count: 蟻 4.0, 鯖 4.1; 獺 2.9, 蠅 2.3
+            std::stable_partition(candidates.begin() + 1, candidates.end(), [&](const PhraseCandidate& c) {
+                if (c.text == chosen || kanjiSets_->Common(c.text)) return true;
+                return converter_ && converter_->WordCount(c.text).value_or(0.0) >= kWrittenCount;
+            });
         }
         // The forms end the list, the first one last, all but the first
         // candidate moved there.

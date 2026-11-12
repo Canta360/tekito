@@ -39,6 +39,7 @@
 #include "Core/EnglishSpelling.h"
 #include "Core/ExternalRankingProviders.h"
 #include "Core/Japanese/WrittenForms.h"
+#include "Core/Japanese/UnusualReadings.h"
 #include "Core/Utf8.h"
 
 #if defined(_WIN32)
@@ -2455,6 +2456,16 @@ void TestWrittenForms(const RomajiTable& table, const MiniPack& pack) {
     Require(!named.OfferedName(L"zapier"), "and is not offered again");
     std::error_code ignored;
     std::filesystem::remove_all(dir, ignored);
+
+    // Words read as their kanji are hardly read (天 read あめ): listed by
+    // reading and word.
+    const auto unusualFile = std::filesystem::temp_directory_path() / L"tekito-test-unusual-readings.tsv";
+    std::ofstream(unusualFile, std::ios::binary) << "\xE3\x81\x82\xE3\x82\x81\t\xE5\xA4\xA9\n";  // あめ 天
+    tekito::japanese::UnusualReadings unusual;
+    Require(unusual.Open(unusualFile), "an unusual-readings list written for the test opens");
+    Require(unusual.HasReading(L"あめ") && unusual.Contains(L"あめ", L"天"), "天 read あめ is unusual");
+    Require(!unusual.Contains(L"あめ", L"飴") && !unusual.HasReading(L"てん"), "飴 read あめ, and 天 read てん, are not");
+    std::filesystem::remove(unusualFile, ignored);
 }
 
 // A loanword written in katakana as its romaji spells it (anime: アニメ)
