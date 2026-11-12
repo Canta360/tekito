@@ -1059,6 +1059,7 @@ int RunChunks(const ConnectionMatrix& matrix, const JapaneseDictionary& dictiona
     }
     // TEKITO_EVAL_RAMP=chars: the sentence model's ramp instead of the pack's.
     if (const char* ramp = std::getenv("TEKITO_EVAL_RAMP"); ramp && *ramp) reranker.SetRampChars(std::strtof(ramp, nullptr));
+    if (const char* with = std::getenv("TEKITO_EVAL_RAMP_CONTEXT"); with && *with) reranker.SetRampWithContext(*with == '1');
     if (reranker.IsOpen()) composer.SetSentenceReranker(&reranker);
     // --ai: the model chooses among the sentence's texts on Enter (--hold);
     // TEKITO_EVAL_MIX_AI_MARGIN=nats, TEKITO_EVAL_MIX_AI_NOTATION=0 lets it
@@ -1932,6 +1933,8 @@ int main(int argc, char** argv) {
         }
         // TEKITO_EVAL_RAMP=chars: the sentence model's ramp instead of the pack's.
         if (const char* ramp = std::getenv("TEKITO_EVAL_RAMP"); ramp && *ramp) reranker.SetRampChars(std::strtof(ramp, nullptr));
+        // TEKITO_EVAL_RAMP_CONTEXT=0/1: whether the text before counts toward the ramp.
+        if (const char* with = std::getenv("TEKITO_EVAL_RAMP_CONTEXT"); with && *with) reranker.SetRampWithContext(*with == '1');
         tekito::japanese::KanaSlips slips;
         if (!slipsPack.empty() && !slips.Open(slipsPack)) {
             std::cerr << "could not open the slip finder at " << slipsPack.string() << "\n";

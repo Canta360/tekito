@@ -1,29 +1,37 @@
-"""Adds unusual-readings.tsv to a built japanese-jmdict pack: words read in
-a way their kanji are hardly read (天 read あめ, 餌 read え, 工夫 read こうふ),
-from JMdict's priority marks (CC BY-SA 4.0, as the pack).
+"""Adds unusual-readings.tsv to a built japanese-jmdict pack: words read in a
+way the word is hardly read (店 read たな, 門 read かど), or read as only old
+Japanese read it while it is read otherwise today (天 read あめ), from JMdict
+(CC BY-SA 4.0, as the pack), KANJIDIC2 and JMnedict (the same).
 
-A reading of a word is unusual when no JMdict entry that has the word with
-that reading is marked common at all (ke_pri or re_pri; an entry marked for
-町 makes 街 read まち usual too), while another reading of the same word is
-(天: てん) and another word of the same reading (あめ: 雨, 飴). A word of
-one kanji read as KANJIDIC2 (CC BY-SA 4.0) gives an on reading (今: こん,
-版: ばん) or the stem of a kun reading with okurigana or a prefix (古: ふる,
-真: ま), or a kun reading voiced (川: がわ) is not: those are how compounds
-are read. Only a kun reading of its own is (天: あめ). Words with kana in
-them (降り read おり) are forms of words JMdict lists otherwise: never.
-TEKITO makes such a word cost more for that reading, so 飴 comes before 天
-for あめ.
+Both are the same word as a reading of today: some meaning (an English
+gloss) of it is one of that reading's too. A word of its own, however old or
+rare, is neither (天地 read あめつち, 候 read そうろう: to be; 自重 read
+じちょう: prudence, not じじゅう's dead load).
 
-An archaic reading of a word that is read otherwise today (天 read あめ:
-every JMdict sense of it marked arch or obs, while 天 read てん is not) is
-"archaic": TEKITO puts it after the words of today. A word that is itself
-archaic (天地 read あめつち, an entry of its own) is neither.
+- "rare": no common JMdict entry (ke_pri or re_pri) has the word with the
+  reading, while one has the word with another reading, and another word
+  with the reading (たな: 棚). A reading in a common entry is common unless
+  JMdict marks it irregular, old, rare or search-only (ik, ok, rk, sk):
+  霊験 read れいげん and 初産 read しょさん are common. For a word of one
+  kanji, only a reading marked common itself is, when another one of the
+  entry is (側: がわ, not かわ).
+- "archaic": every JMdict sense of the word so read is marked arch or obs,
+  while the word has a reading of today.
+
+Not either: a reading JMnedict has the word with as a place (斑鳩 read いかるが),
+words with kana in them (forms of words: 降り read おり), and, for a word of
+one kanji, a reading compounds use (KANJIDIC2: an on reading, also voiced
+or ending in っ, 今: こん, 版: ばん; a kun stem or prefix, 古: ふる; a kun
+reading voiced, 川: がわ).
+
+TEKITO makes them cost more for that reading (archaic most), so 雨 and 飴
+come before 天 for あめ.
 
 Rows: reading, tab, word, tab, kind ("rare" or "archaic"); sorted.
 
 Usage:
-  python scripts/ja/build-japanese-unusual-readings.py --jmdict JMdict_e.gz --kanjidic kanjidic2.xml.gz \
-      --pack <japanese-jmdict pack>
+  python scripts/ja/build-japanese-unusual-readings.py --jmdict JMdict_e.gz --jmnedict JMnedict.xml.gz \\
+      --kanjidic kanjidic2.xml.gz --pack <japanese-jmdict pack>
 """
 
 from __future__ import annotations
@@ -37,55 +45,74 @@ import re
 from pathlib import Path
 
 FILE = "unusual-readings.tsv"
+IRREGULAR = ("&ik;", "&ok;", "&rk;", "&sk;")
+VOICED = str.maketrans("がぎぐげござじずぜぞだぢづでどばびぶべぼぱぴぷぺぽ", "かきくけこさしすせそたちつてとはひふへほはひふへほ")
 
 
 def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest().upper()
 
 
+def hiragana(text: str) -> str:
+    return "".join(chr(ord(c) - 0x60) if "ァ" <= c <= "ヶ" else c for c in text)
+
+
+def forms(reading: str) -> set[str]:
+    plain = reading[:1].translate(VOICED) + reading[1:]
+    return {plain, plain[:-1] + "っ" if len(plain) > 1 else plain}
+
+
+def gloss_key(gloss: str) -> str:
+    gloss = re.sub(r"\([^)]*\)", "", gloss).lower()
+    return re.sub(r"^(to|a|an|the) ", "", gloss.strip())
+
+
+def kanji_only(word: str) -> bool:
+    return all("一" <= c <= "鿿" or c in "々〆" for c in word)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--jmdict", type=Path, required=True)
+    parser.add_argument("--jmnedict", type=Path, required=True)
     parser.add_argument("--kanjidic", type=Path, required=True)
     parser.add_argument("--pack", type=Path, required=True)
     args = parser.parse_args()
 
-    text = gzip.open(args.jmdict, "rt", encoding="utf-8").read()
     common: dict[tuple[str, str], bool] = collections.defaultdict(bool)
-    # Whether every entry with the word so read is archaic in every sense.
     archaic: dict[tuple[str, str], bool] = {}
+    glosses: dict[tuple[str, str], set[str]] = collections.defaultdict(set)
+    text = gzip.open(args.jmdict, "rt", encoding="utf-8").read()
     for entry in re.findall(r"<entry>(.*?)</entry>", text, re.S):
         kanji = [re.search(r"<keb>(.*?)</keb>", k).group(1) for k in re.findall(r"<k_ele>(.*?)</k_ele>", entry, re.S)]
         entry_common = "<ke_pri>" in entry or "<re_pri>" in entry
         senses = re.findall(r"<sense>(.*?)</sense>", entry, re.S)
         entry_archaic = bool(senses) and all("&arch;" in sense or "&obs;" in sense for sense in senses)
+        meanings = {gloss_key(g) for sense in senses for g in re.findall(r"<gloss[^>]*>(.*?)</gloss>", sense)}
         for r in re.findall(r"<r_ele>(.*?)</r_ele>", entry, re.S):
             if "<re_nokanji/>" in r:
                 continue
             reading = re.search(r"<reb>(.*?)</reb>", r).group(1)
-            # A reading of its own in a common entry (あま for 天) counts by its own mark.
-            reading_common = entry_common and ("<re_pri>" in r or "<re_pri>" not in entry)
+            reading_common = entry_common and not any(mark in r for mark in IRREGULAR)
+            marked_alone = "<re_pri>" in r or "<re_pri>" not in entry
             only = re.findall(r"<re_restr>(.*?)</re_restr>", r)
             for word in kanji:
                 if only and word not in only:
                     continue
-                common[(word, reading)] = common[(word, reading)] or reading_common
-                archaic[(word, reading)] = archaic.get((word, reading), True) and entry_archaic
+                key = (word, reading)
+                common[key] = common[key] or (reading_common and (len(word) > 1 or marked_alone))
+                archaic[key] = archaic.get(key, True) and entry_archaic
+                glosses[key] |= meanings
 
-    common_readings: dict[str, set[str]] = collections.defaultdict(set)
-    common_words: dict[str, set[str]] = collections.defaultdict(set)
-    for (word, reading), is_common in common.items():
-        if is_common:
-            common_readings[word].add(reading)
-            common_words[reading].add(word)
-    # Readings of single kanji that compounds use: on readings (voiced too,
-    # and with っ for their last kana) and kun stems and prefixes.
-    def hiragana(text: str) -> str:
-        return "".join(chr(ord(c) - 0x60) if "ァ" <= c <= "ヶ" else c for c in text)
-    voiced = str.maketrans("がぎぐげござじずぜぞだぢづでどばびぶべぼぱぴぷぺぽ", "かきくけこさしすせそたちつてとはひふへほはひふへほ")
-    def forms(reading: str) -> set[str]:
-        plain = reading[:1].translate(voiced) + reading[1:]
-        return {plain, plain[:-1] + "っ" if len(plain) > 1 else plain}
+    # Places only: surnames are read every way (天 read あめ too).
+    names: set[tuple[str, str]] = set()
+    for entry in re.findall(r"<entry>(.*?)</entry>", gzip.open(args.jmnedict, "rt", encoding="utf-8").read(), re.S):
+        if "&place;" not in entry and "&station;" not in entry:
+            continue
+        for word in re.findall(r"<keb>(.*?)</keb>", entry):
+            for reading in re.findall(r"<reb>(.*?)</reb>", entry):
+                names.add((word, reading))
+
     compound: dict[str, set[str]] = collections.defaultdict(set)
     plain_kun: dict[str, set[str]] = collections.defaultdict(set)
     kanjidic = gzip.open(args.kanjidic, "rt", encoding="utf-8").read()
@@ -102,25 +129,30 @@ def main() -> int:
     def compound_reading(word: str, reading: str) -> bool:
         if len(word) != 1:
             return False
-        voiced_kun = reading[:1] != reading[:1].translate(voiced) and             reading[:1].translate(voiced) + reading[1:] in plain_kun.get(word, set())
+        unvoiced = reading[:1].translate(VOICED) + reading[1:]
+        voiced_kun = unvoiced != reading and unvoiced in plain_kun.get(word, set())
         return voiced_kun or bool(forms(reading) & compound.get(word, set()))
 
-    def kanji_only(word: str) -> bool:
-        return all("一" <= c <= "鿿" or c in "々〆" for c in word)
-
-    # Readings of today: in an entry not all archaic.
+    common_readings: dict[str, set[str]] = collections.defaultdict(set)
+    common_words: dict[str, set[str]] = collections.defaultdict(set)
     todays_readings: dict[str, set[str]] = collections.defaultdict(set)
-    for (word, reading), old in archaic.items():
-        if not old:
+    for (word, reading), is_common in common.items():
+        if is_common:
+            common_readings[word].add(reading)
+            common_words[reading].add(word)
+        if not archaic[(word, reading)]:
             todays_readings[word].add(reading)
+
+    def same_word(word: str, reading: str, others: set[str]) -> bool:
+        return any(glosses[(word, reading)] & glosses[(word, other)] for other in others - {reading})
 
     rows = []
     for (word, reading), is_common in common.items():
-        if not kanji_only(word) or compound_reading(word, reading):
+        if not kanji_only(word) or compound_reading(word, reading) or (word, reading) in names:
             continue
-        if archaic[(word, reading)] and todays_readings[word] - {reading}:
+        if archaic[(word, reading)] and same_word(word, reading, todays_readings[word]):
             rows.append((reading, word, "archaic"))
-        elif not is_common and common_readings[word] - {reading} and common_words[reading] - {word}:
+        elif not is_common and common_words[reading] - {word} and same_word(word, reading, common_readings[word]):
             rows.append((reading, word, "rare"))
     rows.sort()
 

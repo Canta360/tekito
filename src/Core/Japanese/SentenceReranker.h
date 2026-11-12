@@ -29,6 +29,9 @@ public:
     // proportion (the pack's own setting; 0: never less).
     [[nodiscard]] float RampChars() const noexcept { return rampChars_; }
     void SetRampChars(float chars) noexcept { rampChars_ = chars; }
+    // Whether the text before (Choose's context) counts toward the ramp (on
+    // by default): a word typed after it is read with it (経費を + せいさん: 精算).
+    void SetRampWithContext(bool on) noexcept { rampWithContext_ = on; }
     [[nodiscard]] bool IsOpen() const noexcept { return vocab_ != 0; }
     // How many of the converter's sentences it chooses among.
     [[nodiscard]] std::size_t Top() const noexcept { return prior_.size(); }
@@ -74,6 +77,7 @@ private:
     MappedFile file_;
     std::uint32_t vocab_{0}, embed_{0}, hidden_{0};
     float scale_{0}, weight_{0}, rampChars_{0}, margin_{0}, unknownScore_{0};
+    bool rampWithContext_{true};
     std::vector<float> prior_;
     const std::int8_t* embedding_{nullptr};
     const float* embeddingScale_{nullptr};

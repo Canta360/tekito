@@ -355,7 +355,8 @@ std::size_t SentenceReranker::Choose(std::span<const std::wstring> sentences, st
     std::vector<std::wstring> read(sentences.begin(), sentences.begin() + static_cast<std::ptrdiff_t>(count));
     read.insert(read.end(), sentences.begin() + static_cast<std::ptrdiff_t>(ranked), sentences.end());
     const auto logProbabilities = LogProbabilities(read, context);
-    const double ramp = rampChars_ > 0 ? std::min(1.0, CodePoints(sentences[0]) / static_cast<double>(rampChars_)) : 1.0;
+    const double readChars = static_cast<double>(CodePoints(sentences[0]) + (rampWithContext_ ? CodePoints(context) : 0));
+    const double ramp = rampChars_ > 0 ? std::min(1.0, readChars / static_cast<double>(rampChars_)) : 1.0;
     std::size_t best = 0;
     std::vector<double> scores(read.size());
     for (std::size_t i = 0; i < read.size(); ++i) {
