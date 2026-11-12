@@ -215,7 +215,7 @@ const en = {
     sentenceCheck: { title: "Choose by the whole sentence", description: "Puts first the conversion that reads most naturally as a sentence." },
     firstPageSymbol: { title: "Symbols and emoji on the first page", description: "e.g. はーと → ♡" },
     typedForms: { title: "Typed forms at the end of the list", description: "Hiragana, katakana, half-width kana and letters at the end." },
-    chunks: { title: "Whole stretches in the list", description: "Other ways to write the words that follow too, such as にじがでる → 二次が出る." },
+    chunks: { title: "Whole stretches in the list", description: "e.g. にじがでる → 二次が出る, 虹がでる" },
     kanjiVariants: { title: "Kanji variants", description: "Other forms of kanji, such as 髙 and 﨑, after the usual ones." },
     keys: {
       convert: "Convert, then next candidate",
@@ -646,7 +646,7 @@ const ja = {
     sentenceCheck: { title: "文全体で変換を選ぶ", description: "文として自然な変換が第1候補になります" },
     firstPageSymbol: { title: "記号・絵文字を1ページ目に表示", description: "例：はーと → ♡" },
     typedForms: { title: "入力した形を候補の末尾に表示", description: "ひらがな・カタカナ・半角カナ・英字が候補の末尾に表示されます" },
-    chunks: { title: "続く言葉とまとめた候補を表示", description: "続く言葉までまとめた別の書き方も表示されます（例：にじがでる → 二次が出る）" },
+    chunks: { title: "続く言葉とまとめた候補を表示", description: "例：にじがでる → 二次が出る、虹がでる" },
     kanjiVariants: { title: "異体字を表示", description: "髙・﨑などの異体字が、通常の漢字の後に表示されます" },
     keys: {
       convert: "変換、次の候補",
