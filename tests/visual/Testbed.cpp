@@ -353,7 +353,7 @@ void Paint(Testbed& bed, HDC target) {
         if (cell.text == L"\n") continue;
         // Mix: the sentence held until Enter, behind a marker.
         if (cell.style == Style::Settled) {
-            HBRUSH marker = CreateSolidBrush(RGB(245, 150, 25));
+            HBRUSH marker = CreateSolidBrush(RGB(252, 212, 160));
             FillRect(dc, &cell.rect, marker);
             DeleteObject(marker);
         }

@@ -96,14 +96,15 @@ ITfDisplayAttributeInfo* CreateJapaneseUnderline(JapaneseUnderline underline) {
         break;
     case JapaneseUnderline::Settled:
     case JapaneseUnderline::SettledEnglish:
-        // A marker in Mix's orange, the colour of its underline, with dark
-        // text, readable on light and dark pages (white text would not be);
-        // English in it underlined too.
+        // A marker in a light tint of Mix's orange (the colour of its
+        // underline), so it does not stand out more than the text, with dark
+        // text, readable on light and dark pages; English in it underlined
+        // too.
         attribute.lsStyle = underline == JapaneseUnderline::SettledEnglish ? TF_LS_SOLID : TF_LS_NONE;
         attribute.crText.type = TF_CT_COLORREF;
         attribute.crText.cr = RGB(32, 32, 32);
         attribute.crBk.type = TF_CT_COLORREF;
-        attribute.crBk.cr = RGB(245, 150, 25);
+        attribute.crBk.cr = RGB(252, 212, 160);
         attribute.bAttr = TF_ATTR_CONVERTED;
         description = L"TEKITO Mix sentence held until Enter";
         break;
