@@ -3609,6 +3609,9 @@ void JapaneseComposer::AddSlipCandidatesFor(PhraseState& phrase) const {
     // own list below. These go after the phrase's own candidates.
     const std::wstring allKeys = Keys(false);
     std::vector<PhraseCandidate> wholeInput;
+    // A whole-input slip reads better than what is shown: the sentences the
+    // check read for the chunk candidates were of the slip.
+    bool wholeSlipBetter = false;
     if (phrases_.size() > 1 && allKeys.size() <= kWholeSlipKeys && lettersOnly(allKeys)) {
         const std::wstring typedAll = typedKanaOf(allKeys);
         const std::int64_t typedCost = costOf(converter_->Best(typedAll, 0, userDictionary_));
@@ -3624,6 +3627,18 @@ void JapaneseComposer::AddSlipCandidatesFor(PhraseState& phrase) const {
             candidate.reading = kana;
             candidate.slip = true;
             wholeInput.push_back(std::move(candidate));
+        }
+        if (!wholeInput.empty()) {
+            if (reranker_ && sentenceCheck_) {
+                std::wstring shown;
+                for (const auto& p : phrases_) shown += PhraseText(p);
+                std::vector<std::wstring> sentences{shown};
+                for (const auto& c : wholeInput) sentences.push_back(c.text);
+                const auto scores = reranker_->LogProbabilities(sentences, precedingText_);
+                for (std::size_t i = 1; i < scores.size(); ++i) wholeSlipBetter = wholeSlipBetter || scores[i] > scores[0];
+            } else {
+                for (const auto& c : wholeInput) wholeSlipBetter = wholeSlipBetter || c.cost + kSlipLikelier < typedCost;
+            }
         }
         // The whole input split another way inside its first phrase, when
         // that reads nearly as likely: いがい|たい is 以外帯, い|がいたい is
@@ -3742,9 +3757,7 @@ void JapaneseComposer::AddSlipCandidatesFor(PhraseState& phrase) const {
         return std::any_of(phrase.candidates.begin(), phrase.candidates.end(), same) ||
                std::any_of(added.begin(), added.end(), same);
     });
-    // The whole input read with a slip undone: the sentences the check read
-    // were of the slip, so the chunk candidates from them go.
-    if (!wholeInput.empty()) {
+    if (wholeSlipBetter) {
         for (std::size_t k = phrase.candidates.size(); k-- > 0;) {
             if (!phrase.candidates[k].chunk) continue;
             phrase.candidates.erase(phrase.candidates.begin() + static_cast<std::ptrdiff_t>(k));
