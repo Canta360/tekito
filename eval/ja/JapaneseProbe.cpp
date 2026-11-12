@@ -249,6 +249,17 @@ int main(int argc, char** argv) {
     // Mix with its own ways of writing, as the text service sets it.
     tekito::userdata::ApplyJapaneseSettings(composer, settings, nullptr, mix);
     tekito::japanese::AttachMixedTyping(composer, mix);
+    // English Auto's spelling for Mix's English, as the text service gives it.
+    std::unique_ptr<tekito::IConversionEngine> englishEngine;
+    std::unique_ptr<tekito::EnglishSpelling> englishSpelling;
+    if (mix) {
+        tekito::PreloadDefaultEngineData();
+        englishEngine = tekito::CreateDefaultConversionEngine();
+        if (englishEngine) {
+            englishSpelling = std::make_unique<tekito::EnglishSpelling>(*englishEngine);
+            composer.SetEnglishSpelling(englishSpelling.get());
+        }
+    }
     // "keys": each line is keys pressed, through the text service's key
     // handling (TranslateKey, ApplyKey) into a document, printed after each
     // key as the document then [the composition]. A capital is Shift and

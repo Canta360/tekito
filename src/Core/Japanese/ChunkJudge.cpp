@@ -315,8 +315,7 @@ ChunkJudge::Judgement ChunkJudge::JudgeLanguage(std::wstring_view keys, std::siz
         std::wstring lower = result.word;
         for (auto& c : lower) c = static_cast<wchar_t>(std::towlower(c));
         const auto seen = names_ ? names_->InJapaneseText(lower) : std::nullopt;
-        const bool used = !names_ || !names_->HasJapaneseTextCounts() || englishBefore >= kEnglishSentence ||
-                          seen.has_value();
+        const bool used = !names_ || !names_->HasJapaneseTextCounts() || englishSentence || seen.has_value();
         if (!used) return false;
         judgement.english = true;
         judgement.word = true;
@@ -346,6 +345,9 @@ ChunkJudge::Judgement ChunkJudge::JudgeLanguage(std::wstring_view keys, std::siz
             return judgement;
         }
         if (known) {
+            // A slip English text has often enough to be listed (recived,
+            // teh): as English Auto puts it right; a name as it is.
+            if (!name) spelled();
             judgement.english = true;
             return judgement;
         }
@@ -366,6 +368,9 @@ ChunkJudge::Judgement ChunkJudge::JudgeLanguage(std::wstring_view keys, std::siz
             if (name || !spelled()) judgement.english = true;
             return judgement;
         }
+        // In an English sentence, English Auto's spelling before a slip
+        // that makes Japanese of it (check it tomorow: tomorrow, not ところ).
+        if (englishBefore >= kEnglishSentence && !japaneseInSentence && spelled()) return judgement;
         if (slip) return judgement;
         if (spelled()) return judgement;
         judgement.english = true;
@@ -415,6 +420,10 @@ ChunkJudge::Judgement ChunkJudge::JudgeLanguage(std::wstring_view keys, std::siz
         }
         at = end + 1;
     }
+    // In an English sentence, keys that are no Japanese word and that
+    // English Auto puts right are that English word (I received the fike:
+    // file or like, not 輝家).
+    if (englishBefore >= kEnglishSentence && !japaneseInSentence && !japaneseWord && spelled()) return judgement;
     if (englishBefore >= kEnglishSentence && !japaneseInSentence && grammar && (japaneseOdd || japaneseWord)) {
         judgement.english = true;
         return judgement;
