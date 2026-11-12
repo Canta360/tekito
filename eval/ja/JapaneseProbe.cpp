@@ -13,6 +13,7 @@
 // Japanese data and the default settings.
 #include "Core/Japanese/JapaneseComposer.h"
 #include "Core/Japanese/JapaneseData.h"
+#include "Core/Japanese/JapaneseKeys.h"
 #include "Core/Japanese/KanaText.h"
 #include "Core/Japanese/LanguageModel.h"
 #include "Core/Japanese/SentenceReranker.h"
@@ -24,6 +25,7 @@
 
 #include <windows.h>
 
+#include <algorithm>
 #include <cctype>
 #include <fstream>
 #include <iomanip>
@@ -182,6 +184,72 @@ int main(int argc, char** argv) {
     }
     tekito::userdata::ApplyJapaneseSettings(composer, settings, nullptr);
     tekito::japanese::AttachMixedTyping(composer, mix);
+    // "keys": each line is keys pressed, through the text service's key
+    // handling (TranslateKey, ApplyKey) into a document, printed after each
+    // key as the document then [the composition]. A capital is Shift and
+    // the letter; {space} {enter} {bs} {esc} {left} {right} {f6}..{f10} are
+    // those keys (a plain space too).
+    if (std::find_if(argv + 3, argv + argc, [](const char* a) { return std::string(a) == "keys"; }) != argv + argc) {
+        using Key = tekito::japanese::KeyPress::Key;
+        const auto options = tekito::userdata::JapaneseKeyOptions(settings, mix);
+        std::ifstream lines(argv[1], std::ios::binary);
+        for (std::string line; std::getline(lines, line);) {
+            if (!line.empty() && line.back() == '\r') line.pop_back();
+            if (line.empty() || line[0] == '#') continue;
+            composer.Clear();
+            composer.ForgetContext();
+            std::wstring document;
+            std::cout << line << "\n ";
+            const std::wstring keys = Widen(line);
+            for (std::size_t i = 0; i < keys.size(); ++i) {
+                tekito::japanese::KeyPress press;
+                std::wstring name(1, keys[i]);
+                if (keys[i] == L'{') {
+                    const auto close = keys.find(L'}', i);
+                    name = keys.substr(i, close - i + 1);
+                    i = close;
+                    const std::pair<std::wstring_view, Key> named[] = {
+                        {L"{space}", Key::Space}, {L"{enter}", Key::Enter}, {L"{bs}", Key::Backspace}, {L"{esc}", Key::Escape},
+                        {L"{left}", Key::Left}, {L"{right}", Key::Right}, {L"{f6}", Key::F6}, {L"{f7}", Key::F7},
+                        {L"{f8}", Key::F8}, {L"{f9}", Key::F9}, {L"{f10}", Key::F10}};
+                    for (const auto& [text, key] : named) {
+                        if (name == text) press.key = key;
+                    }
+                } else if (keys[i] == L' ') {
+                    press.key = Key::Space;
+                } else {
+                    press.key = Key::Character;
+                    press.character = keys[i];
+                    press.shift = keys[i] >= L'A' && keys[i] <= L'Z';
+                    if (keys[i] >= L'1' && keys[i] <= L'9') press.digit = keys[i] - L'0';
+                }
+                const auto command = tekito::japanese::TranslateKey(composer, press, options);
+                if (!command) {
+                    // The application's: a plain text box.
+                    if (press.key == Key::Character) document += press.character;
+                    if (press.key == Key::Space) document += L' ';
+                    if (press.key == Key::Enter) document += L'\n';
+                    if (press.key == Key::Backspace && !document.empty()) document.pop_back();
+                } else {
+                    const auto outcome = tekito::japanese::ApplyKey(composer, *command);
+                    if (outcome.uncommitted && document.ends_with(*outcome.uncommitted)) {
+                        document.erase(document.size() - outcome.uncommitted->size());
+                    }
+                    if (outcome.committed) {
+                        const bool takeSpace = composer.TakeSpaceBefore();
+                        if (takeSpace && !outcome.committed->empty() && document.ends_with(L' ')) document.pop_back();
+                        document += *outcome.committed;
+                    }
+                    document += outcome.outside;
+                }
+                std::wstring shown;
+                for (const auto& segment : composer.Segments()) shown += segment.text;
+                std::cout << " " << Narrow(name) << ":" << Narrow(document) << "[" << Narrow(shown) << "]";
+            }
+            std::cout << "\n";
+        }
+        return 0;
+    }
     if (sentences) composer.SetKeepCheckedFeatures(true);
     std::ifstream in(argv[1], std::ios::binary);
     for (std::string line; std::getline(in, line);) {
