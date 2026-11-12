@@ -2968,6 +2968,11 @@ void JapaneseComposer::AddChunkCandidates(std::size_t i) {
     }
     const auto& checked = lastCheckedSentences_;
     if (checked.reading != conversionReading_ || checked.scores.size() != checked.shown.size()) return;
+    // Letters romaji left (otukarw): a slip, which the slip candidates read.
+    if (std::any_of(conversionReading_.begin(), conversionReading_.end(),
+                    [](wchar_t c) { return (c >= L'a' && c <= L'z') || (c >= L'A' && c <= L'Z') || (c >= 0xFF21 && c <= 0xFF5A); })) {
+        return;
+    }
     const std::size_t last = phrases_.size() - i <= kWholeRest ? phrases_.size() - 1 : i + 1;
     std::wstring before, chunk, after;
     for (std::size_t k = 0; k < phrases_.size(); ++k) {
@@ -3026,7 +3031,9 @@ void JapaneseComposer::AddChunkCandidates(std::size_t i) {
         if ((digits(chunk) && !digits(text)) || narrow(text) == ownNarrow) continue;
         const std::wstring theirs = kanji(text);
         const bool written = within(theirs, ownKanji) || within(ownKanji, theirs);
-        if (written && !within(katakana(text), ownKatakana)) continue;
+        // Written another way: not in katakana the phrase is not in, nor all
+        // in kana when it has kanji (はひめまして for は秘めまして).
+        if (written && (!within(katakana(text), ownKatakana) || (theirs.empty() && !ownKanji.empty()))) continue;
         found.push_back({std::move(text), checked.scores[k], written});
     }
     std::stable_sort(found.begin(), found.end(), [](const Found& a, const Found& b) { return a.score > b.score; });
@@ -3610,9 +3617,13 @@ void JapaneseComposer::AddSlipCandidatesFor(PhraseState& phrase) const {
         // The likeliest readings with a slip undone, each with its likeliest
         // spellings (きかいが: 機会が, 機械が), then the next readings.
         const auto found = SlipReadings(keys, {typedKana, shown}, typedCost);
+        // Keys that are a word as typed (あした: 明日) are not taken for a
+        // slip however cheap one reads (ました, a word that only follows
+        // another): its readings wait their place further down.
+        const bool typedWord = converter_->IsWord(typedKana);
         std::size_t offered = 0;
         for (std::size_t i = 0; i < found.size() && offered < kSlipCandidates; ++i) {
-            likelier = likelier || (i == 0 && found[i].first.cost + kSlipLikelier < typedCost);
+            likelier = likelier || (i == 0 && !typedWord && found[i].first.cost + kSlipLikelier < typedCost);
             if (i >= kSlipSpelledReadings) {
                 if (offer(found[i].first)) ++offered;
                 continue;
@@ -3647,6 +3658,15 @@ void JapaneseComposer::AddSlipCandidatesFor(PhraseState& phrase) const {
         return std::any_of(phrase.candidates.begin(), phrase.candidates.end(), same) ||
                std::any_of(added.begin(), added.end(), same);
     });
+    // The whole input read with a slip undone: the sentences the check read
+    // were of the slip, so the chunk candidates from them go.
+    if (!wholeInput.empty()) {
+        for (std::size_t k = phrase.candidates.size(); k-- > 0;) {
+            if (!phrase.candidates[k].chunk) continue;
+            phrase.candidates.erase(phrase.candidates.begin() + static_cast<std::ptrdiff_t>(k));
+            if (phrase.selected > k) --phrase.selected;
+        }
+    }
     if (likelier) {
         added.insert(added.end(), std::make_move_iterator(wholeInput.begin()), std::make_move_iterator(wholeInput.end()));
     } else {
