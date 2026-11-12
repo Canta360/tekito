@@ -105,6 +105,10 @@ constexpr std::int64_t kKanaNumberCost = 1000;
 constexpr std::int64_t kCountedNumberCost = -2000;
 // And when a word without a number reads the same (ご縁, 誤解).
 constexpr std::int64_t kHomophoneCost = 1500;
+// A word with no number in it comes before a number and its counter read the
+// same only when it is seen this often (ln count in japanese-lm): 虹 (6.4)
+// over 2時, not 惨事 (5.2) over 3時 nor 給餌 (3.6) over 9時.
+constexpr double kCommonerWordCount = 6.0;
 
 // A decimal point or thousands comma, as typed in Japanese.
 bool IsNumberMark(wchar_t c) {
@@ -378,7 +382,8 @@ Lattice BuildLattice(const JapaneseDictionary& dictionary, const ReadingCodes& c
                         const bool numbered = digits > 0 && WritesCounter(counterKana, std::wstring_view(surface).substr(digits));
                         homophone = homophone || !numbered;
                         if (numbered) numberedCost = std::min<std::int64_t>(numberedCost, word.cost);
-                        if (digits == 0) plainCost = std::min<std::int64_t>(plainCost, word.cost);
+                        const bool common = !model || model->LogCount(surface).value_or(0.0) >= kCommonerWordCount;
+                        if (digits == 0 && common) plainCost = std::min<std::int64_t>(plainCost, word.cost);
                     });
                 }
                 countedHomophones[i].push_back(homophone);
