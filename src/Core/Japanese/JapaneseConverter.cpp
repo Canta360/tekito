@@ -267,6 +267,16 @@ bool WritesCounter(std::wstring_view kana, std::wstring_view written) {
     return false;
 }
 
+// Whether a word starts with a counter (じはん: 時半), as written.
+bool StartsWithCounter(std::wstring_view kana, std::wstring_view written) {
+    for (std::size_t k = 1; k <= std::min<std::size_t>(kana.size(), 5); ++k) {
+        for (std::size_t m = 1; m <= std::min<std::size_t>(written.size(), 5); ++m) {
+            if (WritesCounter(kana.substr(0, k), written.substr(0, m))) return true;
+        }
+    }
+    return false;
+}
+
 // Letters by their names in kana, as Japanese reads them out (ぴー: P,
 // えいち and えっち: H, だぶりゅー: W), long vowels typed with う too (ゆう).
 constexpr std::pair<std::wstring_view, wchar_t> kLetterNames[] = {
@@ -335,6 +345,16 @@ Lattice BuildLattice(const JapaneseDictionary& dictionary, const ReadingCodes& c
     // And numbers of one part before a counter, costing more (一番, 一度
     // stay words).
     std::vector<std::vector<Counted>> counted(n);
+    // For each, the words read the same as the number and its counter:
+    // whether one has no number in it (ごえん: ご縁, ごかい: 誤解, にじ: 虹) or
+    // a number but not this counter after it (いっさい: 一切), which makes our
+    // number cost more; and whether one with no number in it is a commoner
+    // word to the dictionary than the number and counter written in kanji
+    // (虹 over 二時, 誤解 over 五回; not 二界 over 二階), which makes the
+    // dictionary's number before the counter cost more too. The words
+    // around then decide.
+    std::vector<std::vector<bool>> countedHomophones(n);
+    std::vector<std::vector<bool>> countedCommonerWords(n);
     if (number) {
         std::size_t covered = 0;
         for (std::size_t i = 0; i < n; ++i) {
@@ -342,6 +362,28 @@ Lattice BuildLattice(const JapaneseDictionary& dictionary, const ReadingCodes& c
             numerals[i] = KanaNumbers(reading.substr(i));
             counted[i] = CountedNumber(reading.substr(i));
             for (const auto& [length, value] : numerals[i]) covered = std::max(covered, i + length);
+            for (const auto& [length, value, counterLength] : counted[i]) {
+                bool homophone = false;
+                std::int64_t plainCost = kInfinity;
+                std::int64_t numberedCost = kInfinity;
+                if (const auto record = dictionary.Find(ReadingCodesView(codes).substr(i, length + counterLength))) {
+                    const auto part = reading.substr(i, length + counterLength);
+                    const auto counterKana = reading.substr(i + length, counterLength);
+                    dictionary.ForEachWord(*record, [&](const DictionaryWord& word) {
+                        const std::wstring surface = dictionary.Surface(word, part);
+                        const auto numberEnd = std::find_if(surface.begin(), surface.end(), [](wchar_t c) {
+                            return !IsDigit(c) && std::wstring_view(L"〇一二三四五六七八九十百千万").find(c) == std::wstring_view::npos;
+                        });
+                        const auto digits = static_cast<std::size_t>(numberEnd - surface.begin());
+                        const bool numbered = digits > 0 && WritesCounter(counterKana, std::wstring_view(surface).substr(digits));
+                        homophone = homophone || !numbered;
+                        if (numbered) numberedCost = std::min<std::int64_t>(numberedCost, word.cost);
+                        if (digits == 0) plainCost = std::min<std::int64_t>(plainCost, word.cost);
+                    });
+                }
+                countedHomophones[i].push_back(homophone);
+                countedCommonerWords[i].push_back(plainCost < numberedCost);
+            }
         }
     }
     for (std::size_t i = 0; i < n; ++i) {
@@ -366,7 +408,9 @@ Lattice BuildLattice(const JapaneseDictionary& dictionary, const ReadingCodes& c
                 // style.
                 // So too its number alone before the counter (三 then 時; に,
                 // a number the dictionary leaves in kana, then 歳).
-                for (const auto& [numberLength, value, counterLength] : counted[i]) {
+                bool commonerWord = false;
+                for (std::size_t c = 0; c < counted[i].size(); ++c) {
+                    const auto& [numberLength, value, counterLength] = counted[i][c];
                     const auto part = reading.substr(i, length);
                     const auto surface = dictionary.Surface(word, part);
                     const auto kanji = SmallKanji(value);
@@ -382,8 +426,11 @@ Lattice BuildLattice(const JapaneseDictionary& dictionary, const ReadingCodes& c
                                 (number && word.left == number->left && surface == part))) {
                         node.numberValue = value;
                         node.numberPrefix = surface.size();
+                        // Only when they are all that is typed (にじ: 虹; にじに: 2時に).
+                        commonerWord = commonerWord || (i == 0 && numberLength + counterLength == n && countedCommonerWords[i][c]);
                     }
                 }
+                if (commonerWord) node.cost += kHomophoneCost;
                 if (lattice.compoundCost > 0 && !word.spellingCorrection) {
                     const auto part = reading.substr(i, length);
                     const auto surface = dictionary.Surface(word, part);
@@ -480,29 +527,12 @@ Lattice BuildLattice(const JapaneseDictionary& dictionary, const ReadingCodes& c
         // A number read in kana, written in digits as a number word
         // (にせんごねん: 2005年); the number style is the composer's.
         if (number) {
-            for (const auto& [length, value, counterLength] : counted[i]) {
+            for (std::size_t c = 0; c < counted[i].size(); ++c) {
+                const auto& [length, value, counterLength] = counted[i][c];
                 if (crosses(i, i + length)) continue;
                 // Also where the dictionary has the number and counter in
                 // kanji: that word may be another one (十時, a surname).
-                // A word read the same with no number in it (ごえん: ご縁,
-                // ごかい: 誤解, にじ: 虹): the number costs more, the words
-                // around decide; also one with a number but not this counter
-                // after it (いっさい: 一切).
-                bool homophone = false;
-                if (const auto record = dictionary.Find(ReadingCodesView(codes).substr(i, length + counterLength))) {
-                    const auto part = reading.substr(i, length + counterLength);
-                    const auto counterKana = reading.substr(i + length, counterLength);
-                    dictionary.ForEachWord(*record, [&](const DictionaryWord& word) {
-                        const std::wstring surface = dictionary.Surface(word, part);
-                        const auto numberEnd = std::find_if(surface.begin(), surface.end(), [](wchar_t c) {
-                            return !IsDigit(c) && std::wstring_view(L"〇一二三四五六七八九十百千万").find(c) == std::wstring_view::npos;
-                        });
-                        const auto digits = static_cast<std::size_t>(numberEnd - surface.begin());
-                        const bool numbered =
-                            digits > 0 && WritesCounter(counterKana, std::wstring_view(surface).substr(digits));
-                        homophone = homophone || !numbered;
-                    });
-                }
+                const bool homophone = countedHomophones[i][c];
                 Node numeral;
                 numeral.begin = static_cast<std::uint32_t>(i);
                 numeral.end = static_cast<std::uint32_t>(i + length);
@@ -814,8 +844,12 @@ std::vector<Phrase> JapaneseConverter::Convert(std::wstring_view reading,
     for (std::size_t k = 1; k < path.size(); ++k) {
         const Node& before = nodes[path[k - 1]];
         const Node& node = nodes[path[k]];
+        // A number read in kana and its counter stay one phrase (にじ: 2時,
+        // with 虹 among its candidates, not 2 then 時).
+        const bool counted = (before.numeral || before.numberValue > 0) &&
+                             StartsWithCounter(reading.substr(node.begin, node.end - node.begin), NodeText(dictionary_, node, reading));
         const bool split = fixedBoundary[node.begin] ||
-                           (node.begin >= fixedEnd && matrix_.IsBoundary(before.right, node.left));
+                           (node.begin >= fixedEnd && !counted && matrix_.IsBoundary(before.right, node.left));
         if (split) {
             spans.emplace_back(start, k);
             start = k;
