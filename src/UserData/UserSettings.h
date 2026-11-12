@@ -232,9 +232,9 @@ struct UserSettings {
     // Auto too: Space puts the spaces in whenever known words make it up,
     // not only common ones (which it offers otherwise).
     bool spacelessEnglishAlways{false};
-    // Mix: the sentence held until Enter has a marker in Mix's orange; off,
-    // it is underlined as converted text.
-    bool mixSettledMarker{true};
+    // Mix: the sentence held until Enter has a marker in a light tint of
+    // Mix's orange; off (the default), it is underlined as converted text.
+    bool mixSettledMarker{false};
     // Mix: what is taken as English is underlined in English Auto's blue.
     bool mixEnglishUnderline{false};
     // A half-width space between Japanese and an English word when text is

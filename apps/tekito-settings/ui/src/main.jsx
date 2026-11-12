@@ -71,7 +71,7 @@ const initialSettings = {
   mixCorrection: true,
   spacelessEnglish: true,
   spacelessEnglishAlways: false,
-  mixSettledMarker: true,
+  mixSettledMarker: false,
   mixEnglishUnderline: false,
   rainbowAccent: false,
   catSounds: false,
