@@ -1657,6 +1657,14 @@ std::vector<Prediction> JapaneseConverter::Predict(std::wstring_view reading, st
             });
         }
     }
+    // Not endings no one types to stop on: one that a ば or う must follow
+    // (よろしけれ, よろしかろ), one before た (よかっ, 行っ) or a word cut
+    // short in speech (わかりゃ).
+    std::erase_if(found, [&](const Found& item) {
+        const std::wstring key = dictionary_.KeyText(item.record);
+        const std::wstring text = dictionary_.Surface(item.word, key);
+        return text.ends_with(L"けれ") || text.ends_with(L"かろ") || text.ends_with(L"っ") || text.ends_with(L"ゃ");
+    });
     const auto cheaper = [](const Found& a, const Found& b) { return a.cost < b.cost; };
     // Only the first few are needed; some may be dropped below.
     const std::size_t sorted = std::min(found.size(), limit * 4);
