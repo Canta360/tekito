@@ -2459,7 +2459,7 @@ void TestSqliteUserSettingsRepository() {
                                            "'mix_kanji_range','mix_kanji_grade','mix_symbol_width','mix_letter_width',"
                                            "'mix_space_width','mix_notation_level','mix_rough_numbers_kanji','mix_kanji_names',"
                                            "'mix_sentence_check','mix_slip_auto_apply','mix_typed_forms','mix_live_refine',"
-                                           "'mix_english_spacing');",
+                                           "'mix_english_spacing','mix_chunk_candidates');",
                                  nullptr, nullptr, nullptr) == SQLITE_OK,
                 "Mix's ways of writing are taken out, as before Mix had them");
         sqlite3_close(database);

@@ -151,6 +151,9 @@ public:
     void SetSentenceReranker(const SentenceReranker* reranker) noexcept { reranker_ = reranker; }
     // The user's switch for it (on by default).
     void SetSentenceCheck(bool on) noexcept { sentenceCheck_ = on; }
+    // The list also offers the phrase and the ones after it written another
+    // way as a whole (AddChunkCandidates).
+    void SetChunkCandidates(bool on) noexcept { chunkCandidates_ = on; }
     // How many whole texts that break the reading in other places the
     // sentence check also reads (0: only the phrases' choices).
     void SetWholeSentences(std::size_t count) noexcept { wholeSentences_ = count; }
@@ -478,8 +481,13 @@ public:
     // evaluation and its training lists: as shown, as the model read them
     // (numbers in kanji), and how many came by rank before the whole texts.
     struct CheckedSentences {
+        // The reading checked.
+        std::wstring reading;
         std::vector<std::wstring> shown;
         std::vector<std::wstring> read;
+        // Each one's score as the check weighed it (SentenceWeights; the
+        // sentence model's alone when off), when it scored them.
+        std::vector<float> scores;
         std::size_t ranked{0};
         std::size_t chosen{0};
         // Each one's SentenceFeature values; counts the checks made.
@@ -672,6 +680,9 @@ private:
     // Words of the dictionary over phrase `i` and the next ones, offered in
     // its list when the list opens.
     void AddLongerWords(std::size_t i);
+    // The phrase `i` and the ones after it written another way as a whole
+    // (sentences the check read), after the phrase's first candidate.
+    void AddChunkCandidates(std::size_t i);
     // A longer word chosen: the focused phrase takes its length.
     void TakeLongerWord();
     // Whether what is typed next may hardly start with a one-kana particle:
@@ -919,6 +930,7 @@ private:
     std::wstring aiKeys_;
     std::size_t aiFocus_{0};
     bool sentenceCheck_{true};
+    bool chunkCandidates_{true};
     bool sentencesByCost_{true};
     std::size_t beamWidth_{0};
     double beamCostPerNat_{1000.0}, beamMargin_{0.0}, beamWholeCost_{0.0};

@@ -59,6 +59,7 @@ inline void ApplyModeSettings(japanese::JapaneseComposer& composer, const UserSe
     composer.SetSentenceCheck(settings.japaneseSentenceCheck);
     composer.SetSlipAutoApply(settings.japaneseSlipAutoApply);
     composer.SetTypedForms(settings.japaneseTypedForms);
+    composer.SetChunkCandidates(settings.japaneseChunkCandidates);
     composer.SetKanjiVariants(settings.japaneseKanjiVariants);
     composer.SetNotationLevel(std::clamp(settings.japaneseNotationLevel, 1, 5));
     composer.SetLiveRefine(settings.japaneseLiveRefine);

@@ -128,6 +128,9 @@ struct CandidateList {
         std::uint32_t number{0};
         // Read with a slip undone, or a spelling Mozc corrects.
         bool suggestion{false};
+        // The first of the phrase's own candidates after its chunk
+        // candidates (PhraseCandidate::chunk): a line above it.
+        bool groupStart{false};
     };
     Kind kind{Kind::None};
     std::vector<Row> rows;

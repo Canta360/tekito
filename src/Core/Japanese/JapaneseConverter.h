@@ -62,6 +62,10 @@ struct PhraseCandidate {
     // characters of the reading from the phrase's start (へ|いき: 併記 over
     // へいき); choosing it makes the phrase that long. 0: the phrase's own.
     std::size_t length{0};
+    // The phrase and the ones after it written another way as a whole, from
+    // the sentences the sentence check read (JapaneseComposer's chunk
+    // candidates); `length` is how far it reaches.
+    bool chunk{false};
     // What the sentence's other words say for it, as the topic order read
     // them (PhraseSignal); 0 when not read.
     std::array<float, 5> signals{};

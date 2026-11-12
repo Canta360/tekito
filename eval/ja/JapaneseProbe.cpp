@@ -26,6 +26,7 @@
 
 #include <cctype>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <optional>
 #include <string>
@@ -165,9 +166,13 @@ int main(int argc, char** argv) {
     tekito::userdata::UserSettings settings;
     bool mix = false;
     bool steps = false;
+    // "sentences": the sentences the sentence check read, in its order, the
+    // one it chose marked.
+    bool sentences = false;
     for (int i = 3; i < argc; ++i) {
         if (std::string(argv[i]) == "mixlive") settings.mixLiveConversion = true;
         if (std::string(argv[i]) == "steps") steps = true;
+        if (std::string(argv[i]) == "sentences") sentences = true;
         if (std::string(argv[i]) == "live") settings.japaneseLiveConversion = true;
         if (std::string(argv[i]) == "mix") mix = true;
         if (std::string(argv[i]) == "nocheck") settings.japaneseSentenceCheck = false;
@@ -177,6 +182,7 @@ int main(int argc, char** argv) {
     }
     tekito::userdata::ApplyJapaneseSettings(composer, settings, nullptr);
     tekito::japanese::AttachMixedTyping(composer, mix);
+    if (sentences) composer.SetKeepCheckedFeatures(true);
     std::ifstream in(argv[1], std::ios::binary);
     for (std::string line; std::getline(in, line);) {
         if (!line.empty() && line.back() == '\r') line.pop_back();
@@ -211,13 +217,30 @@ int main(int argc, char** argv) {
         std::wstring phrases;
         for (const auto& segment : composer.Segments()) phrases += (phrases.empty() ? L"" : L"|") + segment.text;
         std::cout << "\tphrases: " << Narrow(phrases) << "\n  ";
+        // As the list opens (with the chunk candidates, marked ^).
+        if (sentences) composer.ShowCandidates();
         if (const auto* list = composer.FocusedCandidates()) {
             for (std::size_t i = 0; i < list->size() && i < rows; ++i) {
-                std::cout << (i ? " | " : "") << Narrow((*list)[i].text);
+                std::cout << (i ? " | " : "") << ((*list)[i].chunk ? "^" : "") << Narrow((*list)[i].text);
             }
             std::cout << "  (" << list->size() << ")";
         }
         std::cout << "\n";
+        // Mix: what Enter commits.
+        if (mix) std::cout << "  commit: " << Narrow(composer.Commit()) << "\n";
+        if (sentences) {
+            const auto& checked = composer.LastCheckedSentences();
+            std::cout << "  sentences:";
+            for (std::size_t i = 0; i < checked.read.size() && i < rows; ++i) {
+                std::cout << (i ? " | " : " ") << (i == checked.chosen ? "*" : "") << Narrow(checked.read[i]);
+                // The check's score over the chosen one's.
+                if (i < checked.scores.size() && checked.chosen < checked.scores.size()) {
+                    const float delta = checked.scores[i] - checked.scores[checked.chosen];
+                    std::cout << " (" << std::fixed << std::setprecision(1) << delta << std::defaultfloat << ")";
+                }
+            }
+            std::cout << "  (" << checked.read.size() << ")\n";
+        }
     }
     return 0;
 }

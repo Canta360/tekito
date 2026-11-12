@@ -90,6 +90,9 @@ struct Candidate {
     // The candidate window marks it with a dictionary sign: there is a
     // meaning to show for it.
     bool hasMeaning{false};
+    // The candidate window draws a thin line above it: candidates of another
+    // kind start here (a phrase's own after ones over the phrases after it).
+    bool groupStart{false};
 
     bool operator==(const Candidate&) const = default;
 };

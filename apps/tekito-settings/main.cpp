@@ -1387,6 +1387,8 @@ private:
         json += settings_.japaneseFirstPageSymbol ? L"true" : L"false";
         json += L",\"japaneseTypedForms\":";
         json += settings_.japaneseTypedForms ? L"true" : L"false";
+        json += L",\"japaneseChunkCandidates\":";
+        json += settings_.japaneseChunkCandidates ? L"true" : L"false";
         json += L",\"japaneseKanjiVariants\":";
         json += settings_.japaneseKanjiVariants ? L"true" : L"false";
         json += L",\"japaneseLiveRefine\":";
@@ -1650,6 +1652,7 @@ private:
             else if (key == L"japaneseSlipAutoApply") settings_.japaneseSlipAutoApply = value;
             else if (key == L"japaneseFirstPageSymbol") settings_.japaneseFirstPageSymbol = value;
             else if (key == L"japaneseTypedForms") settings_.japaneseTypedForms = value;
+            else if (key == L"japaneseChunkCandidates") settings_.japaneseChunkCandidates = value;
             else if (key == L"japaneseKanjiVariants") settings_.japaneseKanjiVariants = value;
             else if (key == L"japaneseLiveRefine") settings_.japaneseLiveRefine = value;
             else if (key == L"japaneseKanaInput") settings_.japaneseKanaInput = value;

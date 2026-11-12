@@ -308,7 +308,8 @@ CandidateList CandidateListFor(const JapaneseComposer& composer, std::size_t pag
     for (std::size_t i = 0; i < candidates->size(); ++i) {
         const auto& candidate = (*candidates)[i];
         list.rows.push_back({candidate.text, reading, static_cast<std::uint32_t>(i % pageSize + 1),
-                             candidate.slip || candidate.spellingCorrection});
+                             candidate.slip || candidate.spellingCorrection,
+                             i > 0 && (*candidates)[i - 1].chunk && !candidate.chunk});
     }
     const std::size_t selected = std::min(composer.FocusedSelection(), candidates->size() - 1);
     list.selected = selected;

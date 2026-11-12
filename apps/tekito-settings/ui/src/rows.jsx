@@ -590,7 +590,7 @@ export const mixPairs = {
   japaneseKanjiRange: "mixKanjiRange", japaneseKanjiGrade: "mixKanjiGrade", japaneseSymbolWidth: "mixSymbolWidth",
   japaneseLetterWidth: "mixLetterWidth", japaneseSpaceWidth: "mixSpaceWidth", japaneseNotationLevel: "mixNotationLevel",
   japaneseRoughNumbersKanji: "mixRoughNumbersKanji", japaneseKanjiNames: "mixKanjiNames", japaneseKanjiVariants: "mixKanjiVariants",
-  japaneseSentenceCheck: "mixSentenceCheck", japaneseSlipAutoApply: "mixSlipAutoApply", japaneseTypedForms: "mixTypedForms",
+  japaneseSentenceCheck: "mixSentenceCheck", japaneseSlipAutoApply: "mixSlipAutoApply", japaneseTypedForms: "mixTypedForms", japaneseChunkCandidates: "mixChunkCandidates",
   japaneseLiveRefine: "mixLiveRefine", japaneseEnglishSpacing: "mixEnglishSpacing",
 };
 

@@ -338,6 +338,8 @@ struct Row {
     std::wstring text;
     std::wstring label;
     bool meaning{false};
+    // A thin line above it (Candidate::groupStart).
+    bool groupStart{false};
 };
 
 constexpr std::size_t kNoRow = static_cast<std::size_t>(-1);
@@ -920,6 +922,13 @@ void DrawRows(ID2D1RenderTarget* target, IDWriteFactory* factory, const TextForm
         if ((onlyRow != kNoRow && i != onlyRow) || i == skipRow) continue;
         const Row& row = frame.rows[i];
         const D2D1_RECT_F rect = layout.RowRect(i);
+        if (row.groupStart && !selected) {
+            // Between two kinds of candidates, in the gap above the row.
+            const float y = std::round(rect.top - (layout.rowPitch - layout.rowHeight) / 2.0f) + 0.5f;
+            auto line = SolidBrush(target, WithAlpha(p.mutedText, p.mutedText.a * 0.35f));
+            target->DrawLine(D2D1::Point2F(rect.left + layout.rowPaddingLeft, y),
+                             D2D1::Point2F(rect.right - layout.rowPaddingRight, y), line.get(), 1.0f);
+        }
 
         const float numberLeft = rect.left + layout.rowPaddingLeft;
         const D2D1_RECT_F numberRect =
@@ -2327,8 +2336,8 @@ void CandidateWindow::Show(const RECT& caretRect,
         const auto index = pageStart_ + row;
         const auto& candidate = candidates_[index];
         const auto displayId = candidate.id == 0 ? index + 1 : candidate.id;
-        frame.rows.push_back(
-            {std::to_wstring(displayId), candidate.text, LabelText(candidate, japanese_), candidate.hasMeaning});
+        frame.rows.push_back({std::to_wstring(displayId), candidate.text, LabelText(candidate, japanese_), candidate.hasMeaning,
+                              candidate.groupStart && row > 0});
     }
     if (selectedIndex_ >= pageStart_ && selectedIndex_ - pageStart_ < visibleCount_) {
         frame.selectedRow = selectedIndex_ - pageStart_;

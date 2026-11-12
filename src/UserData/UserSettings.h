@@ -176,6 +176,9 @@ struct UserSettings {
     // Each list ends with what was typed in every form (kana, half-width
     // katakana, the keys in both widths).
     bool japaneseTypedForms{true};
+    // The list also offers the phrase and the ones after it written another
+    // way as a whole (にじがでる: 二次が出る, 虹がでる), after its first.
+    bool japaneseChunkCandidates{true};
     // The first words' kanji written another way (異体字: 髙橋, 山﨑) after
     // a phrase's words.
     bool japaneseKanjiVariants{true};
@@ -215,6 +218,7 @@ struct UserSettings {
     bool mixSentenceCheck{true};
     bool mixSlipAutoApply{true};
     bool mixTypedForms{true};
+    bool mixChunkCandidates{true};
     bool mixLiveRefine{true};
     bool mixEnglishSpacing{false};
     // Mix: a vowel typed alone (i) is kana (い) first, not the letter (I).
@@ -339,6 +343,7 @@ inline constexpr MixStyleSwitch kMixStyleSwitches[] = {
     {"mix_sentence_check", L"mixSentenceCheck", &UserSettings::mixSentenceCheck, &UserSettings::japaneseSentenceCheck},
     {"mix_slip_auto_apply", L"mixSlipAutoApply", &UserSettings::mixSlipAutoApply, &UserSettings::japaneseSlipAutoApply},
     {"mix_typed_forms", L"mixTypedForms", &UserSettings::mixTypedForms, &UserSettings::japaneseTypedForms},
+    {"mix_chunk_candidates", L"mixChunkCandidates", &UserSettings::mixChunkCandidates, &UserSettings::japaneseChunkCandidates},
     {"mix_live_refine", L"mixLiveRefine", &UserSettings::mixLiveRefine, &UserSettings::japaneseLiveRefine},
     {"mix_english_spacing", L"mixEnglishSpacing", &UserSettings::mixEnglishSpacing, &UserSettings::japaneseEnglishSpacing},
 };

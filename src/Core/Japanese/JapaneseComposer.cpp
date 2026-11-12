@@ -2349,7 +2349,12 @@ std::vector<std::size_t> JapaneseComposer::ReadBest(const std::vector<std::vecto
     lastCheckedSentences_.shown.assign(sentences.begin(), sentences.begin() + static_cast<std::ptrdiff_t>(byCost));
     lastCheckedSentences_.shown.insert(lastCheckedSentences_.shown.end(), sentences.begin() + static_cast<std::ptrdiff_t>(combined),
                                        sentences.end());
+    lastCheckedSentences_.reading = conversionReading_;
     lastCheckedSentences_.read = checked;
+    lastCheckedSentences_.scores.clear();
+    if (scored.size() == checked.size()) {
+        for (const auto& [model, prior] : scored) lastCheckedSentences_.scores.push_back(static_cast<float>(model));
+    }
     lastCheckedSentences_.ranked = byCost;
     lastCheckedSentences_.chosen = chosen;
     lastCheckedSentences_.serial = ++checks_;
@@ -2401,6 +2406,12 @@ std::vector<std::size_t> JapaneseComposer::ReadBest(const std::vector<std::vecto
                 }
             }
             lastCheckedSentences_.chosen = chosen;
+            // The scores the chunk candidates are measured by: what the
+            // check chose by.
+            auto& scores = lastCheckedSentences_.scores;
+            if (scores.size() == features.size()) {
+                for (std::size_t k = 0; k < features.size(); ++k) scores[k] = static_cast<float>(sum(features[k]));
+            }
         }
         if (!keepFeatures_) features.clear();
     }
@@ -2826,8 +2837,9 @@ void JapaneseComposer::AddLongerWords(std::size_t i) {
     const std::wstring& reading = conversionReading_;
     if (!converter_ || i + 1 >= phrases_.size()) return;
     auto& phrase = phrases_[i];
-    if (phrase.candidates.empty() ||
-        std::any_of(phrase.candidates.begin(), phrase.candidates.end(), [](const PhraseCandidate& c) { return c.length > 0; })) {
+    if (phrase.candidates.empty() || std::any_of(phrase.candidates.begin(), phrase.candidates.end(), [](const PhraseCandidate& c) {
+            return c.length > 0 && !c.chunk;
+        })) {
         return;
     }
     std::vector<PhraseCandidate> longer;
@@ -2856,6 +2868,118 @@ void JapaneseComposer::AddLongerWords(std::size_t i) {
         if (listed) continue;
         phrase.candidates.insert(phrase.candidates.begin() + static_cast<std::ptrdiff_t>(at++), std::move(word));
         ++added;
+    }
+}
+
+void JapaneseComposer::AddChunkCandidates(std::size_t i) {
+    // The phrase and the ones after it to the end (at most this many), else
+    // it and the next one: two other ways to write them as a whole, from the
+    // sentences the sentence check read, if they score no more than this
+    // below the sentence shown, as the check weighs them (箸を渡る and
+    // 構想を寝る do). One that means something else and one written another
+    // way (子ども for 子供, わかりました for 分かりました), else two of either.
+    // Not one that takes the digits out of a number (3時に: 惨事に), nor one
+    // written in katakana the phrase is not in (三時: サンジ).
+    constexpr std::size_t kWholeRest = 3;
+    constexpr std::size_t kChunks = 2;
+    constexpr float kLessLikely = 2.0f;
+    if (!chunkCandidates_ || i + 1 >= phrases_.size()) return;
+    auto& phrase = phrases_[i];
+    if (phrase.candidates.empty() ||
+        std::any_of(phrase.candidates.begin(), phrase.candidates.end(), [](const PhraseCandidate& c) { return c.chunk; })) {
+        return;
+    }
+    const auto& checked = lastCheckedSentences_;
+    if (checked.reading != conversionReading_ || checked.scores.size() != checked.shown.size()) return;
+    const std::size_t last = phrases_.size() - i <= kWholeRest ? phrases_.size() - 1 : i + 1;
+    std::wstring before, chunk, after;
+    for (std::size_t k = 0; k < phrases_.size(); ++k) {
+        (k < i ? before : k <= last ? chunk : after) += PhraseText(phrases_[k]);
+    }
+    const std::wstring shown = before + chunk + after;
+    // The sentence shown, or the one the check chose, as the measure.
+    const auto at = std::find(checked.shown.begin(), checked.shown.end(), shown);
+    const std::size_t base = at != checked.shown.end() ? static_cast<std::size_t>(at - checked.shown.begin()) : checked.chosen;
+    if (base >= checked.scores.size()) return;
+    const auto kanji = [](std::wstring_view text) {
+        std::wstring found;
+        for (const wchar_t c : text) {
+            if (((c >= 0x4E00 && c <= 0x9FFF) || c == 0x3005) && found.find(c) == std::wstring::npos) found += c;
+        }
+        return found;
+    };
+    const auto within = [](const std::wstring& some, const std::wstring& all) {
+        return std::all_of(some.begin(), some.end(), [&](wchar_t c) { return all.find(c) != std::wstring::npos; });
+    };
+    const std::wstring ownKanji = kanji(chunk);
+    const auto digits = [](std::wstring_view text) {
+        return std::any_of(text.begin(), text.end(), [](wchar_t c) { return (c >= L'0' && c <= L'9') || (c >= 0xFF10 && c <= 0xFF19); });
+    };
+    const auto katakana = [](std::wstring_view text) {
+        std::wstring found;
+        for (const wchar_t c : text) {
+            if (c >= 0x30A1 && c <= 0x30FA) found += c;
+        }
+        return found;
+    };
+    const std::wstring ownKatakana = katakana(chunk);
+    // Letters and digits in one width (でしｔ is でしt written wider).
+    const auto narrow = [](std::wstring text) {
+        for (auto& c : text) {
+            if (c >= 0xFF01 && c <= 0xFF5E) c = static_cast<wchar_t>(c - 0xFEE0);
+        }
+        return text;
+    };
+    const std::wstring ownNarrow = narrow(chunk);
+    struct Found {
+        std::wstring text;
+        float score;
+        bool written;  // written another way, not another meaning
+    };
+    std::vector<Found> found;
+    for (std::size_t k = 0; k < checked.shown.size(); ++k) {
+        const auto& sentence = checked.shown[k];
+        if (checked.scores[k] < checked.scores[base] - kLessLikely) continue;
+        if (sentence.size() < before.size() + after.size() || !sentence.starts_with(before) || !sentence.ends_with(after)) continue;
+        std::wstring text = sentence.substr(before.size(), sentence.size() - before.size() - after.size());
+        if (text.empty() || text == chunk ||
+            std::any_of(found.begin(), found.end(), [&](const Found& f) { return narrow(f.text) == narrow(text); })) {
+            continue;
+        }
+        if ((digits(chunk) && !digits(text)) || narrow(text) == ownNarrow) continue;
+        const std::wstring theirs = kanji(text);
+        const bool written = within(theirs, ownKanji) || within(ownKanji, theirs);
+        if (written && !within(katakana(text), ownKatakana)) continue;
+        found.push_back({std::move(text), checked.scores[k], written});
+    }
+    std::stable_sort(found.begin(), found.end(), [](const Found& a, const Found& b) { return a.score > b.score; });
+    std::vector<const Found*> picked;
+    for (const bool written : {false, true}) {
+        const auto it = std::find_if(found.begin(), found.end(), [&](const Found& f) { return f.written == written; });
+        if (it != found.end()) picked.push_back(&*it);
+    }
+    for (const auto& f : found) {
+        if (picked.size() >= kChunks) break;
+        if (std::find(picked.begin(), picked.end(), &f) == picked.end()) picked.push_back(&f);
+    }
+    std::stable_sort(picked.begin(), picked.end(), [](const Found* a, const Found* b) { return a->score > b->score; });
+    if (picked.empty()) return;
+    const std::size_t length = phrases_[last].begin + phrases_[last].length - phrase.begin;
+    // The phrase's choice first (the check may have chosen one further
+    // down), so that the list starts with what is shown.
+    if (phrase.selected > 0 && phrase.selected < phrase.candidates.size()) {
+        std::rotate(phrase.candidates.begin(), phrase.candidates.begin() + static_cast<std::ptrdiff_t>(phrase.selected),
+                    phrase.candidates.begin() + static_cast<std::ptrdiff_t>(phrase.selected) + 1);
+        phrase.selected = 0;
+    }
+    std::size_t insertAt = std::min<std::size_t>(1, phrase.candidates.size());
+    for (const Found* f : picked) {
+        PhraseCandidate candidate{f->text, 0, PhraseCandidate::Kind::Dictionary};
+        candidate.length = length;
+        candidate.chunk = true;
+        phrase.candidates.insert(phrase.candidates.begin() + static_cast<std::ptrdiff_t>(insertAt), std::move(candidate));
+        if (phrase.selected >= insertAt) ++phrase.selected;
+        ++insertAt;
     }
 }
 
@@ -3209,6 +3333,7 @@ void JapaneseComposer::Convert() {
                 whole = candidates[1].text;
             }
         }
+        AddChunkCandidates(focus_);
         AddLongerWords(focus_);
         auto& phrase = phrases_[focus_];
         AddSlipCandidates(phrase);
@@ -3511,6 +3636,7 @@ void JapaneseComposer::ShowCandidates() {
     if (!IsConverted()) Convert();
     if (!IsConverted()) return;
     StartPicking();
+    AddChunkCandidates(focus_);
     AddLongerWords(focus_);
     auto& phrase = phrases_[focus_];
     AddSlipCandidates(phrase);
@@ -3526,6 +3652,7 @@ void JapaneseComposer::NextCandidate() {
         return;
     }
     StartPicking();
+    AddChunkCandidates(focus_);
     AddLongerWords(focus_);
     auto& phrase = phrases_[focus_];
     AddSlipCandidates(phrase);
@@ -3544,6 +3671,7 @@ void JapaneseComposer::PreviousCandidate() {
         return;
     }
     StartPicking();
+    AddChunkCandidates(focus_);
     AddLongerWords(focus_);
     auto& phrase = phrases_[focus_];
     AddSlipCandidates(phrase);

@@ -311,6 +311,7 @@ export function catalog(ctx) {
     linked("firstPageSymbol", "candidates", "extra", "mood", j.firstPageSymbol, { japanese: "japaneseFirstPageSymbol", mixed: "mixFirstPageSymbol" },
       { detail: true }),
     styledToggle("typedForms", "candidates", "extra", "text_fields", j.typedForms, "japaneseTypedForms", { detail: true }),
+    styledToggle("chunks", "candidates", "extra", "segment", j.chunks, "japaneseChunkCandidates", { detail: true }),
 
     // 辞書と学習 (the page draws its own; these are for All settings, search and AI)
     {
@@ -431,7 +432,7 @@ export function aiSpecs(ctx) {
     kanjiVariants: ["japaneseKanjiVariants"], period: ["periodOnEnter"], doubleSpace: ["doubleSpacePeriod"], smart: ["smartPunctuation"],
     meanings: ["meaningsEnabled", "meaningsInUiLanguage"], candidateWindow: ["candidateWindowEnabled"],
     special: ["dateConversion", "symbolConversion", "calculatorEnabled"], firstPageSymbol: ["japaneseFirstPageSymbol", "mixFirstPageSymbol"],
-    typedForms: ["japaneseTypedForms"], kanaInput: ["japaneseKanaInput", "japaneseKanaInputKey"], capsLock: ["japaneseIgnoreCapsLock"],
+    typedForms: ["japaneseTypedForms"], chunks: ["japaneseChunkCandidates"], kanaInput: ["japaneseKanaInput", "japaneseKanaInputKey"], capsLock: ["japaneseIgnoreCapsLock"],
     numpad: ["japaneseNumpadDirect"], brackets: ["bracketPairs"], spaceless: ["spacelessEnglish", "spacelessEnglishAlways"],
     numbers: ["japaneseRoughNumbersKanji", "numberConversion"],
     learn: ["learningEnabled"], secret: ["secretMode"], private: ["noLearningInPrivate"],

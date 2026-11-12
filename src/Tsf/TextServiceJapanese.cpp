@@ -718,6 +718,7 @@ void TextService::ShowJapaneseCandidates(ITfContext* context, TfEditCookie editC
         row.text = list.rows[i].text;
         row.id = list.rows[i].number;
         if (list.rows[i].suggestion) row.label = SemanticLabel::Suggestion;
+        row.groupStart = list.rows[i].groupStart;
         // Only the rows on the page shown are looked up.
         row.hasMeaning = userSettings_.meaningsEnabled && i >= list.pageStart && i < list.pageStart + list.count &&
                          japanese::ProcessMeanings()
