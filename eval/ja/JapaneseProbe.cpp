@@ -324,6 +324,11 @@ int main(int argc, char** argv) {
         if (line.empty() || line[0] == '#') continue;
         composer.Clear();
         composer.ForgetContext();
+        // "text<TAB>keys": the app's text before the caret, then the keys.
+        if (const auto tab = line.find('	'); tab != std::string::npos) {
+            composer.SetPrecedingText(Widen(line.substr(0, tab)));
+            line.erase(0, tab + 1);
+        }
         // What is shown: the segments, as the text service writes them.
         const auto shown = [&] {
             std::wstring text;
