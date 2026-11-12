@@ -198,6 +198,9 @@ def build_runtime(release: Path, windows_ml: Path, crt: Path, out: Path, version
             "language": "mul",
             "type": "ai-runtime",
             "protocol": "TKA3",
+            # Which models it runs: conversion's and Settings' (older
+            # copies ran conversion's only).
+            "models": ["conversion", "settings"],
             "variant": variant,
             "file": "TekitoAI.exe",
             "sha256": {"file": sha256(directory / "TekitoAI.exe")},

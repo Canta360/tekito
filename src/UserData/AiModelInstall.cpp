@@ -156,6 +156,15 @@ bool AiRuntimeHasWindowsMl(const std::filesystem::path& dataRoot) {
            std::filesystem::is_regular_file(pack / L"Microsoft.Windows.AI.MachineLearning.dll", error);
 }
 
+bool AiRuntimeRunsSettings(const std::filesystem::path& dataRoot) {
+    if (!AiRuntimeInstalled(dataRoot)) return false;
+    std::ifstream in(dataRoot / std::wstring(japanese::aihelper::kRuntimePack) / L"manifest.json", std::ios::binary);
+    const std::string manifest((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    const auto key = manifest.find("\"models\"");
+    const auto end = key == std::string::npos ? key : manifest.find(']', key);
+    return end != std::string::npos && manifest.substr(key, end - key).find("\"settings\"") != std::string::npos;
+}
+
 void StopAiHelper() { japanese::aihelper::Stop(); }
 
 }  // namespace tekito::userdata

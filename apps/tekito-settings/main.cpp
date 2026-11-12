@@ -196,13 +196,14 @@ constexpr AiModelInfo kAiModels[] = {
 // What runs them (TekitoAI.exe and ONNX Runtime, on the processor),
 // downloaded with the first model and removed with the last; and the copy
 // with Windows ML in its place (GPUs and NPUs), downloaded once the user
-// chooses one and agrees to Microsoft's terms.
+// chooses one and agrees to Microsoft's terms. Both also run Settings'
+// model (ai-models-2's copies do not, and are replaced).
 constexpr AiModelInfo kAiRuntime{
-    L"ai-runtime", L"https://github.com/Canta360/tekito/releases/download/ai-models-2/TEKITO-ai-runtime.zip",
-    "A6CB720BC9C35659C3432D6A207E5C9E90E2767C7C88795AA3F55E03C003B7E9", 6373633ull};
+    L"ai-runtime", L"https://github.com/Canta360/tekito/releases/download/ai-models-3/TEKITO-ai-runtime.zip",
+    "AF216815E7B721890841A558D0F4F157DC67C6887F29817D72342482DC8ED6C5", 6380188ull};
 constexpr AiModelInfo kAiRuntimeWindowsMl{
-    L"ai-runtime", L"https://github.com/Canta360/tekito/releases/download/ai-models-2/TEKITO-ai-runtime-windows-ml.zip",
-    "BFE57C35E50C55A2AAF526CAFC3ED388F9149CAC0C79C00EDC7D04B2D35F05C1", 18125131ull};
+    L"ai-runtime", L"https://github.com/Canta360/tekito/releases/download/ai-models-3/TEKITO-ai-runtime-windows-ml.zip",
+    "003B574CB4874F37415B29A3B214CC555032D27197702A10140DE8195DB3AE14", 18131689ull};
 
 tekito::userdata::AiModelInstallError DownloadAiPack(const AiModelInfo& pack, const std::filesystem::path& root);
 
@@ -264,15 +265,19 @@ std::optional<std::vector<double>> ScoreTexts(const std::wstring& prompt, const 
     return scores;
 }
 
+// What runs the models, when it is not there or is too old to run
+// Settings' model: the copy with Windows ML when that is the one there.
+tekito::userdata::AiModelInstallError UpdateAiRuntime(const std::filesystem::path& root) {
+    if (tekito::userdata::AiRuntimeRunsSettings(root)) return tekito::userdata::AiModelInstallError::None;
+    return DownloadAiPack(tekito::userdata::AiRuntimeHasWindowsMl(root) ? kAiRuntimeWindowsMl : kAiRuntime, root);
+}
+
 // Downloads what runs the models when it is not there yet, then `model`
 // (1 or 2), and installs them into `root`.
 tekito::userdata::AiModelInstallError DownloadAiModel(int model, const std::filesystem::path& root) {
     using tekito::userdata::AiModelInstallError;
-    for (const AiModelInfo* info : {&kAiRuntime, &kAiModels[model - 1]}) {
-        if (info == &kAiRuntime && tekito::userdata::AiRuntimeInstalled(root)) continue;
-        const auto error = DownloadAiPack(*info, root);
-        if (error != AiModelInstallError::None) return error;
-    }
+    if (const auto error = UpdateAiRuntime(root); error != AiModelInstallError::None) return error;
+    if (const auto error = DownloadAiPack(kAiModels[model - 1], root); error != AiModelInstallError::None) return error;
     // Home's AI comes with the first model; without it, conversion is still
     // there, and Home offers to download it.
     if (!tekito::userdata::AiModelPackInstalled(kSettingsAi.pack, root)) (void)DownloadAiPack(kSettingsAi, root);
@@ -1849,8 +1854,7 @@ private:
             aiError_.clear();
             std::thread([hwnd = hwnd_, root = AiDataRoot()] {
                 auto* download = new AiModelDownload{0};
-                download->error = tekito::userdata::AiRuntimeInstalled(root) ? tekito::userdata::AiModelInstallError::None
-                                                                            : DownloadAiPack(kAiRuntime, root);
+                download->error = UpdateAiRuntime(root);
                 if (download->error == tekito::userdata::AiModelInstallError::None) download->error = DownloadAiPack(kSettingsAi, root);
                 if (!PostMessageW(hwnd, kAiModelInstalled, 0, reinterpret_cast<LPARAM>(download))) delete download;
             }).detach();
@@ -2426,7 +2430,7 @@ private:
     // Settings' AI model and what runs it are there.
     static bool SettingsAiReady() {
         const auto root = AiDataRoot();
-        return tekito::userdata::AiModelPackInstalled(kSettingsAi.pack, root) && tekito::userdata::AiRuntimeInstalled(root);
+        return tekito::userdata::AiModelPackInstalled(kSettingsAi.pack, root) && tekito::userdata::AiRuntimeRunsSettings(root);
     }
 
     void FinishAiModelInstall(std::unique_ptr<AiModelDownload> download) {

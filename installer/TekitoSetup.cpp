@@ -1212,8 +1212,8 @@ void Paint(Wizard& wizard) {
             DrawText(wizard,
                      wizard.japanese && wizard.ai
                          ? Tr(L"Downloads the Japanese dictionary and language data (about 232 MB) and the AI model "
-                              L"(about 360 MB) from TEKITO's release on GitHub while installing.",
-                              L"インストール中に、日本語の辞書と言語データ（約 232 MB）と AI モデル（約 360 MB）が、"
+                              L"(about 720 MB) from TEKITO's release on GitHub while installing.",
+                              L"インストール中に、日本語の辞書と言語データ（約 232 MB）と AI モデル（約 720 MB）が、"
                               L"GitHub の TEKITO のリリースからダウンロードされます。")
                          : Tr(L"Downloads the Japanese dictionary and language data (about 232 MB) from TEKITO's release "
                               L"on GitHub while installing.",
@@ -1397,8 +1397,8 @@ void Paint(Wizard& wizard) {
                  wizard.bodyCentered.Get(), D2D1::RectF(90.0f, 238.0f, kWidth - 90.0f, 290.0f), p.ink2);
         if (wizard.installExitCode.load() == 30) {
             DrawText(wizard,
-                     Tr(L"The AI model couldn't be downloaded. You can add it later in Settings > AI.",
-                        L"AI モデルはダウンロードできませんでした。あとから設定の「AI」で追加できます。"),
+                     Tr(L"The AI model couldn't be downloaded. You can add it later in Settings > Conversion.",
+                        L"AI モデルはダウンロードできませんでした。あとから設定の「変換」で追加できます。"),
                      wizard.captionCentered.Get(), D2D1::RectF(90.0f, 344.0f, kWidth - 90.0f, 382.0f), p.problem);
         }
         break;

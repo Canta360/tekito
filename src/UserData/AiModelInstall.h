@@ -37,6 +37,9 @@ enum class AiModelInstallError { None, Download, Checksum, Unpack, Invalid, InUs
 // Whether that copy has Windows ML (to run them on a GPU or an NPU); the
 // processor's copy has ONNX Runtime alone.
 [[nodiscard]] bool AiRuntimeHasWindowsMl(const std::filesystem::path& dataRoot);
+// Whether what runs the models also runs Settings' (Home's AI): its
+// manifest lists "settings" in "models" (older copies do not).
+[[nodiscard]] bool AiRuntimeRunsSettings(const std::filesystem::path& dataRoot);
 
 // Has TekitoAI.exe (next to this program) let go of its model files: it
 // exits, and starts again when the input method next asks for it.
