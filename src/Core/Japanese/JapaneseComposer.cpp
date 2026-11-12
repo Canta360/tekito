@@ -547,6 +547,81 @@ void JapaneseComposer::ResetLive() noexcept {
     kanaView_ = false;
     settledPhrases_ = 0;
     settledLength_ = 0;
+    liveShown_.clear();
+    liveShownBefore_.clear();
+    liveShownReading_.clear();
+    liveShownUnits_ = 0;
+}
+
+void JapaneseComposer::RememberLiveShown() {
+    // Shown again for the same keys: what was shown before stays.
+    if (units_.size() != liveShownUnits_ || conversionReading_ != liveShownReading_) liveShownBefore_ = std::move(liveShown_);
+    liveShown_ = phrases_;
+    liveShownReading_ = conversionReading_;
+    liveShownUnits_ = units_.size();
+}
+
+void JapaneseComposer::KeepLiveSteady(const std::wstring& reading) {
+    // Units typed since the conversion shown, at most, before the new one
+    // is shown anyway.
+    constexpr std::size_t kHeldUnits = 3;
+    if (liveShown_.empty() || !reading.starts_with(liveShownReading_) || units_.size() <= liveShownUnits_) {
+        RememberLiveShown();
+        return;
+    }
+    const std::size_t added = units_.size() - liveShownUnits_;
+    // What must stay: the first phrases shown that are whole, a word and
+    // its particle (今日は, 明日の, 食べてから), or were shown the same before too; the
+    // last one only while one unit has come after it, and only if whole. A
+    // word growing as it is typed (おつか: お疲れ, おく: 送る) changes
+    // freely, and so does one that just came (置く|リマ, before 送ります).
+    // Kana not converted never stays.
+    const auto whole = [&](const PhraseState& phrase) {
+        const std::wstring text = PhraseText(phrase);
+        const auto kana = [](wchar_t c) { return c >= 0x3041 && c <= 0x3096; };
+        return text.size() >= 2 && std::wstring_view(L"はがをにでとのもへやらど").find(text.back()) != std::wstring_view::npos &&
+               !std::all_of(text.begin(), text.end(), kana);
+    };
+    const auto typed = [](const PhraseState& phrase) {
+        return !phrase.form && phrase.selected < phrase.candidates.size() &&
+               phrase.candidates[phrase.selected].kind == PhraseCandidate::Kind::Hiragana;
+    };
+    const auto shownBefore = [&](const PhraseState& phrase) {
+        return std::any_of(liveShownBefore_.begin(), liveShownBefore_.end(), [&](const PhraseState& other) {
+            return other.begin == phrase.begin && other.length == phrase.length && PhraseText(other) == PhraseText(phrase);
+        });
+    };
+    std::size_t keep = 0;
+    while (keep < liveShown_.size()) {
+        const auto& phrase = liveShown_[keep];
+        const bool last = keep + 1 == liveShown_.size();
+        const bool stays = !typed(phrase) && (last ? added <= 1 && whole(phrase) : whole(phrase) || shownBefore(phrase));
+        if (!stays) break;
+        ++keep;
+    }
+    std::wstring kept;
+    for (std::size_t k = 0; k < keep; ++k) kept += PhraseText(liveShown_[k]);
+    std::wstring now;
+    for (const auto& phrase : phrases_) now += PhraseText(phrase);
+    if (keep == 0 || now.starts_with(kept) || added > kHeldUnits) {
+        RememberLiveShown();
+        return;
+    }
+    // The kept phrases, then the rest of the kana as typed.
+    const std::size_t covered = liveShown_[keep - 1].begin + liveShown_[keep - 1].length;
+    if (covered > reading.size()) {
+        RememberLiveShown();
+        return;
+    }
+    phrases_.assign(liveShown_.begin(), liveShown_.begin() + static_cast<std::ptrdiff_t>(keep));
+    if (covered < reading.size()) {
+        const std::wstring rest = reading.substr(covered);
+        PhraseCandidate hiragana{rest, 0, PhraseCandidate::Kind::Hiragana, false};
+        PhraseCandidate katakana{ToKatakana(rest), 0, PhraseCandidate::Kind::Katakana, false};
+        phrases_.push_back({covered, rest.size(), {hiragana, katakana}});
+    }
+    settledPhrases_ = std::min(settledPhrases_, keep);
+    settledLength_ = settledPhrases_ ? phrases_[settledPhrases_ - 1].begin + phrases_[settledPhrases_ - 1].length : 0;
 }
 
 void JapaneseComposer::SettleAll() {
@@ -642,6 +717,7 @@ void JapaneseComposer::UpdateLive() {
         settledLength_ = phrases_[settledPhrases_ - 1].begin + phrases_[settledPhrases_ - 1].length;
     }
     for (auto& phrase : phrases_) KeepKanjiInRange(phrase);
+    KeepLiveSteady(reading);
     preview_ = true;
     focus_ = phrases_.size() - 1;
     listOpen_ = false;
@@ -671,6 +747,7 @@ bool JapaneseComposer::RebuildLive(bool again) {
     focus_ = phrases_.empty() ? 0 : phrases_.size() - 1;
     listOpen_ = false;
     refinedKeys_ = Keys(false);
+    RememberLiveShown();
     return true;
 }
 

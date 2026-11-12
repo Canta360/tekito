@@ -770,6 +770,13 @@ private:
     // From the live conversion to picking, on the last phrase.
     void StartPicking();
     void ResetLive() noexcept;
+    // Live: what UpdateLive shows from now on is held to (KeepLiveSteady).
+    void RememberLiveShown();
+    // Live: the text already shown is not rewritten by the kana just typed
+    // (きょうは: 今日は, then きょうはい: 今日はい, not 向背, until いい):
+    // while the new conversion would change it, it stays, the new kana
+    // after it as typed, for a few keys at most.
+    void KeepLiveSteady(const std::wstring& reading);
     // Live: the converted text left for the typed kana (the caret moves in
     // it), and the conversion shown again once the caret is at the end.
     void LeaveLivePreview();
@@ -1034,6 +1041,13 @@ private:
     // The first phrases, and the reading they cover, that stay as they are.
     std::size_t settledPhrases_{0};
     std::size_t settledLength_{0};
+    // Live: the phrases last shown as converted, the reading they covered
+    // and how many units had been typed (KeepLiveSteady).
+    std::vector<PhraseState> liveShown_;
+    // And the ones shown before those.
+    std::vector<PhraseState> liveShownBefore_;
+    std::wstring liveShownReading_;
+    std::size_t liveShownUnits_{0};
     // The keys RefineLive converted last.
     std::wstring refinedKeys_;
     bool predictionEnabled_{false};
