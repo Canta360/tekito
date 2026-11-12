@@ -602,10 +602,11 @@ HRESULT TextService::ReplaceJapaneseComposition(ITfContext* context, TfEditCooki
             SUCCEEDED(part->ShiftStart(editCookie, offset, &moved, nullptr))) {
             const bool mix = mode_ == InputMode::Mixed && userSettings_.modeUnderlineColors;
             // The held sentence: marked, or (mixSettledMarker off) underlined
-            // as converted text.
+            // in light grey.
             const bool marked = segment.settled && userSettings_.mixSettledMarker;
             auto underline = marked              ? JapaneseUnderline::Settled
-                             : !segment.converted && !segment.settled ? (mix ? JapaneseUnderline::MixInput : JapaneseUnderline::Input)
+                             : segment.settled  ? JapaneseUnderline::Held
+                             : !segment.converted ? (mix ? JapaneseUnderline::MixInput : JapaneseUnderline::Input)
                              : segment.focused  ? (mix ? JapaneseUnderline::MixFocused : JapaneseUnderline::Focused)
                                                 : (mix ? JapaneseUnderline::MixConverted : JapaneseUnderline::Converted);
             // What Mix took as English, in English Auto's colour.

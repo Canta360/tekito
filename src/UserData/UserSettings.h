@@ -233,7 +233,7 @@ struct UserSettings {
     // not only common ones (which it offers otherwise).
     bool spacelessEnglishAlways{false};
     // Mix: the sentence held until Enter has a marker in a light tint of
-    // Mix's orange; off (the default), it is underlined as converted text.
+    // Mix's orange; off (the default), it is underlined in light grey.
     bool mixSettledMarker{false};
     // Mix: what is taken as English is underlined in English Auto's blue.
     bool mixEnglishUnderline{false};

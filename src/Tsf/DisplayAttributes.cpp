@@ -60,6 +60,7 @@ const GUID& JapaneseUnderlineGuid(JapaneseUnderline underline) noexcept {
     case JapaneseUnderline::MixEnglish: return GUID_TekitoDisplayAttributeMixEnglish;
     case JapaneseUnderline::MixEnglishFocused: return GUID_TekitoDisplayAttributeMixEnglishFocused;
     case JapaneseUnderline::SettledEnglish: return GUID_TekitoDisplayAttributeSettledEnglish;
+    case JapaneseUnderline::Held: return GUID_TekitoDisplayAttributeHeld;
     case JapaneseUnderline::Input: break;
     }
     return GUID_TekitoDisplayAttributeInput;
@@ -105,6 +106,15 @@ ITfDisplayAttributeInfo* CreateJapaneseUnderline(JapaneseUnderline underline) {
         attribute.crText.cr = RGB(32, 32, 32);
         attribute.crBk.type = TF_CT_COLORREF;
         attribute.crBk.cr = RGB(252, 212, 160);
+        attribute.bAttr = TF_ATTR_CONVERTED;
+        description = L"TEKITO Mix sentence held until Enter";
+        break;
+    case JapaneseUnderline::Held:
+        // Without the marker: a light grey line, quieter than the orange of
+        // what is being typed, seen on light and dark pages.
+        attribute.lsStyle = TF_LS_SOLID;
+        attribute.crLine.type = TF_CT_COLORREF;
+        attribute.crLine.cr = RGB(190, 190, 190);
         attribute.bAttr = TF_ATTR_CONVERTED;
         description = L"TEKITO Mix sentence held until Enter";
         break;

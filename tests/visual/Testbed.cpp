@@ -127,7 +127,7 @@ bool g_darkPage = false;
 std::wstring g_keyLabel;
 
 // One character laid out on the page, and how it is underlined.
-enum class Style { Committed, Input, Converted, Focused, Settled };
+enum class Style { Committed, Input, Converted, Focused, Settled, Held };
 struct Cell {
     std::wstring text;  // one character as drawn (an emoji may take several units)
     Style style;
@@ -255,7 +255,8 @@ std::vector<Cell> Layout(const Testbed& bed, HDC dc, int top, int width, std::si
     } else {
         for (const auto& segment : bed.composer.Segments()) {
             const Style style = segment.settled && bed.settings.mixSettledMarker ? Style::Settled
-                                : !segment.converted && !segment.settled ? Style::Input
+                                : segment.settled    ? Style::Held
+                                : !segment.converted ? Style::Input
                                 : segment.focused    ? Style::Focused
                                                      : Style::Converted;
             for (const wchar_t ch : segment.text) chars.push_back({ch, style});
@@ -344,6 +345,8 @@ void Paint(Testbed& bed, HDC target) {
                           : bed.composer.MixedTyping()      ? RGB(245, 150, 25)
                                                             : ink;
     HPEN thin = CreatePen(PS_SOLID, Scale(bed, 1), underline);
+    // Mix's sentence held until Enter, without the marker: light grey.
+    HPEN held = CreatePen(PS_SOLID, Scale(bed, 1), RGB(190, 190, 190));
     HPEN thick = CreatePen(PS_SOLID, Scale(bed, 2), underline);
     HPEN dotted = CreatePen(PS_DOT, 1, underline == ink ? (g_darkPage ? RGB(170, 170, 170) : RGB(90, 90, 90)) : underline);
     bed.hasFocusRect = false;
@@ -361,7 +364,8 @@ void Paint(Testbed& bed, HDC target) {
         SetTextColor(dc, cell.style == Style::Settled ? RGB(32, 32, 32) : g_darkPage ? RGB(240, 240, 240) : RGB(20, 20, 20));
         TextOutW(dc, cell.rect.left, cell.rect.top, cell.text.c_str(), static_cast<int>(cell.text.size()));
         if (cell.style == Style::Committed || cell.style == Style::Settled) continue;
-        HPEN pen = cell.style == Style::Focused ? thick : cell.style == Style::Converted ? thin : dotted;
+        HPEN pen = cell.style == Style::Focused ? thick : cell.style == Style::Converted ? thin
+                 : cell.style == Style::Held ? held : dotted;
         HGDIOBJ oldPen = SelectObject(dc, pen);
         const int y = cell.rect.bottom + Scale(bed, 1);
         // A gap between phrases, as editors draw them.
@@ -390,6 +394,7 @@ void Paint(Testbed& bed, HDC target) {
 
     SelectObject(dc, oldFont);
     DeleteObject(thin);
+    DeleteObject(held);
     DeleteObject(thick);
     DeleteObject(dotted);
         if (g_recording && !g_keyLabel.empty()) {
