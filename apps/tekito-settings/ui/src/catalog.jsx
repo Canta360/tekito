@@ -146,6 +146,7 @@ export function catalog(ctx) {
       id: "excludedApps", page: "general", group: "apps", keys: ["excludedApps"], title: g.excluded.title, detail: true,
       render: () => <ExcludedApps settings={s} runAction={ctx.runAction} />,
     },
+    toggle("companion", "general", "general", "mood", g.companion, "desktopCompanion", { detail: true }),
     choice("language", "general", "general", "language", g.language, "uiLanguage", [[0, g.language.system], [1, "English"], [2, "日本語"]],
       { detail: true }),
     { ...toggle("rainbow", "general", "general", "palette", g.rainbow, "rainbowAccent", { detail: true }), hidden: "rainbow",
@@ -434,6 +435,7 @@ export function aiSpecs(ctx) {
     numpad: ["japaneseNumpadDirect"], brackets: ["bracketPairs"], spaceless: ["spacelessEnglish", "spacelessEnglishAlways"],
     numbers: ["japaneseRoughNumbersKanji", "numberConversion"],
     learn: ["learningEnabled"], secret: ["secretMode"], private: ["noLearningInPrivate"],
+    companion: ["desktopCompanion"],
   })) {
     for (const key of keys) add(id, key, onOff);
   }

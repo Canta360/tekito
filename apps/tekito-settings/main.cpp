@@ -17,6 +17,7 @@
 #include "Core/Japanese/JapaneseData.h"
 #include "Core/Japanese/RomajiTable.h"
 #include "Dictionary/ExternalDictionaryProvider.h"
+#include "apps/tekito-settings/Companion.h"
 #include "UserData/AiModelInstall.h"
 #include "UserData/DataPackValidation.h"
 #include "UserData/KeyboardLayout.h"
@@ -656,6 +657,8 @@ public:
         runtime_ = std::make_unique<tekito::userdata::RuntimeModeState>(
             startupMode, tekito::userdata::kRuntimeStateName,
             tekito::userdata::StartMode(settings_, settings_.lastJapaneseProfileMode));
+        // Back if it was closed (an update stops it).
+        if (settings_.desktopCompanion) StartCompanion();
 
         WNDCLASSW windowClass{};
         windowClass.hInstance = instance_;
@@ -1263,6 +1266,8 @@ private:
         json += settings_.rainbowAccent ? L"true" : L"false";
         json += L",\"catSounds\":";
         json += settings_.catSounds ? L"true" : L"false";
+        json += L",\"desktopCompanion\":";
+        json += settings_.desktopCompanion ? L"true" : L"false";
         json += L",\"mixCorrection\":";
         json += settings_.mixCorrection ? L"true" : L"false";
         json += L",\"spacelessEnglish\":";
@@ -1537,6 +1542,7 @@ private:
             else if (key == L"mixEnglishUnderline") settings_.mixEnglishUnderline = value;
             else if (key == L"rainbowAccent") settings_.rainbowAccent = value;
             else if (key == L"catSounds") settings_.catSounds = value;
+            else if (key == L"desktopCompanion") settings_.desktopCompanion = value;
             else if (key == L"correctionEnabled") settings_.correctionEnabled = value;
             else if (key == L"commonMisspellingsEnabled") settings_.commonMisspellingsEnabled = value;
             else if (key == L"contextSuggestionsEnabled") settings_.contextSuggestionsEnabled = value;
@@ -1684,6 +1690,11 @@ private:
                 Reply(requestId, false, Text(L"Settings could not be saved.", L"設定を保存できませんでした。"));
             } else {
                 if (key == L"uiLanguage") SetWindowTextW(hwnd_, WindowTitle());
+                // The companion leaves by itself when it is turned off.
+                if (key == L"desktopCompanion" && settings_.desktopCompanion != previous.desktopCompanion) {
+                    SetCompanionAtStartup(settings_.desktopCompanion);
+                    if (settings_.desktopCompanion) StartCompanion();
+                }
                 // The English profile's keyboard layout is part of its
                 // registration, which needs administrator rights.
                 if (key == L"keyboardType" && settings_.keyboardType != previous.keyboardType) {
@@ -2906,6 +2917,7 @@ std::optional<int> InstallAiFromCommandLine() {
 }  // namespace
 
 int RunTekitoSettings(HINSTANCE instance) {
+    if (const auto companion = RunCompanionFromCommandLine()) return *companion;
     if (const auto exported = ExportDictionariesFromCommandLine()) return *exported;
     if (const auto erased = EraseUserDataFromCommandLine()) return *erased;
     if (const auto rescued = RescueFromCommandLine()) return *rescued;

@@ -99,6 +99,7 @@ function initialState() {
       mixEnglishUnderline: false,
       rainbowAccent: false,
       catSounds: false,
+      desktopCompanion: false,
       correctionEnabled: true,
       commonMisspellingsEnabled: true,
       contextSuggestionsEnabled: true,

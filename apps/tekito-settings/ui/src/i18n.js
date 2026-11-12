@@ -135,6 +135,7 @@ const en = {
     brackets: { title: "Close brackets", description: "Types the closing bracket with the opening one, the cursor between them." },
     language: { title: "Language", system: "Match Windows" },
     rainbow: { title: "Rainbow", description: "The accent color goes round the rainbow." },
+    companion: { title: "Desktop companion", description: "The companion sits in a corner of the desktop." },
     cat: { title: "Cat", description: "Each key you type meows." },
     excluded: {
       title: "Apps where TEKITO is off",
@@ -564,6 +565,7 @@ const ja = {
     brackets: { title: "かっこを自動で閉じる", description: "開きかっこを入力すると閉じかっこが挿入され、間にカーソルが置かれます" },
     language: { title: "表示言語", system: "Windows に合わせる" },
     rainbow: { title: "レインボー", description: "アクセントカラーが虹色に変わり続けます" },
+    companion: { title: "デスクトップのコンパニオン", description: "デスクトップの隅にコンパニオンが表示されます" },
     cat: { title: "ねこ", description: "キーを押すたびに、ねこが鳴きます" },
     excluded: {
       title: "TEKITO を使わないアプリ",

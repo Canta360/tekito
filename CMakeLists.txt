@@ -170,6 +170,7 @@ target_link_options(Tekito.Tsf PRIVATE /DELAYLOAD:d3d11.dll /DELAYLOAD:CoreMessa
 add_executable(TEKITO WIN32
     apps/tekito/main.cpp
     apps/tekito-settings/main.cpp
+    apps/tekito-settings/Companion.cpp
     assets/tekito_app.rc
 )
 target_include_directories(TEKITO PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} src third_party/webview2/include)
@@ -178,7 +179,7 @@ target_compile_options(TEKITO PRIVATE /utf-8)
 target_compile_definitions(TEKITO PRIVATE TEKITO_VERSION_STRING="${PROJECT_VERSION}")
 target_link_libraries(TEKITO PRIVATE
     tekito_userdata tekito_dictionary
-    user32 gdi32 comctl32 comdlg32 shell32 advapi32 urlmon dxgi
+    user32 gdi32 comctl32 comdlg32 shell32 advapi32 urlmon dxgi d2d1
     "${CMAKE_CURRENT_SOURCE_DIR}/third_party/webview2/lib/x64/WebView2LoaderStatic.lib"
 )
 # The page itself is built by `npm run build` in apps/tekito-settings/ui.

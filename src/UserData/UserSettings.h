@@ -263,6 +263,9 @@ struct UserSettings {
     // rainbow (Settings and the candidate list), and each key typed meows.
     bool rainbowAccent{false};
     bool catSounds{false};
+    // The companion on the desktop (TEKITO.exe --companion, started with
+    // Windows while on).
+    bool desktopCompanion{false};
 
     [[nodiscard]] static constexpr int ValidCandidateRows(int rows) noexcept {
         return rows >= kMinCandidateRows && rows <= kMaxCandidateRows ? rows : 0;

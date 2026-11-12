@@ -407,6 +407,8 @@ bool SqliteUserDictionaryRepository::LoadSettings(UserSettings& settings) const 
             loaded.rainbowAccent = value != 0;
         } else if (std::strcmp(key, "cat_sounds") == 0) {
             loaded.catSounds = value != 0;
+        } else if (std::strcmp(key, "desktop_companion") == 0) {
+            loaded.desktopCompanion = value != 0;
         } else if (std::strcmp(key, "keep_recent_conversions") == 0) {
             loaded.keepRecentConversions = value != 0;
         } else if (std::strcmp(key, "japanese_prediction_enabled") == 0) {
@@ -595,6 +597,7 @@ bool SqliteUserDictionaryRepository::SaveSettings(const UserSettings& settings) 
     saveValue("mix_settled_marker", settings.mixSettledMarker ? 1 : 0);
     saveValue("rainbow_accent", settings.rainbowAccent ? 1 : 0);
     saveValue("cat_sounds", settings.catSounds ? 1 : 0);
+    saveValue("desktop_companion", settings.desktopCompanion ? 1 : 0);
     saveValue("ai_settings_control", settings.aiSettingsControl);
     saveValue("mix_english_underline", settings.mixEnglishUnderline ? 1 : 0);
     saveValue("mix_live_conversion", settings.mixLiveConversion ? 1 : 0);

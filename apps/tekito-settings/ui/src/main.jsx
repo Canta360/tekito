@@ -74,6 +74,7 @@ const initialSettings = {
   mixEnglishUnderline: false,
   rainbowAccent: false,
   catSounds: false,
+  desktopCompanion: false,
   japaneseEnabled: true,
   modeIndicatorEnabled: true,
   modeUnderlineColors: true,

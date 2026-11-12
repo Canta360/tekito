@@ -130,6 +130,9 @@ Remove-InstalledFiles $installRoot
 $userDataRoot = Join-Path $env:LOCALAPPDATA "TEKITO"
 if ($RemoveUserData) { Remove-InstalledFiles $userDataRoot }
 Remove-Item -LiteralPath $uninstallKey -Recurse -Force -ErrorAction SilentlyContinue
+# The desktop companion: no longer started with Windows, and where it was left.
+Remove-ItemProperty -LiteralPath "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name "TEKITO Companion" -ErrorAction SilentlyContinue
+Remove-Item -LiteralPath "HKCU:\Software\TEKITO\Companion" -Recurse -Force -ErrorAction SilentlyContinue
 Remove-Item -LiteralPath (Join-Path ([IO.Path]::GetTempPath()) "TEKITO-install.log") -Force -ErrorAction SilentlyContinue
 
 # Files still open: deleted at the next sign-in.

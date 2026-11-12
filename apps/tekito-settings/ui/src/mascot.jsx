@@ -1,7 +1,5 @@
-// Home's companion: TEKITO's filled mark (assets/icons/symbols/
-// tekito-filled.svg) without the T, in the app icon's colors
-// (assets/icons/Tekito.ico: light blue at the top left, blue, cyan at the
-// bottom right; the small ring cyan), with white eyes. It answers with its eyes
+// Home's companion (its shapes and colors: companionShapes.js), with white
+// eyes. It answers with its eyes
 // and how it moves:
 //   idle       floats and blinks, eyes open; its eyes on the pointer (`follow`)
 //   listening  the user is typing: eyes wider, on the box
@@ -13,19 +11,15 @@
 // Also the icon beside AI's replies. Still for those who ask Windows for
 // less motion.
 import React, { useEffect, useId, useRef, useState } from "react";
-import { eyeShapes, tear } from "./companionEyes.js";
+import { body, eyeShapes, face, tear } from "./companionShapes.js";
 
-// The mark: a disc (center 450, 450; radius 362), its lower half a little
-// flattened so it does not look drawn with compasses, with room cut around
-// its small ring (center 709, 695), the ring a little smaller than the
-// mark's (86 across the outside, a 35 hole; the mark's 108 and 44).
-const kDisc = "M88 450A362 362 0 0 1 812 450C812 640 680 768 450 768C220 768 88 640 88 450Z";
-const kSmall = "M709 609a86 86 0 1 0 0.01 0ZM709 660a35 35 0 1 1 -0.01 0Z";
-// Large white eyes (companionEyes.js), as wide apart as the user drew them.
-const kEyes = [298, 602];
-const kEyeY = 430;
-// companionEyes.js's shapes made larger.
-const kEyeScale = 1.15;
+// The body, the eyes and the colors: companionShapes.js.
+const kDisc = body.disc;
+const kSmall = (({ cx, cy, outer, hole }) =>
+  `M${cx} ${cy - outer}a${outer} ${outer} 0 1 0 0.01 0ZM${cx} ${cy - hole}a${hole} ${hole} 0 1 1 -0.01 0Z`)(body.ring);
+const kEyes = face.eyes;
+const kEyeY = face.y;
+const kEyeScale = face.scale;
 
 // One shape for both eyes; the right one mirrored. `scale` and `drop` per
 // eye: [left, right].
@@ -55,10 +49,9 @@ function eyes(mood) {
   }
 }
 
-// The icon's colors, and its blue's hue.
-const kBodyStops = [[0, "#a6c8ff"], [0.3, "#3f88ff"], [0.55, "#0668ff"], [0.75, "#0590ff"], [1, "#00dcff"]];
-const kRingStops = [[0, "#6fe8ff"], [1, "#10b6fe"]];
-const kBlueHue = 216;
+const kBodyStops = body.stops;
+const kRingStops = body.ringStops;
+const kBlueHue = body.blueHue;
 
 function toHsl(hex) {
   const [r, g, b] = [1, 3, 5].map((at) => parseInt(hex.slice(at, at + 2), 16) / 255);
@@ -125,17 +118,13 @@ export function Mascot({ mood = "idle", size = 96, follow = false, label }) {
         <linearGradient id={`mascot-ring-${id}`} x1="0" y1="0" x2="1" y2="1">
           {kRingStops.map(([offset, color], i) => <stop key={offset} offset={offset} style={{ stopColor: `var(--mascot-ring-${i}, ${color})` }} />)}
         </linearGradient>
-        <radialGradient id={`mascot-sheen-${id}`} cx="0.18" cy="0.14" r="0.62">
-          <stop offset="0" stopColor="#ffffff" stopOpacity="0.6" />
+        <radialGradient id={`mascot-sheen-${id}`} cx={body.sheen.cx} cy={body.sheen.cy} r={body.sheen.r}>
+          <stop offset="0" stopColor="#ffffff" stopOpacity={body.sheen.opacity} />
           <stop offset="1" stopColor="#ffffff" stopOpacity="0" />
         </radialGradient>
-        <linearGradient id={`mascot-ring-${id}`} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#6fe8ff" />
-          <stop offset="1" stopColor="#10b6fe" />
-        </linearGradient>
         <mask id={cut} maskUnits="userSpaceOnUse" x="0" y="0" width="960" height="960">
           <rect width="960" height="960" fill="#fff" />
-          <circle cx="709" cy="695" r="120" fill="#000" />
+          <circle cx={body.cut.cx} cy={body.cut.cy} r={body.cut.r} fill="#000" />
         </mask>
       </defs>
       <g className="mascot-body">
