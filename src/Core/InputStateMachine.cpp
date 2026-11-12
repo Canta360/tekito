@@ -225,8 +225,15 @@ InputAction InputStateMachine::OnPunctuation(wchar_t punctuation, PunctuationRol
 
     const std::optional<std::size_t> explicitSelection =
         state_ == CompositionState::Cycling ? std::optional(selectedIndex_) : std::nullopt;
-    const auto selected = autoApplyPolicy_.SelectForBoundary(rawText_, candidates_,
-                                                              explicitSelection);
+    auto selected = autoApplyPolicy_.SelectForBoundary(rawText_, candidates_,
+                                                        explicitSelection);
+    // As Space does: the first candidate when it is a correction Space would
+    // put in (reoly, is reply, though rely is a candidate too), but never one
+    // that takes the word out (a doubled word), which would leave its space.
+    if (!selected) {
+        selected = spaceBoundaryPolicy_.SelectCorrection(rawText_, candidates_);
+        if (selected && candidates_[*selected].text.empty()) selected.reset();
+    }
     std::wstring text = selected ? candidates_[*selected].text : rawText_;
     text.push_back(punctuation);
     Reset();

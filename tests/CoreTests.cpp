@@ -344,8 +344,8 @@ void TestEngineAndAutoApplyPolicyIntegration() {
     state.BeginOrUpdate(L"neme", nemeCandidates);
     const auto rawPunctuation =
         state.OnPunctuation(L'.', tekito::PunctuationRole::SentenceTerminal);
-    Require(rawPunctuation.text == L"neme.",
-            "ambiguous punctuation keeps neme raw");
+    Require(rawPunctuation.text == L"name.",
+            "punctuation puts in the correction Space would (neme. is name.)");
 
     state.BeginOrUpdate(L"neme", nemeCandidates);
     const auto rawEnter = state.OnEnter(true);
