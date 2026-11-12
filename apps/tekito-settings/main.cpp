@@ -1855,7 +1855,10 @@ private:
             std::thread([hwnd = hwnd_, root = AiDataRoot()] {
                 auto* download = new AiModelDownload{0};
                 download->error = UpdateAiRuntime(root);
-                if (download->error == tekito::userdata::AiModelInstallError::None) download->error = DownloadAiPack(kSettingsAi, root);
+                if (download->error == tekito::userdata::AiModelInstallError::None &&
+                    !tekito::userdata::AiModelPackInstalled(kSettingsAi.pack, root)) {
+                    download->error = DownloadAiPack(kSettingsAi, root);
+                }
                 if (!PostMessageW(hwnd, kAiModelInstalled, 0, reinterpret_cast<LPARAM>(download))) delete download;
             }).detach();
             Reply(requestId, true);
@@ -2505,9 +2508,16 @@ private:
                     (tekito::userdata::AiModelPackInstalled(kAiModels[i].pack, AiDataRoot()) ? L"true" : L"false") +
                     L",\"bytes\":" + std::to_wstring(kAiModels[i].bytes) + L"}";
         }
-        json += std::wstring(L",\"settings\":{\"installed\":") +
-                (tekito::userdata::AiModelPackInstalled(kSettingsAi.pack, AiDataRoot()) ? L"true" : L"false") +
-                L",\"bytes\":" + std::to_wstring(kSettingsAi.bytes) + L",\"downloading\":" +
+        // Ready only with what runs it too; else what is left to download
+        // (an older copy of what runs the models, replaced).
+        const auto root = AiDataRoot();
+        const bool settingsPack = tekito::userdata::AiModelPackInstalled(kSettingsAi.pack, root);
+        const auto runtimeBytes = tekito::userdata::AiRuntimeRunsSettings(root) ? 0ull
+                                  : tekito::userdata::AiRuntimeHasWindowsMl(root) ? kAiRuntimeWindowsMl.bytes
+                                                                                   : kAiRuntime.bytes;
+        json += std::wstring(L",\"settings\":{\"installed\":") + (SettingsAiReady() ? L"true" : L"false") +
+                L",\"bytes\":" + std::to_wstring((settingsPack ? 0ull : kSettingsAi.bytes) + runtimeBytes) +
+                L",\"downloading\":" +
                 (settingsAiDownloading_ ? L"true" : L"false") + L"}";
         json += std::wstring(L",\"runtime\":{\"installed\":") +
                 (tekito::userdata::AiRuntimeInstalled(AiDataRoot()) ? L"true" : L"false") +
