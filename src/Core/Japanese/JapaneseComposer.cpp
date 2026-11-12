@@ -4023,7 +4023,11 @@ std::vector<PreeditSegment> JapaneseComposer::Segments() const {
         for (const auto& chunk : settled_) {
             if (!chunk.marksOnly) englishLast = chunk.isEnglish;
         }
-        const bool japaneseNext = IsConverted() && !ChoseEnglish();
+        // Japanese next: converted, or typed and shown as kana (このfileを as
+        // it will be committed; while only a key or letters show, the space
+        // stays, so that they do not read as part of the word).
+        const bool kanaTyped = !IsConverted() && !units_.empty() && !TypedLetters();
+        const bool japaneseNext = (IsConverted() && !ChoseEnglish()) || kanaTyped;
         auto& last = segments.back().text;
         if (englishLast && Typing() && !japaneseNext && !last.empty() && last.back() < 0x3000) last.push_back(L' ');
     }
