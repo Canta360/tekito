@@ -7,7 +7,8 @@
 //
 // "live" turns live conversion on (the text after a pause is printed too);
 // "mix" types in Mix, "mixlive" with its live conversion; "steps" prints
-// what is shown after each key; "nocheck" turns the sentence check off.
+// what is shown after each key; "nocheck" turns the sentence check off;
+// "set:<setting>=<value>" sets a setting by its UserSettings name.
 //
 // The composer is set up as the text service sets it up: the installed
 // Japanese data and the default settings.
@@ -181,8 +182,72 @@ int main(int argc, char** argv) {
         if (std::string(argv[i]).starts_with("num=")) settings.japaneseNumberStyle = std::stoi(argv[i] + 4);
         if (std::string(argv[i]).starts_with("kanji=")) settings.japaneseKanjiRange = std::stoi(argv[i] + 6);
         if (std::string(argv[i]).starts_with("grade=")) settings.japaneseKanjiGrade = std::stoi(argv[i] + 6);
+        // "set:<setting>=<value>" sets one of the user's settings by its name.
+        if (std::string(argv[i]).starts_with("set:")) {
+            const std::string arg = argv[i] + 4;
+            const auto eq = arg.find('=');
+            const std::string name = arg.substr(0, eq);
+            const int value = eq == std::string::npos ? 1 : std::stoi(arg.substr(eq + 1));
+            bool found = false;
+            if (name == "learningEnabled") { settings.learningEnabled = value != 0; found = true; }
+            if (name == "japanesePredictionEnabled") { settings.japanesePredictionEnabled = value != 0; found = true; }
+            if (name == "japaneseLiveConversion") { settings.japaneseLiveConversion = value != 0; found = true; }
+            if (name == "japaneseSentenceCheck") { settings.japaneseSentenceCheck = value != 0; found = true; }
+            if (name == "japaneseSlipAutoApply") { settings.japaneseSlipAutoApply = value != 0; found = true; }
+            if (name == "japaneseFirstPageSymbol") { settings.japaneseFirstPageSymbol = value != 0; found = true; }
+            if (name == "japaneseTypedForms") { settings.japaneseTypedForms = value != 0; found = true; }
+            if (name == "japaneseChunkCandidates") { settings.japaneseChunkCandidates = value != 0; found = true; }
+            if (name == "japaneseKanjiVariants") { settings.japaneseKanjiVariants = value != 0; found = true; }
+            if (name == "japaneseLiveRefine") { settings.japaneseLiveRefine = value != 0; found = true; }
+            if (name == "japaneseRoughNumbersKanji") { settings.japaneseRoughNumbersKanji = value != 0; found = true; }
+            if (name == "japaneseKanjiNames") { settings.japaneseKanjiNames = value != 0; found = true; }
+            if (name == "mixLiveConversion") { settings.mixLiveConversion = value != 0; found = true; }
+            if (name == "mixAi") { settings.mixAi = value != 0; found = true; }
+            if (name == "mixPredictionEnabled") { settings.mixPredictionEnabled = value != 0; found = true; }
+            if (name == "mixFirstPageSymbol") { settings.mixFirstPageSymbol = value != 0; found = true; }
+            if (name == "mixRoughNumbersKanji") { settings.mixRoughNumbersKanji = value != 0; found = true; }
+            if (name == "mixKanjiNames") { settings.mixKanjiNames = value != 0; found = true; }
+            if (name == "mixKanjiVariants") { settings.mixKanjiVariants = value != 0; found = true; }
+            if (name == "mixSentenceCheck") { settings.mixSentenceCheck = value != 0; found = true; }
+            if (name == "mixSlipAutoApply") { settings.mixSlipAutoApply = value != 0; found = true; }
+            if (name == "mixTypedForms") { settings.mixTypedForms = value != 0; found = true; }
+            if (name == "mixChunkCandidates") { settings.mixChunkCandidates = value != 0; found = true; }
+            if (name == "mixLiveRefine") { settings.mixLiveRefine = value != 0; found = true; }
+            if (name == "mixSingleVowelKana") { settings.mixSingleVowelKana = value != 0; found = true; }
+            if (name == "mixCorrection") { settings.mixCorrection = value != 0; found = true; }
+            if (name == "spacelessEnglish") { settings.spacelessEnglish = value != 0; found = true; }
+            if (name == "dateConversion") { settings.dateConversion = value != 0; found = true; }
+            if (name == "numberConversion") { settings.numberConversion = value != 0; found = true; }
+            if (name == "symbolConversion") { settings.symbolConversion = value != 0; found = true; }
+            if (name == "calculatorEnabled") { settings.calculatorEnabled = value != 0; found = true; }
+            if (name == "japaneseSpaceWidth") { settings.japaneseSpaceWidth = value; found = true; }
+            if (name == "japanesePunctuation") { settings.japanesePunctuation = value; found = true; }
+            if (name == "japaneseDigitWidth") { settings.japaneseDigitWidth = value; found = true; }
+            if (name == "japaneseNumberStyle") { settings.japaneseNumberStyle = value; found = true; }
+            if (name == "japaneseKanjiRange") { settings.japaneseKanjiRange = value; found = true; }
+            if (name == "japaneseKanjiGrade") { settings.japaneseKanjiGrade = value; found = true; }
+            if (name == "japaneseSymbolWidth") { settings.japaneseSymbolWidth = value; found = true; }
+            if (name == "japaneseLetterWidth") { settings.japaneseLetterWidth = value; found = true; }
+            if (name == "japaneseNotationLevel") { settings.japaneseNotationLevel = value; found = true; }
+            if (name == "japaneseSentenceModel") { settings.japaneseSentenceModel = value; found = true; }
+            if (name == "mixPunctuation") { settings.mixPunctuation = value; found = true; }
+            if (name == "mixDigitWidth") { settings.mixDigitWidth = value; found = true; }
+            if (name == "mixNumberStyle") { settings.mixNumberStyle = value; found = true; }
+            if (name == "mixKanjiRange") { settings.mixKanjiRange = value; found = true; }
+            if (name == "mixKanjiGrade") { settings.mixKanjiGrade = value; found = true; }
+            if (name == "mixSymbolWidth") { settings.mixSymbolWidth = value; found = true; }
+            if (name == "mixLetterWidth") { settings.mixLetterWidth = value; found = true; }
+            if (name == "mixSpaceWidth") { settings.mixSpaceWidth = value; found = true; }
+            if (name == "mixNotationLevel") { settings.mixNotationLevel = value; found = true; }
+            if (name == "candidateRows") { settings.candidateRows = value; found = true; }
+            if (!found) {
+                std::cerr << "no such setting: " << name << "\n";
+                return 2;
+            }
+        }
     }
-    tekito::userdata::ApplyJapaneseSettings(composer, settings, nullptr);
+    // Mix with its own ways of writing, as the text service sets it.
+    tekito::userdata::ApplyJapaneseSettings(composer, settings, nullptr, mix);
     tekito::japanese::AttachMixedTyping(composer, mix);
     // "keys": each line is keys pressed, through the text service's key
     // handling (TranslateKey, ApplyKey) into a document, printed after each
@@ -192,6 +257,7 @@ int main(int argc, char** argv) {
     if (std::find_if(argv + 3, argv + argc, [](const char* a) { return std::string(a) == "keys"; }) != argv + argc) {
         using Key = tekito::japanese::KeyPress::Key;
         const auto options = tekito::userdata::JapaneseKeyOptions(settings, mix);
+        const bool showPhrases = std::find_if(argv + 3, argv + argc, [](const char* a) { return std::string(a) == "phrases"; }) != argv + argc;
         std::ifstream lines(argv[1], std::ios::binary);
         for (std::string line; std::getline(lines, line);) {
             if (!line.empty() && line.back() == '\r') line.pop_back();
@@ -242,8 +308,9 @@ int main(int argc, char** argv) {
                     }
                     document += outcome.outside;
                 }
+                // The composition, its phrases apart with "|" when "phrases" is given.
                 std::wstring shown;
-                for (const auto& segment : composer.Segments()) shown += segment.text;
+                for (const auto& segment : composer.Segments()) shown += (showPhrases && !shown.empty() ? L"|" : L"") + segment.text;
                 std::cout << " " << Narrow(name) << ":" << Narrow(document) << "[" << Narrow(shown) << "]";
             }
             std::cout << "\n";

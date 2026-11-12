@@ -361,10 +361,14 @@ void JapaneseComposer::Insert(wchar_t key) {
         // A capital after kana typed without a space (きょうはZ) starts an
         // English word: the kana before it is a Japanese chunk of its own,
         // as if Space had come between, not letters with it (kyouhaZ).
-        // Not after a single kana (iPhone, eBay) nor in a word shown as
-        // letters or with a capital already.
+        // Not after a single kana (iPhone, eBay) nor digits alone (100GB), nor
+        // in a word shown as letters or with a capital already.
+        const auto kanaTyped = [&] {
+            const std::wstring reading = Reading();
+            return std::count_if(reading.begin(), reading.end(), [](wchar_t c) { return c >= 0x3041 && c <= 0x30FF; }) >= 2;
+        };
         if (key >= L'A' && key <= L'Z' && !Live() && Typing() && !IsConverted() && pending_.empty() &&
-            units_.size() >= 2 && caret_ == units_.size() && !TypedLetters() &&
+            units_.size() >= 2 && caret_ == units_.size() && !TypedLetters() && kanaTyped() &&
             std::none_of(typedCase_.begin(), typedCase_.end(), [](wchar_t c) { return c >= L'A' && c <= L'Z'; })) {
             Convert();
         }
@@ -721,6 +725,18 @@ void JapaneseComposer::UpdateLive() {
         PhraseCandidate hiragana{rest, 0, PhraseCandidate::Kind::Hiragana, false};
         PhraseCandidate katakana{ToKatakana(rest), 0, PhraseCandidate::Kind::Katakana, false};
         phrases_.push_back({settledLength_, rest.size(), {hiragana, katakana}});
+    }
+    // Digits typed stay digits as Space writes them (11がつ: 11月, not 十一月),
+    // that one first: nothing is picked yet, and Enter converts it again.
+    if (phrases_.size() > before) {
+        ApplyNumberStyle(before);
+        for (std::size_t i = before; i < phrases_.size(); ++i) {
+            auto& phrase = phrases_[i];
+            if (phrase.form || phrase.selected == 0 || phrase.selected >= phrase.candidates.size()) continue;
+            std::rotate(phrase.candidates.begin(), phrase.candidates.begin() + static_cast<std::ptrdiff_t>(phrase.selected),
+                        phrase.candidates.begin() + static_cast<std::ptrdiff_t>(phrase.selected) + 1);
+            phrase.selected = 0;
+        }
     }
     if (phrases_.size() > settledPhrases_ + liveOpenPhrases_) {
         settledPhrases_ = phrases_.size() - liveOpenPhrases_;
@@ -1215,7 +1231,7 @@ bool JapaneseComposer::InKanjiRange(std::wstring_view text) const {
     return !kanjiSets_ || kanjiRange_ == KanjiRange::All || kanjiSets_->Allows(text, kanjiRange_, kanjiGrade_, kanjiNames_);
 }
 
-void JapaneseComposer::KeepKanjiInRange(PhraseState& phrase) const {
+void JapaneseComposer::KeepKanjiInRange(PhraseState& phrase, std::wstring_view reading) const {
     if (!kanjiSets_ || kanjiRange_ == KanjiRange::All || phrase.candidates.empty()) return;
     auto& candidates = phrase.candidates;
     const std::wstring chosen = phrase.selected < candidates.size() ? candidates[phrase.selected].text : std::wstring{};
@@ -1223,8 +1239,8 @@ void JapaneseComposer::KeepKanjiInRange(PhraseState& phrase) const {
     std::erase_if(candidates, [&](const PhraseCandidate& c) { return !kanjiSets_->Allows(c.text, kanjiRange_, kanjiGrade_, kanjiNames_); });
     // A word with kanji outside the range is written in kana first, not as
     // another word that happens to fit (差して is さして, not さし手).
-    if ((firstOut || candidates.empty()) && phrase.begin + phrase.length <= conversionReading_.size()) {
-        PhraseCandidate hiragana{conversionReading_.substr(phrase.begin, phrase.length), 0, PhraseCandidate::Kind::Hiragana, false};
+    if ((firstOut || candidates.empty()) && phrase.begin + phrase.length <= reading.size()) {
+        PhraseCandidate hiragana{std::wstring(reading.substr(phrase.begin, phrase.length)), 0, PhraseCandidate::Kind::Hiragana, false};
         std::erase_if(candidates, [&](const PhraseCandidate& c) { return c.text == hiragana.text; });
         candidates.insert(candidates.begin(), std::move(hiragana));
     }
@@ -1234,6 +1250,9 @@ void JapaneseComposer::KeepKanjiInRange(PhraseState& phrase) const {
 }
 
 void JapaneseComposer::BuildPhrasesFor(bool convert) {
+    // Mixed typing: shown as letters while typed (3abc), the keys still
+    // pending as they showed.
+    const auto shownLetters = convert ? TypedLetters() : std::nullopt;
     FlushAll();
     predictions_.clear();
     chosenPrediction_.reset();
@@ -1475,6 +1494,28 @@ void JapaneseComposer::BuildPhrasesFor(bool convert) {
         english.otherLanguage = true;
         candidates.insert(candidates.begin() + 1, std::move(english));
     }
+    // Mixed typing: letters shown as typed that convert only to kana or kanji
+    // with letters left in them (3abc: 3亜bc) stay letters first, as Enter
+    // commits them.
+    if (shownLetters && chunk && !chunk->english && !phrases_.empty()) {
+        std::wstring text;
+        for (const auto& phrase : phrases_) text += PhraseText(phrase);
+        const bool latin = std::any_of(text.begin(), text.end(), [](wchar_t c) {
+            return (c >= L'a' && c <= L'z') || (c >= L'A' && c <= L'Z');
+        });
+        const bool japanese = std::any_of(text.begin(), text.end(), [](wchar_t c) { return c >= 0x3041; });
+        // English run into Japanese as one reading (meetingで) is meant so.
+        const bool wholeRead = std::any_of(phrases_.begin(), phrases_.end(), [](const PhraseState& phrase) {
+            return !phrase.form && phrase.selected < phrase.candidates.size() &&
+                   !phrase.candidates[phrase.selected].reading.empty();
+        });
+        if (latin && japanese && !wholeRead) {
+            conversionReading_ = reading;
+            phrases_.clear();
+            phrases_.push_back({0, reading.size(), EnglishCandidates(*shownLetters, reading)});
+            return;
+        }
+    }
     if (convert) JoinEllipsis();
     // An AI model chosen reads the sentence check's choices, with it on or off.
     if (convert && reranker_ && (sentenceCheck_ || aiJudge_) && !chunkJudge_ && !reconverted_) CheckSentence();
@@ -1657,14 +1698,14 @@ void JapaneseComposer::WidenDigits(PhraseState& phrase, std::wstring_view readin
     }
 }
 
-void JapaneseComposer::ApplyNumberStyle() {
+void JapaneseComposer::ApplyNumberStyle(std::size_t from) {
     // A rough number is part of a word and written in kanji: 数十人, 十数人,
     // 十余年, 二、三日.
     constexpr std::wstring_view kNumerals = L"〇一二三四五六七八九";
     constexpr std::wstring_view kRoughBefore = L"数何幾";
     constexpr std::wstring_view kRoughAfter = L"数余";
     const auto digitOf = [](wchar_t c) { return c >= L'\xFF10' ? c - L'\xFF10' : c - L'0'; };
-    for (std::size_t index = 0; index < phrases_.size(); ++index) {
+    for (std::size_t index = from; index < phrases_.size(); ++index) {
         auto& phrase = phrases_[index];
         if (phrase.candidates.empty() || phrase.begin + phrase.length > conversionReading_.size()) continue;
         const std::wstring_view reading = std::wstring_view(conversionReading_).substr(phrase.begin, phrase.length);
@@ -3025,10 +3066,13 @@ void JapaneseComposer::AddChunkCandidates(std::size_t i) {
         return found;
     };
     const std::wstring ownKatakana = katakana(chunk);
-    // Letters and digits in one width (でしｔ is でしt written wider).
+    // Letters and digits in one width (でしｔ is でしt written wider), and
+    // the marks as one (雨. is 雨。 with the other period).
     const auto narrow = [](std::wstring text) {
         for (auto& c : text) {
             if (c >= 0xFF01 && c <= 0xFF5E) c = static_cast<wchar_t>(c - 0xFEE0);
+            if (c == L'。') c = L'.';
+            if (c == L'、') c = L',';
         }
         return text;
     };
@@ -3197,6 +3241,9 @@ void JapaneseComposer::AddLoanwords(std::vector<PhraseCandidate>& candidates, st
         ToHiragana(candidates.front().text) == ToHiragana(reading)) {
         for (std::size_t length = reading.size();
              length >= kShortestUnknownLoanword && reading.size() - length <= kLoanwordParticle; --length) {
+            // A word the dictionary knows (ほんと, not haunt; ハート, its
+            // katakana read below) is no unknown loanword.
+            if (converter_ && converter_->IsWord(std::wstring(reading.substr(0, length)))) break;
             const auto words = loanwords_->Words(reading.substr(0, length), kLoanwords);
             if (words.empty()) continue;
             const std::wstring rest(reading.substr(length));
@@ -3406,7 +3453,11 @@ void JapaneseComposer::Convert() {
         // next candidate: the whole input read another way (English run in)
         // when there is one, else the last phrase's. The next Space opens
         // the list.
-        if (!pending_.empty()) {
+        // Keys still pending (100en: 100絵n) are first read as Space reads
+        // them (100円), which is shown before any other candidate.
+        const std::wstring typedShown = Preedit();
+        const bool flushed = !pending_.empty();
+        if (flushed) {
             FlushAll();
             UpdateLive();
         }
@@ -3414,6 +3465,14 @@ void JapaneseComposer::Convert() {
         const bool rebuilt = RebuildLive();
         StartPicking();
         if (!IsConverted()) return;
+        // The last word's, not the punctuation after it (今日は雨。: 雨).
+        const auto marksOnly = [](const std::wstring& text) {
+            return !text.empty() && std::all_of(text.begin(), text.end(), [](wchar_t c) {
+                return std::wstring_view(L"。、．，.,！？!?…‥・").find(c) != std::wstring_view::npos;
+            });
+        };
+        while (focus_ > 0 && marksOnly(PhraseText(phrases_[focus_]))) --focus_;
+        if (flushed && Preedit() != typedShown) return;
         // What was shown changed (English run in, a slip undone): that comes
         // first, as Space shows it without live conversion.
         // A whole-input reading shown: Space and its list are that phrase's.
@@ -4201,7 +4260,13 @@ void JapaneseComposer::SettleChunk() {
                                 conversionReading_.size() + 2 >= typedReading.size();
         chunk.reading = slipUndone ? conversionReading_ : typedReading;
         chunk.context = context_;
-        const auto phrases = ConvertReading(chunk.reading, 0, context_, WordsWithEnglish());
+        auto phrases = ConvertReading(chunk.reading, 0, context_, WordsWithEnglish());
+        // Only kanji in the range set, as the chunk showed (れんらく, not 連らく).
+        for (auto& phrase : phrases) {
+            PhraseState state{phrase.begin, phrase.length, std::move(phrase.candidates)};
+            KeepKanjiInRange(state, chunk.reading);
+            phrase.candidates = std::move(state.candidates);
+        }
         for (const auto& phrase : phrases) {
             if (!phrase.candidates.empty()) chunk.japanese += phrase.candidates.front().text;
         }
@@ -4400,7 +4465,9 @@ std::optional<std::wstring> JapaneseComposer::MixLiveText() const {
         mixLiveReading_ = kana;
         mixLiveText_ = std::move(text);
     }
-    return mixLiveText_ + reading.substr(end);
+    // The keys still pending follow, as typed (3時 then k), as in Japanese
+    // mode's live conversion.
+    return mixLiveText_ + reading.substr(end) + PendingText();
 }
 
 std::wstring JapaneseComposer::SettledText() const {
@@ -4474,7 +4541,7 @@ void JapaneseComposer::ConvertJapaneseRuns() {
                 AddLoanwords(state.candidates, phraseReading);
                 AddLongVowelWords(state.candidates, phraseReading, true);
                 StyleKanaNumbers(state.candidates);
-                KeepKanjiInRange(state);
+                KeepKanjiInRange(state, reading);
                 perChunk[c - first].push_back({state.begin, state.length, std::move(state.candidates)});
                 ++p;
             }
@@ -4994,6 +5061,11 @@ std::wstring JapaneseComposer::CommitChunk() {
     if (IsConverted()) {
         const auto& phrase = phrases_.back();
         if (!phrase.form && phrase.selected < phrase.candidates.size()) last = phrase.candidates[phrase.selected].rightId;
+    } else if (converter_ && !units_.empty() && pending_.empty() && !HasAscii()) {
+        // Kana committed as typed (こんにちは) goes on as the words it reads
+        // as, not as a sentence start (こんにちは, then にじがでる: 虹が出る,
+        // not に地が出る).
+        if (const auto best = converter_->Best(Reading(), context_)) last = best->rightId;
     }
     auto text = IsConverted() ? Preedit() : RenderTyping(false);
     context_ = ContextAfter(text, last);

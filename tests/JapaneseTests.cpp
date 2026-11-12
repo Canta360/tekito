@@ -816,6 +816,18 @@ void TestLiveConversion(const RomajiTable& table, const MiniPack& pack) {
     Require(std::count_if(segments.begin(), segments.end(), [](const auto& s) { return s.focused; }) == 1,
             "one phrase is focused");
     composer.Clear();
+
+    // Space with a key still pending (the last n of henkan) shows what
+    // Space shows without live conversion, not the candidate after it.
+    JapaneseComposer plain(&table);
+    plain.SetConverter(&converter);
+    Type(plain, L"kanjinihenkan");
+    plain.Convert();
+    Type(composer, L"kanjinihenkan");
+    composer.Convert();
+    RequireText(composer.Preedit(), plain.Preedit(), "Space after a pending key shows the conversion first");
+    Require(composer.FocusedSelection() == 0, "its first candidate");
+    composer.Clear();
 }
 
 // Shift+letter: letters as typed, in half-width, until committed.
@@ -1040,6 +1052,13 @@ void TestMixedTyping(const RomajiTable& table, const MiniPack& pack) {
         for (const auto& segment : live.Segments()) shown += segment.text;
         Require((shown.starts_with(L"push") || shown.starts_with(L"Push")) && shown.size() < std::wstring(L"pushsimasita").size(),
                 "live conversion shows the English word and the Japanese after it converted, not all letters");
+        // A key still pending shows after the conversion (変換 then k), as in
+        // Japanese mode; it is not hidden until it makes kana.
+        live.Clear();
+        Type(live, L"kanjinihenkank");
+        shown.clear();
+        for (const auto& segment : live.Segments()) shown += segment.text;
+        Require(shown.ends_with(L"k") || shown.ends_with(L"ｋ"), "Mix live conversion shows the key still pending");
     }
     {
         const auto sentence = judge.Judge(L"ipushtohome", 0);

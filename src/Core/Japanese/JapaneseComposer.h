@@ -619,7 +619,9 @@ private:
     void BuildPhrasesFor(bool convert);
     // Candidates with kanji outside SetKanjiRange taken out (the phrase's
     // kana when none is left).
-    void KeepKanjiInRange(PhraseState& phrase) const;
+    void KeepKanjiInRange(PhraseState& phrase) const { KeepKanjiInRange(phrase, conversionReading_); }
+    // `reading`: what the phrase's begin and length are in (a settled run's).
+    void KeepKanjiInRange(PhraseState& phrase, std::wstring_view reading) const;
     // Whether every kanji of `text` is in SetKanjiRange's range.
     [[nodiscard]] bool InKanjiRange(std::wstring_view text) const;
     // Mix on Enter: runs of Japanese chunks converted again as one reading,
@@ -896,8 +898,9 @@ private:
     // Digits in a phrase with other words: the width the number style asks
     // for, in the candidate shown.
     void WidenDigits(PhraseState& phrase, std::wstring_view reading) const;
-    // Phrases that are only digits: the form SetNumberStyle asks for first.
-    void ApplyNumberStyle();
+    // Phrases that are only digits: the form SetNumberStyle asks for first;
+    // from phrase `from` on (live conversion's new phrases).
+    void ApplyNumberStyle(std::size_t from = 0);
     // A run of 。 typed as ... is one phrase, … first.
     void JoinEllipsis();
     // Numbers read in kana in the number style, the other way next.
