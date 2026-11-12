@@ -2828,6 +2828,11 @@ std::vector<PhraseCandidate> JapaneseComposer::EnglishCandidates(const std::wstr
         }
     }
     add(Keys(false), PhraseCandidate::Kind::English);
+    // How a little-known name is written, after the keys as typed (meetin,
+    // then MEETin).
+    if (chunkJudge_) {
+        if (auto name = chunkJudge_->OfferedName(Keys(false))) add(std::move(*name), PhraseCandidate::Kind::English);
+    }
     // The word written with a hyphen it was typed without (usbc: USB-C).
     if (chunkJudge_) {
         if (const auto hyphened = chunkJudge_->Hyphenated(Keys(false))) add(*hyphened, PhraseCandidate::Kind::English);

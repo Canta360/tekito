@@ -127,6 +127,9 @@ public:
     // hyphen) are typed without one, as it is written (usbc: USB-C), to
     // offer; nothing when there is none.
     [[nodiscard]] std::optional<std::wstring> Hyphenated(std::wstring_view keys) const;
+    // A little-known name the keys are written as (meetin: MEETin), only
+    // offered as a candidate after the keys as typed.
+    [[nodiscard]] std::optional<std::wstring> OfferedName(std::wstring_view keys) const;
 
     // Japanese with English words typed into it without spaces
     // (reflectsareta: reflect + sareta, kyouhameetinggaarimasu: kyouha +

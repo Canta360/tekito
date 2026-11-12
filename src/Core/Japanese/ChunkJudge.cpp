@@ -90,7 +90,7 @@ std::wstring ChunkJudge::AsName(std::wstring written, bool inJapanese) const {
     for (const WrittenForms* names : {englishNames_, productNames_}) {
         if (!names) continue;
         const auto name = names->Find(written);
-        if (!name || (!inJapanese && name->japaneseOnly) ||
+        if (!name || name->offered || (!inJapanese && name->japaneseOnly) ||
             std::none_of(name->written.begin(), name->written.end(), [](wchar_t c) { return std::iswupper(c) != 0; })) {
             continue;
         }
@@ -101,6 +101,16 @@ std::wstring ChunkJudge::AsName(std::wstring written, bool inJapanese) const {
         return name->written;
     }
     return written;
+}
+
+std::optional<std::wstring> ChunkJudge::OfferedName(std::wstring_view keys) const {
+    std::wstring lower(keys);
+    for (auto& c : lower) c = static_cast<wchar_t>(std::towlower(c));
+    for (const WrittenForms* names : {englishNames_, productNames_}) {
+        if (!names) continue;
+        if (const auto name = names->Find(lower); name && name->offered) return name->written;
+    }
+    return std::nullopt;
 }
 
 std::optional<std::wstring> ChunkJudge::Hyphenated(std::wstring_view keys) const {

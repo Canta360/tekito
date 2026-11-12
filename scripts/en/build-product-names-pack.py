@@ -13,6 +13,12 @@ word such as Hello or Weather stays a word. Two letters are in only when
 Japanese text writes them so most of the time (the Leipzig Corpora
 Collection's Japanese news 2019 and Wikipedia 2021 corpora, CC BY 4.0).
 
+A name is written so by itself (scope "always") only when it is known:
+Japanese writes it so (its Japanese Wikipedia article, or the corpora), or
+it has articles in several languages and is no near miss of a common English
+word. Any other name (MEETin, one article; meetin is meeting cut short) is
+only offered as a candidate after the keys as typed (scope "offer").
+
 The inputs are QLever's (https://qlever.dev/api/wikidata) answers as TSV,
 for the classes in ROOT/.cache/tekito-data/wikidata/q_products.rq:
   products_ge1.tsv:
@@ -63,6 +69,33 @@ PLAIN_KINDS = {
 # Nor a word English uses this often (log10 frequency in word-scores.tsv:
 # check 4.3, hello 3.26; safari 2.8, git 2.3), more likely meant as a word.
 PLAIN_COMMON = 3.2
+# Known: articles in this many languages, or Japanese writes it so.
+KNOWN_LINKS = 4
+# A near miss of a word English uses this often (log10): one letter more,
+# less or other, or its start (meetin: meeting).
+NEAR_COMMON = 3.0
+NEAR_START = 3
+
+
+def near_words(scores: dict[str, float]):
+    common = {word for word, score in scores.items() if score >= NEAR_COMMON and word.isalpha()}
+    starts = {word[:i] for word in common for i in range(NEAR_START, len(word))}
+    letters = "abcdefghijklmnopqrstuvwxyz"
+
+    def near(key: str) -> bool:
+        if key in starts or key in common:
+            return True
+        for i in range(len(key) + 1):
+            if any(key[:i] + c + key[i:] in common for c in letters):
+                return True
+        for i in range(len(key)):
+            if key[:i] + key[i + 1:] in common:
+                return True
+            if any(c != key[i] and key[:i] + c + key[i + 1:] in common for c in letters):
+                return True
+        return False
+
+    return near
 
 
 def literal(field: str) -> str:
@@ -140,8 +173,9 @@ def main() -> int:
             if key not in best or (japanese, links) > (best[key][2], best[key][1]):
                 best[key] = (label, links, japanese, kind)
 
+    near = near_words(scores)
     rows: dict[str, tuple[str, str]] = {}
-    plain = 0
+    plain = offered = 0
     for key, (label, links, japanese, kind) in best.items():
         if len(key) < SHORTEST:
             seen = cases.get(key, collections.Counter())
@@ -153,7 +187,12 @@ def main() -> int:
                 rows[key] = (label, "japanese")
                 plain += 1
             continue
-        rows[key] = (label, "always")
+        written_so = cases.get(key, collections.Counter()).get(label, 0) >= SHORT_SEEN
+        if japanese or written_so or (links >= KNOWN_LINKS and not near(key)):
+            rows[key] = (label, "always")
+        else:
+            rows[key] = (label, "offer")
+            offered += 1
 
     pack = full.reset_pack("product-names")
     with (pack / "entries.tsv").open("w", encoding="utf-8", newline="\n") as output:
@@ -170,7 +209,8 @@ def main() -> int:
         "Japanese text writes them so, counted in the Leipzig Corpora Collection's Japanese news 2019 "
         "and Wikipedia 2021 corpora (CC BY 4.0): D. Goldhahn, T. Eckart and U. Quasthoff, \"Building "
         "Large Monolingual Dictionaries at the Leipzig Corpora Collection\", LREC 2012.")
-    print(f"Built {manifest['display_name']}: {manifest['entry_count']:,} entries ({plain:,} plain words, Japanese only)")
+    print(f"Built {manifest['display_name']}: {manifest['entry_count']:,} entries ({plain:,} plain words, Japanese only; "
+          f"{offered:,} only offered)")
     return 0
 
 

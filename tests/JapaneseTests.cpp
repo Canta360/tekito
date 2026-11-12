@@ -2418,6 +2418,24 @@ void TestWrittenForms(const RomajiTable& table, const MiniPack& pack) {
     const auto offered = hyphens.Hyphenated(L"usbc");
     Require(offered && *offered == L"USB-C", "and USB-C is offered for it");
     Require(!hyphens.Hyphenated(L"hsbc"), "a word with no hyphenated form offers none");
+
+    // A little-known name (scope "offer") is never written so by itself, only
+    // offered (meetin stays meetin, MEETin offered); a known one is written.
+    const auto dir = std::filesystem::temp_directory_path() / L"tekito-test-product-names";
+    std::filesystem::create_directories(dir);
+    std::ofstream(dir / L"entries.tsv", std::ios::binary)
+        << "meetin\tMEETin\toffer\ten-US\tWikidata product\nzapier\tZapier\talways\ten-US\tWikidata product\n";
+    tekito::japanese::WrittenForms products;
+    Require(products.Open(dir), "a product-names pack written for the test opens");
+    tekito::japanese::ChunkJudge named(table, converter, nullptr, scores, nullptr);
+    named.SetProductNames(&products);
+    RequireText(named.EnglishWritten(L"meetin"), L"meetin", "a little-known name leaves the keys as typed (meetin)");
+    const auto meetin = named.OfferedName(L"meetin");
+    Require(meetin && *meetin == L"MEETin", "and is offered as it is written (MEETin)");
+    RequireText(named.EnglishWritten(L"zapier"), L"Zapier", "a known name is written so (zapier: Zapier)");
+    Require(!named.OfferedName(L"zapier"), "and is not offered again");
+    std::error_code ignored;
+    std::filesystem::remove_all(dir, ignored);
 }
 
 // A loanword written in katakana as its romaji spells it (anime: アニメ)

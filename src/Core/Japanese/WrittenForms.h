@@ -23,6 +23,9 @@ public:
         std::wstring written;
         // Written so only among Japanese (LINE, RAM), not in English.
         bool japaneseOnly{false};
+        // Only a candidate, never written so by itself: a name too little
+        // known to change what was typed (meetin: MEETin).
+        bool offered{false};
     };
     // `lower`: small letters.
     [[nodiscard]] std::optional<Form> Find(std::wstring_view lower) const;
