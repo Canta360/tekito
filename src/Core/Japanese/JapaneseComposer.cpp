@@ -3028,6 +3028,8 @@ void JapaneseComposer::AddChunkCandidates(std::size_t i) {
     constexpr float kLessLikely = 2.0f;
     if (!chunkCandidates_ || i + 1 >= phrases_.size()) return;
     auto& phrase = phrases_[i];
+    if (phrase.chunksTried) return;
+    phrase.chunksTried = true;
     if (phrase.candidates.empty() ||
         std::any_of(phrase.candidates.begin(), phrase.candidates.end(), [](const PhraseCandidate& c) { return c.chunk; })) {
         return;

@@ -335,16 +335,22 @@ int main(int argc, char** argv) {
             for (const auto& segment : composer.Segments()) text += segment.text;
             return text;
         };
-        // A space is the Space key (Mix settles a chunk with it).
+        // A space is the Space key (Mix settles a chunk with it); < is
+        // Shift+Space.
         std::wstring shownSteps;
         for (const wchar_t key : Widen(line)) {
-            if (key != L' ') {
+            if (key == L'<') {
+                composer.PreviousCandidate();
+            } else if (key != L' ') {
                 if (composer.CommitsBeforeTyping() && !mix) composer.Commit();
                 composer.Insert(key);
             } else {
                 composer.Convert();
             }
-            if (steps) shownSteps += (shownSteps.empty() ? L"" : L" > ") + shown();
+            if (steps) {
+                shownSteps += (shownSteps.empty() ? L"" : L" > ") + shown();
+                if (composer.IsCandidateListOpen()) shownSteps += L"[" + std::to_wstring(composer.FocusedSelection()) + L"]";
+            }
         }
         std::cout << line << "\t" << Narrow(shown());
         if (steps) std::cout << "\n  steps: " << Narrow(shownSteps) << "\n ";

@@ -574,6 +574,9 @@ private:
         int letterCase{0};
         // The list has been given what the keys mean with a slip undone.
         bool slipsAdded{false};
+        // The chunk candidates were looked for, as the list opened: not again
+        // for each candidate picked after (the sentence shown then is another).
+        bool chunksTried{false};
         // Learning put another candidate first: the sentence check keeps it.
         bool learned{false};
     };
