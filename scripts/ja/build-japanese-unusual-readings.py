@@ -14,7 +14,12 @@ them (降り read おり) are forms of words JMdict lists otherwise: never.
 TEKITO makes such a word cost more for that reading, so 飴 comes before 天
 for あめ.
 
-Rows: reading, tab, word; sorted.
+An archaic reading of a word that is read otherwise today (天 read あめ:
+every JMdict sense of it marked arch or obs, while 天 read てん is not) is
+"archaic": TEKITO puts it after the words of today. A word that is itself
+archaic (天地 read あめつち, an entry of its own) is neither.
+
+Rows: reading, tab, word, tab, kind ("rare" or "archaic"); sorted.
 
 Usage:
   python scripts/ja/build-japanese-unusual-readings.py --jmdict JMdict_e.gz --kanjidic kanjidic2.xml.gz \
@@ -47,9 +52,13 @@ def main() -> int:
 
     text = gzip.open(args.jmdict, "rt", encoding="utf-8").read()
     common: dict[tuple[str, str], bool] = collections.defaultdict(bool)
+    # Whether every entry with the word so read is archaic in every sense.
+    archaic: dict[tuple[str, str], bool] = {}
     for entry in re.findall(r"<entry>(.*?)</entry>", text, re.S):
         kanji = [re.search(r"<keb>(.*?)</keb>", k).group(1) for k in re.findall(r"<k_ele>(.*?)</k_ele>", entry, re.S)]
         entry_common = "<ke_pri>" in entry or "<re_pri>" in entry
+        senses = re.findall(r"<sense>(.*?)</sense>", entry, re.S)
+        entry_archaic = bool(senses) and all("&arch;" in sense or "&obs;" in sense for sense in senses)
         for r in re.findall(r"<r_ele>(.*?)</r_ele>", entry, re.S):
             if "<re_nokanji/>" in r:
                 continue
@@ -61,6 +70,7 @@ def main() -> int:
                 if only and word not in only:
                     continue
                 common[(word, reading)] = common[(word, reading)] or reading_common
+                archaic[(word, reading)] = archaic.get((word, reading), True) and entry_archaic
 
     common_readings: dict[str, set[str]] = collections.defaultdict(set)
     common_words: dict[str, set[str]] = collections.defaultdict(set)
@@ -98,14 +108,26 @@ def main() -> int:
     def kanji_only(word: str) -> bool:
         return all("一" <= c <= "鿿" or c in "々〆" for c in word)
 
-    rows = sorted((reading, word) for (word, reading), is_common in common.items()
-                  if not is_common and common_readings[word] - {reading} and common_words[reading] - {word}
-                  and kanji_only(word) and not compound_reading(word, reading))
+    # Readings of today: in an entry not all archaic.
+    todays_readings: dict[str, set[str]] = collections.defaultdict(set)
+    for (word, reading), old in archaic.items():
+        if not old:
+            todays_readings[word].add(reading)
+
+    rows = []
+    for (word, reading), is_common in common.items():
+        if not kanji_only(word) or compound_reading(word, reading):
+            continue
+        if archaic[(word, reading)] and todays_readings[word] - {reading}:
+            rows.append((reading, word, "archaic"))
+        elif not is_common and common_readings[word] - {reading} and common_words[reading] - {word}:
+            rows.append((reading, word, "rare"))
+    rows.sort()
 
     path = args.pack / FILE
     with path.open("w", encoding="utf-8", newline="\n") as out:
-        for reading, word in rows:
-            out.write(f"{reading}\t{word}\n")
+        for reading, word, kind in rows:
+            out.write(f"{reading}\t{word}\t{kind}\n")
     manifest_path = args.pack / "manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     files = manifest.get("files") or [manifest["file"]]
@@ -114,7 +136,8 @@ def main() -> int:
     manifest["files"] = files
     manifest.setdefault("sha256", {})["unusual-readings"] = sha256(path)
     manifest_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
-    print(f"{len(rows):,} unusual readings in {path}")
+    archaic_count = sum(1 for row in rows if row[2] == "archaic")
+    print(f"{len(rows):,} unusual readings ({archaic_count:,} archaic) in {path}")
     return 0
 
 

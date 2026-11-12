@@ -2457,14 +2457,17 @@ void TestWrittenForms(const RomajiTable& table, const MiniPack& pack) {
     std::error_code ignored;
     std::filesystem::remove_all(dir, ignored);
 
-    // Words read as their kanji are hardly read (天 read あめ): listed by
-    // reading and word.
+    // Words read as their kanji are hardly read (餌 read え) or as only old
+    // Japanese read them (天 read あめ): listed by reading, word and kind.
     const auto unusualFile = std::filesystem::temp_directory_path() / L"tekito-test-unusual-readings.tsv";
-    std::ofstream(unusualFile, std::ios::binary) << "\xE3\x81\x82\xE3\x82\x81\t\xE5\xA4\xA9\n";  // あめ 天
+    std::ofstream(unusualFile, std::ios::binary) << "\xE3\x81\x82\xE3\x82\x81\t\xE5\xA4\xA9\tarchaic\n"  // あめ 天
+                                                 << "\xE3\x81\x88\t\xE9\xA4\x8C\trare\n";              // え 餌
     tekito::japanese::UnusualReadings unusual;
     Require(unusual.Open(unusualFile), "an unusual-readings list written for the test opens");
-    Require(unusual.HasReading(L"あめ") && unusual.Contains(L"あめ", L"天"), "天 read あめ is unusual");
-    Require(!unusual.Contains(L"あめ", L"飴") && !unusual.HasReading(L"てん"), "飴 read あめ, and 天 read てん, are not");
+    Require(unusual.HasReading(L"あめ") && unusual.Find(L"あめ", L"天") == tekito::japanese::UnusualReadings::Kind::Archaic,
+            "天 read あめ is archaic");
+    Require(unusual.Find(L"え", L"餌") == tekito::japanese::UnusualReadings::Kind::Rare, "餌 read え is rare");
+    Require(!unusual.Contains(L"あめ", L"飴") && !unusual.HasReading(L"てん"), "飴 read あめ, and 天 read てん, are not listed");
     std::filesystem::remove(unusualFile, ignored);
 }
 

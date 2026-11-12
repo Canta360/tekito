@@ -356,12 +356,16 @@ public:
         notationCost_ = cost;
     }
     void SetNotationLevel(int level) const noexcept { notationLevel_ = level; }
-    // Words read as their kanji are hardly read (天 read あめ, the
+    // Words read as their kanji are hardly read (餌 read え, the
     // japanese-jmdict pack's unusual-readings.tsv) cost `cost` more for that
-    // reading, so 飴 and 雨 come before 天; nullptr: off.
-    void SetUnusualReadings(const UnusualReadings* readings, std::int64_t cost = 1000) noexcept {
+    // reading; read as only old Japanese read them while they are read
+    // otherwise today (天 read あめ), `archaicCost` more, after the words of
+    // today (雨, 飴, then 天); nullptr: off.
+    void SetUnusualReadings(const UnusualReadings* readings, std::int64_t cost = 1000,
+                            std::int64_t archaicCost = 4000) noexcept {
         unusualReadings_ = readings;
         unusualCost_ = cost;
+        archaicCost_ = archaicCost;
     }
     // The parts of speech (left ids) of names the sentence check leaves
     // (PhraseCandidate::name): organizations (東武, 西友) and the like.
@@ -384,6 +388,7 @@ private:
     const LanguageModel* model_{nullptr};
     const UnusualReadings* unusualReadings_{nullptr};
     std::int64_t unusualCost_{0};
+    std::int64_t archaicCost_{0};
     const TopicVectors* vectors_{nullptr};
     const EnglishTies* englishTies_{nullptr};
     const Collocations* collocations_{nullptr};
