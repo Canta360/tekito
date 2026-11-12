@@ -358,6 +358,16 @@ void JapaneseComposer::Insert(wchar_t key) {
     // Mixed typing: a capital is a letter of the chunk like any other; the
     // chunk keeps it for when it is English.
     if (chunkJudge_) {
+        // A capital after kana typed without a space (きょうはZ) starts an
+        // English word: the kana before it is a Japanese chunk of its own,
+        // as if Space had come between, not letters with it (kyouhaZ).
+        // Not after a single kana (iPhone, eBay) nor in a word shown as
+        // letters or with a capital already.
+        if (key >= L'A' && key <= L'Z' && !Live() && Typing() && !IsConverted() && pending_.empty() &&
+            units_.size() >= 2 && caret_ == units_.size() && !TypedLetters() &&
+            std::none_of(typedCase_.begin(), typedCase_.end(), [](wchar_t c) { return c >= L'A' && c <= L'Z'; })) {
+            Convert();
+        }
         // A converted chunk joins the sentence, and a new one starts.
         if (IsConverted() && !Live()) SettleChunk();
         if (!Typing()) {
@@ -1252,6 +1262,11 @@ void JapaneseComposer::BuildPhrasesFor(bool convert) {
             phrases_.push_back({0, reading.size(), std::move(candidates)});
             return;
         }
+    }
+    // Mixed typing: committed as it showed in letters (CommitChunk).
+    if (const auto shown = std::exchange(committedAsShown_, std::nullopt); shown && convert) {
+        phrases_.push_back({0, reading.size(), {{*shown, 0, PhraseCandidate::Kind::English, false}}});
+        return;
     }
     // Mixed typing: the chunk may be English, with punctuation typed after
     // it (you., hello,), or be only punctuation after English.
@@ -4884,6 +4899,14 @@ std::wstring JapaneseComposer::CommitChunk() {
         const auto chunk = JudgeChunk(std::wstring_view(keys).substr(0, word));
         const bool capitals = TypedWithCapitals(std::wstring_view(keys).substr(0, word)).has_value();
         if ((chunk.english || capitals) && word > 0) BuildPhrases(true);
+        // Not English, yet shown as letters (3abc: the b and c no kana
+        // took): committed as it shows.
+        if (!IsConverted() && !Live()) {
+            if (const auto letters = TypedLetters()) {
+                committedAsShown_ = *letters;
+                BuildPhrases(true);
+            }
+        }
     }
     if (chunkJudge_) {
         const bool english = ChoseEnglish();

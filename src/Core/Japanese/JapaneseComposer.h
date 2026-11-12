@@ -938,6 +938,8 @@ private:
     std::size_t aiFocus_{0};
     bool sentenceCheck_{true};
     bool chunkCandidates_{true};
+    // Mix: letters Enter commits as they showed (CommitChunk, BuildPhrases).
+    std::optional<std::wstring> committedAsShown_;
     bool sentencesByCost_{true};
     std::size_t beamWidth_{0};
     double beamCostPerNat_{1000.0}, beamMargin_{0.0}, beamWholeCost_{0.0};
