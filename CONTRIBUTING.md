@@ -14,10 +14,28 @@ Issues are welcome. Each kind has its own form:
 
 Issues are public. Remove anything private before you submit. What you
 report may be used to improve TEKITO, for example as a test sentence.
+Report security problems privately, as in [Security](SECURITY.md).
 
 ## Pull requests
 
-We are not taking pull requests while TEKITO is in preview.
+Pull requests are welcome.
+
+1. For anything larger than a fix, open an Issue first, so that we can agree
+   on the change before you write it.
+2. One topic per pull request.
+3. Sign the [Contributor License Agreement](CLA.md): the CLA check asks for
+   it on your first pull request.
+4. `scripts\verify.ps1` passes, and new behaviour has a test.
+5. A change to conversion or correction shows its effect: the scores on the
+   evaluation sets before and after (`eval/`), and sentences that changed.
+   Measure on sentences you did not tune on.
+6. Behaviour other input methods lack gets an on/off switch in Settings,
+   under More settings, with a sensible default.
+7. Settings, the setup program and messages are in English and Japanese;
+   follow the wording of the existing text.
+
+Code, comments and commit messages are in English. Issues and pull request
+discussion may be in English or Japanese.
 
 ## Building and checking
 
@@ -33,8 +51,17 @@ it builds TEKITO, runs the tests and checks the rules below.
   only to put the caret back between brackets in older edit controls.
 - Leave correct words, names and code as they are. When unsure, suggest
   instead of replacing.
-- Data must allow commercial use. Each data pack names its source and
-  license in its `NOTICE` and `manifest.json`.
+
+## Data
+
+- Only data whose license allows commercial use.
+- Each pack names its source and license in its `NOTICE` and
+  `manifest.json`, and the script that builds it is in `scripts/`.
+- No copying of other input methods' dictionaries.
+
+## Code of Conduct
+
+See [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## License
 

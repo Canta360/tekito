@@ -19,21 +19,20 @@
 </p>
 
 <p align="center">
-  <img src="docs/images/typing-demo.png" alt="Typing “thnaks for teh reveiw.” in a plain page: the candidate list appears under each word, Space fixes the typos, and the line ends up as “thanks for the review.”" width="717">
+  <img src="docs/images/typing-demo.png" alt="Typing “Thank you for your quivk reoly, I recived the flie and will check it tomorow.”: the candidate list appears under each word, and Space, the comma and the period put each slip right, so the line ends up as “Thank you for your quick reply, I received the file and will check it tomorrow.”" width="800"><br>
+  <sub>English (Auto): Space, a comma or a period puts each slip right.</sub>
 </p>
 
 TEKITO is an input method (a TSF text service), so it works in ordinary
 Windows apps without plugins. One input method types both languages: English
-gets its spelling fixed as you go, and with Japanese added, romaji becomes
-kana and kanji. Everything runs on your PC.
-
-> TEKITO is a preview. It has been tested in Notepad; other apps are listed in
-> [the compatibility notes](docs/compatibility.md).
+gets its spelling fixed as you go, and romaji becomes kana and kanji.
+Everything runs on your PC. See [the compatibility notes](docs/compatibility.md)
+for the apps it has been tried in.
 
 ## Modes
 
 The button in the taskbar shows the mode. Click it to switch, or right-click
-to pick one.
+it to pick a mode, turn on Secret mode or open Settings.
 
 <table>
   <tr>
@@ -66,18 +65,16 @@ to pick one.
 
 The switch key is Hankaku/Zenkaku on a Japanese keyboard and Alt+` on a US
 one (or Ctrl+Space, Ctrl+Shift+Space, or none). It goes round the modes
-turned on under **Settings → General**, in the order set there. On
-a Japanese keyboard, Henkan switches to Japanese, Muhenkan to English, and
-Hiragana to Japanese in hiragana (katakana with Shift). After a switch, the
-new mode shows by the caret for a moment.
+checked under **Settings → General → Switch order**, in that order. On a
+Japanese keyboard, Henkan switches to Japanese, Muhenkan to English, and
+Hiragana to Japanese in hiragana (katakana with Shift).
 
-Japanese input is optional. Without it, or with it turned off in Settings,
-TEKITO has Auto and Direct only. It stays off in terminals, in apps running
-as administrator, and in any apps you list in Settings.
+Japanese input is optional. Without it, TEKITO has Auto and Direct only.
+TEKITO stays off in terminals, in apps running as administrator, and in the
+apps you list under **Settings → General**.
 
-Right-clicking the taskbar button also turns on **Secret mode**: nothing you
-type is learned or kept, in every app, until you turn it off. It turns off
-when you sign out or restart.
+**Secret mode**: until you turn it off, nothing you type is learned or kept,
+in every app. It turns off when you sign out or restart.
 
 ## Typing English
 
@@ -93,39 +90,33 @@ list of choices appears under it.
 | Esc | Keeps what you typed. |
 | Enter | Picks the highlighted choice when you are in the list; otherwise ends the line as usual. |
 
-Typing the next letter settles the word, so there is nothing to undo later.
-TEKITO leaves alone words it recognizes, chat abbreviations like “brb”,
-anything you capitalize yourself, anything that looks like code, URLs and
-addresses, and fields marked as passwords, numbers or email.
+TEKITO leaves alone words it knows, chat abbreviations like “brb”, anything
+you capitalize yourself, anything that looks like code, URLs and addresses,
+and fields marked as passwords, numbers or email.
 
-Space also writes English the usual way: “i” becomes “I”, “dont” and
-“youre” get their apostrophes, “ofthe” keeps both words, and days, months,
-languages and names like “iPhone” get their capitals. Where the word you
-typed is a word too, like “cant” or “march”, it stays, and the other way of
-writing it comes right after it in the list. English typed without spaces
-is split into words when the words are clear, and offered as a choice
-otherwise.
-
-The list also offers words that often come next (“to” for “I want t”), and
-Space takes out a word typed twice, like “the the”; Backspace brings it back.
-**Settings → Auto** turns these off, and turns on **Period with two
-spaces** and **Curly quotes and dashes**.
-
-A few things come up as choices too: “today” and “now” offer the date and
-time, “heart”, “(c)” and “->” offer ♡, © and →, and “1+2=” offers 3. What you typed
-stays first, so nothing changes unless you pick one.
+Space also writes English the usual way: “i” becomes “I”, “dont” gets its
+apostrophe, and days, months and names like “iPhone” get their capitals.
+Where what you typed is a word too, like “cant”, it stays, with the other
+spelling next in the list. The list also offers the word that often comes
+next (“to” for “I want t”), and “today”, “heart” and “1+2=” offer the date,
+♡ and 3. Each of these can be turned on or off in Settings.
 
 ![The TEKITO candidate list, glass and simple, in light and dark, with the meaning of the highlighted word beside it](docs/images/candidate-list.png)
 
 ## Typing Japanese
 
-With Japanese added, type romaji in Japanese mode; it becomes hiragana as you
-type, underlined. Space converts the
-whole line at once, split into phrases, and a second Space opens the list
-for the phrase in focus.
+Type romaji in Japanese mode; it shows as hiragana, underlined. Space
+converts the whole line, split into phrases, and a second Space opens the
+list for the phrase in focus.
 
 <p align="center">
-  <img src="docs/images/japanese-demo.png" alt="Typing “hahimemasite”, a slip for はじめまして: Space converts what was typed, the second Space opens the list, where はじめまして waits marked TYPO with its meaning beside it; then “kyouhaiitenkidesune.” becomes 今日はいい天気ですね。" width="559">
+  <img src="docs/images/japanese-demo.png" alt="Typing the romaji of a Japanese message with slips in it (nattermasu, sousin, simasira) in two goes: Space converts each to お世話になっております、 and 本日の会議の資料をメールで送信しました。" width="671"><br>
+  <sub>Japanese: Space converts, with the slips put right.</sub>
+</p>
+
+<p align="center">
+  <img src="docs/images/live-demo.png" alt="The same message with live conversion on: converted while typing, and put right as a whole when typing pauses (お世話になってリマス becomes お世話になっております)" width="606"><br>
+  <sub>Live conversion: converted as you type, put right when you pause.</sub>
 </p>
 
 | Key | What it does |
@@ -134,141 +125,128 @@ for the phrase in focus.
 | ← → | Before converting, moves the caret. After, moves between phrases. |
 | Shift+← → | Makes the phrase in focus shorter or longer. |
 | 1–9 | Picks a candidate from the list. |
-| Tab, ↓ | Picks one of the predicted words shown while you type. |
+| Tab, ↓ | Picks one of the predictions shown while you type. |
 | Enter | Commits what is shown. |
 | Esc | After converting, goes back to the kana; before, clears what you typed. |
-| PageUp, PageDown | Pages through the open list. |
 | F6–F8 | Hiragana, katakana, half-width katakana. |
 | F9, F10 | The letters you typed, full-width or as typed. |
-| Shift+letter | Starts an English word inside Japanese. In the middle of Japanese, the letters that follow stay as typed (NHKの, Windows11). |
-| Henkan | With nothing typed, converts the selected text again (or what you just entered). |
+| Shift+letter | Starts English inside Japanese (NHKの, Windows11). |
+| Henkan | With nothing typed, converts the selected text again. |
 | Ctrl+Backspace | Right after entering text, takes it back to the conversion. |
-| Ctrl+Delete | Stops suggesting a word TEKITO learned (the prediction or candidate picked). |
+| Ctrl+Delete | Stops suggesting a candidate TEKITO learned. |
 
-- **The whole sentence counts.** Conversion weighs which words go together,
-  learned from Japanese news and Wikipedia text, and carries on from what you
-  committed just before, so a phrase converted on its own still reads as
-  part of the sentence. A small language model then reads the likeliest
-  sentences as a whole and picks the one that reads most naturally.
-- **An AI model (optional).** Download one under **Settings → AI** and turn
-  it on, and an AI reviews your Japanese conversions. It runs on this PC, on
-  the CPU, the GPU or the NPU, and nothing you type leaves your PC. Light
-  (about 360 MB) and Accurate (about 1.6 GB) are offered.
-- **A slip is not a dead end.** When the keys look like a slip of the finger
-  (a neighboring key, a key dropped or doubled, two swapped), what you meant
-  is offered in the list, marked TYPO. What you typed stays first; you
-  never have to delete and retype.
-- **Meanings beside the list.** Candidates with a meaning carry a small book
-  sign, and the highlighted one's meaning appears beside the list, so you
-  can tell 初め from 始め. Slang such as エモい and 推し活 has one too.
+- **The whole sentence counts.** Conversion weighs which words go together
+  and reads on from the text before the caret, and a small language model
+  picks the sentence that reads most naturally.
+- **Slips fixed.** When the keys look like a slip of the finger (a
+  neighboring key, a key dropped or doubled, two swapped), Space converts
+  what you meant (arigayou → ありがとう). What you typed stays in the list.
+- **Whole stretches.** The list also offers the phrase and the ones after
+  it written another way as a whole (きしゃにきいた → 記者に聞いた, 貴社に聞いた).
+- **Meanings beside the list.** The highlighted candidate's meaning shows
+  beside the list, so you can tell 初め from 始め. Slang such as エモい has
+  one too.
 - **Katakana with its English.** Loanwords and names offer the English word
-  too (ミーティング → meeting, グーグル → Google), from JMdict and Japanese
-  Wikipedia.
-- **Kanji variants and letters.** Variants such as 髙 and 﨑 come among the
-  candidates, and letters can be typed by their names (ぴーしー → PC).
-- **It learns your way of writing.** The conversion you pick for a reading
-  comes first the next time.
-- **Your own words.** Add a reading and how you write it under
-  **Settings → Dictionary & learning → Japanese words**.
-- **Numbers, dates and symbols.** Digits read as numbers, so 3こ is 3個 and
-  100えん 100円. Digits you type follow the style set under
-  **Settings → Japanese → Numbers**, and converting a number offers the
-  other width and kanji (千二百三十四). **Numbers** and **Kanji** in **Settings → Japanese** set
-  how numbers are written and which kanji are used (by school year, 常用,
-  人名用). きょう and いま offer the date and time, やじるし and ほし
-  symbols, にこにこ emoticons, and 1+2= its answer. Single kanji come after
-  a reading's words.
-- **Postal codes.** Turn on **Settings → Japanese → Postal codes to
-  addresses** to download Japan Post's data; 1000001 then converts to its
-  address.
-- **Live conversion.** Turn on **Settings → Japanese → Live conversion**
-  to see the text converted as you type; Space then picks another candidate for the
-  last phrase.
-- **Emoji.** Readings offer emoji after the symbols: ねこ gives 🐱.
-- **Words shared with other IMEs.** Words exported as text from Microsoft
-  IME, Google Japanese Input or ATOK can be imported under
-  **Settings → Dictionary & learning → Import and export**, and your
-  Japanese words exported in a form other IMEs import.
-- **Kana input and the romaji table.** **Kana input** types the kana printed
-  on a JIS keyboard. The **Romaji table** can be edited or read from another
-  IME.
+  too (ミーティング → meeting, グーグル → Google).
+- **Your words and your way.** The conversion you pick comes first next
+  time. Add your own words under **Settings → Dictionary & learning**, and
+  import words exported from Microsoft IME, Google Japanese Input or ATOK.
+- **Numbers, dates and symbols.** 3こ becomes 3個 and 100えん 100円, in the
+  style set under **Settings → Formatting**, where the kanji used (by
+  school year, 常用, 人名用) are set too. きょう and いま offer the date and
+  time, やじるし symbols, ねこ emoji, にこにこ emoticons and 1+2= its answer.
+- **Postal codes.** Turn on **Postal codes to addresses** under
+  **Settings → Candidate list**, and 1000001 converts to its address.
+- **Live conversion.** Turn it on under **Settings → Conversion** to see
+  the text converted as you type.
+- **Kana input and the romaji table** are under **Settings → Keys & typing**.
 - **Everywhere you type.** TEKITO works in the Start menu's search,
   Settings and Store apps too, and a katakana field (furigana) types
   katakana.
+
+### Mix
+
+Check Mix under **Settings → General → Switch order**, and type Japanese and
+English without switching, a Space after each part: `kyouha github ni push
+suru` becomes 今日はGitHubにpushする. Each part is taken as Japanese or
+English on its own; names are written the way they are (GitHub), and a part
+that reads both ways follows the sentence. Space again gives the other one.
+A capital typed after Japanese starts English (`kyouhaZoom` → 今日はZoom),
+and Enter enters what is shown.
+
+<p align="center">
+  <img src="docs/images/mix-demo.png" alt="Four lines typed in Mix, a Space after each part: the Japanese message, the English sentence, 新しいAPIの仕様書をGitHubにアップしたので、URLを確認してください。 typed as api, gothub and url with slips, and the same sentence typed without spaces" width="762"><br>
+  <sub>Mix: Japanese, English, the two together, and typed without spaces.</sub>
+</p>
+
+Live conversion works in Mix too, so a sentence typed without spaces
+converts as you type:
+
+<p align="center">
+  <img src="docs/images/mix-live-demo.png" alt="Mix with live conversion on: atarasiiapinosiyousyowogithubniappusitanode,urlwokakuninsitekudasai. typed without spaces becomes 新しいAPIの仕様書をGitHubにアップしたので、URLを確認してください。 as it is typed" width="637"><br>
+  <sub>Mix with live conversion, typed without spaces.</sub>
+</p>
+
+### AI (optional)
+
+Turn on **Check with AI** under **Settings → Conversion**, and an AI model
+reviews your Japanese conversions. It runs on this PC, on the CPU, the GPU
+or the NPU, and nothing you type leaves your PC. Light (about 360 MB) and
+Accurate (about 1.6 GB) are offered.
 
 Microsoft IME, Google Japanese Input and ATOK are trademarks of their
 owners; they are named here only to say which files TEKITO reads. TEKITO
 is not affiliated with them.
 
-### Mix mode
-
-Turn on Mix in **Settings → General**, and it joins the modes you switch
-between. There you type Japanese and English without switching, a Space
-after each part: `kyouha github ni push suru` becomes 今日はGitHubにpushする.
-Each part is taken as Japanese or English on its own: keys that are no romaji
-(github, push) and well-known names (API) stay English, written the way they
-are (GitHub); Japanese is converted as usual. A part that reads both ways,
-like “take”, follows the sentence: Japanese in Japanese, English after
-English. Space again gives the other one.
-
-Words typed with a capital show as letters while you type, and English typed
-without spaces is split into words. Enter enters what is shown, with typing
-slips still fixed. With the AI model on, Enter also picks how the sentence is
-written. With live conversion, English typed straight into Japanese shows as
-English and converted Japanese (pushしました).
-
 ## Settings
 
 ![TEKITO Settings](docs/images/settings.png)
 
-Each page shows what most people change, and **More settings** at its end
-holds the rest. **Settings → General → Typing samples** shows short clips of
-what each mode does.
+Home finds a setting by its name. With the AI model downloaded, you can
+also ask in your own words (“stop correcting my English”), and AI changes
+the setting for you, with a way back. Each page shows what most people
+change, and **More settings** at its end holds the rest; **All settings**
+shows every setting on one page.
 
-Settings, the setup program and TEKITO's own messages are available in
-English and Japanese; they follow the Windows display language unless you
-pick one under **Settings → General → Language**.
+Your dictionary and what TEKITO learns can be encrypted under
+**Settings → Dictionary & learning**, with a recovery code. Home's companion
+can also sit in a corner of the desktop (**Settings → General**). Settings,
+the setup program and TEKITO's messages are in English and Japanese.
 
 ## Privacy
 
-Everything TEKITO does happens on your computer. It does not send your
-typing anywhere, it has no account and no telemetry, and it does not use the
-network while you type. What it learns from your choices stays in
-`%LOCALAPPDATA%\TEKITO` and can be cleared from Settings. It downloads only
-the Japanese data, when you choose Japanese in the setup program, postal
-codes, when you turn them on in Settings, an AI model, when you choose
-one in the setup program or in Settings, and what runs it on a GPU or an NPU,
-when you choose one in Settings.
-See [the privacy notice](PRIVACY.md).
+Everything TEKITO does happens on your PC. It does not send your typing
+anywhere, it has no account and no telemetry, and it does not use the
+network while you type. What it learns stays in `%LOCALAPPDATA%\TEKITO` and
+can be cleared from Settings. It downloads only what you choose: the
+Japanese data, postal codes, an AI model, and what runs it on a GPU or an
+NPU. See [the privacy notice](PRIVACY.md).
 
 ## Install
 
-Download `TEKITO-0.7.3-full-installer.exe` from
-[Releases](https://github.com/Canta360/tekito/releases) and run it.
+Download `TEKITO-1.0.0-full-installer.exe` from
+[Releases](https://github.com/Canta360/tekito/releases/latest) and run it.
 
 - **Add Japanese input** (on when Windows shows Japanese) downloads the
-  Japanese dictionary and language data, about 232 MB, from the same release,
-  and checks it against the checksum the installer carries. TEKITO then
-  appears in the Japanese keyboard list; its Auto and Direct cover English,
-  so it leaves the English list unless you keep it there under **Options**.
-- Without Japanese, TEKITO appears in the English keyboard list with Auto and
-  Direct. Run the installer again to add Japanese later.
+  Japanese dictionary and language data, about 232 MB, from the same release
+  and checks it before installing. TEKITO then appears in the Japanese
+  keyboard list.
+- **Check with AI** also downloads the AI models, about 720 MB.
+- Without Japanese, TEKITO appears in the English keyboard list with Auto
+  and Direct. Japanese can be added later from Settings.
 - It needs the Microsoft Edge WebView2 Runtime, which Windows 11 already has.
-- **Check with AI** also downloads the AI model (Light, about 360 MB). You
-  can download one later under **Settings → AI** too.
 
-After installing, restart the apps you want to type in (or sign out and back
-in), then pick TEKITO with Win+Space.
+After installing, restart the apps you type in (or sign out and back in),
+then pick TEKITO with Win+Space.
 
-The installer is not code-signed yet, so Windows SmartScreen may ask you to
+The installer is not code-signed, so Windows SmartScreen may ask you to
 confirm before it runs. To install without a network, see
 [the installer notes](installer/README.md).
 
 ## Build
 
-You need Windows 11, Visual Studio 2026 (or 2022) with the C++
-desktop workload, CMake 3.24 or later, Python 3, and Node.js for the Settings
-page.
+You need Windows 11, Visual Studio 2026 (or 2022) with the C++ desktop
+workload, CMake 3.24 or later, Python 3, and Node.js for the Settings page.
 
 ```powershell
 cd apps\tekito-settings\ui
@@ -281,45 +259,34 @@ cmake --build --preset windows-x64-debug
 ```
 
 `verify.ps1` builds everything, runs the tests and checks
-[the rules](CONTRIBUTING.md#rules). To try your build, register it from
-an administrator PowerShell with `scripts\register-debug.ps1`
-and remove it again with `unregister-debug.ps1`.
+[the rules](CONTRIBUTING.md#rules). To try your build, register it from an
+administrator PowerShell with `scripts\register-debug.ps1`, and remove it
+with `unregister-debug.ps1`.
 
 The language data lives in `data/`. The large packs are built from their
-public sources rather than kept in the repository:
-
-- `scripts\ja\prepare-japanese-packs.ps1` builds the Japanese dictionary from
-  Mozc, the word statistics from the Leipzig corpora, and the meanings from
-  TEKITO's slang list, Wiktionary and the Japanese WordNet. Without them Japanese types kana but
-  does not convert.
-- `scripts\en\prepare-full-data-packs.ps1` builds the English phrase
-  statistics. TEKITO works without them.
-
-See [Data Packs](docs/data-packs.md) for every pack, its source and its
-license. To make an installer, build the `windows-x64-release` preset and run
-`installer\package-release.ps1`; it also writes the Japanese data ZIP to
-attach to the release.
-
-## Repository layout
+public sources: `scripts\ja\prepare-japanese-packs.ps1` for the Japanese
+dictionary and language data (without it, Japanese types kana but does not
+convert), and `scripts\en\prepare-full-data-packs.ps1` for the English
+phrase statistics. See [Data Packs](docs/data-packs.md) for every pack, its
+source and its license, and [the installer notes](installer/README.md) for
+making a release.
 
 | Path | Contents |
 | --- | --- |
-| `src/Core` | English candidate search, ranking and the typing state machine. No Windows code. |
+| `src/Core` | English candidates, ranking and the typing state machine. No Windows code. |
 | `src/Core/Japanese` | Romaji, kana-kanji conversion, slips, predictions and meanings. No Windows code. |
-| `src/Tsf` | The TSF text service and the candidate window. |
-| `src/UserData` | Settings, the user dictionary and learning, stored in SQLite. |
-| `tests` | Unit tests for the engines and user data (Japanese test data in `tests/data/ja`). |
-| `eval`, `benchmarks` | Offline accuracy and speed measurements, in `en` and `ja`. |
+| `src/Tsf` | The TSF text service, the candidate window and the taskbar menu. |
+| `src/UserData` | Settings, the user dictionary and learning, in SQLite. |
 | `apps/tekito-settings` | The Settings window: a Win32 host and a React page in WebView2. |
 | `installer` | The setup program and packaging scripts. |
-| `data` | Language data packs, each with its own manifest and NOTICE: `en` for English, `ja` for Japanese, `common` for both. |
-| `scripts` | Build, install and check scripts; the ones that build each language's data are in `en` and `ja`. |
+| `data` | Language data packs: `en`, `ja`, and `common` for both. |
+| `tests`, `eval`, `benchmarks` | Unit tests, and accuracy and speed measurements. |
+| `scripts` | Build, install and check scripts, and the ones that build each language's data. |
 
 ## Contributing
 
-Bug reports and ideas are welcome in Issues. See
-[Contributing](CONTRIBUTING.md) for how to report and the rules for working
-on TEKITO.
+Bug reports, ideas and pull requests are welcome. See
+[Contributing](CONTRIBUTING.md).
 
 ## License
 
@@ -328,15 +295,11 @@ The source code is available under the
 it and share it for anything except a competing commercial product. Each
 release becomes Apache 2.0 two years after it is published. The installer we
 publish is covered by [the TEKITO License Agreement](installer/TEKITO_LICENSE.md),
-and each data pack keeps the license of its source: among them the Mozc
-dictionary (IPAdic and BSD 3-Clause), the Leipzig Corpora Collection
-(CC BY 4.0), Wiktionary (CC BY-SA 4.0) and the Japanese WordNet. The optional
-AI models are Liquid AI's LFM2.5 (LFM Open License), run with ONNX Runtime
-(MIT), or with Microsoft's Windows ML for a GPU or an NPU. The details
-are in [Licensing](LICENSING.md) and
-[third-party notices](THIRD_PARTY_NOTICES.md).
+and each data pack keeps the license of its source. The details are in
+[Licensing](LICENSING.md) and [third-party notices](THIRD_PARTY_NOTICES.md).
 
-TEKITO is made by [Capitata](https://capitata.dev).
+TEKITO is made by [Capitata](https://capitata.dev) and
+[its contributors](CONTRIBUTORS.md).
 
 <p align="center">
   <a href="https://capitata.dev">

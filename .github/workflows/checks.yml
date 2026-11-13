@@ -1,0 +1,41 @@
+# Builds TEKITO, runs the tests and checks the rules (scripts\verify.ps1) on
+# every pull request and push to main, on GitHub's Windows runner (Visual
+# Studio 2022, hence the vs2022 preset). The data it tests with is what the
+# repository holds; packs built locally (phrase, the Japanese data) are not
+# needed: tests that use them check only where they are installed.
+# Actions are pinned by commit (latest releases on 2026-11-11).
+name: Checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: windows-2025
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/tekito-settings/ui/package-lock.json
+      - name: Settings page
+        working-directory: apps/tekito-settings/ui
+        shell: pwsh
+        run: |
+          npm ci
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm run build
+      - name: Build, tests and rules
+        shell: pwsh
+        run: scripts\verify.ps1 -Preset windows-x64-vs2022-debug

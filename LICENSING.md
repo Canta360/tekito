@@ -9,6 +9,7 @@ repository and of the installer come under different terms.
 | Installer and builds published by Capitata | TEKITO License Agreement | `installer/TEKITO_LICENSE.md` |
 | Language data packs | The license of each source | `data/<pack>/NOTICE`, `data/<pack>/manifest.json` |
 | Third-party software, fonts, icons, sounds and the optional AI models | The license of each | `THIRD_PARTY_NOTICES.md` |
+| Contributions from others | Their authors keep the copyright and license them to Capitata under the Contributor License Agreement; Capitata distributes them under the terms above | `CLA.md`, `CONTRIBUTORS.md` |
 
 ## The source code
 
@@ -24,6 +25,31 @@ it is published. From then on, that release is ordinary open source.
 The license covers no trademarks. The name TEKITO, the TEKITO icons and logo,
 and the Capitata name and logo identify our builds; please do not use them for
 your own.
+
+## Using TEKITO's code in your own program
+
+Where the license allows you to use TEKITO's code, in part or in whole:
+
+- Keep the copyright notices, and include `LICENSE.md` (or a link to it) and
+  the `NOTICE` file with your program.
+- Credit TEKITO where your program credits the software it uses, such as its
+  About screen or its third-party notices, for example: "Includes code from
+  TEKITO by Capitata (https://github.com/Canta360/tekito)".
+
+Naming TEKITO this way is welcome and needs no permission. What needs our
+permission is using the name TEKITO or the TEKITO or Capitata logos as or in
+your program's name, icon or branding, or in a way that suggests that we made
+or endorse it. Writing about TEKITO, reviews, tutorials, screenshots and
+saying that something works with TEKITO need no permission either. For
+anything else, ask us at https://capitata.dev.
+
+## Contributions
+
+People who contribute to TEKITO keep the copyright in what they wrote and
+license it to Capitata under the [Contributor License Agreement](CLA.md).
+Capitata distributes it as part of TEKITO under the same terms as the rest:
+the source code under `LICENSE.md`, the builds under the TEKITO License
+Agreement. Contributors are listed in `CONTRIBUTORS.md`.
 
 ## Builds from Capitata
 

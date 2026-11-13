@@ -58,5 +58,5 @@ extracted package:
 It exits with 20 when the Japanese data cannot be downloaded and 21 when the
 file does not match, before changing anything.
 
-The package and installer are not signed yet, so SmartScreen and Smart App
+The package and installer are not code-signed, so SmartScreen and Smart App
 Control may block them.
