@@ -7,6 +7,8 @@
 
 #include <ctffunc.h>
 #include <oleauto.h>
+#include <algorithm>
+#include <cstdint>
 #include <cwchar>
 #include <string>
 #include <utility>
@@ -31,6 +33,45 @@ bool TaskbarIsDark() {
         RegGetValueW(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
                      L"SystemUsesLightTheme", RRF_RT_REG_DWORD, nullptr, &value, &size);
     return result == ERROR_SUCCESS && value == 0;
+}
+
+// The icon grayed out (its colors as gray, a little faded), for secret
+// mode; nothing when it cannot be read.
+HICON GrayedIcon(HICON source) {
+    ICONINFO info{};
+    if (!GetIconInfo(source, &info)) return nullptr;
+    HICON grayed = nullptr;
+    BITMAP bitmap{};
+    if (info.hbmColor && GetObjectW(info.hbmColor, sizeof(bitmap), &bitmap) && bitmap.bmWidth > 0 && bitmap.bmHeight > 0) {
+        const int width = bitmap.bmWidth;
+        const int height = bitmap.bmHeight;
+        BITMAPINFO header{};
+        header.bmiHeader = {sizeof(BITMAPINFOHEADER), width, -height, 1, 32, BI_RGB};
+        std::vector<std::uint32_t> pixels(static_cast<std::size_t>(width) * height);
+        HDC screen = GetDC(nullptr);
+        if (GetDIBits(screen, info.hbmColor, 0, height, pixels.data(), &header, DIB_RGB_COLORS) == height) {
+            // Faded to this share of its opacity.
+            constexpr std::uint32_t kOpacityPercent = 55;
+            for (auto& pixel : pixels) {
+                const std::uint32_t alpha = pixel >> 24;
+                const std::uint32_t red = (pixel >> 16) & 0xff, green = (pixel >> 8) & 0xff, blue = pixel & 0xff;
+                const std::uint32_t gray = (red * 30 + green * 59 + blue * 11) / 100;
+                pixel = ((alpha * kOpacityPercent / 100) << 24) | (gray << 16) | (gray << 8) | gray;
+            }
+            void* bits = nullptr;
+            HBITMAP color = CreateDIBSection(screen, &header, DIB_RGB_COLORS, &bits, nullptr, 0);
+            if (color && bits) {
+                std::copy(pixels.begin(), pixels.end(), static_cast<std::uint32_t*>(bits));
+                ICONINFO made{TRUE, 0, 0, info.hbmMask, color};
+                grayed = CreateIconIndirect(&made);
+            }
+            if (color) DeleteObject(color);
+        }
+        ReleaseDC(nullptr, screen);
+    }
+    if (info.hbmColor) DeleteObject(info.hbmColor);
+    if (info.hbmMask) DeleteObject(info.hbmMask);
+    return grayed;
 }
 
 }  // namespace
@@ -263,6 +304,13 @@ HRESULT ModeLangBarItem::GetIcon(HICON* icon) {
     const int size = GetSystemMetrics(SM_CXSMICON);
     *icon = static_cast<HICON>(
         LoadImageW(instance_, MAKEINTRESOURCEW(resourceId), IMAGE_ICON, size, size, LR_DEFAULTCOLOR));
+    // Secret mode: the mode's icon grayed out, as it is on (the tooltip says so).
+    if (*icon && Secret()) {
+        if (HICON grayed = GrayedIcon(*icon)) {
+            DestroyIcon(*icon);
+            *icon = grayed;
+        }
+    }
     Trace(*icon ? L"ModeLangBarItem GetIcon succeeded" : L"ModeLangBarItem GetIcon failed");
     return *icon ? S_OK : E_FAIL;
 }
