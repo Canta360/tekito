@@ -1,6 +1,7 @@
 # Builds TEKITO, runs the tests and checks the rules (scripts\verify.ps1) on
-# every pull request and push to main, on GitHub's Windows runner (Visual
-# Studio 2022, hence the vs2022 preset). The data it tests with is what the
+# every pull request and push to main, on GitHub's Windows runner, with the
+# preset for the Visual Studio it has (2026; 2022 on older images). The data
+# it tests with is what the
 # repository holds; packs built locally (phrase, the Japanese data) are not
 # needed: tests that use them check only where they are installed.
 # Actions are pinned by commit (latest releases on 2026-11-11).
@@ -38,4 +39,9 @@ jobs:
           npm run build
       - name: Build, tests and rules
         shell: pwsh
-        run: scripts\verify.ps1 -Preset windows-x64-vs2022-debug
+        run: |
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vswhere.exe"
+          $version = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationVersion
+          $preset = if ($version -like "17.*") { "windows-x64-vs2022-debug" } else { "windows-x64-debug" }
+          Write-Host "Visual Studio ${version}: $preset"
+          scripts\verify.ps1 -Preset $preset
