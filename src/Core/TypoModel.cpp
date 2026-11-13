@@ -40,14 +40,10 @@ constexpr double kTranspositionCost = 1.0;
 // A letter typed twice (youu, pleasee): the commonest slip, cheaper than a
 // key hit for another (youu is you, not your). Chosen on dev sentences.
 constexpr double kRepeatedKeyCost = 0.7;
-// A key hit for its neighbor (fike: file), a little cheaper than one far
-// away; a slip in the first letter, dearer (people seldom miss it). Chosen
-// on the typo corpus and real sentences (top-1 81.8 -> 82.6%, fewer correct
-// words rewritten).
-constexpr double kNeighborSubstitutionCost = 0.9;
+// A slip in the first letter costs more: people seldom miss it (fike is
+// not like). Chosen on the typo corpus (top-1 81.8 -> 82.4%). A neighbor key
+// made cheaper measured a little better there but took recived to revived.
 constexpr double kFirstLetterFactor = 1.3;
-
-bool IsQwertyNeighbor(wchar_t left, wchar_t right) noexcept;
 
 double WeightedEditDistance(std::wstring_view left, std::wstring_view right) noexcept {
     std::array<double, 32> beforePrevious{};
@@ -62,9 +58,7 @@ double WeightedEditDistance(std::wstring_view left, std::wstring_view right) noe
     for (std::size_t i = 1; i <= left.size(); ++i) {
         current[0] = static_cast<double>(i) * kInsertDeleteCost;
         for (std::size_t j = 1; j <= right.size(); ++j) {
-            const double substitution = left[i - 1] == right[j - 1]                    ? 0.0
-                                        : IsQwertyNeighbor(left[i - 1], right[j - 1]) ? kNeighborSubstitutionCost
-                                                                                       : kSubstitutionCost;
+            const double substitution = left[i - 1] == right[j - 1] ? 0.0 : kSubstitutionCost;
             const double firstSubstitution = i == 1 && j == 1 && substitution > 0.0 ? substitution * kFirstLetterFactor : substitution;
             const double extra = i > 1 && left[i - 1] == left[i - 2] ? kRepeatedKeyCost : kInsertDeleteCost;
             current[j] = std::min({previous[j] + extra, current[j - 1] + kInsertDeleteCost,
