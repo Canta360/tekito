@@ -24,8 +24,9 @@ export const body = {
   blueHue: 216,
 };
 
-// Where the eyes go, and how much larger than drawn below.
-export const face = { eyes: [298, 602], y: 430, scale: 1.15 };
+// Where the eyes go, and how much larger than drawn below: a little up and
+// to the right of the middle, so the face is not set too squarely.
+export const face = { eyes: [328, 632], y: 404, scale: 1.15 };
 
 // The eyes, from the user's drawings. Each is the left eye, centered on 0, 0
 // and about 200 across; the right eye is its mirror image.
