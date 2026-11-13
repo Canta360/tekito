@@ -202,6 +202,22 @@ bool IsDigits(std::wstring_view text) {
     return !text.empty() && std::all_of(text.begin(), text.end(), IsDigit);
 }
 
+// A decimal point or comma between two digits as wide as they are: 1.1 and
+// １．１, not 1．1 (half-width digits) or １.１.
+std::wstring MarksAsDigits(std::wstring text) {
+    for (std::size_t i = 1; i + 1 < text.size(); ++i) {
+        const wchar_t left = text[i - 1];
+        const wchar_t right = text[i + 1];
+        const bool halfDigits = left >= L'0' && left <= L'9' && right >= L'0' && right <= L'9';
+        const bool fullDigits = left >= L'\xFF10' && left <= L'\xFF19' && right >= L'\xFF10' && right <= L'\xFF19';
+        if (!halfDigits && !fullDigits) continue;
+        auto& mark = text[i];
+        if (mark == L'.' || mark == L'\xFF0E') mark = halfDigits ? L'.' : L'\xFF0E';
+        if (mark == L',' || mark == L'\xFF0C') mark = halfDigits ? L',' : L'\xFF0C';
+    }
+    return text;
+}
+
 // The reading a phrase is learned under. Right after digits it is learned
 // apart ("#こ"): 3こ stays 3個 even when こ alone is usually 子. The mark
 // keeps it out of predictions, which look up typed kana.
@@ -1683,7 +1699,7 @@ void JapaneseComposer::WidenDigits(PhraseState& phrase, std::wstring_view readin
             }
             i = end;
         }
-        return out;
+        return MarksAsDigits(std::move(out));
     };
     auto& shown = phrase.candidates[phrase.selected];
     const std::wstring wanted = widened(shown.text);
@@ -1801,6 +1817,27 @@ void JapaneseComposer::ApplyNumberStyle(std::size_t from) {
         std::rotate(candidates.begin(), found, found + 1);
         phrase.selected = 0;
         phrase.form.reset();
+    }
+    // A decimal point or a thousands comma of its own between two numbers
+    // (1|．|1) as wide as the digits the style wrote them in: 1.1.1, not
+    // 1．1．1 when typing is full-width and the style half-width.
+    for (std::size_t index = std::max<std::size_t>(from, 1); index + 1 < phrases_.size(); ++index) {
+        auto& phrase = phrases_[index];
+        if (phrase.form || phrase.selected >= phrase.candidates.size()) continue;
+        const std::wstring mark = PhraseText(phrase);
+        const std::wstring before = PhraseText(phrases_[index - 1]);
+        const std::wstring after = PhraseText(phrases_[index + 1]);
+        if (mark.size() != 1 || before.empty() || after.empty()) continue;
+        const std::wstring matched = MarksAsDigits(before.back() + mark + after.front());
+        if (matched[1] == mark[0]) continue;
+        const std::wstring wanted(1, matched[1]);
+        auto& candidates = phrase.candidates;
+        const auto listed = std::find_if(candidates.begin(), candidates.end(), [&](const PhraseCandidate& c) { return c.text == wanted; });
+        if (listed != candidates.end()) {
+            phrase.selected = static_cast<std::size_t>(listed - candidates.begin());
+        } else {
+            candidates[phrase.selected].text = wanted;
+        }
     }
 }
 

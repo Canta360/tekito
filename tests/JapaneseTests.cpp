@@ -269,6 +269,12 @@ void TestConversionForms(const RomajiTable& table) {
         RequireText(converted(L"0120", Style::Kanji), L"0120", "nor written in kanji");
         number.SetHalfWidthDigits(false);
         RequireText(converted(L"15", Style::HalfWidth), L"15", "half-width, even typed full-width");
+        // The marks between them follow: 1.1.1, not 1．1．1.
+        RequireText(converted(L"1.1.1", Style::HalfWidth), L"1.1.1", "a decimal point as wide as the digits the style writes");
+        RequireText(converted(L"3.14", Style::Official), L"3.14", "official documents' too");
+        number.SetHalfWidthDigits(true);
+        RequireText(converted(L"1.5", Style::FullWidth), L"１．５", "and full-width with full-width digits");
+        number.SetHalfWidthDigits(false);
         // Typed with one digit full-width: as it shows before conversion.
         number.SetHalfWidthDigits(true);
         number.SetSingleDigitFullWidth(true);
