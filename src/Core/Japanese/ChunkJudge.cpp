@@ -345,9 +345,10 @@ ChunkJudge::Judgement ChunkJudge::JudgeLanguage(std::wstring_view keys, std::siz
             return judgement;
         }
         if (known) {
-            // A slip English text has often enough to be listed (recived,
-            // teh): as English Auto puts it right; a name as it is.
-            if (!name) spelled();
+            // In an English sentence, a slip English text has often enough
+            // to be listed (I recived): as English Auto puts it right; a name,
+            // and a listed word anywhere else (nginx, cdn), as it is.
+            if (!name && englishBefore >= kEnglishSentence && !japaneseInSentence) spelled();
             judgement.english = true;
             return judgement;
         }
