@@ -35,8 +35,8 @@ inline constexpr float kSheenRadius = 0.62f;
 inline constexpr float kSheenOpacity = 0.6f;
 inline constexpr float kBlueHue = 216.0f;
 
-inline constexpr float kEyeLeft = 328.0f;
-inline constexpr float kEyeRight = 632.0f;
+inline constexpr float kEyeLeft = 268.0f;
+inline constexpr float kEyeRight = 572.0f;
 inline constexpr float kEyeY = 404.0f;
 inline constexpr float kEyeScale = 1.15f;
 inline constexpr EyeShape kEyeOpen{"M-100 0C-100 -52 -62 -84 0 -84C62 -84 100 -52 100 0C100 52 62 84 0 84C-62 84 -100 52 -100 0Z", false};
