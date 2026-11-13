@@ -9,12 +9,18 @@
 # word as typed and suggests nothing.
 
 abt	about	colloquial
+acct	account	abbreviation
 afaik	as far as I know	abbreviation
 afk	away from keyboard	abbreviation
+appt	appointment	abbreviation
 asap	as soon as possible	abbreviation
 atm	at the moment	abbreviation
+auth	authentication	abbreviation
 bae	bae	slang
+bal	balance	abbreviation
+bby	baby	colloquial
 bc	because	abbreviation
+bcc	blind carbon copy	abbreviation
 bday	birthday	colloquial
 betcha	bet you	colloquial
 bf	boyfriend	abbreviation
@@ -23,21 +29,27 @@ bout	about	colloquial
 brb	be right back	abbreviation
 bruh	bro	slang
 btw	by the way	abbreviation
-bby	baby	colloquial
 c'mon	come on	colloquial
+conf	conference	abbreviation
+config	configuration	abbreviation
 congrats	congratulations	colloquial
 convo	conversation	colloquial
 cooked	exhausted	slang
+cust	customer	abbreviation
 cuz	because	colloquial
 cya	see you	abbreviation
 def	definitely	colloquial
 defo	definitely	colloquial
 delulu	delusional	slang
+dist	distribution	abbreviation
 dm	direct message	abbreviation
 dms	direct messages	abbreviation
 dontcha	don't you	colloquial
 dunno	don't know	colloquial
+encl	enclosure	abbreviation
+env	environment	abbreviation
 eod	end of day	abbreviation
+eow	end of week	abbreviation
 eta	estimated time of arrival	abbreviation
 fab	fabulous	colloquial
 fam	family	slang
@@ -79,6 +91,8 @@ ily	I love you	abbreviation
 imho	in my humble opinion	abbreviation
 imo	in my opinion	abbreviation
 imy	I miss you	abbreviation
+intl	international	abbreviation
+inv	invoice	abbreviation
 irl	in real life	abbreviation
 istg	I swear to God	abbreviation
 iykyk	if you know, you know	abbreviation
@@ -87,6 +101,7 @@ jk	just kidding	abbreviation
 k	okay	colloquial
 kinda	kind of	colloquial
 kk	okay	colloquial
+lbs	pounds	abbreviation
 lemme	let me	colloquial
 lil	little	colloquial
 lmao	lmao	abbreviation
@@ -98,8 +113,10 @@ luv	love	colloquial
 lysm	love you so much	abbreviation
 mfw	my face when	abbreviation
 mid	average	slang
+mins	minutes	abbreviation
 msg	message	abbreviation
 nah	no	colloquial
+natl	national	abbreviation
 naw	no	colloquial
 nbd	no big deal	abbreviation
 ngl	not gonna lie	abbreviation
@@ -130,19 +147,20 @@ ppl	people	abbreviation
 prob	probably	colloquial
 probs	probably	colloquial
 prolly	probably	colloquial
+qty	quantity	abbreviation
+ridic	ridiculous	colloquial
 rizz	charisma	slang
 rly	really	abbreviation
 rn	right now	abbreviation
 rofl	rolling on the floor laughing	abbreviation
-ridic	ridiculous	colloquial
 sesh	session	colloquial
 smh	shaking my head	abbreviation
 smth	something	abbreviation
 sorta	sort of	colloquial
-sry	sorry	abbreviation
 srsly	seriously	abbreviation
-sth	something	abbreviation
+sry	sorry	abbreviation
 stfu	stfu	abbreviation
+sth	something	abbreviation
 sup	what's up	colloquial
 sus	suspicious	slang
 tbd	to be determined	abbreviation
@@ -172,7 +190,9 @@ ty	thank you	abbreviation
 tysm	thank you so much	abbreviation
 tyvm	thank you very much	abbreviation
 u	you	abbreviation
+univ	university	abbreviation
 ur	your	abbreviation
+ver	version	abbreviation
 vid	video	colloquial
 vids	videos	colloquial
 wanna	want to	colloquial
@@ -182,6 +202,7 @@ wdym	what do you mean	abbreviation
 wfh	work from home	abbreviation
 whatcha	what are you	colloquial
 whatevs	whatever	colloquial
+wks	weeks	abbreviation
 wtf	wtf	abbreviation
 wya	where are you	abbreviation
 wyd	what are you doing	abbreviation

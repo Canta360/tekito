@@ -1,11 +1,16 @@
 abt	about	colloquial	en-US	TEKITO-owned
+acct	account	abbreviation	en-US	TEKITO-owned
 afaik	as far as I know	abbreviation	en-US	TEKITO-owned
 afk	away from keyboard	abbreviation	en-US	TEKITO-owned
+appt	appointment	abbreviation	en-US	TEKITO-owned
 asap	as soon as possible	abbreviation	en-US	TEKITO-owned
 atm	at the moment	abbreviation	en-US	TEKITO-owned
+auth	authentication	abbreviation	en-US	TEKITO-owned
 bae	bae	slang	en-US	TEKITO-owned
+bal	balance	abbreviation	en-US	TEKITO-owned
 bby	baby	colloquial	en-US	TEKITO-owned
 bc	because	abbreviation	en-US	TEKITO-owned
+bcc	blind carbon copy	abbreviation	en-US	TEKITO-owned
 bday	birthday	colloquial	en-US	TEKITO-owned
 betcha	bet you	colloquial	en-US	TEKITO-owned
 bf	boyfriend	abbreviation	en-US	TEKITO-owned
@@ -15,19 +20,26 @@ brb	be right back	abbreviation	en-US	TEKITO-owned
 bruh	bro	slang	en-US	TEKITO-owned
 btw	by the way	abbreviation	en-US	TEKITO-owned
 c'mon	come on	colloquial	en-US	TEKITO-owned
+conf	conference	abbreviation	en-US	TEKITO-owned
+config	configuration	abbreviation	en-US	TEKITO-owned
 congrats	congratulations	colloquial	en-US	TEKITO-owned
 convo	conversation	colloquial	en-US	TEKITO-owned
 cooked	exhausted	slang	en-US	TEKITO-owned
+cust	customer	abbreviation	en-US	TEKITO-owned
 cuz	because	colloquial	en-US	TEKITO-owned
 cya	see you	abbreviation	en-US	TEKITO-owned
 def	definitely	colloquial	en-US	TEKITO-owned
 defo	definitely	colloquial	en-US	TEKITO-owned
 delulu	delusional	slang	en-US	TEKITO-owned
+dist	distribution	abbreviation	en-US	TEKITO-owned
 dm	direct message	abbreviation	en-US	TEKITO-owned
 dms	direct messages	abbreviation	en-US	TEKITO-owned
 dontcha	don't you	colloquial	en-US	TEKITO-owned
 dunno	don't know	colloquial	en-US	TEKITO-owned
+encl	enclosure	abbreviation	en-US	TEKITO-owned
+env	environment	abbreviation	en-US	TEKITO-owned
 eod	end of day	abbreviation	en-US	TEKITO-owned
+eow	end of week	abbreviation	en-US	TEKITO-owned
 eta	estimated time of arrival	abbreviation	en-US	TEKITO-owned
 fab	fabulous	colloquial	en-US	TEKITO-owned
 fam	family	slang	en-US	TEKITO-owned
@@ -69,6 +81,8 @@ ily	I love you	abbreviation	en-US	TEKITO-owned
 imho	in my humble opinion	abbreviation	en-US	TEKITO-owned
 imo	in my opinion	abbreviation	en-US	TEKITO-owned
 imy	I miss you	abbreviation	en-US	TEKITO-owned
+intl	international	abbreviation	en-US	TEKITO-owned
+inv	invoice	abbreviation	en-US	TEKITO-owned
 irl	in real life	abbreviation	en-US	TEKITO-owned
 istg	I swear to God	abbreviation	en-US	TEKITO-owned
 iykyk	if you know, you know	abbreviation	en-US	TEKITO-owned
@@ -77,6 +91,7 @@ jk	just kidding	abbreviation	en-US	TEKITO-owned
 k	okay	colloquial	en-US	TEKITO-owned
 kinda	kind of	colloquial	en-US	TEKITO-owned
 kk	okay	colloquial	en-US	TEKITO-owned
+lbs	pounds	abbreviation	en-US	TEKITO-owned
 lemme	let me	colloquial	en-US	TEKITO-owned
 lil	little	colloquial	en-US	TEKITO-owned
 lmao	lmao	abbreviation	en-US	TEKITO-owned
@@ -88,8 +103,10 @@ luv	love	colloquial	en-US	TEKITO-owned
 lysm	love you so much	abbreviation	en-US	TEKITO-owned
 mfw	my face when	abbreviation	en-US	TEKITO-owned
 mid	average	slang	en-US	TEKITO-owned
+mins	minutes	abbreviation	en-US	TEKITO-owned
 msg	message	abbreviation	en-US	TEKITO-owned
 nah	no	colloquial	en-US	TEKITO-owned
+natl	national	abbreviation	en-US	TEKITO-owned
 naw	no	colloquial	en-US	TEKITO-owned
 nbd	no big deal	abbreviation	en-US	TEKITO-owned
 ngl	not gonna lie	abbreviation	en-US	TEKITO-owned
@@ -120,6 +137,7 @@ ppl	people	abbreviation	en-US	TEKITO-owned
 prob	probably	colloquial	en-US	TEKITO-owned
 probs	probably	colloquial	en-US	TEKITO-owned
 prolly	probably	colloquial	en-US	TEKITO-owned
+qty	quantity	abbreviation	en-US	TEKITO-owned
 ridic	ridiculous	colloquial	en-US	TEKITO-owned
 rizz	charisma	slang	en-US	TEKITO-owned
 rly	really	abbreviation	en-US	TEKITO-owned
@@ -162,7 +180,9 @@ ty	thank you	abbreviation	en-US	TEKITO-owned
 tysm	thank you so much	abbreviation	en-US	TEKITO-owned
 tyvm	thank you very much	abbreviation	en-US	TEKITO-owned
 u	you	abbreviation	en-US	TEKITO-owned
+univ	university	abbreviation	en-US	TEKITO-owned
 ur	your	abbreviation	en-US	TEKITO-owned
+ver	version	abbreviation	en-US	TEKITO-owned
 vid	video	colloquial	en-US	TEKITO-owned
 vids	videos	colloquial	en-US	TEKITO-owned
 wanna	want to	colloquial	en-US	TEKITO-owned
@@ -172,6 +192,7 @@ wdym	what do you mean	abbreviation	en-US	TEKITO-owned
 wfh	work from home	abbreviation	en-US	TEKITO-owned
 whatcha	what are you	colloquial	en-US	TEKITO-owned
 whatevs	whatever	colloquial	en-US	TEKITO-owned
+wks	weeks	abbreviation	en-US	TEKITO-owned
 wtf	wtf	abbreviation	en-US	TEKITO-owned
 wya	where are you	abbreviation	en-US	TEKITO-owned
 wyd	what are you doing	abbreviation	en-US	TEKITO-owned
