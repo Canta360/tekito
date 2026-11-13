@@ -38,6 +38,11 @@ def main() -> int:
             ids.append(int(number))
     path = args.pack / FILE
     path.write_text("".join(f"{i}\n" for i in sorted(ids)), encoding="utf-8", newline="\n")
+    notice = args.pack / "NOTICE"
+    line = f"{FILE} lists part-of-speech ids from Mozc's id.def (BSD-3-Clause), as the dictionary does."
+    if notice.is_file() and line not in notice.read_text(encoding="utf-8"):
+        with notice.open("a", encoding="utf-8", newline="\n") as out:
+            out.write("\n" + line + "\n")
     manifest_path = args.pack / "manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     files = manifest.get("files") or [manifest["file"]]

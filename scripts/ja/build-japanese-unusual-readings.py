@@ -160,6 +160,13 @@ def main() -> int:
     with path.open("w", encoding="utf-8", newline="\n") as out:
         for reading, word, kind in rows:
             out.write(f"{reading}\t{word}\t{kind}\n")
+    notice = args.pack / "NOTICE"
+    line = (f"{FILE} lists words read in a rare or archaic way, derived from JMdict, JMnedict and KANJIDIC2, "
+            "the property of the Electronic Dictionary Research and Development Group (https://www.edrdg.org/), "
+            "used in conformance with the Group's licence, under CC BY-SA 4.0.")
+    if notice.is_file() and line not in notice.read_text(encoding="utf-8"):
+        with notice.open("a", encoding="utf-8", newline="\n") as out:
+            out.write("\n" + line + "\n")
     manifest_path = args.pack / "manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     files = manifest.get("files") or [manifest["file"]]

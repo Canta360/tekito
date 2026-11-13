@@ -65,6 +65,25 @@ python (Join-Path $PSScriptRoot "build-japanese-packs.py") --mozc $mozc --commit
 if ($LASTEXITCODE -ne 0) { throw "build-japanese-packs.py failed with exit code $LASTEXITCODE" }
 Write-Host "Built $Output"
 
+# The parts of speech of suffixes and dependent nouns (Mozc's id.def), so that
+# conversion does not start with one (かに: カニ, not 化に).
+python (Join-Path $PSScriptRoot "build-japanese-dependent-ids.py") --mozc $mozc --pack $Output
+if ($LASTEXITCODE -ne 0) { throw "build-japanese-dependent-ids.py failed with exit code $LASTEXITCODE" }
+
+# Words read in a way they are hardly or only formerly read (天 read あめ), for
+# japanese-jmdict, from JMdict, JMnedict and KANJIDIC2 when they are there.
+$jmdictPack = Join-Path (Split-Path $Output -Parent) "japanese-jmdict"
+$edrdg = @{
+    jmdict = Join-Path $repoRoot ".cache\tekito-data\jmdict\JMdict_e.gz"
+    jmnedict = Join-Path $repoRoot ".cache\tekito-data\jmdict\JMnedict.xml.gz"
+    kanjidic = Join-Path $repoRoot ".cache\tekito-data\kanjidic2\kanjidic2.xml.gz"
+}
+if ((Test-Path (Join-Path $jmdictPack "manifest.json")) -and -not ($edrdg.Values | Where-Object { -not (Test-Path $_) })) {
+    python (Join-Path $PSScriptRoot "build-japanese-unusual-readings.py") --jmdict $edrdg.jmdict --jmnedict $edrdg.jmnedict `
+        --kanjidic $edrdg.kanjidic --pack $jmdictPack
+    if ($LASTEXITCODE -ne 0) { throw "build-japanese-unusual-readings.py failed with exit code $LASTEXITCODE" }
+}
+
 # How English letters differ from romaji, for Mix (from the same Mozc readings).
 python (Join-Path $PSScriptRoot "build-japanese-letter-odds.py") --mozc $mozc --out (Join-Path (Split-Path $Output -Parent) "japanese-letter-odds")
 if ($LASTEXITCODE -ne 0) { throw "build-japanese-letter-odds.py failed with exit code $LASTEXITCODE" }
