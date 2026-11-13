@@ -481,7 +481,7 @@ Every entry is a suggestion only; TEKITO never replaces a word with one.
 
 # Hiragana by the vowel they end in, for the long-vowel mark (as in
 # src/Core/Japanese/Loanwords.cpp).
-VOWELS = {
+KANA_BY_VOWEL = {
     "あ": "あかさたなはまやらわがざだばぱぁゃゎ",
     "い": "いきしちにひみりぎじぢびぴぃ",
     "う": "うくすつぬふむゆるぐずづぶぷぅゅゔ",
@@ -499,7 +499,7 @@ def loanword_key(kana: str) -> str:
     key = ""
     for c in text:
         if c == "ー":
-            vowel = next((v for v, row in VOWELS.items() if key and key[-1] in row), "")
+            vowel = next((v for v, row in KANA_BY_VOWEL.items() if key and key[-1] in row), "")
             key += vowel
             continue
         key += c
