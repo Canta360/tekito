@@ -2127,6 +2127,16 @@ void TestSpecialConversions(const RomajiTable& table, const MiniPack& pack) {
                                 [](const auto& c) { return c.text == L"二千二十六"; }),
                 "half-width first, then full-width and kanji");
         half.Clear();
+        // Digits with a point between them: half-width, full-width and with 。.
+        Type(half, L"3.14");
+        half.Convert();
+        const auto* pointed = half.FocusedCandidates();
+        const auto offers = [&](std::wstring_view text) {
+            return std::any_of(pointed->begin(), pointed->end(), [&](const auto& c) { return c.text == text; });
+        };
+        Require(half.Preedit() == L"3.14" && offers(L"\xFF13\xFF0E\xFF11\xFF14") && offers(L"3\x3002" L"14"),
+                "a number with a point has its full-width form and 。 too");
+        half.Clear();
         // A number typed in kana has the same forms (じゅうご: ⅩⅤ, ⑮).
         Type(half, L"juugo");
         half.Convert();

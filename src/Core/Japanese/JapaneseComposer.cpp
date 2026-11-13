@@ -1704,11 +1704,16 @@ void JapaneseComposer::WidenDigits(PhraseState& phrase, std::wstring_view readin
     auto& shown = phrase.candidates[phrase.selected];
     const std::wstring wanted = widened(shown.text);
     if (wanted == shown.text) return;
-    // The form already listed is taken; otherwise the one shown is written so.
+    // The form already listed is taken, first in the list as the style's
+    // own (1.1 before １．１); otherwise the one shown is written so.
     const auto listed = std::find_if(phrase.candidates.begin(), phrase.candidates.end(),
                                      [&](const PhraseCandidate& c) { return c.text == wanted; });
     if (listed != phrase.candidates.end()) {
-        phrase.selected = static_cast<std::size_t>(listed - phrase.candidates.begin());
+        if (phrase.selected == 0) {
+            std::rotate(phrase.candidates.begin(), listed, listed + 1);
+        } else {
+            phrase.selected = static_cast<std::size_t>(listed - phrase.candidates.begin());
+        }
     } else {
         shown.text = wanted;
     }
@@ -3349,7 +3354,38 @@ void JapaneseComposer::AddSpecial(std::wstring_view reading, std::vector<PhraseC
         std::size_t digits = 0;
         while (digits < reading.size() && IsDigit(reading[digits])) ++digits;
         const auto& first = candidates.front().text;
-        if (digits == reading.size()) {
+        // Digits with points or commas between them (1.1.1, 3.14, 1,000):
+        // all half-width, all full-width, and with 。 and 、 as typed in
+        // Japanese, right after the first.
+        const auto mark = [](wchar_t c) {
+            return std::wstring_view(L".,\xFF0E\xFF0C\x3002\x3001").find(c) != std::wstring_view::npos;
+        };
+        const bool marked = digits > 0 && digits < reading.size() && IsDigit(reading.back()) &&
+                            std::all_of(reading.begin(), reading.end(), [&](wchar_t c) { return IsDigit(c) || mark(c); });
+        if (marked) {
+            std::wstring half, full, kuten;
+            bool number = true;
+            for (std::size_t i = 0; i < reading.size() && number; ++i) {
+                const wchar_t c = reading[i];
+                if (IsDigit(c)) {
+                    const wchar_t ascii = c >= L'\xFF10' ? static_cast<wchar_t>(c - 0xFEE0) : c;
+                    half += ascii;
+                    full += static_cast<wchar_t>(ascii + 0xFEE0);
+                    kuten += ascii;
+                    continue;
+                }
+                // Two marks in a row are no number: left as they are.
+                if (i + 1 < reading.size() && !IsDigit(reading[i + 1])) {
+                    number = false;
+                    continue;
+                }
+                const bool comma = c == L',' || c == L'\xFF0C' || c == L'\x3001';
+                half += comma ? L',' : L'.';
+                full += comma ? L'\xFF0C' : L'\xFF0E';
+                kuten += comma ? L'\x3001' : L'\x3002';
+            }
+            if (number) insert(1, {half, full, kuten}, {});
+        } else if (digits == reading.size()) {
             insert(1, special_->Numbers(reading), {});
         } else if (digits > 0 && first.size() > digits && !IsDigit(first[digits]) &&
                    ToHalfWidthAscii(first.substr(0, digits)) == ToHalfWidthAscii(reading.substr(0, digits))) {
