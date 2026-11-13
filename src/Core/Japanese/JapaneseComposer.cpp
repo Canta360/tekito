@@ -194,6 +194,13 @@ bool IsProtectedSpan(std::wstring_view keys) {
     return !keys.empty() && std::regex_match(keys.begin(), keys.end(), pattern);
 }
 
+// The same, or one still being typed: name@ and its domain so far
+// (kanta@capitata), a URL after its :// . Shown and committed as typed.
+bool IsAddressTyping(std::wstring_view keys) {
+    static const std::wregex pattern(LR"(^(?:[A-Za-z0-9._%+\-]+@(?:[A-Za-z][A-Za-z0-9.\-]*)?|(?:https?|ftp)://\S*)$)");
+    return IsProtectedSpan(keys) || (!keys.empty() && std::regex_match(keys.begin(), keys.end(), pattern));
+}
+
 bool IsDigit(wchar_t c) {
     return (c >= L'0' && c <= L'9') || (c >= L'\xFF10' && c <= L'\xFF19');
 }
@@ -577,6 +584,7 @@ void JapaneseComposer::ResetLive() noexcept {
     kanaView_ = false;
     settledPhrases_ = 0;
     settledLength_ = 0;
+    liveBreaks_.clear();
     liveShown_.clear();
     liveShownBefore_.clear();
     liveShownReading_.clear();
@@ -664,6 +672,7 @@ void JapaneseComposer::SettleAll() {
     }
     settledPhrases_ = phrases_.size();
     settledLength_ = conversionReading_.size();
+    liveBreaks_.push_back(settledLength_);
     preview_ = true;
     listOpen_ = false;
 }
@@ -723,7 +732,30 @@ void JapaneseComposer::UpdateLive() {
         context = ContextAfter(text, chosen ? last.candidates[last.selected].rightId : 0);
         AddContentWords(text, words);
     }
-    phrases_ = std::move(settled);
+    phrases_ = settled;
+    // An address or URL typed from the start, or after where typing went on
+    // after picking, stays as typed (the keys still pending after it too).
+    std::erase_if(liveBreaks_, [&](std::size_t at) { return at > reading.size(); });
+    if (const std::size_t from = liveBreaks_.empty() ? 0 : liveBreaks_.back();
+        from < reading.size() && readingKeys_[from] != std::wstring::npos && !HasAscii()) {
+        std::wstring keys = Keys(false).substr(readingKeys_[from]);
+        if (IsAddressTyping(keys + pending_)) {
+            while (!phrases_.empty() && phrases_.back().begin + phrases_.back().length > from) phrases_.pop_back();
+            const bool atBoundary = phrases_.empty() ? from == 0 : phrases_.back().begin + phrases_.back().length == from;
+            if (atBoundary) {
+                PhraseState address{from, reading.size() - from, {{std::move(keys), 0, PhraseCandidate::Kind::English, false}}};
+                address.address = true;
+                settledPhrases_ = phrases_.size();
+                settledLength_ = from;
+                phrases_.push_back(std::move(address));
+                preview_ = true;
+                focus_ = phrases_.size() - 1;
+                listOpen_ = false;
+                return;
+            }
+            phrases_.assign(settled.begin(), settled.end());
+        }
+    }
     const std::wstring rest = reading.substr(settledLength_);
     std::vector<Phrase> converted;
     if (settledLength_ == 0) {
@@ -773,9 +805,11 @@ bool JapaneseComposer::RefineLive() {
 
 bool JapaneseComposer::RebuildLive(bool again) {
     if (!Live() || !preview_ || kanaView_ || !pending_.empty() || units_.empty() || (LiveRefined() && !again)) return false;
-    // A candidate picked while typing stays, as on Enter.
-    if (!again && std::any_of(phrases_.begin(), phrases_.end(),
-                    [](const PhraseState& phrase) { return phrase.selected != 0 || phrase.form; })) {
+    // A candidate picked while typing stays, as on Enter, and an address
+    // typed after other text.
+    if (!again && std::any_of(phrases_.begin(), phrases_.end(), [](const PhraseState& phrase) {
+            return phrase.selected != 0 || phrase.form || phrase.address;
+        })) {
         return false;
     }
     // A prediction picked with Tab stays as it is shown.
@@ -1033,6 +1067,7 @@ std::size_t JapaneseComposer::CaretOffset() const {
         return end;
     }
     if (!segments.empty() && segments.front().settled) settled = segments.front().text.size();
+    if (const auto address = AddressShown()) return settled + address->size();
     if (const auto live = MixLiveText()) return settled + live->size();
     if (const auto letters = LettersShown()) return settled + letters->size();
     return settled + ReadingOffset(caret_) + pending_.size();
@@ -1160,6 +1195,8 @@ std::wstring JapaneseComposer::Reading() const {
 }
 
 std::wstring JapaneseComposer::PendingText() const {
+    // After an address being typed, as typed (kanta@c).
+    if (preview_ && !phrases_.empty() && phrases_.back().address) return pending_;
     std::wstring text = ToFullWidthAscii(pending_);
     for (auto& ch : text) {
         const bool letter = (ch >= L'\xFF21' && ch <= L'\xFF3A') || (ch >= L'\xFF41' && ch <= L'\xFF5A');
@@ -1290,7 +1327,7 @@ void JapaneseComposer::BuildPhrasesFor(bool convert) {
     // A URL, address, path or mention stays as typed.
     if (convert && !HasAscii()) {
         const std::wstring keys = Keys(false);
-        if (IsProtectedSpan(keys)) {
+        if (IsAddressTyping(keys)) {
             std::vector<PhraseCandidate> candidates{{keys, 0, PhraseCandidate::Kind::English, false}};
             candidates.push_back({ToFullWidthAscii(keys), 0, PhraseCandidate::Kind::Hiragana, false});
             candidates.push_back({reading, 0, PhraseCandidate::Kind::Hiragana, false});
@@ -3552,6 +3589,8 @@ void JapaneseComposer::Convert() {
             });
         };
         while (focus_ > 0 && marksOnly(PhraseText(phrases_[focus_]))) --focus_;
+        // An address stays as typed; the next Space goes on to its other forms.
+        if (phrases_[focus_].address) return;
         if (flushed && Preedit() != typedShown) return;
         // What was shown changed (English run in, a slip undone): that comes
         // first, as Space shows it without live conversion.
@@ -4183,7 +4222,7 @@ void JapaneseComposer::DropWholeChoice() noexcept {
 }
 
 std::wstring JapaneseComposer::Preedit() const {
-    if (!IsConverted()) return RenderTyping(true);
+    if (!IsConverted()) return AddressShown().value_or(RenderTyping(true));
     if (const auto* whole = WholeChoice()) return whole->text;
     std::wstring text;
     for (const auto& phrase : phrases_) text += PhraseText(phrase);
@@ -4224,7 +4263,9 @@ std::vector<PreeditSegment> JapaneseComposer::Segments() const {
         if (englishLast && Typing() && !japaneseNext && !last.empty() && last.back() < 0x3000) last.push_back(L' ');
     }
     if (!IsConverted()) {
-        if (const auto live = MixLiveText()) {
+        if (const auto address = AddressShown()) {
+            segments.push_back({*address, false, false});
+        } else if (const auto live = MixLiveText()) {
             segments.push_back({*live, true, false});
         } else if (Typing()) {
             // Not taken as anything yet, even shown as letters.
@@ -4379,8 +4420,9 @@ void JapaneseComposer::SettleChunk() {
     while (!text.empty() && text.back() == L' ') text.pop_back();
     chunk.isEnglish = lastChunkEnglish_;
     lastChunkEnglish_ = false;
-    // Japanese settled as typed (Enter) stays as typed.
+    // Japanese settled as typed (Enter) stays as typed, and an address.
     if (asTyped && !chunk.isEnglish) chunk.locked = chunk.picked = true;
+    if (IsAddressTyping(chunk.keys)) chunk.locked = chunk.picked = true;
     // A slip put right in its kana: Enter, which reads the chunk's reading
     // again, would take it back.
     if (!chunk.isEnglish && !asTyped && slipUndone_) chunk.locked = true;
@@ -4460,6 +4502,13 @@ std::optional<std::wstring> JapaneseComposer::TypedLetters() const {
 }
 
 std::optional<std::wstring> JapaneseComposer::MixLiveSplit() const { return MixSplitShown(true); }
+
+std::optional<std::wstring> JapaneseComposer::AddressShown() const {
+    if (!Typing() || IsConverted() || caret_ != units_.size() || HasAscii()) return std::nullopt;
+    std::wstring keys = Keys(true);
+    if (!IsAddressTyping(keys)) return std::nullopt;
+    return keys;
+}
 
 std::optional<std::wstring> JapaneseComposer::LettersShown() const {
     const auto letters = TypedLetters();
@@ -4674,7 +4723,7 @@ std::optional<std::wstring> JapaneseComposer::MixSplitShown(bool convert) const 
 
 std::optional<std::wstring> JapaneseComposer::MixLiveText() const {
     if (!mixLive_ || !chunkJudge_ || !converter_ || !Typing() || IsConverted() || caret_ != units_.size() ||
-        HasAscii() || KanaTyped()) {
+        HasAscii() || KanaTyped() || AddressShown()) {
         return std::nullopt;
     }
     // English run into Japanese shows as Space will split it.
@@ -5196,8 +5245,9 @@ std::wstring JapaneseComposer::CommitChunk() {
     // the whole input read at once), unless a candidate was picked while
     // typing; then only the keys that were pending are converted too.
     if (Live() && preview_ && !LiveRefined()) {
-        const bool picked = std::any_of(phrases_.begin(), phrases_.end(),
-                                        [](const PhraseState& phrase) { return phrase.selected != 0 || phrase.form; });
+        const bool picked = std::any_of(phrases_.begin(), phrases_.end(), [](const PhraseState& phrase) {
+            return phrase.selected != 0 || phrase.form || phrase.address;
+        });
         if (picked) {
             UpdateLive();
         } else {
@@ -5206,7 +5256,7 @@ std::wstring JapaneseComposer::CommitChunk() {
         }
     }
     // A URL, address, path or mention is committed as typed on Enter too.
-    if (Typing() && !IsConverted() && !HasAscii() && !chosenPrediction_ && IsProtectedSpan(Keys(false))) {
+    if (Typing() && !IsConverted() && !HasAscii() && !chosenPrediction_ && IsAddressTyping(Keys(false))) {
         BuildPhrases(true);
     }
     // Mixed typing: Enter before Space takes the chunk as Space would.

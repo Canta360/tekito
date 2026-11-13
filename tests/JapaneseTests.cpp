@@ -838,6 +838,37 @@ void TestLiveConversion(const RomajiTable& table, const MiniPack& pack) {
 }
 
 // Shift+letter: letters as typed, in half-width, until committed.
+void TestAddresses(const RomajiTable& table, const MiniPack& pack) {
+    const tekito::japanese::JapaneseConverter converter(pack.dictionary, pack.matrix);
+    for (const bool live : {false, true}) {
+        JapaneseComposer composer(&table);
+        composer.SetConverter(&converter);
+        composer.SetLiveConversion(live);
+        // As typed from its @ on, not kana (かんた。せきぐち＠かぴ).
+        RequireText(Type(composer, L"kanta.sekiguchi@capi"), L"kanta.sekiguchi@capi", "an address shows as typed while typed");
+        RequireText(SegmentsText(composer), L"kanta.sekiguchi@capi", "in the composition too");
+        Require(composer.CaretOffset() == 20, "with the caret at its end");
+        Type(composer, L"tata.dev");
+        RequireText(composer.Commit(), L"kanta.sekiguchi@capitata.dev", "and committed as typed");
+        RequireText(Type(composer, L"https://capi"), L"https://capi", "a URL after its ://");
+        composer.Clear();
+        // A price (りんご＠100) is no address.
+        Require(Type(composer, L"ringo@100") != L"ringo@100", "an @ before digits is not an address");
+        composer.Clear();
+    }
+    // Live: an address typed after a conversion (Space) is one of its own.
+    JapaneseComposer composer(&table);
+    composer.SetConverter(&converter);
+    composer.SetLiveConversion(true);
+    Type(composer, L"watashino");
+    composer.Convert();
+    const std::wstring before = composer.Preedit();
+    RequireText(Type(composer, L"kanta@example.com"), before + L"kanta@example.com", "an address after converted text");
+    composer.Convert();
+    RequireText(composer.Preedit(), before + L"kanta@example.com", "Space leaves it as typed");
+    RequireText(composer.Commit(), before + L"kanta@example.com", "Enter too");
+}
+
 void TestCapitals(const RomajiTable& table, const MiniPack& pack) {
     const tekito::japanese::JapaneseConverter converter(pack.dictionary, pack.matrix);
     JapaneseComposer composer(&table);
@@ -2743,6 +2774,7 @@ int main(int argc, char** argv) {
     TestComposerConversion(*table, *pack);
     TestKeys(*table, *pack);
     TestLiveConversion(*table, *pack);
+    TestAddresses(*table, *pack);
     TestCapitals(*table, *pack);
     TestUndoCommit(*table, *pack);
     TestReconvert(*table, *pack);

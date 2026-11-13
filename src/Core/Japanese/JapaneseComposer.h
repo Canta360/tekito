@@ -579,6 +579,8 @@ private:
         bool chunksTried{false};
         // Learning put another candidate first: the sentence check keeps it.
         bool learned{false};
+        // Live: an address (name@example.com) or URL, kept as typed.
+        bool address{false};
     };
 
     void Feed(wchar_t key);
@@ -1007,6 +1009,9 @@ private:
     [[nodiscard]] std::optional<std::wstring> MixSplitShown(bool convert) const;
     // What typing shows as letters, or as MixSplitShown when it splits.
     [[nodiscard]] std::optional<std::wstring> LettersShown() const;
+    // An address or URL being typed (name@, https://), shown as typed: the
+    // keys, as Space and Enter will commit them.
+    [[nodiscard]] std::optional<std::wstring> AddressShown() const;
     mutable std::wstring liveSplitKeys_;
     mutable bool liveSplitConverted_{false};
     mutable std::size_t liveSplitPending_{0};
@@ -1059,6 +1064,9 @@ private:
     // The first phrases, and the reading they cover, that stay as they are.
     std::size_t settledPhrases_{0};
     std::size_t settledLength_{0};
+    // Live: where typing went on after picking (Space), in the reading: an
+    // address typed after it is one of its own.
+    std::vector<std::size_t> liveBreaks_;
     // Live: the phrases last shown as converted, the reading they covered
     // and how many units had been typed (KeepLiveSteady).
     std::vector<PhraseState> liveShown_;
