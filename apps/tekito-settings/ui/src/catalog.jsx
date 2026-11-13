@@ -80,7 +80,9 @@ export function catalog(ctx) {
   };
   const setNumbers = (put) => async (value) => {
     await put("japaneseNumberStyle", value);
-    if (value <= 3) await put("japaneseDigitWidth", value - 1);
+    // Digits typed as the style writes them: kanji and official documents'
+    // 1億2,345万 start from half-width digits, not a width chosen before.
+    await put("japaneseDigitWidth", value <= 3 ? value - 1 : 0);
   };
   // Japanese mode's ways of writing, with Mix's beside them.
   const styled = (entry) => ({
