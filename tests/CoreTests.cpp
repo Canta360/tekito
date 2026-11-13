@@ -2383,7 +2383,7 @@ void TestSqliteUserSettingsRepository() {
     Require(loaded.keyboardType == 1 &&
                 loaded.lastJapaneseProfileMode == tekito::InputMode::Convert &&
                 loaded.japaneseProfileEnglishMode == tekito::InputMode::Direct &&
-                loaded.japaneseSpaceWidth == 2 && loaded.japanesePunctuation == 3 && loaded.japaneseDigitWidth == 1 && loaded.japaneseSymbolWidth == 1 && loaded.advancedSettings &&
+                loaded.japaneseSpaceWidth == 2 && loaded.japanesePunctuation == 3 && loaded.japaneseDigitWidth == 0 /* as kanji numbers (style 4) start from */ && loaded.japaneseSymbolWidth == 1 && loaded.advancedSettings &&
                 !loaded.japanesePredictionEnabled &&
                 loaded.candidateRows == 15 && loaded.aiSettingsControl == 2 && loaded.mixPunctuation == 2 && !loaded.mixKanjiVariants && !loaded.meaningsEnabled && loaded.japaneseSwitchOrder == 2 &&
                     !loaded.japaneseEnabled && !loaded.modeIndicatorEnabled,

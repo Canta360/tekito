@@ -474,6 +474,12 @@ bool SqliteUserDictionaryRepository::LoadSettings(UserSettings& settings) const 
     if (loaded.japaneseNumberStyle == 0) loaded.japaneseNumberStyle = loaded.japaneseDigitWidth + 1;
     // Mix wrote as Japanese mode did until it had its own.
     if (!mixStyleSaved) CopyJapaneseStyleToMix(loaded);
+    // Digits are typed as the number style writes them, as Settings sets the
+    // two together: a width saved before with another style (full-width,
+    // then official documents' numbers) follows the style.
+    const auto widthFor = [](int style) { return style >= 1 && style <= 3 ? style - 1 : 0; };
+    loaded.japaneseDigitWidth = widthFor(loaded.japaneseNumberStyle);
+    if (loaded.mixNumberStyle != 0) loaded.mixDigitWidth = widthFor(loaded.mixNumberStyle);
 
     if (success) {
         statement = nullptr;
