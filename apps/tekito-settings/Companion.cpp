@@ -17,8 +17,10 @@
 #include <cstdlib>
 #include <iterator>
 #include <memory>
+#include <random>
 #include <string>
 #include <string_view>
+#include <utility>
 
 using Microsoft::WRL::ComPtr;
 
@@ -59,6 +61,25 @@ constexpr float kListeningEyes = 1.08f;
 // The body's foot, which it hops and squashes from.
 constexpr float kFootX = 450.0f;
 constexpr float kFootY = 768.0f;
+// Left alone, now and then it does something of its own (looks around,
+// tilts, hops a little, looks pleased), every this many seconds.
+constexpr double kFidgetMin = 18.0;
+constexpr double kFidgetMax = 40.0;
+constexpr double kLookAroundTime = 2.4;
+constexpr double kTiltTime = 1.6;
+constexpr float kTiltDegrees = 14.0f;
+constexpr double kContentTime = 1.2;
+constexpr float kSmallHop = 0.8f;
+// Looking around, its eyes go further than toward the pointer.
+constexpr float kLookAround = 2.0f;
+// No key or pointer used anywhere for this long: sleepy, then asleep with
+// z's over its head; any input wakes it with a hop.
+constexpr DWORD kSleepyMs = 3 * 60 * 1000;
+constexpr DWORD kAsleepMs = 6 * 60 * 1000;
+constexpr double kZPeriod = 2.4;
+constexpr float kZPen = 18.0f;
+// Dragged, it swings against the way it goes, up to this much.
+constexpr float kSwingDegrees = 14.0f;
 
 constexpr UINT kMenuSettings = 1;
 constexpr UINT kMenuHide = 2;
@@ -215,12 +236,22 @@ class Companion {
 public:
     bool Create(HINSTANCE instance) {
         instance_ = instance;
+        // Before the first drawing (Resize draws), which times from it.
+        started_ = std::chrono::steady_clock::now();
         repository_ = tekito::userdata::CreateDefaultUserDataRepository();
         if (!repository_ || !repository_->Open() || !repository_->LoadSettings(settings_)) return false;
 #ifndef NDEBUG
         // Debug builds: TEKITO_COMPANION_PREVIEW=1 shows it with the setting
         // off, to look at it without changing the user's settings.
         preview_ = GetEnvironmentVariableW(L"TEKITO_COMPANION_PREVIEW", nullptr, 0) > 0;
+        // TEKITO_COMPANION_IDLE=<seconds>: as if nothing was used for that
+        // long, to look at it sleepy or asleep.
+        wchar_t idle[16]{};
+        if (GetEnvironmentVariableW(L"TEKITO_COMPANION_IDLE", idle, 16) > 0) forcedIdleMs_ = _wtoi(idle) * 1000;
+        // TEKITO_COMPANION_NO_SECRET=1: as if secret mode were off.
+        noSecret_ = GetEnvironmentVariableW(L"TEKITO_COMPANION_NO_SECRET", nullptr, 0) > 0;
+        // TEKITO_COMPANION_FIDGETS=1: something of its own every 2 to 3 seconds.
+        if (GetEnvironmentVariableW(L"TEKITO_COMPANION_FIDGETS", nullptr, 0) > 0) fidgetEvery_ = {2.0, 3.0};
 #endif
         if (!settings_.desktopCompanion && !preview_) return false;
         // Seeding a new session as Settings does (it may start first).
@@ -247,7 +278,6 @@ public:
         if (!hwnd_) return false;
         Resize(GetDpiForWindow(hwnd_));
         if (!KeepOnScreen(saved_)) MoveTo(DefaultPlace());
-        started_ = std::chrono::steady_clock::now();
         motion_ = AnimationsEnabled();
         Check();
         SetTimer(hwnd_, kCheckTimer, kCheckMilliseconds, nullptr);
@@ -346,11 +376,14 @@ private:
         disc->GetBounds(nullptr, &bodyBox_);
         open_ = ReadPath(factory_.Get(), kEyeOpen.path, kEyeOpen.line);
         happy_ = ReadPath(factory_.Get(), kEyeHappy.path, kEyeHappy.line);
+        half_ = ReadPath(factory_.Get(), kEyeHalf.path, kEyeHalf.line);
         shut_ = ReadPath(factory_.Get(), kEyeShut.path, kEyeShut.line);
+        // A z, drawn as a line, about 60 across.
+        z_ = ReadPath(factory_.Get(), "M-30 -32H30L-30 32H30", true);
         const D2D1_STROKE_STYLE_PROPERTIES round{D2D1_CAP_STYLE_ROUND, D2D1_CAP_STYLE_ROUND, D2D1_CAP_STYLE_ROUND,
                                                  D2D1_LINE_JOIN_ROUND};
         factory_->CreateStrokeStyle(round, nullptr, 0, &roundPen_);
-        return open_ && happy_ && shut_;
+        return open_ && happy_ && half_ && shut_ && z_;
     }
 
     void Resize(UINT dpi) {
@@ -379,7 +412,9 @@ private:
         if (FAILED(factory_->CreateDCRenderTarget(&properties, &target_))) return false;
         target_->SetAntialiasMode(D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
         brushHue_ = -1.0f;
-        return SUCCEEDED(target_->CreateSolidColorBrush(Color(0xffffff), &white_));
+        zBrush_.Reset();
+        target_->CreateSolidColorBrush(Color(tekito::companion::kRingStops[1].rgb), &zBrush_);
+        return zBrush_ && SUCCEEDED(target_->CreateSolidColorBrush(Color(0xffffff), &white_));
     }
 
     // The gradients, turned to `hue` degrees while Rainbow is on.
@@ -448,27 +483,40 @@ private:
         using namespace tekito::companion;
         CheckModes();
         const double t = std::chrono::duration<double>(std::chrono::steady_clock::now() - started_).count();
-        Follow();
+        constexpr double kPi = 3.14159265358979;
 
-        // What it shows: eyes shut in secret mode, pleased after a change,
-        // wide while the pointer is on it, else open, blinking now and then.
+        // What it shows: eyes shut in secret mode or asleep, pleased after a
+        // change, half shut when sleepy, wide while the pointer is on it, else
+        // open, blinking now and then.
+        const bool asleep = !secret_ && idleMs_ >= kAsleepMs;
+        const bool sleepy = !secret_ && idleMs_ >= kSleepyMs;
+        Fidget(t, sleepy);
+        Follow(t, sleepy);
         const bool happy = t < happyUntil_;
         const bool listening = !happy && (hover_ || dragging_);
-        const bool blink = !secret_ && !happy && std::fmod(t, kBlinkPeriod) / kBlinkPeriod > 0.93;
+        const bool blink = !secret_ && !happy && !sleepy && std::fmod(t, kBlinkPeriod) / kBlinkPeriod > 0.93;
+
+        // Swinging against the way it is dragged, and back.
+        const float moved = static_cast<float>(place_.x - lastX_) / scale_;
+        lastX_ = place_.x;
+        const float swingTo = dragging_ ? std::clamp(-moved * 1.2f, -kSwingDegrees, kSwingDegrees) : 0.0f;
+        swing_ += (swingTo - swing_) * 0.2f;
 
         auto bodyMove = D2D1::Matrix3x2F::Identity();
         auto ringMove = D2D1::Matrix3x2F::Identity();
         if (motion_) {
+            const int hops = smallHop_ ? 1 : kHops;
+            const float height = kHopHeight * (smallHop_ ? kSmallHop : 1.0f);
             const double hop = t - hopStart_;
-            if (hop >= 0 && hop < kHopTime * kHops) {
+            if (hop >= 0 && hop < kHopTime * hops) {
                 const float p = static_cast<float>(std::fmod(hop, kHopTime) / kHopTime);
                 float y = 0, sx = 1, sy = 1;
                 if (p < 0.35f) {
                     const float k = Ease(p / 0.35f);
-                    y = -kHopHeight * k, sx = 1.03f - 0.06f * k, sy = 0.97f + 0.06f * k;
+                    y = -height * k, sx = 1.03f - 0.06f * k, sy = 0.97f + 0.06f * k;
                 } else if (p < 0.7f) {
                     const float k = Ease((p - 0.35f) / 0.35f);
-                    y = -kHopHeight * (1 - k), sx = 0.97f + 0.07f * k, sy = 1.03f - 0.07f * k;
+                    y = -height * (1 - k), sx = 0.97f + 0.07f * k, sy = 1.03f - 0.07f * k;
                 } else {
                     const float k = Ease((p - 0.7f) / 0.3f);
                     sx = 1.04f - 0.04f * k, sy = 0.96f + 0.04f * k;
@@ -476,12 +524,26 @@ private:
                 bodyMove = D2D1::Matrix3x2F::Scale(sx, sy, D2D1::Point2F(kFootX, kFootY)) *
                            D2D1::Matrix3x2F::Translation(0, y);
             } else {
-                const float rise = static_cast<float>((1 - std::cos(2 * 3.14159265 * t / kFloatPeriod)) / 2);
-                bodyMove = D2D1::Matrix3x2F::Translation(0, -kFloatHeight * rise);
+                // Asleep, it floats slower and lower, breathing.
+                const double period = asleep ? kFloatPeriod * 1.8 : kFloatPeriod;
+                const float lift = asleep ? kFloatHeight * 0.5f : kFloatHeight;
+                const float rise = static_cast<float>((1 - std::cos(2 * kPi * t / period)) / 2);
+                bodyMove = D2D1::Matrix3x2F::Translation(0, -lift * rise);
                 if (listening) bodyMove = D2D1::Matrix3x2F::Scale(1.01f, 0.99f, D2D1::Point2F(kFootX, kFootY)) * bodyMove;
-                const float bob = static_cast<float>((1 - std::cos(2 * 3.14159265 * (t - 0.4) / kFloatPeriod)) / 2);
+                if (asleep) {
+                    bodyMove = D2D1::Matrix3x2F::Scale(1.0f + 0.015f * rise, 1.0f - 0.015f * rise, D2D1::Point2F(kFootX, kFootY)) *
+                               bodyMove;
+                }
+                const float bob = static_cast<float>((1 - std::cos(2 * kPi * (t - 0.4) / period)) / 2);
                 ringMove = D2D1::Matrix3x2F::Translation(-5 * bob, -9 * bob);
             }
+            // A tilt now and then (to one side and back), and the swing.
+            float tilt = swing_;
+            if (fidget_ == Fidgets::Tilt) {
+                const double p = std::min(1.0, (t - fidgetStart_) / kTiltTime);
+                tilt += kTiltDegrees * tiltSide_ * static_cast<float>(std::sin(kPi * p));
+            }
+            if (tilt != 0.0f) bodyMove = D2D1::Matrix3x2F::Rotation(tilt, D2D1::Point2F(kFootX, kFootY)) * bodyMove;
         }
         const float picture = static_cast<float>(width_) / kViewSize;
         const auto view = D2D1::Matrix3x2F::Translation(-kViewLeft, -kViewLeft) *
@@ -500,12 +562,29 @@ private:
         target_->FillGeometry(body_.Get(), sheenBrush_.Get());
         target_->SetTransform(ringMove * face);
         target_->FillGeometry(ring_.Get(), ringBrush_.Get());
-        if (secret_ || blink) {
+        if (secret_ || blink || (asleep && !happy)) {
             DrawEyes(shut_.Get(), true, face, 1.0f);
         } else if (happy) {
             DrawEyes(happy_.Get(), false, face, 1.0f);
+        } else if (sleepy) {
+            DrawEyes(half_.Get(), false, face, 1.0f);
         } else {
             DrawEyes(open_.Get(), false, face, listening ? kListeningEyes : 1.0f);
+        }
+        // Asleep: z's rising from the top right of its head, growing and
+        // fading, in the small ring's color.
+        if (asleep && motion_) {
+            for (int k = 0; k < 3; ++k) {
+                const double phase = std::fmod(t / kZPeriod + k / 3.0, 1.0);
+                const float p = static_cast<float>(phase);
+                const float alpha = p < 0.15f ? p / 0.15f : 1.0f - (p - 0.15f) / 0.85f;
+                const float size = 0.55f + 0.6f * p;
+                const float x = 690.0f + 80.0f * p + 12.0f * static_cast<float>(std::sin(2 * kPi * phase));
+                const float y = 300.0f - 190.0f * p;
+                zBrush_->SetOpacity(alpha);
+                target_->SetTransform(D2D1::Matrix3x2F::Scale(size, size) * D2D1::Matrix3x2F::Translation(x, y) * view);
+                target_->DrawGeometry(z_.Get(), zBrush_.Get(), kZPen / size, roundPen_.Get());
+            }
         }
         target_->SetTransform(D2D1::Matrix3x2F::Identity());
         if (target_->EndDraw() == D2DERR_RECREATE_TARGET) {
@@ -514,6 +593,7 @@ private:
             ringBrush_.Reset();
             sheenBrush_.Reset();
             white_.Reset();
+            zBrush_.Reset();
             return;
         }
         Show();
@@ -527,8 +607,9 @@ private:
     }
 
     // The eyes toward the pointer (a glance, eased), and whether it is on
-    // the body.
-    void Follow() {
+    // the body; looking left, then right while it looks around; down and
+    // still while sleepy.
+    void Follow(double t, bool sleepy) {
         POINT pointer;
         GetCursorPos(&pointer);
         const float cx = static_cast<float>(place_.x) + width_ / 2.0f;
@@ -538,15 +619,44 @@ private:
         const float distance = std::max(std::hypot(dx, dy), 1.0f);
         hover_ = distance < width_ * 0.45f;
         const float reach = std::min(1.0f, distance / (240.0f * scale_)) * kLookReach;
-        const D2D1_POINT_2F aim{dx / distance * reach, dy / distance * reach * 0.8f};
-        look_.x += (aim.x - look_.x) * 0.25f;
-        look_.y += (aim.y - look_.y) * 0.25f;
+        D2D1_POINT_2F aim{dx / distance * reach, dy / distance * reach * 0.8f};
+        float ease = 0.25f;
+        if (sleepy) {
+            aim = {0.0f, kLookReach * 0.4f};
+            ease = 0.08f;
+        } else if (fidget_ == Fidgets::LookAround) {
+            const double p = (t - fidgetStart_) / kLookAroundTime;
+            aim = {(p < 0.4 ? -1.0f : p < 0.8 ? 1.0f : 0.0f) * kLookReach * kLookAround, -kLookReach * 0.3f};
+            ease = 0.15f;
+        }
+        look_.x += (aim.x - look_.x) * ease;
+        look_.y += (aim.y - look_.y) * ease;
+    }
+
+    // Now and then, left alone and awake, something of its own.
+    void Fidget(double t, bool sleepy) {
+        const double lengths[] = {0.0, kLookAroundTime, kTiltTime, kHopTime, kContentTime};
+        if (fidget_ != Fidgets::None && t - fidgetStart_ > lengths[static_cast<int>(fidget_)]) fidget_ = Fidgets::None;
+        if (nextFidget_ < 0) nextFidget_ = t + std::uniform_real_distribution<double>(fidgetEvery_.first, fidgetEvery_.second)(random_);
+        const bool busy = sleepy || secret_ || hover_ || pressed_ || t < happyUntil_ || t - hopStart_ < kHopTime * kHops;
+        if (!motion_ || fidget_ != Fidgets::None || busy || t < nextFidget_) return;
+        nextFidget_ = t + std::uniform_real_distribution<double>(fidgetEvery_.first, fidgetEvery_.second)(random_);
+        fidget_ = static_cast<Fidgets>(std::uniform_int_distribution<int>(1, 4)(random_));
+        fidgetStart_ = t;
+        if (fidget_ == Fidgets::Tilt) tiltSide_ = std::uniform_int_distribution<int>(0, 1)(random_) ? 1.0f : -1.0f;
+        if (fidget_ == Fidgets::SmallHop) {
+            hopStart_ = t;
+            smallHop_ = true;
+        }
+        if (fidget_ == Fidgets::Content) happyUntil_ = t + kContentTime;
     }
 
     void Cheer() {
         const double t = std::chrono::duration<double>(std::chrono::steady_clock::now() - started_).count();
         happyUntil_ = t + kHappyTime;
         hopStart_ = t;
+        smallHop_ = false;
+        fidget_ = Fidgets::None;
     }
 
     // --- settings, modes, full screen --------------------------------------
@@ -562,6 +672,15 @@ private:
             }
         }
         rainbow_ = settings_.rainbowAccent;
+        // How long since any key or pointer was used (not which: Windows
+        // keeps the time), for sleepy and asleep; it wakes with a hop.
+        LASTINPUTINFO input{sizeof(input)};
+        if (GetLastInputInfo(&input)) {
+            idleMs_ = forcedIdleMs_ >= 0 ? static_cast<DWORD>(forcedIdleMs_) : GetTickCount() - input.dwTime;
+            const bool drowsy = idleMs_ >= kSleepyMs;
+            if (drowsy_ && !drowsy) Cheer();
+            drowsy_ = drowsy;
+        }
         if (ScreenBusy()) {
             if (!hidden_) {
                 hidden_ = true;
@@ -578,7 +697,7 @@ private:
     }
 
     void CheckModes() {
-        secret_ = runtime_->Secret();
+        secret_ = runtime_->Secret() && !noSecret_;
         if (runtime_->ModeGeneration() != modeGeneration_) {
             modeGeneration_ = runtime_->ModeGeneration();
             Cheer();
@@ -677,12 +796,15 @@ private:
     ComPtr<ID2D1PathGeometry> ring_;
     ComPtr<ID2D1PathGeometry> open_;
     ComPtr<ID2D1PathGeometry> happy_;
+    ComPtr<ID2D1PathGeometry> half_;
     ComPtr<ID2D1PathGeometry> shut_;
+    ComPtr<ID2D1PathGeometry> z_;
     ComPtr<ID2D1StrokeStyle> roundPen_;
     ComPtr<ID2D1LinearGradientBrush> bodyBrush_;
     ComPtr<ID2D1LinearGradientBrush> ringBrush_;
     ComPtr<ID2D1RadialGradientBrush> sheenBrush_;
     ComPtr<ID2D1SolidColorBrush> white_;
+    ComPtr<ID2D1SolidColorBrush> zBrush_;
     D2D1_RECT_F bodyBox_{};
     float brushHue_{-1.0f};
 
@@ -699,6 +821,21 @@ private:
     double happyUntil_{-1.0};
     double hopStart_{-100.0};
     D2D1_POINT_2F look_{};
+    // What it does of its own now (Fidget), and when it does the next.
+    enum class Fidgets { None, LookAround, Tilt, SmallHop, Content };
+    Fidgets fidget_{Fidgets::None};
+    double fidgetStart_{0.0};
+    double nextFidget_{-1.0};
+    std::pair<double, double> fidgetEvery_{kFidgetMin, kFidgetMax};
+    float tiltSide_{1.0f};
+    bool smallHop_{false};
+    std::mt19937 random_{static_cast<std::uint32_t>(std::chrono::steady_clock::now().time_since_epoch().count())};
+    DWORD idleMs_{0};
+    int forcedIdleMs_{-1};
+    bool noSecret_{false};
+    bool drowsy_{false};
+    float swing_{0.0f};
+    LONG lastX_{0};
     bool preview_{false};
     bool motion_{true};
     bool rainbow_{false};
