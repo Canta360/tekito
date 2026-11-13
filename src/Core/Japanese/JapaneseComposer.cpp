@@ -3700,6 +3700,9 @@ void JapaneseComposer::Convert() {
                                 (before.size() >= 2 && kJoins.find(before.back()) != std::wstring_view::npos &&
                                  IsDigit(before[before.size() - 2]));
             if (!text.empty() && IsDigit(text.back()) && codeMarks && joined) return;
+            // A number, or the word read after one (3時30分, 1,000円, 1・2年生):
+            // what the number makes of it stays; the next Space opens the list.
+            if (!text.empty() && (IsDigit(text.front()) || (!before.empty() && IsDigit(before.back())))) return;
             codeBefore = before.size() >= 2 && kJoins.find(before.back()) != std::wstring_view::npos &&
                          IsDigit(before[before.size() - 2]);
             codeBefore = codeBefore || (!text.empty() && IsDigit(text.front()) && before.size() >= 2 &&
