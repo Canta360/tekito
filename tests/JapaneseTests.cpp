@@ -856,6 +856,25 @@ void TestAddresses(const RomajiTable& table, const MiniPack& pack) {
         Require(Type(composer, L"ringo@100") != L"ringo@100", "an @ before digits is not an address");
         composer.Clear();
     }
+    // Digits joined by marks are a code: hyphens (not ー), a colon, a date's
+    // slashes, typed or converted.
+    for (const bool live : {false, true}) {
+        JapaneseComposer codes(&table);
+        codes.SetConverter(&converter);
+        codes.SetLiveConversion(live);
+        codes.SetHalfWidthDigits(true);
+        codes.SetHalfWidthSymbols(true);
+        RequireText(Type(codes, L"090-1234-5678"), L"090-1234-5678", "a phone number shows with hyphens");
+        RequireText(codes.Commit(), L"090-1234-5678", "and is committed so");
+        Type(codes, L"12:30");
+        codes.Convert();
+        RequireText(codes.Commit(), L"12:30", "a time keeps its colon as wide as its digits");
+        Type(codes, L"2026/11/13");
+        codes.Convert();
+        RequireText(codes.Commit(), L"2026/11/13", "a date keeps its slashes");
+        Require(Type(codes, L"1/2") == L"1\x30FB" L"2", "1/2 is no date: 1・2");
+        codes.Clear();
+    }
     // Live: an address typed after a conversion (Space) is one of its own.
     JapaneseComposer composer(&table);
     composer.SetConverter(&converter);

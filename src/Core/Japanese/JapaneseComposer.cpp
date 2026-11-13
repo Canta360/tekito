@@ -195,10 +195,15 @@ bool IsProtectedSpan(std::wstring_view keys) {
 }
 
 // The same, or one still being typed: name@ and its domain so far
-// (kanta@capitata), a URL after its :// . Shown and committed as typed.
+// (kanta@capitata), a URL after its :// ; and a file name (report.pdf) or
+// a version (v1.0.0). Shown and committed as typed.
 bool IsAddressTyping(std::wstring_view keys) {
-    static const std::wregex pattern(LR"(^(?:[A-Za-z0-9._%+\-]+@(?:[A-Za-z][A-Za-z0-9.\-]*)?|(?:https?|ftp)://\S*)$)");
-    return IsProtectedSpan(keys) || (!keys.empty() && std::regex_match(keys.begin(), keys.end(), pattern));
+    static const std::wregex pattern(LR"(^(?:[A-Za-z0-9._%+\-]+@(?:[A-Za-z][A-Za-z0-9.\-]*)?|(?:https?|ftp)://\S*|v[0-9]+(?:\.[0-9]+)*\.?)$)");
+    static const std::wregex file(
+        LR"(^[A-Za-z0-9_\-]+(?:\.[A-Za-z0-9_\-]+)*\.(?:pdf|docx?|xlsx?|pptx?|txt|csv|md|json|xml|ya?ml|html?|css|js|ts|tsx|jsx|py|cpp|hpp|h|cs|java|go|rs|sh|ps1|bat|exe|dll|msi|zip|7z|gz|png|jpe?g|gif|svg|webp|mp3|mp4|mov|wav|log|ini|toml)$)",
+        std::regex::icase);
+    return IsProtectedSpan(keys) ||
+           (!keys.empty() && (std::regex_match(keys.begin(), keys.end(), pattern) || std::regex_match(keys.begin(), keys.end(), file)));
 }
 
 bool IsDigit(wchar_t c) {
@@ -221,6 +226,89 @@ std::wstring MarksAsDigits(std::wstring text) {
         auto& mark = text[i];
         if (mark == L'.' || mark == L'\xFF0E') mark = halfDigits ? L'.' : L'\xFF0E';
         if (mark == L',' || mark == L'\xFF0C') mark = halfDigits ? L',' : L'\xFF0C';
+    }
+    return text;
+}
+
+// Digits joined by marks are a code (090-1234-5678, 12:30, 2026/11/13,
+// 192.168.0.1): its marks as wide as its digits, a dash a hyphen (not ー),
+// the ・ of a date a slash; and, joined by a dash, colon or slash, all its
+// digits as wide as the first.
+std::wstring CodeMarks(std::wstring text) {
+    const auto digit = [](wchar_t c) { return (c >= L'0' && c <= L'9') || (c >= L'\xFF10' && c <= L'\xFF19'); };
+    constexpr std::wstring_view kDashes = L"-\x30FC\xFF0D\x2015\x2010";
+    constexpr std::wstring_view kColons = L":\xFF1A";
+    constexpr std::wstring_view kSlashes = L"/\xFF0F\x30FB";
+    constexpr std::wstring_view kPoints = L".\xFF0E,\xFF0C";
+    const auto mark = [&](wchar_t c) {
+        return kDashes.find(c) != std::wstring_view::npos || kColons.find(c) != std::wstring_view::npos ||
+               kSlashes.find(c) != std::wstring_view::npos || kPoints.find(c) != std::wstring_view::npos;
+    };
+    for (std::size_t start = 0; start < text.size();) {
+        if (!digit(text[start])) {
+            ++start;
+            continue;
+        }
+        std::size_t end = start;
+        while (end < text.size() && (digit(text[end]) || (mark(text[end]) && end + 1 < text.size() && digit(text[end + 1])))) ++end;
+        // The groups of digits and the marks between them.
+        std::vector<std::size_t> groups;
+        bool slashes = false, joined = false, others = false;
+        std::size_t length = 0;
+        for (std::size_t i = start; i <= end; ++i) {
+            if (i < end && digit(text[i])) {
+                ++length;
+                continue;
+            }
+            groups.push_back(length);
+            length = 0;
+            if (i == end) break;
+            if (kSlashes.find(text[i]) != std::wstring_view::npos) slashes = true;
+            else others = true;
+            if (kPoints.find(text[i]) == std::wstring_view::npos) joined = true;
+        }
+        const auto value = [&](std::size_t group) {
+            std::size_t at = start;
+            for (std::size_t g = 0; g < group; ++g) at += groups[g] + 1;
+            int n = 0;
+            for (std::size_t k = 0; k < groups[group]; ++k) {
+                const wchar_t c = text[at + k];
+                n = n * 10 + (c >= L'\xFF10' ? c - L'\xFF10' : c - L'0');
+            }
+            return n;
+        };
+        // A date: month and day (11/13), with a year before them (2026/11/13).
+        bool date = slashes && !others && (groups.size() == 2 || groups.size() == 3);
+        if (date) {
+            const std::size_t m = groups.size() - 2;
+            date = groups[m] <= 2 && groups[m + 1] <= 2 && value(m) >= 1 && value(m) <= 12 && value(m + 1) >= 1 &&
+                   value(m + 1) <= 31 &&
+                   (groups.size() == 3 ? groups[0] == 2 || groups[0] == 4 : groups[m] == 2 || groups[m + 1] == 2);
+        }
+        const bool half = text[start] <= L'9';
+        // A plus before it (+81-80-...) as wide as its digits.
+        if (joined && start > 0 && (text[start - 1] == L'+' || text[start - 1] == L'\xFF0B') &&
+            (start == 1 || !digit(text[start - 2]))) {
+            text[start - 1] = half ? L'+' : L'\xFF0B';
+        }
+        for (std::size_t i = start; i < end; ++i) {
+            wchar_t& c = text[i];
+            if (digit(c)) {
+                if (joined && half && c >= L'\xFF10') c = static_cast<wchar_t>(c - 0xFEE0);
+                if (joined && !half && c <= L'9') c = static_cast<wchar_t>(c + 0xFEE0);
+            } else if (kDashes.find(c) != std::wstring_view::npos) {
+                c = half ? L'-' : L'\xFF0D';
+            } else if (kColons.find(c) != std::wstring_view::npos) {
+                c = half ? L':' : L'\xFF1A';
+            } else if (kSlashes.find(c) != std::wstring_view::npos) {
+                if (date) c = half ? L'/' : L'\xFF0F';
+            } else if (c == L'.' || c == L'\xFF0E') {
+                c = half ? L'.' : L'\xFF0E';
+            } else if (c == L',' || c == L'\xFF0C') {
+                c = half ? L',' : L'\xFF0C';
+            }
+        }
+        start = end;
     }
     return text;
 }
@@ -1328,7 +1416,9 @@ void JapaneseComposer::BuildPhrasesFor(bool convert) {
     if (convert && !HasAscii()) {
         const std::wstring keys = Keys(false);
         if (IsAddressTyping(keys)) {
-            std::vector<PhraseCandidate> candidates{{keys, 0, PhraseCandidate::Kind::English, false}};
+            // Mixed typing: with the capitals typed (C:\Users).
+            const std::wstring typed = typedCaseKept_ && typedCase_.size() == keys.size() ? typedCase_ : keys;
+            std::vector<PhraseCandidate> candidates{{typed, 0, PhraseCandidate::Kind::English, false}};
             candidates.push_back({ToFullWidthAscii(keys), 0, PhraseCandidate::Kind::Hiragana, false});
             candidates.push_back({reading, 0, PhraseCandidate::Kind::Hiragana, false});
             phrases_.push_back({0, reading.size(), std::move(candidates)});
@@ -1860,19 +1950,23 @@ void JapaneseComposer::ApplyNumberStyle(std::size_t from) {
         phrase.selected = 0;
         phrase.form.reset();
     }
-    // A decimal point or a thousands comma of its own between two numbers
-    // (1|．|1) as wide as the digits the style wrote them in: 1.1.1, not
-    // 1．1．1 when typing is full-width and the style half-width.
-    for (std::size_t index = std::max<std::size_t>(from, 1); index + 1 < phrases_.size(); ++index) {
+    // Digits joined by marks, across phrases (090|ー|1234, 1|．|1), written
+    // as one code (CodeMarks): 090-1234-5678 and 1.1.1, not 090ー1234ー5678,
+    // or 1．1．1 when typing is full-width and the style half-width.
+    std::wstring whole;
+    std::vector<std::size_t> starts;
+    for (const auto& phrase : phrases_) {
+        starts.push_back(whole.size());
+        whole += PhraseText(phrase);
+    }
+    const std::wstring coded = CodeMarks(whole);
+    if (coded == whole) return;
+    for (std::size_t index = from; index < phrases_.size(); ++index) {
         auto& phrase = phrases_[index];
         if (phrase.form || phrase.selected >= phrase.candidates.size()) continue;
-        const std::wstring mark = PhraseText(phrase);
-        const std::wstring before = PhraseText(phrases_[index - 1]);
-        const std::wstring after = PhraseText(phrases_[index + 1]);
-        if (mark.size() != 1 || before.empty() || after.empty()) continue;
-        const std::wstring matched = MarksAsDigits(before.back() + mark + after.front());
-        if (matched[1] == mark[0]) continue;
-        const std::wstring wanted(1, matched[1]);
+        const std::wstring shown = PhraseText(phrase);
+        const std::wstring wanted = coded.substr(starts[index], shown.size());
+        if (wanted == shown) continue;
         auto& candidates = phrase.candidates;
         const auto listed = std::find_if(candidates.begin(), candidates.end(), [&](const PhraseCandidate& c) { return c.text == wanted; });
         if (listed != candidates.end()) {
@@ -3591,6 +3685,26 @@ void JapaneseComposer::Convert() {
         while (focus_ > 0 && marksOnly(PhraseText(phrases_[focus_]))) --focus_;
         // An address stays as typed; the next Space goes on to its other forms.
         if (phrases_[focus_].address) return;
+        bool codeBefore = false;
+        // So do the digits of a code (090-1234-5678): another width or
+        // kanji numerals for its last group are no other reading.
+        {
+            std::wstring before;
+            for (std::size_t i = 0; i < focus_; ++i) before += PhraseText(phrases_[i]);
+            const std::wstring text = PhraseText(phrases_[focus_]);
+            constexpr std::wstring_view kJoins = L"-\xFF0D\x30FC:\xFF1A/\xFF0F\x30FB";
+            const bool codeMarks = std::all_of(text.begin(), text.end(), [&](wchar_t c) {
+                return IsDigit(c) || kJoins.find(c) != std::wstring_view::npos || std::wstring_view(L".\xFF0E").find(c) != std::wstring_view::npos;
+            });
+            const bool joined = text.find_first_of(kJoins) != std::wstring::npos ||
+                                (before.size() >= 2 && kJoins.find(before.back()) != std::wstring_view::npos &&
+                                 IsDigit(before[before.size() - 2]));
+            if (!text.empty() && IsDigit(text.back()) && codeMarks && joined) return;
+            codeBefore = before.size() >= 2 && kJoins.find(before.back()) != std::wstring_view::npos &&
+                         IsDigit(before[before.size() - 2]);
+            codeBefore = codeBefore || (!text.empty() && IsDigit(text.front()) && before.size() >= 2 &&
+                                        IsDigit(before.back()) && text.find_first_of(kJoins) != std::wstring::npos);
+        }
         if (flushed && Preedit() != typedShown) return;
         // What was shown changed (English run in, a slip undone): that comes
         // first, as Space shows it without live conversion.
@@ -3625,8 +3739,36 @@ void JapaneseComposer::Convert() {
         const auto at = whole ? std::find_if(phrase.candidates.begin(), phrase.candidates.end(),
                                              [&](const PhraseCandidate& c) { return c.text == *whole; })
                               : phrase.candidates.end();
+        const std::size_t was = phrase.selected;
         phrase.selected = at != phrase.candidates.end() ? static_cast<std::size_t>(at - phrase.candidates.begin())
                                                         : (phrase.selected + 1) % phrase.candidates.size();
+        // After the digits of a code (090-1234-5678です), its digits stay:
+        // the same with other widths or commas, or with the digits in kanji,
+        // is no other reading. The next one that keeps them, if any.
+        if (codeBefore && at == phrase.candidates.end()) {
+            const auto narrow = [](std::wstring text) {
+                for (auto& c : text) {
+                    if (c >= L'\xFF01' && c <= L'\xFF5E') c = static_cast<wchar_t>(c - 0xFEE0);
+                }
+                std::erase(text, L',');
+                return text;
+            };
+            const auto digits = [](const std::wstring& text) {
+                std::wstring out;
+                for (const wchar_t c : text) {
+                    if (c >= L'0' && c <= L'9') out += c;
+                }
+                return out;
+            };
+            const std::wstring current = narrow(phrase.candidates[was].text);
+            const auto same = [&](std::size_t index) {
+                const std::wstring text = narrow(phrase.candidates[index].text);
+                return text == current || digits(text) != digits(current);
+            };
+            while (phrase.selected != was && same(phrase.selected)) {
+                phrase.selected = (phrase.selected + 1) % phrase.candidates.size();
+            }
+        }
         return;
     }
     if (!IsConverted()) {
@@ -4157,7 +4299,8 @@ std::wstring JapaneseComposer::RenderTyping(bool includePending) const {
     std::wstring kana = Reading();
     // Pending keys show at the caret, where the kana they make will go.
     if (includePending) kana.insert(ReadingOffset(caret_), PendingText());
-    return TypingForm() == KanaForm::Katakana ? ToKatakana(kana) : kana;
+    // Digits joined by marks as a code (090-1234, not 090ー1234).
+    return CodeMarks(TypingForm() == KanaForm::Katakana ? ToKatakana(kana) : kana);
 }
 
 std::wstring JapaneseComposer::FormText(KanaForm form, std::size_t begin, std::size_t length,
@@ -4507,6 +4650,7 @@ std::optional<std::wstring> JapaneseComposer::AddressShown() const {
     if (!Typing() || IsConverted() || caret_ != units_.size() || HasAscii()) return std::nullopt;
     std::wstring keys = Keys(true);
     if (!IsAddressTyping(keys)) return std::nullopt;
+    if (typedCaseKept_ && typedCase_.size() == keys.size()) return typedCase_;
     return keys;
 }
 
