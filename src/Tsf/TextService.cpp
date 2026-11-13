@@ -1490,6 +1490,14 @@ bool TextService::TranslateEnglishCharacter(wchar_t character, KeyInput& input) 
             return true;
         }
     }
+    // Right after a word a mark put right: a letter or digit (or @ _ / %)
+    // goes on with it, as typed (Printable undoes the fix).
+    if (!state_.IsActive() && !markFixShown_.empty() &&
+        (std::iswalnum(character) || std::wstring_view(L"@_/%").find(character) != std::wstring_view::npos)) {
+        input.type = KeyInput::Type::Printable;
+        input.character = character;
+        return true;
+    }
     PunctuationRole punctuationRole{};
     if (TryClassifyPunctuation(character, punctuationRole)) {
         if (!state_.IsActive()) return false;
@@ -1777,6 +1785,8 @@ HRESULT TextService::HandleKeyInEditSessionCore(ITfContext* context, TfEditCooki
         return SUCCEEDED(hr) ? S_FALSE : hr;
     }
 
+    const std::wstring markFixShown = std::exchange(markFixShown_, {});
+    const std::wstring markFixTyped = std::exchange(markFixTyped_, {});
     if (input.type == KeyInput::Type::SpecialEnd) return HandleSpecialEnd(context, editCookie, input.character);
     if (input.type == KeyInput::Type::SmartPunctuation) {
         return HandleSmartPunctuation(context, editCookie, input.character);
@@ -1857,7 +1867,9 @@ HRESULT TextService::HandleKeyInEditSessionCore(ITfContext* context, TfEditCooki
     case KeyInput::Type::Printable: {
         if (!composition_ && !state_.IsActive() &&
             !CanStartWordAfter(ReadSelectionContext(context, editCookie))) {
-            // Inside a URL, address, path or identifier: type it as is.
+            // Inside a URL, address, path or identifier: type it as is, and
+            // the word a mark just put right (haruka.sato) as typed too.
+            if (!markFixShown.empty()) ReplaceBeforeCaret(context, editCookie, markFixShown, markFixTyped);
             return InsertAtSelection(context, editCookie, std::wstring(1, input.character));
         }
         const auto action = state_.OnPrintable();
@@ -2051,6 +2063,7 @@ HRESULT TextService::HandleKeyInEditSessionCore(ITfContext* context, TfEditCooki
         }
         HRESULT hr = ReplaceComposition(context, editCookie, action.text);
         if (FAILED(hr)) return hr;
+        std::wstring shown = action.text;
         if (firstMark && userSettings_.recheckPreviousWord && candidateEngine_ && !action.text.empty()) {
             const std::wstring left = action.text.substr(0, action.text.size() - 1);
             const std::wstring mark = action.text.substr(action.text.size() - 1);
@@ -2060,7 +2073,8 @@ HRESULT TextService::HandleKeyInEditSessionCore(ITfContext* context, TfEditCooki
             // has only the words before it to go by.
             if (left == rawBefore && (mark == L"." || mark == L"!" || mark == L"?")) {
                 if (const auto meant = candidateEngine_->Recheck(left, CommitContext(context, editCookie), mark)) {
-                    hr = ReplaceComposition(context, editCookie, *meant + mark);
+                    shown = *meant + mark;
+                    hr = ReplaceComposition(context, editCookie, shown);
                     if (FAILED(hr)) return hr;
                 }
             }
@@ -2069,6 +2083,11 @@ HRESULT TextService::HandleKeyInEditSessionCore(ITfContext* context, TfEditCooki
         if (FAILED(hr)) return hr;
         candidateWindow_.Hide();
         rawText_.clear();
+        // A word a period or colon put right, until the next key.
+        if ((input.character == L'.' || input.character == L':') && shown != rawBefore + input.character) {
+            markFixShown_ = shown;
+            markFixTyped_ = rawBefore + input.character;
+        }
         return S_OK;
     }
 
@@ -2601,6 +2620,26 @@ void TextService::RecheckPreviousWord(ITfContext* context, TfEditCookie editCook
     }
     const std::wstring text = *meant + L" ";
     (void)previous->SetText(editCookie, 0, text.c_str(), static_cast<LONG>(text.size()));
+}
+
+void TextService::ReplaceBeforeCaret(ITfContext* context, TfEditCookie editCookie, const std::wstring& shown,
+                                     const std::wstring& typed) {
+    TF_SELECTION selection{};
+    ULONG fetched = 0;
+    if (FAILED(context->GetSelection(editCookie, TF_DEFAULT_SELECTION, 1, &selection, &fetched)) || fetched != 1 ||
+        !selection.range) {
+        return;
+    }
+    ComPtr<ITfRange> range;
+    range.Attach(selection.range);
+    LONG moved = 0;
+    const LONG length = static_cast<LONG>(shown.size());
+    if (FAILED(range->Collapse(editCookie, TF_ANCHOR_START)) ||
+        FAILED(range->ShiftStart(editCookie, -length, &moved, nullptr)) || moved != -length ||
+        ReadRangeText(range.Get(), editCookie) != shown) {
+        return;
+    }
+    (void)range->SetText(editCookie, 0, typed.c_str(), static_cast<LONG>(typed.size()));
 }
 
 void TextService::TakeBackSpaceBefore(ITfContext* context, TfEditCookie editCookie) {

@@ -220,6 +220,9 @@ private:
     // Mix: removes the space right before the composition (or the caret),
     // the one English was committed with, when it is there.
     void TakeBackSpaceBefore(ITfContext* context, TfEditCookie editCookie);
+    // Puts `typed` in place of `shown` right before the caret, when it is there.
+    void ReplaceBeforeCaret(ITfContext* context, TfEditCookie editCookie, const std::wstring& shown,
+                            const std::wstring& typed);
     // Inserts `open` and `close` at the selection with the caret between.
     HRESULT InsertPairAtSelection(ITfContext* context, TfEditCookie editCookie, const std::wstring& open,
                                   const std::wstring& close);
@@ -274,6 +277,12 @@ private:
     // (UserSettings::recheckPreviousWord).
     std::wstring keptWord_;
     std::wstring keptTyped_;
+    // English: a word a period or colon put right, with the mark, as shown
+    // and as typed (haruka. for hanuka.): a letter or digit typed right
+    // after it makes it part of an address or a name (haruka.sato@), and it
+    // goes back as typed.
+    std::wstring markFixShown_;
+    std::wstring markFixTyped_;
     // Puts the word before the composition (`word`, typed as `typed`) right
     // when the word after it (`following`) shows it was a slip, or another
     // fix than the one Space made.
