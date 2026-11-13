@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(TEKITO VERSION 0.7.3 LANGUAGES C CXX)
+project(TEKITO VERSION 1.0.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -313,7 +313,7 @@ if(TEKITO_BUILD_TESTS)
         ${TEKITO_WINDOWS_DEFINES} TEKITO_CANDIDATE_WINDOW_PREVIEW)
     target_compile_options(tekito_typing_demo PRIVATE ${TEKITO_WARNINGS})
     target_link_libraries(tekito_typing_demo PRIVATE
-        tekito_core ole32 oleaut32 advapi32 user32 gdi32 ${TEKITO_CANDIDATE_WINDOW_LIBS})
+        tekito_core tekito_userdata ole32 oleaut32 advapi32 user32 gdi32 ${TEKITO_CANDIDATE_WINDOW_LIBS})
 
     # A window that draws the input method's candidate list itself, as
     # full-screen games do, and logs what the list UI element holds.
