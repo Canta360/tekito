@@ -309,6 +309,9 @@ kbd {
 .app > .content { grid-column: 2; grid-row: 1; }
 
 /* Folded to icons: the TEKITO icon and each page's, centered. */
+/* A click on a page's icon is the item's: the drawing itself takes none
+   (Fluent's list does not select from a click on an SVG inside the item). */
+.sidebar .fui-NavItem svg { pointer-events: none; }
 .sidebar.is-rail .brand { justify-content: center; padding: 6px 0; }
 .sidebar.is-rail .fui-NavItem { justify-content: center; padding-left: 0; padding-right: 0; }
 /* Fluent sets the drawer's width in its own style: the folded width wins here. */
