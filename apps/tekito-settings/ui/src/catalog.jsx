@@ -36,7 +36,7 @@ export function catalog(ctx) {
   const head = (title, modes) => (modes ? <>{title}{badges(modes)}</> : title);
   // A switch: [id, page, group, icon, text, key, options].
   const toggle = (id, page, group, icon, text, key, opts = {}) => ({
-    id, page, group, keys: [key, ...(opts.keys || [])], title: text.title, modes: opts.modes, detail: opts.detail, show: opts.show,
+    id, page, group, keys: [key, ...(opts.keys || [])], title: text.title, about: text.description, modes: opts.modes, detail: opts.detail, show: opts.show,
     render: () => (
       <Row icon={icon} title={head(text.title, opts.modes)} description={text.description} sub={opts.sub?.()}>
         <Toggle label={text.title} checked={s[key]} disabled={opts.disabled} onChange={(value) => set(key, value)} />
@@ -44,7 +44,7 @@ export function catalog(ctx) {
     ),
   });
   const linked = (id, page, group, icon, text, keys, opts = {}) => ({
-    id, page, group, keys: [...Object.values(keys), ...(opts.keys || [])], title: text.title, modes: Object.keys(keys), detail: opts.detail,
+    id, page, group, keys: [...Object.values(keys), ...(opts.keys || [])], title: text.title, about: text.description, modes: Object.keys(keys), detail: opts.detail,
     linkedKeys: Object.entries(keys).filter(([mode]) => on[mode]).map(([, key]) => key),
     render: () => (
       <LinkedToggle id={id} icon={icon} title={text.title} description={text.description} keys={keys} settings={s} setSetting={set}
@@ -52,7 +52,7 @@ export function catalog(ctx) {
     ),
   });
   const choice = (id, page, group, icon, text, key, options, opts = {}) => ({
-    id, page, group, keys: [key], title: text.title, modes: opts.modes, detail: opts.detail, show: opts.show,
+    id, page, group, keys: [key], title: text.title, about: text.description, modes: opts.modes, detail: opts.detail, show: opts.show,
     render: () => (
       <Row icon={icon} title={head(text.title, opts.modes)} description={text.description}>
         <Segmented label={text.title} value={opts.value ?? s[key]} options={options} onChange={(value) => set(key, value)} />

@@ -6,6 +6,7 @@
 // shipped): the clear choices were right about 94% of the time.
 import { hostRequest } from "./host.js";
 import { aiDescriptions } from "./aiDescriptions.js";
+import { asksWhat, pick, talk } from "./aiTalk.js";
 import { aiSpecs, catalog, valueName, visible } from "./catalog.jsx";
 import { mixPairs, revealHidden } from "./rows.jsx";
 
@@ -129,6 +130,12 @@ export async function think(ctx, question, level, lastApplied) {
   if (/何ができ|なにができ|できること|使い方|ヘルプ|what can you|help/i.test(question)) {
     return { kind: "help", reply: c.help, actions: [], show: [] };
   }
+  // Small talk, and questions about TEKITO itself: answered, not looked up.
+  const said = talk(question, lang);
+  if (said) {
+    const shown = said.show.filter((item) => item.type !== "setting" || catalog(ctx).some((entry) => entry.id === item.id && visible(entry, ctx)));
+    return { kind: "talk", reply: said.reply, actions: [], show: shown };
+  }
   const described = aiDescriptions[lang];
   const targets = [
     ...catalog(ctx).filter((entry) => !entry.hidden && visible(entry, ctx) && described[entry.id])
@@ -144,7 +151,7 @@ export async function think(ctx, question, level, lastApplied) {
   const ranked = targets.map((target, i) => ({ ...target, score: scores[i] + kOverlapWeight * overlap(question, target.text + target.title) }))
     .sort((a, b) => b.score - a.score);
   const [best, second] = ranked;
-  if (best.score < kNothingFits) return { kind: "nothing", reply: c.nothingFits, actions: [], show: [] };
+  if (best.score < kNothingFits) return { kind: "nothing", reply: pick(c.nothingFits), actions: [], show: [] };
   if (best.score - second.score < kSureMargin) {
     // As many as are close to the first (two to five), to choose from.
     const close = ranked.filter((target, i) => i < 5 && (i < 2 || best.score - target.score < kSureMargin * 2));
@@ -152,6 +159,8 @@ export async function think(ctx, question, level, lastApplied) {
   }
   const found = { kind: "found", reply: c.found, actions: [], show: [{ type: best.type, id: best.id }] };
   if (best.type !== "setting") return found;
+  // Asked what it is (シークレットモードって何): told, not changed.
+  if (asksWhat(question)) return best.entry.about ? { ...found, reply: c.about(best.entry.title, best.entry.about) } : found;
   const change = await decide(ctx, best.entry, question, level, lang);
   if (!change) return found;
   const spec = aiSpecs(ctx)[change.key];
