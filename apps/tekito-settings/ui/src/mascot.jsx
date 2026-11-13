@@ -135,6 +135,12 @@ export function Mascot({ mood = "idle", size = 96, follow = false, label }) {
           {eyes(mood)}
         </g>
       </g>
+      {mood === "searching" && (
+        // Looking: three dots over its head, rising one after another.
+        <g className="mascot-dots" style={{ fill: `var(--mascot-1, ${kBodyStops[1][1]})` }}>
+          {[320, 450, 580].map((cx) => <circle key={cx} cx={cx} cy="0" r="50" />)}
+        </g>
+      )}
     </svg>
   );
 }
