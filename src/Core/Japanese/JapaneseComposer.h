@@ -1000,7 +1000,17 @@ private:
     // Mix live conversion: English run into Japanese as Space splits it
     // (meetingは何), for the keys it was worked out for.
     [[nodiscard]] std::optional<std::wstring> MixLiveSplit() const;
+    // Mixed typing: English run into Japanese shown as Space will split it,
+    // each run between punctuation on its own as Space takes them; the
+    // Japanese converted (live) or as kana, with the English as written or
+    // as typed (あたらしいapiのしようしょをgithubに), not all of it as letters.
+    [[nodiscard]] std::optional<std::wstring> MixSplitShown(bool convert) const;
+    // What typing shows as letters, or as MixSplitShown when it splits.
+    [[nodiscard]] std::optional<std::wstring> LettersShown() const;
     mutable std::wstring liveSplitKeys_;
+    mutable bool liveSplitConverted_{false};
+    mutable std::size_t liveSplitPending_{0};
+    mutable std::size_t liveSplitTailTaken_{0};
     mutable std::optional<std::wstring> liveSplitText_;
     // The chunk converted last had a slip put right in its kana (FixSlips).
     bool slipUndone_{false};

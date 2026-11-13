@@ -1017,8 +1017,8 @@ std::size_t JapaneseComposer::CaretOffset() const {
         return end;
     }
     if (!segments.empty() && segments.front().settled) settled = segments.front().text.size();
-    if (const auto letters = TypedLetters()) return settled + letters->size();
     if (const auto live = MixLiveText()) return settled + live->size();
+    if (const auto letters = LettersShown()) return settled + letters->size();
     return settled + ReadingOffset(caret_) + pending_.size();
 }
 
@@ -4155,7 +4155,7 @@ std::vector<PreeditSegment> JapaneseComposer::Segments() const {
             segments.push_back({*live, true, false});
         } else if (Typing()) {
             // Not taken as anything yet, even shown as letters.
-            segments.push_back({TypedLetters().value_or(RenderTyping(true)), false, false});
+            segments.push_back({LettersShown().value_or(RenderTyping(true)), false, false});
         }
         return segments;
     }
@@ -4386,21 +4386,41 @@ std::optional<std::wstring> JapaneseComposer::TypedLetters() const {
     return keys;
 }
 
-std::optional<std::wstring> JapaneseComposer::MixLiveSplit() const {
+std::optional<std::wstring> JapaneseComposer::MixLiveSplit() const { return MixSplitShown(true); }
+
+std::optional<std::wstring> JapaneseComposer::LettersShown() const {
+    const auto letters = TypedLetters();
+    if (!letters) return std::nullopt;
+    if (const auto split = MixSplitShown(false)) return split;
+    return letters;
+}
+
+std::optional<std::wstring> JapaneseComposer::MixSplitShown(bool convert) const {
+    if (!chunkJudge_) return std::nullopt;
     // Typed with a capital, or an English word still being typed (meetin):
     // the letters.
     std::wstring keys = Keys(true);
     if (TypedWithCapitals(keys)) return std::nullopt;
     for (auto& c : keys) c = static_cast<wchar_t>(std::towlower(c));
     if (keys.empty() || chunkJudge_->MayStartEnglishWord(keys)) return std::nullopt;
-    // The letters of a syllable still being typed stay as typed.
+    // The letters of a syllable still being typed stay as typed: the keys
+    // still pending, and letters no kana took at the end (full-width in the
+    // reading, ｋ).
     const std::wstring reading = Reading();
-    std::size_t pending = 0;
-    while (pending < reading.size() && pending < keys.size()) {
-        const wchar_t c = reading[reading.size() - 1 - pending];
-        if (!((c >= L'a' && c <= L'z') || (c >= L'A' && c <= L'Z'))) break;
+    std::size_t pending = pending_.size();
+    const std::size_t pendingKeys = pending;
+    std::size_t at = reading.size();
+    for (; at > 0 && pending < keys.size(); --at) {
+        const wchar_t c = reading[at - 1];
+        const bool letter = (c >= L'a' && c <= L'z') || (c >= L'A' && c <= L'Z') || (c >= 0xFF21 && c <= 0xFF3A) ||
+                            (c >= 0xFF41 && c <= 0xFF5A);
+        if (!letter) break;
         ++pending;
     }
+    // Letters no kana took are in what is still being typed (github's b).
+    const bool leftoverAtEnd = pending > pendingKeys;
+    // A small tsu at the end waits for its kana too (app: あっp).
+    if (at > 0 && reading[at - 1] == L'\u3063' && pending == pendingKeys && pending < keys.size()) ++pending;
     std::wstring core = keys.substr(0, keys.size() - pending);
     std::wstring marks;
     while (!core.empty() && std::wstring_view(L".,!?").find(core.back()) != std::wstring_view::npos) {
@@ -4408,42 +4428,175 @@ std::optional<std::wstring> JapaneseComposer::MixLiveSplit() const {
         core.pop_back();
     }
     if (core.empty()) return std::nullopt;
-    if (core != liveSplitKeys_) {
+    std::size_t& tailTaken = liveSplitTailTaken_;
+    if (core != liveSplitKeys_ || convert != liveSplitConverted_ || pending != liveSplitPending_) {
+        liveSplitPending_ = pending;
         liveSplitKeys_ = core;
+        liveSplitConverted_ = convert;
         liveSplitText_.reset();
-        // English run into Japanese, as Space splits it (meetinghananiji:
-        // meetingは何時).
-        if (const auto pieces = chunkJudge_->Split(core)) {
-            std::wstring text;
-            bool english = false, japanese = false, ok = true;
-            // English with Japanese stays in small letters at the start of
-            // a sentence too (LowerSentenceStarts).
-            const bool allEnglish = std::all_of(pieces->begin(), pieces->end(), [](const ChunkJudge::Piece& p) { return p.english; });
-            for (std::size_t i = 0; i < pieces->size() && ok; ++i) {
-                const auto& piece = (*pieces)[i];
-                if (piece.english) {
-                    english = true;
-                    text += i == 0 && allEnglish ? EnglishAsWritten(piece.text) : piece.text;
-                    continue;
-                }
-                japanese = true;
-                // A piece after another is inside the sentence, not at its start.
-                if (i > 0 && converter_) converter_->SetAtSentenceStart(false);
-                const auto piecePhrases = ConvertReading(ApplyTypingStyle(piece.text), 0, i == 0 ? context_ : 0, WordsWithEnglish());
-                if (i > 0) UpdateJoinedStart();
-                for (const auto& phrase : piecePhrases) {
-                    if (phrase.candidates.empty()) {
-                        ok = false;
-                        break;
+        // An n at the end of what is shown is ん when a key came after it
+        // (kakunin then s: かくにん), as the reading has it.
+        const bool nTaken = pending > 0 || !marks.empty();
+        const auto kanaOf = [&](std::wstring_view part, bool atEnd = false) -> std::optional<std::wstring> {
+            std::wstring kana;
+            const auto tokens = ParseRomaji(*table_, part);
+            for (std::size_t t = 0; t < tokens.size(); ++t) {
+                const auto& token = tokens[t];
+                if (token.leftover) {
+                    if (atEnd && nTaken && t + 1 == tokens.size() && token.kana == L"n") {
+                        kana += L'\u3093';
+                        continue;
                     }
-                    text += phrase.candidates.front().text;
+                    return std::nullopt;
+                }
+                kana += token.kana;
+            }
+            return ApplyTypingStyle(kana);
+        };
+        std::wstring text;
+        bool english = false, japanese = false, ok = true;
+        tailTaken = 0;
+        // English run into Japanese, as Space splits it (meetinghananiji:
+        // meetingは何時), each run between punctuation on its own.
+        for (std::size_t start = 0; start < core.size() && ok;) {
+            std::size_t end = core.find_first_of(L".,!?", start);
+            if (end == std::wstring::npos) end = core.size();
+            if (end > start) {
+                const std::wstring_view run = std::wstring_view(core).substr(start, end - start);
+                constexpr std::size_t kTyping = 16;
+                constexpr std::size_t kShortest = 4;
+                const bool last = end == core.size();
+                // An English word being typed at the end (...github,
+                // ...slac): it as typed, after what splits or reads as kana;
+                // the longest such word.
+                const auto englishAtEnd = [&]() -> std::vector<ChunkJudge::Piece> {
+                    std::vector<ChunkJudge::Piece> found;
+                    const std::size_t from = std::max(kShortest, run.size() > kTyping ? run.size() - kTyping : 0);
+                    for (std::size_t cut = from; found.empty() && cut + 2 <= run.size(); ++cut) {
+                        const std::wstring rest(run.substr(cut));
+                        // A common English word's start (sla: slack).
+                        const std::wstring tail = last && marks.empty() ? keys.substr(keys.size() - pending) : std::wstring{};
+                        if (!chunkJudge_->MayStartEnglishWord(rest + tail)) continue;
+                        const std::wstring_view head = run.substr(0, cut);
+                        if (auto pieces = chunkJudge_->Split(head)) {
+                            found = std::move(*pieces);
+                        } else if (const auto kana = kanaOf(head)) {
+                            found.push_back({false, std::wstring(head), *kana});
+                        } else {
+                            continue;
+                        }
+                        found.push_back({true, rest, rest});
+                    }
+                    // Else the fewest letters at the end no kana takes
+                    // (slac: not wo too), after what splits or reads as kana.
+                    for (std::size_t cut = run.size() - 2; found.empty() && cut >= from && cut < run.size(); --cut) {
+                        const std::wstring rest(run.substr(cut));
+                        if (kanaOf(rest)) continue;
+                        const std::wstring_view head = run.substr(0, cut);
+                        if (auto headPieces = chunkJudge_->Split(head)) {
+                            found = std::move(*headPieces);
+                        } else if (const auto kana = kanaOf(head)) {
+                            found.push_back({false, std::wstring(head), *kana});
+                        } else {
+                            continue;
+                        }
+                        found.push_back({true, rest, rest});
+                    }
+                    return found;
+                };
+                std::vector<ChunkJudge::Piece> parts;
+                // An English word that ends in keys still pending (github's
+                // b, then n): split with them, as Space will once they are
+                // taken.
+                if (last && marks.empty() && leftoverAtEnd) {
+                    const std::wstring tail = keys.substr(keys.size() - pending);
+                    for (std::size_t k = tail.size(); k > 0 && parts.empty(); --k) {
+                        auto pieces = chunkJudge_->Split(std::wstring(run) + tail.substr(0, k));
+                        if (!pieces || pieces->empty() || !pieces->back().english) continue;
+                        parts = std::move(*pieces);
+                        tailTaken = k;
+                    }
+                }
+                if (!parts.empty()) {
+                } else if (auto pieces = chunkJudge_->Split(run)) {
+                    parts = std::move(*pieces);
+                } else if (last && leftoverAtEnd && !(parts = englishAtEnd()).empty()) {
+                } else if (const auto kana = kanaOf(run, last)) {
+                    parts.push_back({false, std::wstring(run), *kana});
+                } else {
+                    // Still being typed (urlwokakunins): split as far as it
+                    // splits, the rest as kana; else an English word at the
+                    // end; else this run as letters, the runs before it as
+                    // they split.
+                    for (std::size_t cut = run.size() - 1; cut >= kShortest && cut + kTyping >= run.size(); --cut) {
+                        const auto rest = kanaOf(run.substr(cut), last);
+                        if (!rest) continue;
+                        if (auto cutPieces = chunkJudge_->Split(run.substr(0, cut))) {
+                            parts = std::move(*cutPieces);
+                            parts.push_back({false, std::wstring(run.substr(cut)), *rest});
+                            break;
+                        }
+                    }
+                    if (parts.empty()) parts = englishAtEnd();
+                    // Else letters no kana takes at the start with a
+                    // particle after them (pcwoka: pc, then をか), the fewest
+                    // of them; not an English word still being typed (docke).
+                    constexpr std::wstring_view kParticles[] = {L"wo", L"ga", L"ni", L"de", L"ha", L"wa", L"no", L"mo", L"to"};
+                    const std::wstring typedTail = last && marks.empty() ? keys.substr(keys.size() - pending) : std::wstring{};
+                    const bool englishGoingOn = chunkJudge_->MayStartEnglishWord(std::wstring(run) + typedTail);
+                    for (std::size_t cut = 2; !englishGoingOn && parts.empty() && cut < run.size() && cut <= kTyping; ++cut) {
+                        if (kanaOf(run.substr(0, cut))) continue;
+                        const std::wstring_view after = run.substr(cut);
+                        if (std::none_of(std::begin(kParticles), std::end(kParticles),
+                                         [&](std::wstring_view particle) { return after.starts_with(particle); })) {
+                            continue;
+                        }
+                        const auto rest = kanaOf(after, last);
+                        if (!rest) continue;
+                        parts.push_back({true, std::wstring(run.substr(0, cut)), std::wstring(run.substr(0, cut))});
+                        parts.push_back({false, std::wstring(run.substr(cut)), *rest});
+                    }
+                    if (parts.empty()) parts.push_back({true, std::wstring(run), std::wstring(run)});
+                }
+                // English with Japanese stays in small letters at the start
+                // of a sentence too (LowerSentenceStarts).
+                const bool allEnglish = std::all_of(parts.begin(), parts.end(), [](const ChunkJudge::Piece& p) { return p.english; });
+                for (std::size_t i = 0; i < parts.size() && ok; ++i) {
+                    const auto& piece = parts[i];
+                    if (piece.english) {
+                        english = true;
+                        text += !convert ? piece.keys : start == 0 && i == 0 && allEnglish ? EnglishAsWritten(piece.text) : piece.text;
+                        continue;
+                    }
+                    japanese = true;
+                    if (!convert) {
+                        text += ApplyTypingStyle(piece.text);
+                        continue;
+                    }
+                    // A piece after another is inside the sentence, not at its start.
+                    const bool inside = i > 0 || start > 0;
+                    if (inside && converter_) converter_->SetAtSentenceStart(false);
+                    const auto piecePhrases = ConvertReading(ApplyTypingStyle(piece.text), 0, inside ? 0 : context_, WordsWithEnglish());
+                    if (inside) UpdateJoinedStart();
+                    for (const auto& phrase : piecePhrases) {
+                        if (phrase.candidates.empty()) {
+                            ok = false;
+                            break;
+                        }
+                        text += phrase.candidates.front().text;
+                    }
                 }
             }
-            if (ok && english && japanese) liveSplitText_ = std::move(text);
+            if (end < core.size()) {
+                const auto mark = kanaOf(std::wstring_view(core).substr(end, 1));
+                text += mark ? *mark : std::wstring(1, core[end]);
+            }
+            start = end + 1;
         }
+        if (ok && english && japanese) liveSplitText_ = std::move(text);
     }
     if (!liveSplitText_) return std::nullopt;
-    return *liveSplitText_ + MarksAfterEnglish(marks) + reading.substr(reading.size() - pending);
+    return *liveSplitText_ + MarksAfterEnglish(marks) + keys.substr(keys.size() - pending + tailTaken);
 }
 
 std::optional<std::wstring> JapaneseComposer::MixLiveText() const {
@@ -4994,7 +5147,7 @@ std::wstring JapaneseComposer::CommitChunk() {
         // Not English, yet shown as letters (3abc: the b and c no kana
         // took): committed as it shows.
         if (!IsConverted() && !Live()) {
-            if (const auto letters = TypedLetters()) {
+            if (const auto letters = LettersShown()) {
                 committedAsShown_ = *letters;
                 BuildPhrases(true);
             }

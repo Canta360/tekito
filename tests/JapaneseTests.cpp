@@ -1062,6 +1062,32 @@ void TestMixedTyping(const RomajiTable& table, const MiniPack& pack) {
         Require(shown.ends_with(L"k") || shown.ends_with(L"ｋ"), "Mix live conversion shows the key still pending");
     }
     {
+        // Without live conversion, English run into Japanese shows as Space
+        // will split it, with the Japanese as kana, not all of it as letters;
+        // each run between punctuation on its own, and an English word still
+        // being typed at the end as typed.
+        JapaneseComposer typing(&table);
+        typing.SetConverter(&converter);
+        typing.SetMixedTyping(&judge);
+        const auto shown = [&] {
+            std::wstring text;
+            for (const auto& segment : typing.Segments()) text += segment.text;
+            return text;
+        };
+        Type(typing, L"pushsimasita");
+        Require(shown().starts_with(L"push") && shown().find(L"し") != std::wstring::npos,
+                "English run into Japanese shows its Japanese as kana while typed");
+        Require(typing.CaretOffset() == shown().size(), "with the caret after what shows");
+        typing.Clear();
+        Type(typing, L"pushsimasita,pushsimasita");
+        Require(shown().find(L"、") != std::wstring::npos && shown().ends_with(L"た"),
+                "after punctuation too, each run on its own");
+        typing.Clear();
+        Type(typing, L"pushsimasita,push");
+        Require(!shown().starts_with(L"pushsimasita") && shown().find(L"し") != std::wstring::npos,
+                "English typed after punctuation leaves the kana before it as kana");
+    }
+    {
         const auto sentence = judge.Judge(L"ipushtohome", 0);
         Require(sentence.english && sentence.written == L"I push to home",
                 "an English sentence typed without spaces gets its spaces");
