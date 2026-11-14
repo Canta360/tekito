@@ -1828,8 +1828,10 @@ HRESULT TextService::HandleKeyInEditSessionCore(ITfContext* context, TfEditCooki
     }
     const bool learning = userSettings_.learningEnabled && !symbolComposition_ && !privateField;
 
+    // Social learning keeps nothing either where nothing is learned (secret
+    // mode, a private window, learning off).
     const auto recordSocialSelection = [&](const Candidate& candidate) {
-        if (userSettings_.socialPersonalization <= 0 ||
+        if (!learning || userSettings_.socialPersonalization <= 0 ||
             candidate.socialRange == SocialRangeUnspecified) return;
         const auto trigger = rawText_.starts_with(L':') ? std::wstring_view(rawText_).substr(1)
                                                         : std::wstring_view(rawText_);
@@ -2017,7 +2019,7 @@ HRESULT TextService::HandleKeyInEditSessionCore(ITfContext* context, TfEditCooki
                 userLearning_.RecordExposure(rawText_, candidateBefore);
                 userLearning_.RecordUndo(rawText_, candidateBefore);
             }
-            if (socialCandidateBefore && userSettings_.socialPersonalization > 0) {
+            if (learning && socialCandidateBefore && userSettings_.socialPersonalization > 0) {
                 const auto trigger = rawText_.starts_with(L':') ? std::wstring_view(rawText_).substr(1)
                                                                 : std::wstring_view(rawText_);
                 socialLearning_.RecordUndo(trigger, candidateBefore);
@@ -2471,7 +2473,11 @@ void TextService::ShowCandidates(ITfContext* context, TfEditCookie editCookie) {
     candidateWindow_.SetJapanese(userdata::UseJapaneseUi(userSettings_.uiLanguage));
     candidateWindow_.Show(anchor, EnglishRows(), state_.SelectedIndex(), state_.PageStart(), state_.VisibleCount(),
                           SelectedEnglishMeaning());
-    if (userSettings_.socialPersonalization > 0) {
+    // Not where nothing is learned (secret mode, a private window, learning off).
+    const bool secret = runtimeMode_ && runtimeMode_->Secret();
+    const bool keepsNothing = !userSettings_.learningEnabled || secret ||
+                              (userSettings_.noLearningInPrivate && privateField_);
+    if (userSettings_.socialPersonalization > 0 && !keepsNothing) {
         const auto trigger = rawText_.starts_with(L':') ? std::wstring_view(rawText_).substr(1)
                                                         : std::wstring_view(rawText_);
         for (const auto& candidate : state_.Candidates()) {
