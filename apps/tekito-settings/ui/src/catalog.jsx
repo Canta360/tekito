@@ -116,8 +116,18 @@ export function catalog(ctx) {
         </Row>
       ),
     },
+    {
+      id: "switchOrder", page: "general", group: "switching", keys: ["switchOrder", "switchModes", "japaneseEnabled", "mixedTypingEnabled"],
+      title: g.order.title, find: [t.modes.find(t.modeNames.japanese), t.modes.find(t.modeNames.mixed), t.modes.add],
+      render: () => (
+        <SwitchOrder settings={s} setSetting={set} japaneseInstalled={ctx.japaneseInstalled} japaneseInstalling={ctx.japaneseInstalling}
+          addJapanese={ctx.japaneseAddable ? addJapanese : null} japaneseError={ctx.japaneseDataError} />
+      ),
+    },
+    // Under the switch key and order; on a keyboard without the Japanese
+    // keys shown at once, otherwise under 詳細.
     toggle("altSwitches", "general", "switching", "switch_left", g.altSwitches, "altSwitches", {
-      detail: true, keys: ["altLeftMode", "altRightMode"],
+      detail: ctx.japaneseKeyboard, keys: ["altLeftMode", "altRightMode"],
       sub: () => s.altSwitches && (() => {
         // The modes there are, then none.
         const a = g.altSwitches;
@@ -156,14 +166,6 @@ export function catalog(ctx) {
             {ctx.windowsInput.tekitoDefault ? g.defaultIme.isDefault : g.defaultIme.make}
           </Button>
         </Row>
-      ),
-    },
-    {
-      id: "switchOrder", page: "general", group: "switching", keys: ["switchOrder", "switchModes", "japaneseEnabled", "mixedTypingEnabled"],
-      title: g.order.title, find: [t.modes.find(t.modeNames.japanese), t.modes.find(t.modeNames.mixed), t.modes.add],
-      render: () => (
-        <SwitchOrder settings={s} setSetting={set} japaneseInstalled={ctx.japaneseInstalled} japaneseInstalling={ctx.japaneseInstalling}
-          addJapanese={ctx.japaneseAddable ? addJapanese : null} japaneseError={ctx.japaneseDataError} />
       ),
     },
     {
