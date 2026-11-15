@@ -607,6 +607,7 @@ HRESULT TextService::ActivateEx(ITfThreadMgr* threadManager, TfClientId clientId
 
     UpdateToggleKey(userdata::PreservedSwitchKey(userSettings_.toggleKey, userSettings_.keyboardType));
     UpdateKanaInputKey(userSettings_.japaneseKanaInputKey && JapaneseModeAvailable());
+    UpdateAltHook(userSettings_.altSwitches);
     AdviseThreadManagerSinks();
     SyncModeCompartments();
 
@@ -671,6 +672,7 @@ HRESULT TextService::Deactivate() {
     UnadviseThreadManagerSinks();
     UpdateToggleKey(0);
     UpdateKanaInputKey(false);
+    UpdateAltHook(false);
 
     if (threadManager_ && clientId_ != TF_CLIENTID_NULL) {
         ComPtr<ITfKeystrokeMgr> keystrokeManager;
@@ -790,6 +792,7 @@ void TextService::ResetEngine() {
 }
 
 void TextService::ApplySettings() {
+    UpdateAltHook(userSettings_.altSwitches);
     userLearningProvider_.SetEnabled(userSettings_.learningEnabled);
     socialLearningProvider_.SetProfile(userSettings_.socialExpressionRange,
                                        userSettings_.socialPersonalization);
@@ -1104,10 +1107,6 @@ HRESULT TextService::OnSetFocus(BOOL foreground) {
 HRESULT TextService::OnTestKeyDown(ITfContext* context, WPARAM wParam, LPARAM lParam, BOOL* eaten) {
     if (!eaten) return E_INVALIDARG;
     SyncRuntimeState();
-    if (NoteAltKey(wParam, lParam)) {
-        *eaten = FALSE;
-        return S_OK;
-    }
     if (IsReadOnly(context)) {
         *eaten = FALSE;
         return S_OK;
@@ -1150,10 +1149,6 @@ HRESULT TextService::OnKeyDown(ITfContext* context, WPARAM wParam, LPARAM lParam
     }
     if (!context || !eaten) return E_INVALIDARG;
     SyncRuntimeState();
-    if (NoteAltKey(wParam, lParam)) {
-        *eaten = FALSE;
-        return S_OK;
-    }
     activationSettling_ = false;
     if (IsReadOnly(context)) {
         *eaten = FALSE;
@@ -1199,22 +1194,15 @@ HRESULT TextService::OnKeyDown(ITfContext* context, WPARAM wParam, LPARAM lParam
     return S_OK;
 }
 
-HRESULT TextService::OnTestKeyUp(ITfContext*, WPARAM wParam, LPARAM lParam, BOOL* eaten) {
+HRESULT TextService::OnTestKeyUp(ITfContext*, WPARAM, LPARAM, BOOL* eaten) {
     if (!eaten) return E_INVALIDARG;
-    // Alt tapped alone switches (and opens no menu).
-    *eaten = AltTapped(wParam, lParam) ? TRUE : FALSE;
+    *eaten = FALSE;
     return S_OK;
 }
 
-HRESULT TextService::OnKeyUp(ITfContext* context, WPARAM wParam, LPARAM lParam, BOOL* eaten) {
+HRESULT TextService::OnKeyUp(ITfContext*, WPARAM, LPARAM, BOOL* eaten) {
     if (!eaten) return E_INVALIDARG;
     *eaten = FALSE;
-    const auto tapped = AltTapped(wParam, lParam);
-    if (!tapped) return S_OK;
-    altTap_.reset();
-    if (TraceEnabled()) Trace(*tapped ? L"Alt tapped (right)" : L"Alt tapped (left)");
-    ApplyModeKey(context, AltModeKey(*tapped));
-    *eaten = TRUE;
     return S_OK;
 }
 

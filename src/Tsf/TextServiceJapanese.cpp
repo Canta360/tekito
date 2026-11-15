@@ -321,34 +321,85 @@ TextService::ModeKey TextService::AltModeKey(bool right) const {
     return key;
 }
 
-bool TextService::NoteAltKey(WPARAM wParam, LPARAM lParam) {
-    const bool alt = wParam == VK_MENU || wParam == VK_LMENU || wParam == VK_RMENU;
-    if (!alt) {
+namespace {
+// The text service whose Alt hook runs on this thread.
+thread_local TextService* altHookOwner = nullptr;
+}  // namespace
+
+void TextService::UpdateAltHook(bool on) {
+    const bool wanted = on && clientId_ != TF_CLIENTID_NULL;
+    if (wanted && !altHook_) {
+        altHookOwner = this;
+        // This thread only: the keys of the application TEKITO types in.
+        altHook_ = SetWindowsHookExW(WH_KEYBOARD, &TextService::AltHookProc, nullptr, GetCurrentThreadId());
+        if (!altHook_) altHookOwner = nullptr;
+    } else if (!wanted && altHook_) {
+        UnhookWindowsHookEx(altHook_);
+        altHook_ = nullptr;
+        if (altHookOwner == this) altHookOwner = nullptr;
+        if (altTimer_) KillTimer(nullptr, altTimer_);
+        altTimer_ = 0;
         altTap_.reset();
+        altTapped_.reset();
+    }
+}
+
+LRESULT CALLBACK TextService::AltHookProc(int code, WPARAM wParam, LPARAM lParam) {
+    if (code == HC_ACTION && altHookOwner && altHookOwner->OnAltHookKey(wParam, lParam)) return 1;
+    return CallNextHookEx(nullptr, code, wParam, lParam);
+}
+
+bool TextService::OnAltHookKey(WPARAM key, LPARAM flags) {
+    constexpr ULONGLONG kTapMs = 600;
+    const bool up = (static_cast<ULONG_PTR>(flags) & 0x80000000u) != 0;
+    const bool alt = key == VK_MENU || key == VK_LMENU || key == VK_RMENU;
+    if (!alt) {
+        // Any other key pressed with it: Alt is for a shortcut.
+        if (!up) altTap_.reset();
         return false;
     }
-    // Held down: as it was.
-    if ((lParam & (1 << 30)) != 0) return true;
-    const bool right = wParam == VK_RMENU || (wParam == VK_MENU && (lParam & (1 << 24)) != 0);
-    if (TraceEnabled()) Trace(right ? L"Alt down (right)" : L"Alt down (left)");
-    // Not with Ctrl (AltGr is Ctrl and the right Alt), Shift or Windows.
-    const bool others = KeyDown(VK_CONTROL) || KeyDown(VK_SHIFT) || KeyDown(VK_LWIN) || KeyDown(VK_RWIN);
-    if (userSettings_.altSwitches && !others && !ProcessPassesThrough()) {
-        altTap_ = right;
-        altDownAt_ = GetTickCount64();
-    } else {
-        altTap_.reset();
+    const bool right = key == VK_RMENU || (flags & (1 << 24)) != 0;
+    if (!up) {
+        // Held down: as it was.
+        if ((flags & (1 << 30)) != 0) return false;
+        // Not with Ctrl (AltGr is Ctrl and the right Alt), Shift or Windows.
+        const bool others = KeyDown(VK_CONTROL) || KeyDown(VK_SHIFT) || KeyDown(VK_LWIN) || KeyDown(VK_RWIN);
+        if (userSettings_.altSwitches && !others && !ProcessPassesThrough()) {
+            altTap_ = right;
+            altDownAt_ = GetTickCount64();
+        } else {
+            altTap_.reset();
+        }
+        return false;
     }
+    const bool tapped = altTap_ && *altTap_ == right && GetTickCount64() - altDownAt_ <= kTapMs;
+    altTap_.reset();
+    if (!tapped || !userSettings_.altSwitches) return false;
+    if (TraceEnabled()) Trace(right ? L"Alt tapped (right)" : L"Alt tapped (left)");
+    // Taken from the application, so that its menu does not open; its
+    // keyboard state lets go of Alt all the same.
+    BYTE state[256]{};
+    if (GetKeyboardState(state)) {
+        state[VK_MENU] &= 0x7F;
+        state[VK_LMENU] &= 0x7F;
+        state[VK_RMENU] &= 0x7F;
+        SetKeyboardState(state);
+    }
+    // Switched once the hook has returned (committing may edit the text).
+    altTapped_ = right;
+    altTimer_ = SetTimer(nullptr, altTimer_, 0, &TextService::OnAltTapTimer);
     return true;
 }
 
-std::optional<bool> TextService::AltTapped(WPARAM wParam, LPARAM lParam) const {
-    constexpr ULONGLONG kTapMs = 600;
-    if (!altTap_ || !userSettings_.altSwitches) return std::nullopt;
-    if (wParam != VK_MENU && wParam != VK_LMENU && wParam != VK_RMENU) return std::nullopt;
-    const bool right = wParam == VK_RMENU || (wParam == VK_MENU && (lParam & (1 << 24)) != 0);
-    if (right != *altTap_ || GetTickCount64() - altDownAt_ > kTapMs) return std::nullopt;
-    return right;
+void CALLBACK TextService::OnAltTapTimer(HWND, UINT, UINT_PTR id, DWORD) {
+    KillTimer(nullptr, id);
+    TextService* self = altHookOwner;
+    if (!self || id != self->altTimer_) return;
+    self->altTimer_ = 0;
+    const auto right = std::exchange(self->altTapped_, std::nullopt);
+    if (!right) return;
+    self->SyncRuntimeState();
+    self->ApplyModeKey(self->sinkContext_.Get(), self->AltModeKey(*right));
 }
 
 void TextService::ApplyModeKey(ITfContext* context, const ModeKey& key) {

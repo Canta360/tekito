@@ -184,13 +184,22 @@ private:
     // Alt pressed alone (UserSettings::altSwitches): the left one to
     // English, the right one to Japanese (Mix when it comes first).
     ModeKey AltModeKey(bool right) const;
-    // A key down: whether it is Alt (the application's), noting a press that
-    // may be a tap; any other key ends the tap.
-    bool NoteAltKey(WPARAM wParam, LPARAM lParam);
-    // Alt let go after a tap: which one (true: the right one).
-    std::optional<bool> AltTapped(WPARAM wParam, LPARAM lParam) const;
+    // TSF does not pass Alt to text services: a keyboard hook on this
+    // thread (the application's own) sees it, while altSwitches is on.
+    void UpdateAltHook(bool on);
+    // A key the hook saw (its virtual key and flags, as WH_KEYBOARD gives
+    // them): whether it is taken from the application (Alt let go after a
+    // tap, so that no menu opens).
+    bool OnAltHookKey(WPARAM key, LPARAM flags);
+    static LRESULT CALLBACK AltHookProc(int code, WPARAM wParam, LPARAM lParam);
+    static void CALLBACK OnAltTapTimer(HWND, UINT, UINT_PTR id, DWORD);
+    HHOOK altHook_{nullptr};
+    // Alt pressed, alone so far (true: the right one).
     std::optional<bool> altTap_;
     ULONGLONG altDownAt_{0};
+    // A tap to switch with once the hook has returned.
+    std::optional<bool> altTapped_;
+    UINT_PTR altTimer_{0};
     void ApplyModeKey(ITfContext* context, const ModeKey& key);
     // The mode the switch key (and a click on the mode button) goes to.
     InputMode ToggledMode() const noexcept;
