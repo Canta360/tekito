@@ -116,6 +116,7 @@ export function catalog(ctx) {
         </Row>
       ),
     },
+    toggle("altSwitches", "general", "switching", "switch_left", g.altSwitches, "altSwitches", { detail: true }),
     {
       id: "ctrlShift", page: "general", group: "switching", keys: [], title: g.ctrlShift.title, about: g.ctrlShift.description, detail: true,
       render: () => (
@@ -461,7 +462,7 @@ export function aiSpecs(ctx) {
     kanjiVariants: ["japaneseKanjiVariants"], period: ["periodOnEnter"], doubleSpace: ["doubleSpacePeriod"], smart: ["smartPunctuation"],
     meanings: ["meaningsEnabled", "meaningsInUiLanguage"], candidateWindow: ["candidateWindowEnabled"],
     special: ["dateConversion", "symbolConversion", "calculatorEnabled"], firstPageSymbol: ["japaneseFirstPageSymbol", "mixFirstPageSymbol"],
-    typedForms: ["japaneseTypedForms"], chunks: ["japaneseChunkCandidates"], kanaInput: ["japaneseKanaInput", "japaneseKanaInputKey"], capsLock: ["japaneseIgnoreCapsLock"], escStepsBack: ["escStepsBack"], convertFromEnd: ["convertFromEnd"], shiftEnter: ["shiftEnterCommitsToFocus"], punctuationCommit: ["commitAtPunctuation"],
+    typedForms: ["japaneseTypedForms"], chunks: ["japaneseChunkCandidates"], kanaInput: ["japaneseKanaInput", "japaneseKanaInputKey"], capsLock: ["japaneseIgnoreCapsLock"], escStepsBack: ["escStepsBack"], altSwitches: ["altSwitches"], convertFromEnd: ["convertFromEnd"], shiftEnter: ["shiftEnterCommitsToFocus"], punctuationCommit: ["commitAtPunctuation"],
     numpad: ["japaneseNumpadDirect"], brackets: ["bracketPairs"], spaceless: ["spacelessEnglish", "spacelessEnglishAlways"],
     numbers: ["japaneseRoughNumbersKanji", "numberConversion"],
     learn: ["learningEnabled"], secret: ["secretMode"], private: ["noLearningInPrivate"],

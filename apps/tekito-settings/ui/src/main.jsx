@@ -90,6 +90,7 @@ const initialSettings = {
   recheckPreviousWord: true,
   enterCommitsAsShown: false,
   escStepsBack: false,
+  altSwitches: false,
   convertFromEnd: false,
   shiftEnterCommitsToFocus: false,
   commitAtPunctuation: false,

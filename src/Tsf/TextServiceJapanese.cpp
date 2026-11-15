@@ -283,6 +283,62 @@ bool TextService::TranslateModeKey(WPARAM wParam, ModeKey& key) const {
     }
 }
 
+TextService::ModeKey TextService::AltModeKey(bool right) const {
+    ModeKey key;
+    key.mode = mode_;
+    if (!JapaneseTypingAvailable()) {
+        key.mode = right ? InputMode::Convert : InputMode::Direct;
+        return key;
+    }
+    if (!right) {
+        if (TypesJapanese(mode_)) {
+            key.mode = userSettings_.japaneseProfileEnglishMode == InputMode::Direct ? InputMode::Direct
+                                                                                     : InputMode::Convert;
+        }
+        return key;
+    }
+    if (TypesJapanese(mode_)) return key;
+    // The typing mode that comes first in the switch order.
+    key.mode = AvailableMode(InputMode::Japanese);
+    for (const auto& [mode, bit] : userdata::SwitchOrderModes(userSettings_.switchOrder)) {
+        if ((userSettings_.switchModes & bit) != 0 && TypesJapanese(mode) && AvailableMode(mode) == mode) {
+            key.mode = mode;
+            break;
+        }
+    }
+    return key;
+}
+
+bool TextService::NoteAltKey(WPARAM wParam, LPARAM lParam) {
+    const bool alt = wParam == VK_MENU || wParam == VK_LMENU || wParam == VK_RMENU;
+    if (!alt) {
+        altTap_.reset();
+        return false;
+    }
+    // Held down: as it was.
+    if ((lParam & (1 << 30)) != 0) return true;
+    const bool right = wParam == VK_RMENU || (wParam == VK_MENU && (lParam & (1 << 24)) != 0);
+    if (TraceEnabled()) Trace(right ? L"Alt down (right)" : L"Alt down (left)");
+    // Not with Ctrl (AltGr is Ctrl and the right Alt), Shift or Windows.
+    const bool others = KeyDown(VK_CONTROL) || KeyDown(VK_SHIFT) || KeyDown(VK_LWIN) || KeyDown(VK_RWIN);
+    if (userSettings_.altSwitches && !others && !ProcessPassesThrough()) {
+        altTap_ = right;
+        altDownAt_ = GetTickCount64();
+    } else {
+        altTap_.reset();
+    }
+    return true;
+}
+
+std::optional<bool> TextService::AltTapped(WPARAM wParam, LPARAM lParam) const {
+    constexpr ULONGLONG kTapMs = 600;
+    if (!altTap_ || !userSettings_.altSwitches) return std::nullopt;
+    if (wParam != VK_MENU && wParam != VK_LMENU && wParam != VK_RMENU) return std::nullopt;
+    const bool right = wParam == VK_RMENU || (wParam == VK_MENU && (lParam & (1 << 24)) != 0);
+    if (right != *altTap_ || GetTickCount64() - altDownAt_ > kTapMs) return std::nullopt;
+    return right;
+}
+
 void TextService::ApplyModeKey(ITfContext* context, const ModeKey& key) {
     if (key.ignored) return;
     // What is being typed is committed as it stands before the switch.

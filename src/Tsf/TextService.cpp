@@ -1103,6 +1103,10 @@ HRESULT TextService::OnSetFocus(BOOL foreground) {
 HRESULT TextService::OnTestKeyDown(ITfContext* context, WPARAM wParam, LPARAM lParam, BOOL* eaten) {
     if (!eaten) return E_INVALIDARG;
     SyncRuntimeState();
+    if (NoteAltKey(wParam, lParam)) {
+        *eaten = FALSE;
+        return S_OK;
+    }
     if (IsReadOnly(context)) {
         *eaten = FALSE;
         return S_OK;
@@ -1145,6 +1149,10 @@ HRESULT TextService::OnKeyDown(ITfContext* context, WPARAM wParam, LPARAM lParam
     }
     if (!context || !eaten) return E_INVALIDARG;
     SyncRuntimeState();
+    if (NoteAltKey(wParam, lParam)) {
+        *eaten = FALSE;
+        return S_OK;
+    }
     activationSettling_ = false;
     if (IsReadOnly(context)) {
         *eaten = FALSE;
@@ -1190,15 +1198,22 @@ HRESULT TextService::OnKeyDown(ITfContext* context, WPARAM wParam, LPARAM lParam
     return S_OK;
 }
 
-HRESULT TextService::OnTestKeyUp(ITfContext*, WPARAM, LPARAM, BOOL* eaten) {
+HRESULT TextService::OnTestKeyUp(ITfContext*, WPARAM wParam, LPARAM lParam, BOOL* eaten) {
     if (!eaten) return E_INVALIDARG;
-    *eaten = FALSE;
+    // Alt tapped alone switches (and opens no menu).
+    *eaten = AltTapped(wParam, lParam) ? TRUE : FALSE;
     return S_OK;
 }
 
-HRESULT TextService::OnKeyUp(ITfContext*, WPARAM, LPARAM, BOOL* eaten) {
+HRESULT TextService::OnKeyUp(ITfContext* context, WPARAM wParam, LPARAM lParam, BOOL* eaten) {
     if (!eaten) return E_INVALIDARG;
     *eaten = FALSE;
+    const auto tapped = AltTapped(wParam, lParam);
+    if (!tapped) return S_OK;
+    altTap_.reset();
+    if (TraceEnabled()) Trace(*tapped ? L"Alt tapped (right)" : L"Alt tapped (left)");
+    ApplyModeKey(context, AltModeKey(*tapped));
+    *eaten = TRUE;
     return S_OK;
 }
 
@@ -1231,6 +1246,7 @@ HRESULT TextService::OnPopContext(ITfContext* context) {
 
 HRESULT TextService::OnSetFocus(ITfDocumentMgr* focus, ITfDocumentMgr*) {
     japanese_.ForgetCommit();
+    altTap_.reset();
     badgeOnNextKey_ = focus != nullptr;
     typedTail_.clear();
     // Light or dark taskbar: the mode icon follows when focus moves.

@@ -181,6 +181,16 @@ private:
     // Keys that switch modes: Hankaku/Zenkaku, Henkan and Muhenkan outside
     // a composition, Hiragana/Katakana, IME On/Off.
     bool TranslateModeKey(WPARAM wParam, ModeKey& key) const;
+    // Alt pressed alone (UserSettings::altSwitches): the left one to
+    // English, the right one to Japanese (Mix when it comes first).
+    ModeKey AltModeKey(bool right) const;
+    // A key down: whether it is Alt (the application's), noting a press that
+    // may be a tap; any other key ends the tap.
+    bool NoteAltKey(WPARAM wParam, LPARAM lParam);
+    // Alt let go after a tap: which one (true: the right one).
+    std::optional<bool> AltTapped(WPARAM wParam, LPARAM lParam) const;
+    std::optional<bool> altTap_;
+    ULONGLONG altDownAt_{0};
     void ApplyModeKey(ITfContext* context, const ModeKey& key);
     // The mode the switch key (and a click on the mode button) goes to.
     InputMode ToggledMode() const noexcept;

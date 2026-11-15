@@ -104,6 +104,9 @@ struct UserSettings {
     // 106/109 keys), 2 = US (101/102 keys). Decides the switch keys and the
     // layout the English profile uses. See KeyboardLayout.h.
     int keyboardType{0};
+    // Alt pressed alone: the left one to English, the right one to
+    // Japanese, for keyboards without the Japanese keys. Off by default.
+    bool altSwitches{false};
     // The ja-JP profile's mode (Japanese, Mixed, Convert or Direct), and which of
     // Convert and Direct its switch key goes to from Japanese.
     InputMode lastJapaneseProfileMode{InputMode::Japanese};
