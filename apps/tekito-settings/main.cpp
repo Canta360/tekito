@@ -1341,11 +1341,11 @@ private:
         const auto action = tekito::japanese::ActionFromName(message.String(L"action"))
                                 .value_or(tekito::japanese::UserWordAction::First);
         if (!reading) {
-            error = Text(L"Enter the reading in hiragana.", L"読みはひらがなで入力してください。");
+            error = Text(L"The reading is needed in hiragana.", L"読みはひらがなで登録できます。");
             return false;
         }
         if (surface.empty() || !kind) {
-            error = Text(L"Enter the word.", L"単語を入力してください。");
+            error = Text(L"The word is empty.", L"単語が空欄です。");
             return false;
         }
         const auto originalReading = message.String(L"originalReading");
@@ -1606,7 +1606,7 @@ private:
     bool AddExcludedApp(std::wstring_view input, std::wstring& error) {
         const auto name = ExecutableName(input);
         if (name.empty()) {
-            error = Text(L"Enter an app name, such as code.exe.", L"アプリ名を入力してください（例: code.exe）。");
+            error = Text(L"An app name is needed, such as code.exe.", L"アプリ名がありません（例: code.exe）。");
             return false;
         }
         const auto sameName = [&](const std::wstring& other) {
@@ -1642,7 +1642,7 @@ private:
         const auto raw = message.String(L"raw");
         const auto candidate = message.String(L"candidate");
         if (raw.empty() || candidate.empty()) {
-            error = Text(L"Input and output are required.", L"入力と変換後の両方を入力してください。");
+            error = Text(L"Input and output are required.", L"入力と変換後の両方が必要です。");
             return false;
         }
         const auto previous = dictionary_;
@@ -2270,7 +2270,7 @@ private:
             };
             if (!typed(input) || (!pending.empty() && !typed(pending)) || output.find(L'\t') != std::wstring::npos) {
                 Reply(requestId, false, Text(L"Keys are letters, digits and marks a keyboard types.",
-                                             L"入力はキーボードで打てる英数字と記号で書いてください。"));
+                                             L"入力には、キーボードで打てる英数字と記号を使えます。"));
                 return;
             }
             auto changes = tekito::japanese::RomajiTable::ReadChanges(tekito::japanese::UserRomajiFile());
