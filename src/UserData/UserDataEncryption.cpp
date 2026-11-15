@@ -152,7 +152,7 @@ bool WriteKeyFile(const std::filesystem::path& path, const KeyFile& file) {
     }
     // Written beside it, then put in place, so a failure leaves the old one.
     auto temporary = path;
-    temporary += L".new";
+    temporary += L".new-" + std::to_wstring(GetCurrentProcessId()) + L"-" + std::to_wstring(GetCurrentThreadId());
     {
         std::ofstream file_(temporary, std::ios::binary | std::ios::trunc);
         const auto text = out.str();
@@ -300,6 +300,44 @@ bool Opens(const std::filesystem::path& database, const DataKey& key) {
     return ok;
 }
 
+// One process at a time reads and changes user.key and the database's key
+// with it (Settings renewing the code while an app opening the database
+// changes it to the new key). Held by the thread that holds it again too.
+class KeyFileLock {
+public:
+    explicit KeyFileLock(DWORD wait) : mutex_(CreateMutexW(nullptr, FALSE, L"Local\\TEKITO.UserKey")) {
+        if (!mutex_) return;
+        const DWORD result = WaitForSingleObject(mutex_, wait);
+        held_ = result == WAIT_OBJECT_0 || result == WAIT_ABANDONED;
+    }
+    ~KeyFileLock() {
+        if (held_) ReleaseMutex(mutex_);
+        if (mutex_) CloseHandle(mutex_);
+    }
+    KeyFileLock(const KeyFileLock&) = delete;
+    KeyFileLock& operator=(const KeyFileLock&) = delete;
+    [[nodiscard]] bool Held() const noexcept { return held_; }
+
+private:
+    HANDLE mutex_{nullptr};
+    bool held_{false};
+};
+constexpr DWORD kChangeWait = 60000;  // a renewal waits for one in progress
+constexpr DWORD kOpenWait = 10000;    // opening the database does not wait long
+
+// The key the database opens with now (the system's, or a new one it was
+// already changed to), or nothing.
+std::optional<DataKey> CurrentKey(const std::filesystem::path& database, const KeyFile& file) {
+    auto key = SystemUnwrap(file);
+    if (!DatabaseEncrypted(database)) return key;
+    if (key && Opens(database, *key)) return key;
+    if (key) crypto_wipe(key->data(), key->size());
+    auto next = SystemUnwrapBytes(file.next);
+    if (next && Opens(database, *next)) return next;
+    if (next) crypto_wipe(next->data(), next->size());
+    return std::nullopt;
+}
+
 // No other process has the file open (each process with TEKITO has it).
 bool NobodyElseHasIt(const std::filesystem::path& database) {
     const HANDLE file = CreateFileW(database.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING,
@@ -341,10 +379,22 @@ bool DatabaseEncrypted(const std::filesystem::path& database) {
 }
 
 std::optional<std::string> EnableEncryption(const std::filesystem::path& database) {
+    const KeyFileLock lock(kChangeWait);
+    if (!lock.Held()) return std::nullopt;
+    // A change left half done is finished first.
+    SettleEncryption(database);
     const auto path = UserKeyPath(database);
     auto file = ReadKeyFile(path).value_or(KeyFile{});
-    std::optional<DataKey> key = SystemUnwrap(file);
-    if (!key) {
+    std::optional<DataKey> key = CurrentKey(database, file);
+    if (key) {
+        // user.key keeps the key the database opens with.
+        auto system = SystemWrap(*key);
+        if (!system) {
+            crypto_wipe(key->data(), key->size());
+            return std::nullopt;
+        }
+        file.system = std::move(*system);
+    } else {
         // A key of its own (none yet, or one this user's system cannot open
         // and the database is not encrypted with).
         if (DatabaseEncrypted(database)) return std::nullopt;
@@ -366,6 +416,8 @@ std::optional<std::string> EnableEncryption(const std::filesystem::path& databas
 }
 
 bool DisableEncryption(const std::filesystem::path& database) {
+    const KeyFileLock lock(kChangeWait);
+    if (!lock.Held()) return false;
     const auto path = UserKeyPath(database);
     auto file = ReadKeyFile(path);
     if (!file) return true;
@@ -376,11 +428,23 @@ bool DisableEncryption(const std::filesystem::path& database) {
 }
 
 std::optional<std::string> RenewRecoveryCode(const std::filesystem::path& database) {
+    const KeyFileLock lock(kChangeWait);
+    if (!lock.Held()) return std::nullopt;
+    // A change left half done is finished first; then the key the database
+    // really opens with is the one kept (nothing changes when none does).
+    SettleEncryption(database);
     const auto path = UserKeyPath(database);
     auto file = ReadKeyFile(path);
     if (!file) return std::nullopt;
-    auto current = SystemUnwrap(*file);
+    auto current = CurrentKey(database, *file);
     if (!current) return std::nullopt;
+    // user.key keeps the key the database opens with.
+    auto system = SystemWrap(*current);
+    if (!system) {
+        crypto_wipe(current->data(), current->size());
+        return std::nullopt;
+    }
+    file->system = std::move(*system);
     // A new key with the new code: once the database changes to it
     // (SettleEncryption, now or when no app has it open), the old code with
     // an old copy of user.key no longer opens it. Until then the new code
@@ -402,6 +466,8 @@ std::optional<std::string> RenewRecoveryCode(const std::filesystem::path& databa
 
 bool SettleEncryption(const std::filesystem::path& database) noexcept {
     try {
+        const KeyFileLock lock(kOpenWait);
+        if (!lock.Held()) return false;
         std::error_code error;
         if (!std::filesystem::is_regular_file(database, error) || std::filesystem::file_size(database, error) == 0) return true;
         const auto path = UserKeyPath(database);
