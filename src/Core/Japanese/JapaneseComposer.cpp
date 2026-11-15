@@ -1025,6 +1025,36 @@ bool JapaneseComposer::ForgetChosen() {
                              phrase.candidates[phrase.selected].text);
 }
 
+bool JapaneseComposer::CanHideChosen() const {
+    if (!IsConverted() || preview_ || !listOpen_ || focus_ >= phrases_.size()) return false;
+    const auto& phrase = phrases_[focus_];
+    if (phrase.form || phrase.selected >= phrase.candidates.size() || phrase.candidates.size() < 2) return false;
+    if (phrase.begin + phrase.length > conversionReading_.size()) return false;
+    const auto& chosen = phrase.candidates[phrase.selected];
+    // A word of the dictionary, not the kana typed, a date or a slip undone.
+    if (chosen.kind != PhraseCandidate::Kind::Dictionary || chosen.length > 0 || chosen.chunk || !chosen.reading.empty() ||
+        chosen.slip || chosen.text.empty()) {
+        return false;
+    }
+    return !CanForgetChosen();
+}
+
+std::optional<std::pair<std::wstring, std::wstring>> JapaneseComposer::HideChosen() {
+    if (!CanHideChosen()) return std::nullopt;
+    auto& phrase = phrases_[focus_];
+    std::wstring reading = conversionReading_.substr(phrase.begin, phrase.length);
+    std::wstring text = phrase.candidates[phrase.selected].text;
+    // The kana both end with (the particle after the word) left off.
+    const auto hiragana = [](wchar_t c) { return c >= L'\x3041' && c <= L'\x309F'; };
+    while (reading.size() > 1 && text.size() > 1 && reading.back() == text.back() && hiragana(text.back())) {
+        reading.pop_back();
+        text.pop_back();
+    }
+    phrase.candidates.erase(phrase.candidates.begin() + static_cast<std::ptrdiff_t>(phrase.selected));
+    if (phrase.selected >= phrase.candidates.size()) phrase.selected = phrase.candidates.size() - 1;
+    return std::pair{std::move(reading), std::move(text)};
+}
+
 void JapaneseComposer::ChoosePrediction(std::size_t index) {
     if (index < predictions_.size()) chosenPrediction_ = index;
 }

@@ -243,7 +243,7 @@ const en = {
       english: "Type an English word",
       back: "Back to kana",
       undo: "Undo the last commit",
-      forget: "Forget a learned candidate",
+      forget: "Forget a learned candidate, or hide one",
     },
   },
 
@@ -690,7 +690,7 @@ const ja = {
       english: "英単語を入力",
       back: "かなに戻す",
       undo: "確定を取り消す",
-      forget: "学習した候補を削除",
+      forget: "学習した候補を削除、または候補を表示しない",
     },
   },
 

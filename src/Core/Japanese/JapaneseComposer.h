@@ -555,6 +555,13 @@ public:
     // the list). Only what was learned can be forgotten.
     [[nodiscard]] bool CanForgetChosen() const;
     bool ForgetChosen();
+    // Ctrl+Delete on a candidate of the open list that was not learned (a
+    // word of the dictionary): it is shown no more. Taken out of the list;
+    // the word to hide from now on, its reading and how it is written (the
+    // kana after it both share left off: らいしゅうの 来襲の is らいしゅう 来襲),
+    // for the caller to keep in the user's words.
+    [[nodiscard]] bool CanHideChosen() const;
+    std::optional<std::pair<std::wstring, std::wstring>> HideChosen();
 
     // The text to commit (pending keys are resolved first, and a chosen
     // prediction replaces what is typed); clears the composition.

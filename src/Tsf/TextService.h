@@ -373,6 +373,8 @@ private:
     // The words the user added for Japanese, as stored and as looked up.
     std::vector<japanese::UserWord> japaneseUserWords_;
     japanese::JapaneseUserDictionary japaneseUserDictionary_;
+    // Ctrl+Delete hid a word: kept in the user's words as not shown.
+    void HideJapaneseWord(const std::wstring& reading, const std::wstring& surface);
     // The postal codes the user added in Settings, if any (reopened with the
     // user's words).
     std::shared_ptr<const japanese::PostalCodes> postalCodes_;

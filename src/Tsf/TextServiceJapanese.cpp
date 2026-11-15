@@ -133,6 +133,18 @@ void TextService::RefreshJapaneseUserWords() {
     japanese_.SetUserDictionary(japaneseUserDictionary_.Empty() ? nullptr : &japaneseUserDictionary_);
 }
 
+void TextService::HideJapaneseWord(const std::wstring& reading, const std::wstring& surface) {
+    japanese::UserWord word{reading, surface, japanese::UserWordKind::Noun, japanese::UserWordAction::Suppress};
+    if (std::find(japaneseUserWords_.begin(), japaneseUserWords_.end(), word) != japaneseUserWords_.end()) return;
+    japaneseUserWords_.push_back(std::move(word));
+    RefreshJapaneseUserWords();
+    // Kept with the user's words (Settings lists it as not shown), and the
+    // other apps typing with TEKITO read them again.
+    if (settingsRepository_ && settingsRepository_->SaveJapaneseUserWords(japaneseUserWords_) && runtimeMode_) {
+        runtimeMode_->NotifyDictionaryChanged();
+    }
+}
+
 void TextService::SetJapaneseProfile(bool japanese) {
     if (japanese == japaneseProfile_) return;
     Trace(japanese ? L"Profile Japanese" : L"Profile English");
@@ -532,6 +544,7 @@ HRESULT TextService::HandleJapaneseKey(ITfContext* context, TfEditCookie editCoo
     }
     const std::wstring readingBefore = japanese_.ReportReading();
     const auto outcome = japanese::ApplyKey(japanese_, command);
+    if (outcome.hidden) HideJapaneseWord(outcome.hidden->first, outcome.hidden->second);
     if (!outcome.outside.empty()) return InsertAtSelection(context, editCookie, outcome.outside);
     if (outcome.committed) {
         // A prediction chosen with a click.

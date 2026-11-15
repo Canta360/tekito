@@ -115,6 +115,9 @@ struct KeyOutcome {
     std::wstring outside;
     // Text to take back out of the document, before the composition.
     std::optional<std::wstring> uncommitted;
+    // Ctrl+Delete hid a word (JapaneseComposer::HideChosen): its reading
+    // and how it is written, for the user's words.
+    std::optional<std::pair<std::wstring, std::wstring>> hidden;
 };
 
 KeyOutcome ApplyKey(JapaneseComposer& composer, const KeyCommand& command);

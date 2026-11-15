@@ -41,7 +41,8 @@ std::optional<KeyCommand> TranslateKey(const JapaneseComposer& composer, const K
     if (!composing && key.key == Key::Backspace && key.control && !key.shift && composer.LastCommit()) {
         return Make(Action::UndoCommit);
     }
-    if (composing && key.key == Key::Delete && key.control && !key.shift && composer.CanForgetChosen()) {
+    if (composing && key.key == Key::Delete && key.control && !key.shift &&
+        (composer.CanForgetChosen() || composer.CanHideChosen())) {
         return Make(Action::ForgetChosen);
     }
     if (key.command) {
@@ -211,7 +212,8 @@ KeyOutcome ApplyKey(JapaneseComposer& composer, const KeyCommand& command) {
     case Action::Reconvert:
         break;
     case Action::ForgetChosen:
-        composer.ForgetChosen();
+        // A learned one is forgotten; one never learned is hidden.
+        if (!composer.ForgetChosen()) outcome.hidden = composer.HideChosen();
         break;
     case Action::UndoCommit:
         if (const auto* text = composer.LastCommit()) {

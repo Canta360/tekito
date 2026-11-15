@@ -1769,6 +1769,32 @@ void TestUserWords(const RomajiTable& table, const MiniPack& pack) {
     const auto hiddenBest = converter.Best(L"なかの", 0, &hidden);
     Require(!hiddenBest || hiddenBest->text != dictionaryFirst, "nor chosen as the likeliest");
 
+    // Ctrl+Delete on a word never learned hides it: out of the list, and the
+    // word (the particle left off) for the user's words.
+    {
+        JapaneseComposer hide(&table);
+        hide.SetConverter(&converter);
+        Type(hide, L"nakanoha");
+        hide.Convert();
+        hide.ShowCandidates();
+        Require(hide.IsCandidateListOpen(), "the list is open");
+        const auto* listed = hide.FocusedCandidates();
+        std::size_t index = 0;
+        while (index < listed->size() && (*listed)[index].kind != tekito::japanese::PhraseCandidate::Kind::Dictionary) ++index;
+        Require(index < listed->size(), "a word of the dictionary in the list");
+        hide.SelectCandidate(index);
+        hide.ShowCandidates();
+        const std::wstring chosen = (*hide.FocusedCandidates())[hide.FocusedSelection()].text;
+        Require(hide.CanHideChosen(), "a word never learned can be hidden");
+        const auto word = hide.HideChosen();
+        Require(word && !word->second.empty() && chosen.starts_with(word->second), "the word hidden");
+        Require(word->first.size() < 5 || !word->second.ends_with(L"は"), "the particle left off");
+        const auto* after = hide.FocusedCandidates();
+        Require(std::none_of(after->begin(), after->end(), [&](const auto& c) { return c.text == chosen; }),
+                "out of the list");
+        hide.Clear();
+    }
+
     JapaneseComposer composer(&table);
     composer.SetConverter(&converter);
     composer.SetUserDictionary(&user);
