@@ -1762,6 +1762,10 @@ HRESULT TextService::HandleKeyInEditSessionCore(ITfContext* context, TfEditCooki
         if (context != compositionContext_ || !composition_ || !japanese_.RefineLive()) return S_OK;
         return ShowJapanesePreedit(context, editCookie);
     }
+    if (input.type == KeyInput::Type::JapaneseRedisplay) {
+        if (context != compositionContext_ || !composition_ || !japanese_.IsComposing()) return S_OK;
+        return ShowJapanesePreedit(context, editCookie);
+    }
     if (input.type == KeyInput::Type::JapaneseAiAnswer) {
         if (context != compositionContext_ || !composition_ || !japanese_.TakeAiAnswer()) return S_OK;
         return ShowJapanesePreedit(context, editCookie);

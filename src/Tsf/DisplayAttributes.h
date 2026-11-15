@@ -43,9 +43,9 @@ private:
 // English Auto's colour (UserSettings::mixEnglishUnderline).
 enum class JapaneseUnderline {
     Input, Converted, Focused, Settled, MixInput, MixConverted, MixFocused, AutoInput,
-    MixEnglish, MixEnglishFocused, SettledEnglish, Held
+    MixEnglish, MixEnglishFocused, SettledEnglish, Held, Pending
 };
-inline constexpr int kJapaneseUnderlineCount = 12;
+inline constexpr int kJapaneseUnderlineCount = 13;
 [[nodiscard]] const GUID& JapaneseUnderlineGuid(JapaneseUnderline underline) noexcept;
 [[nodiscard]] ITfDisplayAttributeInfo* CreateJapaneseUnderline(JapaneseUnderline underline);
 

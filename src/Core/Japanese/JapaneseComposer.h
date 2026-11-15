@@ -67,6 +67,9 @@ struct PreeditSegment {
     bool settled{false};
     // Mixed typing: taken as English.
     bool english{false};
+    // Shown as kana while the conversion waits (SetDisplayDelays), and to
+    // become kanji (or katakana) once it is shown.
+    bool pending{false};
 };
 
 // The text being typed in Japanese mode, before it is committed.
@@ -239,6 +242,26 @@ public:
     // Space converts with the last phrase chosen, to put right from the end
     // (UserSettings::convertFromEnd); live conversion always does.
     void SetConvertFromEnd(bool on) noexcept { convertFromEnd_ = on; }
+    // How long what is typed waits before it is shown changed (0: at once):
+    // keys before they show as kana (`letterMs`), and live conversion before
+    // it shows (`kanjiMs`, at least `letterMs`: the keys turn into kana
+    // first), counted from the last key. While the conversion waits, the
+    // kana that will change are marked (PreeditSegment::pending) when
+    // `marker`. Only how the text is shown changes; what Space and Enter do
+    // does not. UserSettings::japaneseLetterDelay, japaneseKanjiDelay,
+    // japaneseKanjiMarker.
+    void SetDisplayDelays(std::uint32_t letterMs, std::uint32_t kanjiMs, bool marker) noexcept {
+        letterDelayMs_ = letterMs;
+        kanjiDelayMs_ = kanjiMs;
+        pendingMarker_ = marker;
+    }
+    // When what is shown next changes by itself (a key turning into kana,
+    // the conversion showing), in milliseconds from now; nothing when it
+    // will not.
+    [[nodiscard]] std::optional<std::uint32_t> NextDisplayChange() const;
+    // The clock the delays are counted on, in milliseconds (tests set their
+    // own; a steady clock otherwise).
+    void SetClock(std::function<std::uint64_t()> clock) { clock_ = std::move(clock); }
     // A punctuation mark typed (、。！？) commits the text up to it,
     // converted as Space converts it (UserSettings::commitAtPunctuation).
     void SetCommitAtPunctuation(bool on) noexcept { commitAtPunctuation_ = on; }
@@ -595,6 +618,7 @@ private:
         std::wstring keys;  // what was typed
         std::wstring kana;  // what the table wrote for it
         bool ascii{false};  // typed after a capital: letters as typed, half-width
+        std::uint64_t typedAt{0};  // Now() when its kana came (0: long ago)
     };
     struct PhraseState {
         std::size_t begin{0};
@@ -1098,6 +1122,21 @@ private:
     bool enterAsShown_{false};
     bool escStepsBack_{false};
     bool convertFromEnd_{false};
+    std::uint32_t letterDelayMs_{0};
+    std::uint32_t kanjiDelayMs_{0};
+    bool pendingMarker_{true};
+    std::function<std::uint64_t()> clock_;
+    // Now(), at the last key typed.
+    std::uint64_t lastKeyAt_{0};
+    [[nodiscard]] std::uint64_t Now() const;
+    // The units at the end still shown as their keys (letterDelayMs_), and
+    // how long their kana make.
+    [[nodiscard]] std::size_t FreshUnits() const;
+    // The live conversion (Japanese or Mix) waits to show (kanjiDelayMs_).
+    [[nodiscard]] bool ConversionWaits() const;
+    // The text as typed with the fresh units as their keys (RenderTyping
+    // with the letter delay).
+    [[nodiscard]] std::wstring DisplayTyping() const;
     bool commitAtPunctuation_{false};
     // StepBack showed the keys typed: Esc again drops everything.
     bool keysShown_{false};

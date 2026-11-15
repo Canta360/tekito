@@ -87,6 +87,13 @@ struct UserSettings {
     // Japanese and Mix: Space converts with the last phrase chosen, to put
     // right from the end. Off by default: the first, as Microsoft IME.
     bool convertFromEnd{false};
+    // Japanese and Mix: how long keys show before they turn into kana, and
+    // live conversion waits before it shows (milliseconds, 0: at once),
+    // counted from the last key; while it waits, the kana that will become
+    // kanji are marked in light grey (japaneseKanjiMarker).
+    int japaneseLetterDelay{0};
+    int japaneseKanjiDelay{0};
+    bool japaneseKanjiMarker{true};
     // Japanese and Mix: Shift+Enter commits the phrases up to the one
     // chosen, the rest staying converted. Off by default: as Enter.
     bool shiftEnterCommitsToFocus{false};

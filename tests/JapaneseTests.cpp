@@ -886,6 +886,48 @@ void TestAddresses(const RomajiTable& table, const MiniPack& pack) {
             RequireText(shown.Commit(), before, "Enter as shown commits the live conversion as it shows");
         }
     }
+    // Delays: keys before they show as kana, live conversion before it
+    // shows, the kana that will change marked meanwhile.
+    {
+        std::uint64_t now = 1000;
+        const auto joined = [](const JapaneseComposer& c) {
+            std::wstring text;
+            for (const auto& segment : c.Segments()) text += segment.text;
+            return text;
+        };
+        JapaneseComposer letters(&table);
+        letters.SetConverter(&converter);
+        letters.SetClock([&] { return now; });
+        letters.SetDisplayDelays(300, 0, true);
+        Type(letters, L"waka");
+        RequireText(joined(letters), L"waka", "the keys show for a while");
+        Require(letters.NextDisplayChange() == 300u, "and turn into kana when the time is up");
+        Require(letters.CaretOffset() == 4, "the caret after the keys shown");
+        now += 301;
+        RequireText(joined(letters), L"わか", "then the kana");
+        Require(!letters.NextDisplayChange(), "nothing more to change");
+
+        JapaneseComposer kanji(&table);
+        kanji.SetConverter(&converter);
+        kanji.SetLiveConversion(true);
+        kanji.SetClock([&] { return now; });
+        kanji.SetDisplayDelays(0, 500, true);
+        Type(kanji, L"watashi");
+        RequireText(joined(kanji), L"わたし", "live conversion waits: the kana");
+        const auto waiting = kanji.Segments();
+        Require(std::any_of(waiting.begin(), waiting.end(), [](const auto& s) { return s.pending; }),
+                "the kana that will become kanji are marked");
+        now += 501;
+        RequireText(joined(kanji), L"私", "then the conversion");
+        const auto shown = kanji.Segments();
+        Require(std::none_of(shown.begin(), shown.end(), [](const auto& s) { return s.pending; }), "and no mark once it shows");
+        kanji.SetDisplayDelays(0, 500, false);
+        Type(kanji, L"no");
+        const auto unmarked = kanji.Segments();
+        Require(std::none_of(unmarked.begin(), unmarked.end(), [](const auto& s) { return s.pending; }),
+                "no mark when the marker is off");
+        RequireText(kanji.Commit(), L"私の", "Enter commits the conversion as before");
+    }
     // Esc steps back: the conversion, the kana, the keys typed, nothing.
     for (const bool live : {false, true}) {
         JapaneseComposer back(&table);

@@ -1485,6 +1485,10 @@ private:
         json += settings_.altSwitches ? L"true" : L"false";
         json += L",\"convertFromEnd\":";
         json += settings_.convertFromEnd ? L"true" : L"false";
+        json += L",\"japaneseLetterDelay\":" + std::to_wstring(settings_.japaneseLetterDelay);
+        json += L",\"japaneseKanjiDelay\":" + std::to_wstring(settings_.japaneseKanjiDelay);
+        json += L",\"japaneseKanjiMarker\":";
+        json += settings_.japaneseKanjiMarker ? L"true" : L"false";
         json += L",\"shiftEnterCommitsToFocus\":";
         json += settings_.shiftEnterCommitsToFocus ? L"true" : L"false";
         json += L",\"commitAtPunctuation\":";
@@ -1735,6 +1739,7 @@ private:
             else if (key == L"showTypedKeys") settings_.showTypedKeys = value;
             else if (key == L"altSwitches") settings_.altSwitches = value;
             else if (key == L"convertFromEnd") settings_.convertFromEnd = value;
+            else if (key == L"japaneseKanjiMarker") settings_.japaneseKanjiMarker = value;
             else if (key == L"shiftEnterCommitsToFocus") settings_.shiftEnterCommitsToFocus = value;
             else if (key == L"commitAtPunctuation") settings_.commitAtPunctuation = value;
             else if (key == L"capitalizedCorrection") settings_.capitalizedCorrection = value;
@@ -1832,6 +1837,12 @@ private:
             }
             else if (key == L"altRightMode") {
                 settings_.altRightMode = std::clamp(integerValue, 0, 4);
+            }
+            else if (key == L"japaneseLetterDelay") {
+                settings_.japaneseLetterDelay = std::clamp(integerValue, 0, 2000);
+            }
+            else if (key == L"japaneseKanjiDelay") {
+                settings_.japaneseKanjiDelay = std::clamp(integerValue, 0, 3000);
             }
             else if (key == L"keyboardType") {
                 settings_.keyboardType = std::clamp(integerValue, 0, 2);

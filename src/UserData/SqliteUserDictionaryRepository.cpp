@@ -448,6 +448,12 @@ bool SqliteUserDictionaryRepository::LoadSettings(UserSettings& settings) const 
             loaded.altSwitches = value != 0;
         } else if (std::strcmp(key, "convert_from_end") == 0) {
             loaded.convertFromEnd = value != 0;
+        } else if (std::strcmp(key, "japanese_letter_delay") == 0) {
+            loaded.japaneseLetterDelay = std::clamp(value, 0, 2000);
+        } else if (std::strcmp(key, "japanese_kanji_delay") == 0) {
+            loaded.japaneseKanjiDelay = std::clamp(value, 0, 3000);
+        } else if (std::strcmp(key, "japanese_kanji_marker") == 0) {
+            loaded.japaneseKanjiMarker = value != 0;
         } else if (std::strcmp(key, "shift_enter_commits_to_focus") == 0) {
             loaded.shiftEnterCommitsToFocus = value != 0;
         } else if (std::strcmp(key, "commit_at_punctuation") == 0) {
@@ -662,6 +668,9 @@ bool SqliteUserDictionaryRepository::SaveSettings(const UserSettings& settings) 
     saveValue("show_typed_keys", settings.showTypedKeys ? 1 : 0);
     saveValue("alt_switches", settings.altSwitches ? 1 : 0);
     saveValue("convert_from_end", settings.convertFromEnd ? 1 : 0);
+    saveValue("japanese_letter_delay", std::clamp(settings.japaneseLetterDelay, 0, 2000));
+    saveValue("japanese_kanji_delay", std::clamp(settings.japaneseKanjiDelay, 0, 3000));
+    saveValue("japanese_kanji_marker", settings.japaneseKanjiMarker ? 1 : 0);
     saveValue("shift_enter_commits_to_focus", settings.shiftEnterCommitsToFocus ? 1 : 0);
     saveValue("commit_at_punctuation", settings.commitAtPunctuation ? 1 : 0);
     saveValue("capitalized_correction", settings.capitalizedCorrection ? 1 : 0);
