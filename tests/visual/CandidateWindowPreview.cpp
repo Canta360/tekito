@@ -29,6 +29,7 @@
 #include "Tsf/CandidateWindow.h"
 
 #include <windows.h>
+#include <dwmapi.h>
 #include <cstdio>
 #include <cwchar>
 #include <string>
@@ -153,7 +154,7 @@ HWND CreateBackdropWindow(HINSTANCE instance) {
     wc.lpszClassName = L"TekitoPreviewBackdrop";
     RegisterClassExW(&wc);
     HWND hwnd = CreateWindowExW(WS_EX_TOPMOST | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW,
-                                L"TekitoPreviewBackdrop", L"", WS_POPUP, 160, 200, 620, 460,
+                                L"TekitoPreviewBackdrop", L"", WS_POPUP, 160, 200, 1000, 720,
                                 nullptr, nullptr, instance, nullptr);
     if (hwnd) ShowWindow(hwnd, SW_SHOWNOACTIVATE);
     return hwnd;
@@ -344,6 +345,20 @@ int wmain(int argc, wchar_t** argv) {
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
     HINSTANCE instance = GetModuleHandleW(nullptr);
     HWND backdrop = CreateBackdropWindow(instance);
+    // The backdrop painted and on screen before the list shows, so that its
+    // glass takes it in rather than what is behind it.
+    if (backdrop) {
+        UpdateWindow(backdrop);
+        for (const auto start = GetTickCount64(); GetTickCount64() - start < 200;) {
+            MSG msg;
+            while (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE)) {
+                TranslateMessage(&msg);
+                DispatchMessageW(&msg);
+            }
+            Sleep(1);
+        }
+        DwmFlush();
+    }
 
     tekito::tsf::CandidateWindow window;
     const DWORD mainThread = GetCurrentThreadId();
