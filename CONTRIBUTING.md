@@ -47,8 +47,10 @@ it builds TEKITO, runs the tests and checks the rules below.
 - Words and phrases belong in data packs, never in `if` statements.
 - Nothing in the input path may use the network, and diagnostics never
   include what the user typed.
-- TEKITO works through TSF only: no keyboard hooks. Synthesized input is used
-  only to put the caret back between brackets in older edit controls.
+- TEKITO works through TSF only. The one keyboard hook watches the typing
+  application's own thread, only while the left and right Alt switch is on
+  (TSF passes no Alt to text services), and keeps no key. Synthesized input is
+  used only to put the caret back between brackets in older edit controls.
 - Leave correct words, names and code as they are. When unsure, suggest
   instead of replacing.
 

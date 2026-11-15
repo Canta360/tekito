@@ -80,9 +80,12 @@ try {
 $product = @("src", "apps")
 
 # TEKITO is a TSF text service. It must not fall back to watching or
-# faking keystrokes the way the retired overlay prototype did. The one
-# exception: Left keys that put the caret back between brackets in older
-# edit controls TSF only bridges to (TextService.cpp, marked verify-allow).
+# faking keystrokes the way the retired overlay prototype did. Two
+# exceptions, each marked verify-allow: Left keys that put the caret back
+# between brackets in older edit controls TSF only bridges to
+# (TextService.cpp), and a keyboard hook on the typing application's own
+# thread, only while the left and right Alt switch is on, as TSF passes no
+# Alt to text services; it keeps no key (TextServiceJapanese.cpp).
 Assert-Absent "no keyboard hooks or synthesized input" `
     "SetWindowsHookEx|WH_KEYBOARD|SendInput|keybd_event|mouse_event" $product
 

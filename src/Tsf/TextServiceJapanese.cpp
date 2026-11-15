@@ -326,7 +326,9 @@ void TextService::UpdateAltHook(bool on) {
     const bool wanted = on && clientId_ != TF_CLIENTID_NULL;
     if (wanted && !altHook_) {
         altHookOwner = this;
-        // This thread only: the keys of the application TEKITO types in.
+        // The one keyboard hook (scripts/verify.ps1 allows it by this mark):
+        // this thread only, while the left and right Alt switch is on; it
+        // keeps no key. verify-allow
         altHook_ = SetWindowsHookExW(WH_KEYBOARD, &TextService::AltHookProc, nullptr, GetCurrentThreadId());
         if (!altHook_) altHookOwner = nullptr;
     } else if (!wanted && altHook_) {

@@ -190,7 +190,7 @@ private:
     // TSF does not pass Alt to text services: a keyboard hook on this
     // thread (the application's own) sees it, while altSwitches is on.
     void UpdateAltHook(bool on);
-    // A key the hook saw (its virtual key and flags, as WH_KEYBOARD gives
+    // A key the hook saw (its virtual key and flags, as the keyboard hook gives
     // them): whether it is taken from the application (Alt let go after a
     // tap, so that no menu opens).
     bool OnAltHookKey(WPARAM key, LPARAM flags);
