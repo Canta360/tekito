@@ -21,7 +21,8 @@
 // fades out by itself (exit code 4 if it stays).
 //
 // TEKITO_PREVIEW_STYLE=simple renders the simple candidate window style;
-// TEKITO_PREVIEW_LANGUAGE=ja shows the Japanese tags.
+// TEKITO_PREVIEW_LANGUAGE=ja shows the Japanese tags, and the English
+// word's meaning in Japanese.
 // Environment overrides (preview builds only): TEKITO_PREVIEW_THEME=dark|light,
 // TEKITO_PREVIEW_NO_COMPOSITION=1 (HWND fallback renderer),
 // TEKITO_PREVIEW_HIGH_CONTRAST=1 (high-contrast palette from system colors).
@@ -261,12 +262,21 @@ std::vector<tekito::Candidate> SampleChunkCandidates() {
 }
 
 // The meaning pane, as the TSF fills it from the meaning packs.
-tekito::tsf::CandidateDetail SampleDetail(bool kanji) {
+tekito::tsf::CandidateDetail SampleDetail(bool kanji, bool japanese) {
     if (kanji) {
         return {L"\u6a5f\u4f1a",
                 {L"\u7269\u4e8b\u3092\u884c\u3046\u306e\u306b\u3001\u6700\u3082\u9069\u3057\u305f"
                  L"\u6642\u671f\u3002\u3061\u3087\u3046\u3069\u3088\u3044\u6642\u3002\u304a\u308a\u3002",
                  L"\u3061\u3087\u3046\u3069\u3088\u3044\u30c1\u30e3\u30f3\u30b9\u3002"}};
+    }
+    // With the Japanese tags, as Settings in Japanese shows it: the meaning
+    // in Japanese (english-meanings-ja's row for world).
+    if (japanese) {
+        return {L"world",
+                {L"存在、宇宙、六合：存在するすべてのもの",
+                 L"界、世界、社会：一般の人々",
+                 L"グローバル、世界的、ワールドワイド：地球全体を含むさま",
+                 L"世界、現実：自分にとって物事がどう見えるかを決定する自分のすべての経験"}};
     }
     return {L"world",
             {L"everything that exists anywhere",
@@ -348,15 +358,14 @@ int wmain(int argc, wchar_t** argv) {
         window.SetStyle(1);
     }
     wchar_t language[8]{};
-    if (GetEnvironmentVariableW(L"TEKITO_PREVIEW_LANGUAGE", language, 8) > 0 && wcscmp(language, L"ja") == 0) {
-        window.SetJapanese(true);
-    }
+    const bool japaneseUi = GetEnvironmentVariableW(L"TEKITO_PREVIEW_LANGUAGE", language, 8) > 0 && wcscmp(language, L"ja") == 0;
+    if (japaneseUi) window.SetJapanese(true);
     auto candidates = chunks ? SampleChunkCandidates() : kanji ? SampleKanjiCandidates() : SampleCandidates(longList);
     if (meaning) {
         // Rows with a meaning show the dictionary sign.
         for (std::size_t i = 0; i < candidates.size(); ++i) candidates[i].hasMeaning = i != 0 && i != 3;
     }
-    const auto detail = meaning ? SampleDetail(kanji) : tekito::tsf::CandidateDetail{};
+    const auto detail = meaning ? SampleDetail(kanji, japaneseUi) : tekito::tsf::CandidateDetail{};
     // Caret under "wrold" on the document's third line.
     RECT caret{232, 280, 234, 302};
     LARGE_INTEGER frequency{};
