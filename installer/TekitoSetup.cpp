@@ -356,10 +356,9 @@ bool HasWebView2Runtime() {
     return false;
 }
 
-void OpenWebView2DownloadPage() {
-    ShellExecuteW(nullptr, L"open", L"https://developer.microsoft.com/microsoft-edge/webview2/", nullptr, nullptr,
-                  SW_SHOWNORMAL);
-}
+void OpenAsUser(const std::wstring& target);
+
+void OpenWebView2DownloadPage() { OpenAsUser(L"https://developer.microsoft.com/microsoft-edge/webview2/"); }
 
 // Program Files: what is registered runs in every app and elevated, so it
 // goes where only administrators can change it (not a folder of one's own).
@@ -486,19 +485,63 @@ std::filesystem::path MakeTempDirectory() {
     return made;
 }
 
-// Scripts run from setup's own folder use it for their temporary files too
-// (downloads, staging, the install's record), not the user's %TEMP%; and
-// PowerShell loads Windows' own modules only, never one from the user's
-// Documents folder (which comes first otherwise).
-void UseAsTemp(const std::filesystem::path& folder) {
-    SetEnvironmentVariableW(L"TEMP", folder.c_str());
-    SetEnvironmentVariableW(L"TMP", folder.c_str());
+std::wstring KnownFolder(REFKNOWNFOLDERID id) {
+    PWSTR path = nullptr;
+    if (FAILED(SHGetKnownFolderPath(id, 0, nullptr, &path))) return {};
+    std::wstring result = path;
+    CoTaskMemFree(path);
+    return result;
+}
+
+// The environment of what setup runs elevated, made here rather than taken
+// from the user's session (which the user's own programs can set: a PATH, a
+// WINDIR or a .NET profiler that PowerShell would follow): Windows' own
+// folders, PATH to System32 only, Windows' own PowerShell modules, and
+// setup's own folder for temporary files and the profile folders PowerShell
+// keeps its caches in.
+std::wstring ElevatedEnvironment(const std::filesystem::path& folder) {
+    wchar_t windows[MAX_PATH]{};
     wchar_t system[MAX_PATH]{};
-    const UINT length = GetSystemDirectoryW(system, MAX_PATH);
-    if (length > 0 && length < MAX_PATH) {
-        const auto modules = std::filesystem::path(system) / LR"(WindowsPowerShell\v1.0\Modules)";
-        SetEnvironmentVariableW(L"PSModulePath", modules.c_str());
+    if (GetWindowsDirectoryW(windows, MAX_PATH) == 0 || GetSystemDirectoryW(system, MAX_PATH) == 0) return {};
+    const std::wstring sys = system;
+    const std::wstring own = folder.wstring();
+    const std::wstring programFiles = KnownFolder(FOLDERID_ProgramFiles);
+    const std::wstring programData = KnownFolder(FOLDERID_ProgramData);
+    SYSTEM_INFO info{};
+    GetNativeSystemInfo(&info);
+    std::vector<std::pair<std::wstring, std::wstring>> variables = {
+        {L"ALLUSERSPROFILE", programData},
+        {L"APPDATA", own},
+        {L"CommonProgramFiles", KnownFolder(FOLDERID_ProgramFilesCommon)},
+        {L"ComSpec", sys + L"\\cmd.exe"},
+        {L"LOCALAPPDATA", own},
+        {L"NUMBER_OF_PROCESSORS", std::to_wstring(info.dwNumberOfProcessors)},
+        {L"OS", L"Windows_NT"},
+        {L"Path", sys + L";" + sys + L"\\Wbem;" + sys + L"\\WindowsPowerShell\\v1.0"},
+        {L"PATHEXT", L".COM;.EXE;.BAT;.CMD"},
+        {L"PROCESSOR_ARCHITECTURE", info.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_ARM64 ? L"ARM64" : L"AMD64"},
+        {L"ProgramData", programData},
+        {L"ProgramFiles", programFiles},
+        {L"ProgramFiles(x86)", KnownFolder(FOLDERID_ProgramFilesX86)},
+        {L"ProgramW6432", programFiles},
+        {L"PSModulePath", sys + L"\\WindowsPowerShell\\v1.0\\Modules"},
+        {L"SystemDrive", std::wstring(windows, 2)},
+        {L"SystemRoot", windows},
+        {L"TEMP", own},
+        {L"TMP", own},
+        {L"USERPROFILE", own},
+        {L"windir", windows},
+    };
+    std::sort(variables.begin(), variables.end(),
+              [](const auto& a, const auto& b) { return _wcsicmp(a.first.c_str(), b.first.c_str()) < 0; });
+    std::wstring block;
+    for (const auto& [name, value] : variables) {
+        if (value.empty()) continue;
+        block += name + L"=" + value;
+        block.push_back(L'\0');
     }
+    block.push_back(L'\0');
+    return block;
 }
 
 // Whether the payload copied out is the one this program was packaged with:
@@ -563,8 +606,8 @@ int WaitForExit(const PROCESS_INFORMATION& process) {
     return static_cast<int>(exitCode);
 }
 
-// The administrator's part: PowerShell elevated, as setup is, with setup's
-// own folder for its temporary files and Windows' own modules (UseAsTemp).
+// The administrator's part: PowerShell elevated, as setup is, in an
+// environment of setup's own (ElevatedEnvironment).
 // -1 when it could not start.
 int RunElevated(const std::wstring& script, const std::filesystem::path& folder) {
     const auto powershell = PowerShellPath();
@@ -577,9 +620,11 @@ int RunElevated(const std::wstring& script, const std::filesystem::path& folder)
     startup.dwFlags = STARTF_USESHOWWINDOW;
     startup.wShowWindow = SW_HIDE;
     PROCESS_INFORMATION process{};
-    UseAsTemp(folder);
-    if (!CreateProcessW(powershell.c_str(), commandLine.data(), nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr,
-                        folder.c_str(), &startup, &process)) {
+    auto environment = ElevatedEnvironment(folder);
+    if (environment.empty()) return -1;
+    if (!CreateProcessW(powershell.c_str(), commandLine.data(), nullptr, nullptr, FALSE,
+                        CREATE_NO_WINDOW | CREATE_UNICODE_ENVIRONMENT, environment.data(), folder.c_str(), &startup,
+                        &process)) {
         return -1;
     }
     return WaitForExit(process);
@@ -589,12 +634,36 @@ int RunElevated(const std::wstring& script, const std::filesystem::path& folder)
 // in the user's folders and settings runs with it, never elevated, so nothing
 // there can be turned against the administrator's rights. When another
 // account approved the elevation, it is still the user at the desktop.
+// Turns one of setup's own privileges on or off; whether it was on before.
+bool SetPrivilege(const wchar_t* name, bool on) {
+    HANDLE token = nullptr;
+    if (!OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &token)) return false;
+    TOKEN_PRIVILEGES change{};
+    TOKEN_PRIVILEGES before{};
+    DWORD size = sizeof(before);
+    change.PrivilegeCount = 1;
+    change.Privileges[0].Attributes = on ? SE_PRIVILEGE_ENABLED : 0;
+    bool wasOn = false;
+    if (LookupPrivilegeValueW(nullptr, name, &change.Privileges[0].Luid) &&
+        AdjustTokenPrivileges(token, FALSE, &change, sizeof(before), &before, &size) && before.PrivilegeCount == 1) {
+        wasOn = (before.Privileges[0].Attributes & SE_PRIVILEGE_ENABLED) != 0;
+    }
+    CloseHandle(token);
+    return wasOn;
+}
+
 HANDLE DesktopUserToken() {
     const HWND shell = GetShellWindow();
     DWORD processId = 0;
     if (!shell || !GetWindowThreadProcessId(shell, &processId) || processId == 0) return nullptr;
+    // Explorer may be another user's (a standard user, an administrator's
+    // account approving): opening it takes the debug privilege, only for this.
+    const bool debugWasOn = SetPrivilege(SE_DEBUG_NAME, true);
     const HANDLE process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, processId);
-    if (!process) return nullptr;
+    if (!process) {
+        if (!debugWasOn) SetPrivilege(SE_DEBUG_NAME, false);
+        return nullptr;
+    }
     HANDLE token = nullptr;
     HANDLE primary = nullptr;
     if (OpenProcessToken(process, TOKEN_DUPLICATE, &token)) {
@@ -607,21 +676,25 @@ HANDLE DesktopUserToken() {
         CloseHandle(token);
     }
     CloseHandle(process);
+    if (!debugWasOn) SetPrivilege(SE_DEBUG_NAME, false);
     return primary;
 }
 
 // The user's part: PowerShell as the user at the desktop, with the user's own
 // environment. `userTemp` is set to the user's temporary folder (where its
-// record goes). -2 when the user's token could not be had, -1 when it could
-// not start.
+// record goes). -2 when the user's token or environment could not be had, -3
+// when it could not start as the user.
 int RunAsUser(const std::wstring& script, const std::filesystem::path& folder, std::filesystem::path* userTemp = nullptr) {
     const auto powershell = PowerShellPath();
     if (powershell.empty()) return -1;
     const HANDLE token = DesktopUserToken();
     if (!token) return -2;
     LPVOID environment = nullptr;
-    if (!CreateEnvironmentBlock(&environment, token, FALSE)) environment = nullptr;
-    if (userTemp && environment) {
+    if (!CreateEnvironmentBlock(&environment, token, FALSE)) {
+        CloseHandle(token);
+        return -2;
+    }
+    if (userTemp) {
         for (auto* entry = static_cast<const wchar_t*>(environment); *entry; entry += wcslen(entry) + 1) {
             if (_wcsnicmp(entry, L"TEMP=", 5) == 0) *userTemp = std::filesystem::path(entry + 5);
         }
@@ -637,15 +710,36 @@ int RunAsUser(const std::wstring& script, const std::filesystem::path& folder, s
     const BOOL started = CreateProcessWithTokenW(token, 0, powershell.c_str(), commandLine.data(),
                                                  CREATE_NO_WINDOW | CREATE_UNICODE_ENVIRONMENT, environment,
                                                  folder.c_str(), &startup, &process);
-    if (environment) DestroyEnvironmentBlock(environment);
+    DestroyEnvironmentBlock(environment);
     CloseHandle(token);
-    if (!started) return -1;
+    if (!started) return -3;
     return WaitForExit(process);
 }
 
+// A web page or folder opened for the user at the desktop, by Explorer as
+// that user: not by the elevated setup (whose file associations the user's
+// own programs can set).
+void OpenAsUser(const std::wstring& target) {
+    wchar_t windows[MAX_PATH]{};
+    if (GetWindowsDirectoryW(windows, MAX_PATH) == 0) return;
+    const auto explorer = std::filesystem::path(windows) / L"explorer.exe";
+    const HANDLE token = DesktopUserToken();
+    if (!token) return;
+    std::wstring command = L"\"" + explorer.wstring() + L"\" \"" + target + L"\"";
+    STARTUPINFOW startup{};
+    startup.cb = sizeof(startup);
+    PROCESS_INFORMATION process{};
+    if (CreateProcessWithTokenW(token, 0, explorer.c_str(), command.data(), 0, nullptr, nullptr, &startup, &process)) {
+        CloseHandle(process.hThread);
+        CloseHandle(process.hProcess);
+    }
+    CloseHandle(token);
+}
+
 // A step's exit code as setup reports it: 5 PowerShell could not start, 6
-// it could not run as the user.
-int StepCode(int code) { return code == -1 ? 5 : code == -2 ? 6 : code; }
+// the user at the desktop could not be acted for, 7 it could not start as
+// that user.
+int StepCode(int code) { return code == -1 ? 5 : code == -2 ? 6 : code == -3 ? 7 : code; }
 
 int InstallEmbeddedPackage(const std::filesystem::path& self, const InstallChoices& choices,
                            std::filesystem::path& installLog) {
@@ -705,6 +799,9 @@ int InstallEmbeddedPackage(const std::filesystem::path& self, const InstallChoic
     if (code != 0 && code != 30 && !userStep && std::filesystem::is_regular_file(log, cleanupError)) {
         std::filesystem::remove_all(packageRoot, cleanupError);
         std::filesystem::remove(zipPath, cleanupError);
+        // Kept to be read, and deleted at the next restart.
+        MoveFileExW(log.c_str(), nullptr, MOVEFILE_DELAY_UNTIL_REBOOT);
+        MoveFileExW(tempRoot.c_str(), nullptr, MOVEFILE_DELAY_UNTIL_REBOOT);
     } else {
         std::filesystem::remove_all(tempRoot, cleanupError);
     }
@@ -762,10 +859,16 @@ std::wstring UninstallFailureMessage(int code) {
                   L"書き出さずにアンインストールしてください。");
     }
     if (code == 6) {
-        return Tr(L"The uninstaller couldn't work as you, the user at the desktop. Sign in to Windows as yourself and "
-                  L"try again.",
-                  L"デスクトップにサインインしている利用者として処理できませんでした。ご自身のアカウントで Windows に"
-                  L"サインインして、もう一度お試しください。");
+        return Tr(L"The uninstaller couldn't act for the user signed in to Windows, so nothing was removed. Restart the "
+                  L"PC and try again.",
+                  L"Windows にサインインしている利用者として処理できなかったため、何も削除されていません。PC を再起動して、"
+                  L"もう一度お試しください。");
+    }
+    if (code == 7) {
+        return Tr(L"The uninstaller couldn't start a program for the user signed in to Windows. Make sure the Secondary "
+                  L"Logon service is not disabled, then try again.",
+                  L"Windows にサインインしている利用者としてプログラムを起動できませんでした。Secondary Logon サービスが"
+                  L"無効になっていないことを確認して、もう一度お試しください。");
     }
     if (UseJapanese()) {
         return L"アンインストールがエラー " + std::to_wstring(code) + L" で停止しました。もう一度お試しください。";
@@ -813,7 +916,8 @@ std::wstring FailureMessage(int code, const std::filesystem::path& log) {
     case 3: return Tr(L"Setup couldn't create a temporary folder. Make sure the drive has free space, then try again.", L"一時フォルダーを作成できませんでした。ドライブの空き容量を確認して、もう一度お試しください。");
     case 4: return Tr(L"Setup couldn't unpack its files. Make sure the drive has free space, then try again.", L"ファイルを展開できませんでした。ドライブの空き容量を確認して、もう一度お試しください。");
     case 5: return Tr(L"Setup couldn't start Windows PowerShell, which it needs to install TEKITO.", L"インストールに必要な Windows PowerShell を起動できませんでした。");
-    case 6: return Tr(L"Setup couldn't work as you, the user at the desktop. Sign in to Windows as yourself and try again.", L"デスクトップにサインインしている利用者として処理できませんでした。ご自身のアカウントで Windows にサインインして、もう一度お試しください。");
+    case 6: return Tr(L"Setup couldn't act for the user signed in to Windows, so nothing was installed. Restart the PC and try again.", L"Windows にサインインしている利用者として処理できなかったため、インストールされていません。PC を再起動して、もう一度お試しください。");
+    case 7: return Tr(L"Setup couldn't start a program for the user signed in to Windows. Make sure the Secondary Logon service is not disabled, then try again.", L"Windows にサインインしている利用者としてプログラムを起動できませんでした。Secondary Logon サービスが無効になっていないことを確認して、もう一度お試しください。");
     case 20: return Tr(L"Setup couldn't download the Japanese data. Check the internet connection and try again, or install without Japanese.", L"日本語のデータをダウンロードできませんでした。インターネット接続を確認してもう一度お試しいただくか、日本語なしでインストールしてください。");
     case 21: return Tr(L"The downloaded Japanese data was not the file this installer expects. Try again, or download the latest TEKITO.", L"ダウンロードした日本語データが、このインストーラーの想定と一致しません。もう一度お試しいただくか、最新の TEKITO をダウンロードしてください。");
     default:
@@ -1772,7 +1876,7 @@ void Activate(Wizard& wizard, Action action, int index = 0) {
         StartUninstall(wizard);
         break;
     case Action::OpenExportFolder:
-        ShellExecuteW(wizard.window, L"open", wizard.exportFolder.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+        OpenAsUser(wizard.exportFolder.wstring());
         break;
     case Action::WithoutJapanese:
         wizard.japanese = false;
@@ -1966,11 +2070,8 @@ LRESULT CALLBACK WizardProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
         KillTimer(window, kAnimationTimer);
         if (wizard->screen == Screen::Uninstalling) {
             const int code = wizard->installExitCode.load();
-            // A folder with nothing in it (no words to save) goes.
+            // uninstall.ps1 removed the folder when there were no words to save.
             std::error_code error;
-            if (!wizard->exportFolder.empty() && std::filesystem::is_empty(wizard->exportFolder, error) && !error) {
-                std::filesystem::remove(wizard->exportFolder, error);
-            }
             wizard->exported = !wizard->exportFolder.empty() && std::filesystem::exists(wizard->exportFolder, error);
             Go(*wizard, code == 0 || code == 3 ? Screen::Uninstalled : Screen::UninstallFailed);
             return 0;
@@ -2163,6 +2264,9 @@ bool ShowWizard(const std::filesystem::path& self, const std::filesystem::path& 
 }  // namespace
 
 int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
+    // DLLs from System32 only, never one saved beside setup (in Downloads);
+    // the ones it links to are loaded on first use, after this.
+    SetDefaultDllDirectories(LOAD_LIBRARY_SEARCH_SYSTEM32);
 #ifdef TEKITO_SETUP_PREVIEW
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
     int argc = 0;
@@ -2207,6 +2311,19 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
             if (std::wstring_view(argv[i]) == L"/from" && i + 1 < argc) uninstallRoot = argv[i + 1];
         }
         if (argv) LocalFree(argv);
+    }
+    // Only the installation in Program Files is uninstalled, with the
+    // uninstall.ps1 there: not one beside a copy of the uninstaller elsewhere.
+    const auto installed = DefaultInstallRoot();
+    const auto same = [](const std::filesystem::path& a, const std::filesystem::path& b) {
+        return !a.empty() && !b.empty() &&
+               _wcsicmp(a.lexically_normal().wstring().c_str(), b.lexically_normal().wstring().c_str()) == 0;
+    };
+    if (uninstall && !same(uninstallRoot.empty() ? self.parent_path() : uninstallRoot, installed)) {
+        MessageBoxW(nullptr, Tr(L"This uninstaller removes TEKITO from Program Files only. Use Installed apps in Settings.",
+                                L"このアンインストーラーは、Program Files の TEKITO だけを削除します。設定の「インストールされているアプリ」からアンインストールしてください。"),
+                    Tr(L"Uninstall TEKITO", L"TEKITO のアンインストール"), MB_OK | MB_ICONERROR);
+        return 1;
     }
     if (uninstall && uninstallRoot.empty()) {
         // Run from the installation, which is deleted: go on from a copy in

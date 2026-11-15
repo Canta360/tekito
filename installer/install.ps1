@@ -46,7 +46,10 @@ if (-not $SourceRoot) { $SourceRoot = $PSScriptRoot }
 
 $tip = "0409:{6F67E5C8-A873-4B69-8EC3-26DF00F642F1}{8D99240A-5C9C-4ED8-8DE4-85F21DF23763}"
 $japaneseTip = "0411:{6F67E5C8-A873-4B69-8EC3-26DF00F642F1}{2876747C-FA52-4CCC-B308-F406190F8CDE}"
-$regsvr32 = Join-Path $env:WINDIR "System32\regsvr32.exe"
+# Windows' own programs by their full paths, not through PATH or WINDIR.
+$system32 = [Environment]::SystemDirectory
+$regsvr32 = Join-Path $system32 "regsvr32.exe"
+$icacls = Join-Path $system32 "icacls.exe"
 $startMenu = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\TEKITO"
 $uninstallKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\TEKITO"
 
@@ -64,7 +67,7 @@ function Grant-AppContainerRead([string]$Folder) {
     # program and its Data Packs (never user.db, which they cannot open).
     if (-not (Test-Path -LiteralPath $Folder)) { return }
     foreach ($sid in @("*S-1-15-2-1", "*S-1-15-2-2")) {
-        & icacls.exe $Folder /grant "${sid}:(OI)(CI)(RX)" /Q | Out-Null
+        & $icacls $Folder /grant "${sid}:(OI)(CI)(RX)" /Q | Out-Null
         if ($LASTEXITCODE -ne 0) { Write-Warning "Could not let apps read $Folder (icacls returned $LASTEXITCODE)." }
     }
 }
@@ -72,7 +75,7 @@ function Grant-AppContainerRead([string]$Folder) {
 # Only administrators and the system change the program; everyone (apps in
 # an app container too) runs and reads it.
 function Protect-InstallFolder([string]$Folder) {
-    & icacls.exe $Folder /inheritance:r /grant:r "*S-1-5-18:(OI)(CI)F" "*S-1-5-32-544:(OI)(CI)F" `
+    & $icacls $Folder /inheritance:r /grant:r "*S-1-5-18:(OI)(CI)F" "*S-1-5-32-544:(OI)(CI)F" `
         "*S-1-5-32-545:(OI)(CI)RX" "*S-1-15-2-1:(OI)(CI)RX" "*S-1-15-2-2:(OI)(CI)RX" /Q | Out-Null
     if ($LASTEXITCODE -ne 0) { throw "The install folder could not be protected (icacls returned $LASTEXITCODE)." }
 }
@@ -253,8 +256,10 @@ try {
     # The administrator's part: the program in Program Files, registered.
     # Nothing here reads or writes the user's own folders.
     if ($doProgram) {
-        # Staged first so a failure leaves the old installation alone.
-        $stagingRoot = Join-Path ([IO.Path]::GetTempPath()) ("tekito-install-" + [guid]::NewGuid().ToString("N"))
+        # Staged first so a failure leaves the old installation alone: beside
+        # the install folder in Program Files, where only administrators write.
+        $stagingParent = if ($SkipRegistration) { [IO.Path]::GetTempPath() } else { Split-Path $installRoot -Parent }
+        $stagingRoot = Join-Path $stagingParent ("TEKITO.staging-" + [guid]::NewGuid().ToString("N"))
         New-Item -ItemType Directory -Path $stagingRoot -Force | Out-Null
         foreach ($name in @("TEKITO.exe", "Tekito.Tsf.dll", "settings-ui", "uninstall.ps1", "TekitoUninstall.exe")) {
             $source = Join-Path $SourceRoot $name

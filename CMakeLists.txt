@@ -242,7 +242,7 @@ endif()
 # Setup program. The package-release script appends the package to it.
 
 set(TEKITO_SETUP_LIBS
-    user32 ole32 oleaut32 shell32 shlwapi advapi32 bcrypt userenv gdi32 d2d1 dwrite dwmapi windowscodecs mfplay
+    delayimp user32 ole32 oleaut32 shell32 shlwapi advapi32 bcrypt userenv gdi32 d2d1 dwrite dwmapi windowscodecs mfplay
     "${CMAKE_CURRENT_SOURCE_DIR}/third_party/webview2/lib/x64/WebView2LoaderStatic.lib"
 )
 
@@ -251,7 +251,9 @@ target_include_directories(TekitoSetupStub PRIVATE third_party/webview2/include)
 target_compile_definitions(TekitoSetupStub PRIVATE ${TEKITO_WINDOWS_DEFINES})
 target_compile_options(TekitoSetupStub PRIVATE /utf-8)
 target_link_libraries(TekitoSetupStub PRIVATE ${TEKITO_SETUP_LIBS})
-set_target_properties(TekitoSetupStub PROPERTIES LINK_FLAGS "/MANIFEST:NO")
+# DLLs beside setup (Downloads) are never loaded: System32 only, and the
+# ones not always loaded by Windows wait until setup has said so.
+set_target_properties(TekitoSetupStub PROPERTIES LINK_FLAGS "/MANIFEST:NO /DEPENDENTLOADFLAG:0x800 /DELAYLOAD:d2d1.dll /DELAYLOAD:dwrite.dll /DELAYLOAD:dwmapi.dll /DELAYLOAD:mfplay.dll /DELAYLOAD:bcrypt.dll /DELAYLOAD:userenv.dll /DELAYLOAD:shlwapi.dll")
 
 # ---------------------------------------------------------------------------
 # Tests and tools
@@ -343,7 +345,9 @@ if(TEKITO_BUILD_TESTS)
         ${TEKITO_WINDOWS_DEFINES} TEKITO_SETUP_PREVIEW)
     target_compile_options(tekito_setup_preview PRIVATE /utf-8)
     target_link_libraries(tekito_setup_preview PRIVATE ${TEKITO_SETUP_LIBS})
-    set_target_properties(tekito_setup_preview PROPERTIES LINK_FLAGS "/MANIFEST:NO")
+    # DLLs beside setup (Downloads) are never loaded: System32 only, and the
+    # ones not always loaded by Windows wait until setup has said so.
+    set_target_properties(tekito_setup_preview PROPERTIES LINK_FLAGS "/MANIFEST:NO /DEPENDENTLOADFLAG:0x800 /DELAYLOAD:d2d1.dll /DELAYLOAD:dwrite.dll /DELAYLOAD:dwmapi.dll /DELAYLOAD:mfplay.dll /DELAYLOAD:bcrypt.dll /DELAYLOAD:userenv.dll /DELAYLOAD:shlwapi.dll")
 endif()
 
 if(TEKITO_BUILD_BENCHMARKS)

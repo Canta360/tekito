@@ -4,6 +4,7 @@
 #include "sqlite3mc_amalgamation.h"
 
 #include <windows.h>
+#include <sddl.h>
 #include <bcrypt.h>
 #include <dpapi.h>
 
@@ -305,7 +306,17 @@ bool Opens(const std::filesystem::path& database, const DataKey& key) {
 // changes it to the new key). Held by the thread that holds it again too.
 class KeyFileLock {
 public:
-    explicit KeyFileLock(DWORD wait) : mutex_(CreateMutexW(nullptr, FALSE, L"Local\\TEKITO.UserKey")) {
+    // Usable by every process of the session, whoever made it first: an
+    // elevated app typing with TEKITO (an administrator's terminal) or another
+    // account's, not only by the processes like the one that made it.
+    explicit KeyFileLock(DWORD wait) {
+        PSECURITY_DESCRIPTOR descriptor = nullptr;
+        if (ConvertStringSecurityDescriptorToSecurityDescriptorW(L"D:(A;;0x100001;;;AU)(A;;0x1F0001;;;SY)S:(ML;;NW;;;LW)",
+                                                                 SDDL_REVISION_1, &descriptor, nullptr)) {
+            SECURITY_ATTRIBUTES attributes{sizeof(attributes), descriptor, FALSE};
+            mutex_ = CreateMutexExW(&attributes, L"Local\\TEKITO.UserKey", 0, SYNCHRONIZE | MUTEX_MODIFY_STATE);
+            LocalFree(descriptor);
+        }
         if (!mutex_) return;
         const DWORD result = WaitForSingleObject(mutex_, wait);
         held_ = result == WAIT_OBJECT_0 || result == WAIT_ABANDONED;
@@ -323,7 +334,7 @@ private:
     bool held_{false};
 };
 constexpr DWORD kChangeWait = 60000;  // a renewal waits for one in progress
-constexpr DWORD kOpenWait = 10000;    // opening the database does not wait long
+constexpr DWORD kOpenWait = 2000;     // opening the database does not wait long
 
 // The key the database opens with now (the system's, or a new one it was
 // already changed to), or nothing.
@@ -466,6 +477,17 @@ std::optional<std::string> RenewRecoveryCode(const std::filesystem::path& databa
 
 bool SettleEncryption(const std::filesystem::path& database) noexcept {
     try {
+        // Nothing to change, as almost always: no waiting for the lock.
+        {
+            std::error_code error;
+            if (!std::filesystem::is_regular_file(database, error) || std::filesystem::file_size(database, error) == 0) {
+                return true;
+            }
+            const auto file = ReadKeyFile(UserKeyPath(database));
+            const bool want = file && file->encrypt;
+            const bool encrypted = DatabaseEncrypted(database);
+            if (want == encrypted && !(encrypted && file && !file->next.empty())) return true;
+        }
         const KeyFileLock lock(kOpenWait);
         if (!lock.Held()) return false;
         std::error_code error;
@@ -493,7 +515,10 @@ bool SettleEncryption(const std::filesystem::path& database) noexcept {
         };
         // Changed to the new key already, and stopped before user.key said so.
         if (encrypted && next && !(key && Opens(database, *key)) && Opens(database, *next)) {
-            takeNext();
+            if (!takeNext()) {
+                wipe();
+                return false;
+            }
             key = next;
             next.reset();
             if (want) {

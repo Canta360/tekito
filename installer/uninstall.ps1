@@ -116,6 +116,10 @@ if ($doWords) {
             Write-Host "The words could not be exported to $ExportTo."
             exit 30
         }
+        # No words to save: the folder made for them goes.
+        if (@(Get-ChildItem -LiteralPath $ExportTo -Force -ErrorAction SilentlyContinue).Count -eq 0) {
+            Remove-Item -LiteralPath $ExportTo -Force -ErrorAction SilentlyContinue
+        }
     }
     # Apps that still have TEKITO loaded keep its database open, so the file
     # may stay until they close. Its contents go now.
@@ -131,7 +135,7 @@ if ($doWords) {
 if ($doProgram) {
     Get-Process -Name TEKITO -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
     if (-not $SkipRegistration) {
-        $regsvr32 = Join-Path $env:WINDIR "System32\regsvr32.exe"
+        $regsvr32 = Join-Path ([Environment]::SystemDirectory) "regsvr32.exe"
         foreach ($dll in @(Get-ChildItem -LiteralPath $installRoot -Filter "Tekito.Tsf*.dll" -File -Recurse -ErrorAction SilentlyContinue)) {
             $process = Start-Process $regsvr32 -ArgumentList @('/u', '/s', ('"{0}"' -f $dll.FullName)) -WindowStyle Hidden -Wait -PassThru
             if ($process.ExitCode -ne 0) { Write-Warning "Unregistering $($dll.Name) returned $($process.ExitCode)." }
