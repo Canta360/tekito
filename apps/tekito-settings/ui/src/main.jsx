@@ -392,6 +392,7 @@ function App() {
   const japaneseKeyboard = Boolean(runtime.japaneseKeyboard);
   const ctx = {
     t, settings, setSetting, runAction, setConfirm, showKeys: setKeys, open, on, multi: japanese || mixed, japaneseInstalled,
+    windowsInput: { ctrlShift: runtime.ctrlShiftSwitches !== false, tekitoDefault: Boolean(runtime.tekitoDefault), defaultSaved: Boolean(runtime.defaultSaved) },
     japaneseKeyboard, aiModels, postalCodes, openRomaji: () => open("romaji"), aiReady, settingsAiOffer, chat: { messages: conversation, setMessages: setConversation },
     japaneseInstalling: Boolean(runtime.japaneseInstalling), japaneseDataBytes: runtime.japaneseDataBytes || 0,
     japaneseAddable: runtime.japaneseAddable !== false, japaneseDataError: runtime.japaneseDataError || "",

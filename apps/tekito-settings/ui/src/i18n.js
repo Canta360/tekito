@@ -116,6 +116,11 @@ const en = {
 
   general: {
     switchKey: { title: "Switch key", none: "None" },
+    ctrlShift: { title: "Ctrl + Shift switches input methods", description: "Off: Ctrl + Shift no longer switches to another input method by accident (a Windows setting)." },
+    defaultIme: {
+      title: "Windows' default input method", description: "TEKITO is used first after you sign in and in apps you open.",
+      make: "Use TEKITO", isDefault: "TEKITO is the default", putBack: "Put back", made: "TEKITO is the default input method now.", putBackDone: "Put back as it was.",
+    },
     order: { title: "Switch order", moveUp: (name) => `Move ${name} up`, moveDown: (name) => `Move ${name} down` },
     indicator: { title: "Show the mode", description: "Briefly shows the mode where you type after switching.", onFocus: "Also when moving to another field or app" },
     candidates: "Candidate list",
@@ -553,6 +558,11 @@ const ja = {
 
   general: {
     switchKey: { title: "切り替えキー", none: "なし" },
+    ctrlShift: { title: "Ctrl + Shift で入力方式を切り替え", description: "オフにすると、Ctrl + Shift で別の入力方式に切り替わらなくなります（Windows の設定）" },
+    defaultIme: {
+      title: "Windows の既定の入力方式", description: "サインインしたときや新しく開いたアプリで、最初に TEKITO が使われます",
+      make: "TEKITO にする", isDefault: "TEKITO になっています", putBack: "元に戻す", made: "既定の入力方式を TEKITO にしました。", putBackDone: "元の設定に戻しました。",
+    },
     order: { title: "切り替え順", moveUp: (name) => `${name} を上へ`, moveDown: (name) => `${name} を下へ` },
     indicator: { title: "モードの表示", description: "切り替え時に、入力位置にモードが一時的に表示されます", onFocus: "入力欄やアプリを移ったときも表示" },
     candidates: "候補一覧",

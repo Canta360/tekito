@@ -2,7 +2,7 @@
 // stores, and its row. The pages, Home's search and AI answers, and All
 // settings are drawn from this list; an id is what an AI answer names.
 import React from "react";
-import { Card, Check, Details, Heading, Keycaps, LinkRow, Row, Segmented, Select, Slider, Toggle } from "./ui.jsx";
+import { Button, Card, Check, Details, Heading, Keycaps, LinkRow, Row, Segmented, Select, Slider, Toggle } from "./ui.jsx";
 import {
   AiModelRow, candidateRowsRange, ExcludedApps, kanjiStop, kanjiStops, LinkedStyle, LinkedToggle, mixPairs, ModeBadges, NumbersRow,
   PostalCodes, RowsRow, SpecialRow,
@@ -113,6 +113,28 @@ export function catalog(ctx) {
       render: () => (
         <Row icon="keyboard" title={g.switchKey.title}>
           <Segmented label={g.switchKey.title} value={s.toggleKey} options={toggleKeys} onChange={(value) => set("toggleKey", value)} />
+        </Row>
+      ),
+    },
+    {
+      id: "ctrlShift", page: "general", group: "switching", keys: [], title: g.ctrlShift.title, about: g.ctrlShift.description, detail: true,
+      render: () => (
+        <Row icon="keyboard_command_key" title={g.ctrlShift.title} description={g.ctrlShift.description}>
+          <Toggle label={g.ctrlShift.title} checked={ctx.windowsInput.ctrlShift}
+            onChange={(value) => ctx.runAction("windows.ctrlShift", { on: value })} />
+        </Row>
+      ),
+    },
+    {
+      id: "defaultIme", page: "general", group: "switching", keys: [], title: g.defaultIme.title, about: g.defaultIme.description, detail: true,
+      render: () => (
+        <Row icon="stars" title={g.defaultIme.title} description={g.defaultIme.description}>
+          {ctx.windowsInput.defaultSaved && (
+            <Button variant="quiet" onClick={() => ctx.runAction("windows.default.restore", {}, g.defaultIme.putBackDone)}>{g.defaultIme.putBack}</Button>
+          )}
+          <Button disabled={ctx.windowsInput.tekitoDefault} onClick={() => ctx.runAction("windows.default.set", {}, g.defaultIme.made)}>
+            {ctx.windowsInput.tekitoDefault ? g.defaultIme.isDefault : g.defaultIme.make}
+          </Button>
         </Row>
       ),
     },

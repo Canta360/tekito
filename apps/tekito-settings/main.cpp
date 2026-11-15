@@ -649,6 +649,131 @@ std::filesystem::path WebViewUserDataDirectory() {
     return std::filesystem::path(localAppData) / L"TEKITO" / L"settings-webview";
 }
 
+// Windows' own input settings Settings can change for the user, as Windows'
+// language settings do, with what they were before kept to put back.
+constexpr wchar_t kTekitoWindowsKey[] = L"Software\\TEKITO\\Windows";
+constexpr wchar_t kTekitoClsid[] = L"{6F67E5C8-A873-4B69-8EC3-26DF00F642F1}";
+
+std::optional<std::wstring> ReadUserString(const wchar_t* key, const wchar_t* name) {
+    wchar_t value[512]{};
+    DWORD size = sizeof(value);
+    if (RegGetValueW(HKEY_CURRENT_USER, key, name, RRF_RT_REG_SZ, nullptr, value, &size) != ERROR_SUCCESS) {
+        return std::nullopt;
+    }
+    return std::wstring(value);
+}
+
+bool WriteUserString(const wchar_t* key, const wchar_t* name, const std::wstring& value) {
+    return RegSetKeyValueW(HKEY_CURRENT_USER, key, name, REG_SZ, value.c_str(),
+                           static_cast<DWORD>((value.size() + 1) * sizeof(wchar_t))) == ERROR_SUCCESS;
+}
+
+void DeleteUserValue(const wchar_t* key, const wchar_t* name) { RegDeleteKeyValueW(HKEY_CURRENT_USER, key, name); }
+
+// input.dll's view of a keyboard in the user's list (LAYOUTORTIPPROFILE).
+struct LayoutOrTip {
+    DWORD profileType;
+    LANGID language;
+    CLSID clsid;
+    GUID profile;
+    GUID category;
+    DWORD substituteLayout;
+    DWORD flags;
+    WCHAR id[MAX_PATH];
+};
+constexpr DWORD kLayoutOrTipDefault = 0x00000001;
+
+// The keyboards in the user's list (the default one flagged).
+std::vector<LayoutOrTip> EnabledKeyboards() {
+    using EnumFunction = UINT(WINAPI*)(LPCWSTR, LPCWSTR, LPCWSTR, LayoutOrTip*, UINT);
+    std::vector<LayoutOrTip> keyboards;
+    const HMODULE input = LoadLibraryExW(L"input.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
+    if (!input) return keyboards;
+    if (const auto enumerate = reinterpret_cast<EnumFunction>(GetProcAddress(input, "EnumEnabledLayoutOrTip"))) {
+        const UINT count = enumerate(nullptr, nullptr, nullptr, nullptr, 0);
+        keyboards.resize(count);
+        if (count > 0) keyboards.resize(enumerate(nullptr, nullptr, nullptr, keyboards.data(), count));
+    }
+    FreeLibrary(input);
+    return keyboards;
+}
+
+std::wstring DefaultKeyboard() {
+    for (const auto& keyboard : EnabledKeyboards()) {
+        if (keyboard.flags & kLayoutOrTipDefault) return keyboard.id;
+    }
+    return {};
+}
+
+bool IsTekito(const std::wstring& keyboard) {
+    std::wstring upper = keyboard;
+    for (auto& c : upper) c = static_cast<wchar_t>(std::towupper(c));
+    return upper.find(kTekitoClsid) != std::wstring::npos;
+}
+
+bool SetDefaultKeyboard(const std::wstring& keyboard) {
+    using SetDefaultFunction = BOOL(WINAPI*)(LPCWSTR, DWORD);
+    const HMODULE input = LoadLibraryExW(L"input.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
+    if (!input) return false;
+    const auto setDefault = reinterpret_cast<SetDefaultFunction>(GetProcAddress(input, "SetDefaultLayoutOrTip"));
+    const bool set = setDefault && setDefault(keyboard.c_str(), 0) != FALSE;
+    FreeLibrary(input);
+    return set;
+}
+
+// TEKITO as Windows' default input method: the Japanese one when it is in
+// the list, else the English one. The default before is kept.
+bool MakeTekitoDefault() {
+    const auto before = DefaultKeyboard();
+    std::wstring tekito = kEnglishTip;
+    for (const auto& keyboard : EnabledKeyboards()) {
+        if (_wcsicmp(keyboard.id, kJapaneseTip) == 0) tekito = kJapaneseTip;
+    }
+    if (!before.empty() && !IsTekito(before)) WriteUserString(kTekitoWindowsKey, L"PreviousDefault", before);
+    return SetDefaultKeyboard(tekito);
+}
+
+bool PutBackDefault() {
+    const auto before = ReadUserString(kTekitoWindowsKey, L"PreviousDefault");
+    if (!before || !SetDefaultKeyboard(*before)) return false;
+    DeleteUserValue(kTekitoWindowsKey, L"PreviousDefault");
+    return true;
+}
+
+// Ctrl+Shift switching keyboards (Windows' "Switch keyboard layout" hotkey,
+// and the language one when it is Ctrl+Shift): "2" is Ctrl+Shift, "3" none.
+constexpr wchar_t kToggleKey[] = L"Keyboard Layout\\Toggle";
+
+bool CtrlShiftSwitches() {
+    const auto layout = ReadUserString(kToggleKey, L"Layout Hotkey").value_or(L"2");
+    const auto language = ReadUserString(kToggleKey, L"Language Hotkey").value_or(L"1");
+    return layout == L"2" || language == L"2";
+}
+
+bool SetCtrlShiftSwitches(bool on) {
+    bool done = true;
+    for (const wchar_t* name : {L"Layout Hotkey", L"Language Hotkey"}) {
+        const std::wstring kept = std::wstring(L"Previous ") + name;
+        if (!on) {
+            const auto now = ReadUserString(kToggleKey, name).value_or(std::wstring(name) == L"Layout Hotkey" ? L"2" : L"1");
+            if (now != L"2") continue;
+            WriteUserString(kTekitoWindowsKey, kept.c_str(), now);
+            done = WriteUserString(kToggleKey, name, L"3") && done;
+        } else if (const auto before = ReadUserString(kTekitoWindowsKey, kept.c_str())) {
+            done = WriteUserString(kToggleKey, name, *before) && done;
+            DeleteUserValue(kTekitoWindowsKey, kept.c_str());
+        } else if (std::wstring(name) == L"Layout Hotkey") {
+            done = WriteUserString(kToggleKey, name, L"2") && done;
+        }
+    }
+    if (ReadUserString(kToggleKey, L"Hotkey")) {
+        // The older name of the language hotkey, kept in step.
+        WriteUserString(kToggleKey, L"Hotkey", ReadUserString(kToggleKey, L"Language Hotkey").value_or(L"1"));
+    }
+    SystemParametersInfoW(SPI_SETLANGTOGGLE, 0, nullptr, SPIF_SENDCHANGE);
+    return done;
+}
+
 class SettingsApp final {
 public:
     bool Initialize(HINSTANCE instance) {
@@ -1421,6 +1546,11 @@ private:
                 japaneseDataSummary_ + L"\",\"japanese\":" + (japaneseAvailable_ ? L"true" : L"false") +
                 L",\"japaneseKeyboard\":" +
                 (tekito::userdata::UsesJapaneseKeyboard(settings_.keyboardType) ? L"true" : L"false");
+        // Windows' own input settings Settings can change.
+        json += std::wstring(L",\"ctrlShiftSwitches\":") + (CtrlShiftSwitches() ? L"true" : L"false") +
+                L",\"tekitoDefault\":" + (IsTekito(DefaultKeyboard()) ? L"true" : L"false") +
+                L",\"defaultSaved\":" +
+                (ReadUserString(kTekitoWindowsKey, L"PreviousDefault") ? L"true" : L"false");
         if (!japaneseAvailable_) {
             // What adding Japanese downloads, when Settings can.
             const auto info = ReadJapaneseDataInfo();
@@ -2217,6 +2347,14 @@ private:
             const auto text = Diagnostics();
             const bool copied = CopyToClipboard(hwnd_, text);
             Reply(requestId, copied, copied ? L"" : Text(L"Diagnostics could not be copied.", L"診断情報をコピーできませんでした。"));
+        } else if (type == L"windows.ctrlShift") {
+            const bool done = SetCtrlShiftSwitches(message.Bool(L"on"));
+            Reply(requestId, done, done ? L"" : Text(L"Windows' setting could not be changed.", L"Windows の設定を変更できませんでした。"));
+            PostState();
+        } else if (type == L"windows.default.set" || type == L"windows.default.restore") {
+            const bool done = type == L"windows.default.set" ? MakeTekitoDefault() : PutBackDefault();
+            Reply(requestId, done, done ? L"" : Text(L"Windows' setting could not be changed.", L"Windows の設定を変更できませんでした。"));
+            PostState();
         } else if (type == L"uninstall.open") {
             // TEKITO's uninstaller (what Installed apps runs), which offers
             // to export the words first; Settings closes as it starts.
