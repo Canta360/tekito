@@ -6,6 +6,9 @@
 #include <algorithm>
 #include <cstdlib>
 #include <cstring>
+#include <ctime>
+#include <string>
+#include <string_view>
 #include <filesystem>
 #include <memory>
 #include <new>
@@ -37,7 +40,8 @@ constexpr const char* kCreateSchema =
     "word TEXT PRIMARY KEY NOT NULL,"
     "candidate_selections INTEGER NOT NULL DEFAULT 0,"
     "raw_keeps INTEGER NOT NULL DEFAULT 0,"
-    "undo_count INTEGER NOT NULL DEFAULT 0"
+    "undo_count INTEGER NOT NULL DEFAULT 0,"
+    "changed_at INTEGER NOT NULL DEFAULT 0"
     ");"
     "CREATE TABLE IF NOT EXISTS user_learning_preferences ("
     "raw_text TEXT NOT NULL,"
@@ -46,6 +50,7 @@ constexpr const char* kCreateSchema =
     "beta REAL NOT NULL DEFAULT 0,"
     "exposure INTEGER NOT NULL DEFAULT 0,"
     "direct_event_mass REAL NOT NULL DEFAULT 0,"
+    "changed_at INTEGER NOT NULL DEFAULT 0,"
     "PRIMARY KEY(raw_text, candidate)"
     ");"
     "CREATE TABLE IF NOT EXISTS social_learning ("
@@ -55,6 +60,7 @@ constexpr const char* kCreateSchema =
     "beta REAL NOT NULL DEFAULT 0," 
     "exposure INTEGER NOT NULL DEFAULT 0," 
     "direct_event_mass REAL NOT NULL DEFAULT 0," 
+    "changed_at INTEGER NOT NULL DEFAULT 0,"
     "PRIMARY KEY(trigger, candidate)"
     ");"
     "CREATE TABLE IF NOT EXISTS japanese_learning ("
@@ -63,6 +69,7 @@ constexpr const char* kCreateSchema =
     "selections REAL NOT NULL DEFAULT 0,"
     "rejections REAL NOT NULL DEFAULT 0,"
     "last_used INTEGER NOT NULL DEFAULT 0,"
+    "changed_at INTEGER NOT NULL DEFAULT 0,"
     "PRIMARY KEY (reading, surface)"
     ");"
     "CREATE TABLE IF NOT EXISTS japanese_user_words ("
@@ -83,6 +90,54 @@ constexpr const char* kCreateSchema =
     "CREATE TABLE IF NOT EXISTS excluded_apps ("
     "name TEXT PRIMARY KEY NOT NULL COLLATE NOCASE"
     ");";
+
+// When each learned row last changed (changed_at), kept across the saves
+// that write a table anew: its rows as they were, before the save.
+struct ChangeColumns {
+    const char* table;
+    const char* keys[2];
+    const char* values[4];  // what learning changes (not how often shown)
+};
+constexpr ChangeColumns kLearningTables[] = {
+    {"user_learning", {"word", nullptr}, {"candidate_selections", "raw_keeps", "undo_count", nullptr}},
+    {"user_learning_preferences", {"raw_text", "candidate"}, {"alpha", "beta", "direct_event_mass", nullptr}},
+    {"social_learning", {"trigger", "candidate"}, {"alpha", "beta", "direct_event_mass", nullptr}},
+    {"japanese_learning", {"reading", "surface"}, {"selections", "rejections", nullptr, nullptr}},
+};
+
+const ChangeColumns* LearningTable(std::string_view table) noexcept {
+    for (const auto& columns : kLearningTables) {
+        if (table == columns.table) return &columns;
+    }
+    return nullptr;
+}
+
+bool KeepChangeTimes(sqlite3* database, std::string_view table) noexcept {
+    const std::string name(table);
+    const std::string sql = "DROP TABLE IF EXISTS temp.before_" + name + "; CREATE TEMP TABLE before_" + name +
+                            " AS SELECT * FROM main." + name + ";";
+    return sqlite3_exec(database, sql.c_str(), nullptr, nullptr, nullptr) == SQLITE_OK;
+}
+
+// After the rows are written: a row as it was keeps its time, any other
+// takes now.
+bool StampChangeTimes(sqlite3* database, std::string_view table) noexcept {
+    const auto* columns = LearningTable(table);
+    if (!columns) return false;
+    const std::string name(table);
+    std::string same;
+    for (const char* key : columns->keys) {
+        if (key) same += std::string(same.empty() ? "" : " AND ") + "b." + key + " = main." + name + "." + key;
+    }
+    for (const char* value : columns->values) {
+        if (value) same += std::string(" AND b.") + value + " IS main." + name + "." + value;
+    }
+    const auto now = static_cast<long long>(std::time(nullptr));
+    const std::string sql = "UPDATE main." + name + " SET changed_at = COALESCE((SELECT b.changed_at FROM temp.before_" +
+                            name + " b WHERE " + same + "), " + std::to_string(now) + "); DROP TABLE temp.before_" +
+                            name + ";";
+    return sqlite3_exec(database, sql.c_str(), nullptr, nullptr, nullptr) == SQLITE_OK;
+}
 
 bool BindText16(sqlite3_stmt* statement, int index, const std::wstring& value) noexcept {
     return sqlite3_bind_text16(statement, index, value.c_str(),
@@ -744,7 +799,9 @@ bool SqliteUserDictionaryRepository::SaveLearning(const UserLearningStore& learn
     // holds is not written back.
     if (ErasedSince()) return false;
     if (sqlite3_exec(database_, "BEGIN IMMEDIATE;", nullptr, nullptr, nullptr) != SQLITE_OK) return false;
-    bool success = sqlite3_exec(database_,
+    bool success = KeepChangeTimes(database_, "user_learning") &&
+                   KeepChangeTimes(database_, "user_learning_preferences") &&
+                   sqlite3_exec(database_,
                                  "DELETE FROM user_learning;"
                                  "DELETE FROM user_learning_preferences;",
                                  nullptr, nullptr, nullptr) == SQLITE_OK;
@@ -791,6 +848,8 @@ bool SqliteUserDictionaryRepository::SaveLearning(const UserLearningStore& learn
         }
         if (statement) sqlite3_finalize(statement);
     }
+    success = success && StampChangeTimes(database_, "user_learning") &&
+              StampChangeTimes(database_, "user_learning_preferences");
     const char* transaction = success ? "COMMIT;" : "ROLLBACK;";
     if (sqlite3_exec(database_, transaction, nullptr, nullptr, nullptr) != SQLITE_OK) success = false;
     return success;
@@ -839,7 +898,8 @@ bool SqliteUserDictionaryRepository::SaveSocialLearning(
     // holds is not written back.
     if (ErasedSince()) return false;
     if (sqlite3_exec(database_, "BEGIN IMMEDIATE;", nullptr, nullptr, nullptr) != SQLITE_OK) return false;
-    bool success = sqlite3_exec(database_, "DELETE FROM social_learning;", nullptr, nullptr, nullptr) == SQLITE_OK;
+    bool success = KeepChangeTimes(database_, "social_learning") &&
+                   sqlite3_exec(database_, "DELETE FROM social_learning;", nullptr, nullptr, nullptr) == SQLITE_OK;
     sqlite3_stmt* statement = nullptr;
     constexpr const char* query =
         "INSERT INTO social_learning "
@@ -859,6 +919,7 @@ bool SqliteUserDictionaryRepository::SaveSocialLearning(
         }
     }
     if (statement) sqlite3_finalize(statement);
+    success = success && StampChangeTimes(database_, "social_learning");
     const char* transaction = success ? "COMMIT;" : "ROLLBACK;";
     if (sqlite3_exec(database_, transaction, nullptr, nullptr, nullptr) != SQLITE_OK) success = false;
     return success;
@@ -902,8 +963,8 @@ bool SqliteUserDictionaryRepository::SaveJapaneseLearning(
     // holds is not written back.
     if (ErasedSince()) return false;
     if (sqlite3_exec(database_, "BEGIN IMMEDIATE;", nullptr, nullptr, nullptr) != SQLITE_OK) return false;
-    bool success =
-        sqlite3_exec(database_, "DELETE FROM japanese_learning;", nullptr, nullptr, nullptr) == SQLITE_OK;
+    bool success = KeepChangeTimes(database_, "japanese_learning") &&
+                   sqlite3_exec(database_, "DELETE FROM japanese_learning;", nullptr, nullptr, nullptr) == SQLITE_OK;
     sqlite3_stmt* statement = nullptr;
     constexpr const char* query =
         "INSERT INTO japanese_learning (reading, surface, selections, rejections, last_used) "
@@ -926,6 +987,7 @@ bool SqliteUserDictionaryRepository::SaveJapaneseLearning(
         success = false;
     }
     if (statement) sqlite3_finalize(statement);
+    success = success && StampChangeTimes(database_, "japanese_learning");
     const char* transaction = success ? "COMMIT;" : "ROLLBACK;";
     if (sqlite3_exec(database_, transaction, nullptr, nullptr, nullptr) != SQLITE_OK) success = false;
     return success;
@@ -1097,6 +1159,22 @@ bool SqliteUserDictionaryRepository::ResetJapaneseLearning() noexcept {
            sqlite3_exec(database_, "DELETE FROM japanese_learning;", nullptr, nullptr, nullptr) == SQLITE_OK;
 }
 
+bool SqliteUserDictionaryRepository::DeleteLearningSince(std::int64_t since) noexcept {
+    if (!database_ || sqlite3_exec(database_, "BEGIN IMMEDIATE;", nullptr, nullptr, nullptr) != SQLITE_OK) return false;
+    bool success = true;
+    for (const auto& columns : kLearningTables) {
+        sqlite3_stmt* statement = nullptr;
+        const std::string sql = std::string("DELETE FROM ") + columns.table + " WHERE changed_at >= ?;";
+        success = sqlite3_prepare_v2(database_, sql.c_str(), -1, &statement, nullptr) == SQLITE_OK &&
+                  sqlite3_bind_int64(statement, 1, since) == SQLITE_OK && sqlite3_step(statement) == SQLITE_DONE;
+        if (statement) sqlite3_finalize(statement);
+        if (!success) break;
+    }
+    const char* transaction = success ? "COMMIT;" : "ROLLBACK;";
+    if (sqlite3_exec(database_, transaction, nullptr, nullptr, nullptr) != SQLITE_OK) success = false;
+    return success;
+}
+
 bool SqliteUserDictionaryRepository::ResetSocialLearning() noexcept {
     return database_ && sqlite3_exec(database_, "DELETE FROM social_learning;", nullptr, nullptr, nullptr) == SQLITE_OK;
 }
@@ -1108,6 +1186,22 @@ bool SqliteUserDictionaryRepository::IsOpen() const noexcept {
 bool SqliteUserDictionaryRepository::EnsureSchema() noexcept {
     if (!database_ || sqlite3_exec(database_, kCreateSchema, nullptr, nullptr, nullptr) != SQLITE_OK) return false;
     // Tables from before a column was added get it.
+    // When each learned row last changed (DeleteLearningSince); rows from
+    // before count as older than any time asked for.
+    for (const auto& columns : kLearningTables) {
+        bool hasChanged = false;
+        sqlite3_stmt* info = nullptr;
+        const std::string pragma = std::string("PRAGMA table_info(") + columns.table + ");";
+        if (sqlite3_prepare_v2(database_, pragma.c_str(), -1, &info, nullptr) == SQLITE_OK) {
+            while (sqlite3_step(info) == SQLITE_ROW) {
+                const auto* name = reinterpret_cast<const char*>(sqlite3_column_text(info, 1));
+                if (name && std::strcmp(name, "changed_at") == 0) hasChanged = true;
+            }
+            sqlite3_finalize(info);
+        }
+        const std::string add = std::string("ALTER TABLE ") + columns.table + " ADD COLUMN changed_at INTEGER NOT NULL DEFAULT 0;";
+        if (!hasChanged && sqlite3_exec(database_, add.c_str(), nullptr, nullptr, nullptr) != SQLITE_OK) return false;
+    }
     bool hasAction = false;
     sqlite3_stmt* statement = nullptr;
     if (sqlite3_prepare_v2(database_, "PRAGMA table_info(japanese_user_words);", -1, &statement, nullptr) ==

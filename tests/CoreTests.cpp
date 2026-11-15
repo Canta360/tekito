@@ -32,6 +32,9 @@
 #include <cwctype>
 #include <cstdlib>
 #include <filesystem>
+#include <chrono>
+#include <ctime>
+#include <thread>
 #include <iostream>
 #include <iterator>
 #include <windows.h>
@@ -2522,6 +2525,28 @@ void TestSqliteUserSettingsRepository() {
         Require(repository.ResetJapaneseLearning(), "Japanese learning resets");
         Require(repository.LoadJapaneseLearning(loadedJapanese) && loadedJapanese.Empty(),
                 "resetting Japanese learning empties it");
+    }
+
+    // Learning by time: what was learned or changed since a time goes, what
+    // was learned before and left as it was stays.
+    {
+        tekito::userdata::SqliteUserDictionaryRepository repository(path);
+        Require(repository.Open(), "the repository opens for learning by time");
+        tekito::japanese::JapaneseLearningStore older;
+        older.RecordChoice(L"きかい", L"機械", L"機会");
+        Require(repository.SaveJapaneseLearning(older), "the older learning saves");
+        std::this_thread::sleep_for(std::chrono::milliseconds(1100));
+        const auto since = static_cast<std::int64_t>(std::time(nullptr));
+        auto newer = older;
+        newer.RecordChoice(L"こうえん", L"講演", L"公園");
+        Require(repository.SaveJapaneseLearning(newer), "the newer learning saves");
+        Require(repository.DeleteLearningSince(since), "learning since a time is deleted");
+        tekito::japanese::JapaneseLearningStore left;
+        Require(repository.LoadJapaneseLearning(left), "what is left loads");
+        Require(left.Contains(L"きかい", L"機械") && !left.Contains(L"こうえん", L"講演"),
+                "what was learned before stays; what was learned since goes");
+        Require(repository.DeleteLearningSince(0) && repository.LoadJapaneseLearning(left) && left.Empty(),
+                "since the start, everything goes");
     }
 
     std::filesystem::remove(path, error);

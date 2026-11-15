@@ -47,6 +47,7 @@
 #include <cstdint>
 #include <cwchar>
 #include <cwctype>
+#include <ctime>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
@@ -2089,6 +2090,25 @@ private:
                 Reply(requestId, false, Text(L"Learning data could not be reset.", L"学習データを消去できませんでした。"));
             } else {
                 learning_.Reset();
+                runtime_->NotifyLearningChanged();
+                Reply(requestId, true);
+            }
+        } else if (type == L"learning.clearSince") {
+            // What was learned or changed in the last hour, or today.
+            const bool today = message.String(L"range") == L"today";
+            std::int64_t since = static_cast<std::int64_t>(std::time(nullptr)) - 3600;
+            if (today) {
+                std::tm local{};
+                const std::time_t now = std::time(nullptr);
+                localtime_s(&local, &now);
+                local.tm_hour = local.tm_min = local.tm_sec = 0;
+                since = static_cast<std::int64_t>(std::mktime(&local));
+            }
+            if (!repository_ || !repository_->DeleteLearningSince(since)) {
+                Reply(requestId, false, Text(L"Learning data could not be deleted.", L"学習データを削除できませんでした。"));
+            } else {
+                tekito::UserLearningStore reloaded;
+                if (repository_->LoadLearning(reloaded)) learning_ = std::move(reloaded);
                 runtime_->NotifyLearningChanged();
                 Reply(requestId, true);
             }

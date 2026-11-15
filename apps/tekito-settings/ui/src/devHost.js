@@ -317,6 +317,8 @@ export function installMockHost() {
         state.settings.excludedApps = state.settings.excludedApps.filter((app) => app !== message.name);
       } else if (type === "learning.clear") {
         state.learning.count = 0;
+      } else if (type === "learning.clearSince") {
+        state.learning.count = Math.max(0, state.learning.count - (message.range === "today" ? 5 : 1));
       } else if (type === "dictionary.create") {
         const id = Math.max(0, ...state.dictionary.map((entry) => entry.id)) + 1;
         state.dictionary.push({ id, raw: message.raw, candidate: message.candidate, type: "Word", policy: message.policy });

@@ -31,6 +31,7 @@ public:
     [[nodiscard]] bool LoadJapaneseLearning(japanese::JapaneseLearningStore& learning) const noexcept override;
     [[nodiscard]] bool SaveJapaneseLearning(const japanese::JapaneseLearningStore& learning) noexcept override;
     [[nodiscard]] bool ResetJapaneseLearning() noexcept override;
+    [[nodiscard]] bool DeleteLearningSince(std::int64_t since) noexcept override;
     [[nodiscard]] bool LoadJapaneseUserWords(std::vector<japanese::UserWord>& words) const noexcept override;
     [[nodiscard]] bool AddRecentConversion(const RecentConversion& conversion, std::size_t keep) noexcept override;
     [[nodiscard]] bool LoadRecentConversions(std::vector<RecentConversion>& conversions) const noexcept override;

@@ -40,6 +40,9 @@ public:
     [[nodiscard]] virtual bool LoadJapaneseLearning(japanese::JapaneseLearningStore& learning) const noexcept = 0;
     [[nodiscard]] virtual bool SaveJapaneseLearning(const japanese::JapaneseLearningStore& learning) noexcept = 0;
     [[nodiscard]] virtual bool ResetJapaneseLearning() noexcept = 0;
+    // Everything learned (English, its expressions and Japanese) that was
+    // learned or changed at or after `since` (seconds since 1970, UTC).
+    [[nodiscard]] virtual bool DeleteLearningSince(std::int64_t since) noexcept = 0;
     // The words the user added for Japanese (reading, surface, kind),
     // separate from the English user dictionary.
     [[nodiscard]] virtual bool LoadJapaneseUserWords(std::vector<japanese::UserWord>& words) const noexcept = 0;

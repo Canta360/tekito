@@ -8,7 +8,7 @@ import { CapitataLogo } from "./CapitataLogo.jsx";
 import { hostRequest, onHostStateChanged } from "./host.js";
 import { messages, resolveLanguage, TextContext, useText } from "./i18n.js";
 import {
-  Button, Card, Details, Dialog, Heading, IconButton, Keycaps, LinkRow, ModeIcon, Row, Segmented, Symbol, TextBox, Toggle, Wordmark, TekitoSymbol,
+  Button, Card, Details, Dialog, Heading, IconButton, Keycaps, LinkRow, ModeIcon, Radios, Row, Segmented, Symbol, TextBox, Toggle, Wordmark, TekitoSymbol,
   LineWordmark,
 } from "./ui.jsx";
 import { brandVariables, hueColor, tekitoTheme } from "./theme.js";
@@ -458,6 +458,7 @@ function App() {
         </Dialog>
         <Dialog open={Boolean(confirm)} title={confirm?.title} onClose={() => setConfirm(null)}>
           {confirm?.message && <p className="dialog-message">{confirm.message}</p>}
+          {confirm?.body}
           {confirm?.link && <button type="button" className="dialog-link" onClick={() => { const link = confirm.link; if (!link.keep) setConfirm(null); link.action(); }}>{confirm.link.label}</button>}
           <div className="dialog-actions">
             <Button variant={confirm?.danger ? "danger" : "primary"} onClick={async () => { const action = confirm.action; setConfirm(null); await action(); }}>{confirm?.confirmLabel}</Button>
@@ -614,6 +615,15 @@ function RomajiTable({ romaji, runAction, setConfirm, back }) {
 // ---------------------------------------------------------------------------
 // 辞書と学習
 
+function ClearRange({ onChange }) {
+  const l = useText().learningList;
+  const [range, setRange] = useState("hour");
+  return (
+    <Radios label={l.range} value={range} onChange={(value) => { setRange(value); onChange(value); }}
+      options={[["hour", l.ranges.hour], ["today", l.ranges.today], ["all", l.ranges.all]]} />
+  );
+}
+
 function DictionaryPage({ settings, setSetting, runAction, setConfirm, japanese, learning, dictionary, japaneseWords, setModal, encryption }) {
   const t = useText();
   const d = t.dictionary;
@@ -644,14 +654,24 @@ function DictionaryPage({ settings, setSetting, runAction, setConfirm, japanese,
       if (Boolean(settings.socialPersonalization) !== value) await setSetting("socialPersonalization", value ? 1 : 0);
     }
   };
-  const askClear = () => setConfirm({
-    title: l.confirmTitle, message: l.confirmMessage, confirmLabel: d.learned.clear, danger: true,
-    action: async () => {
-      await runAction("learning.clear", {});
-      if (japanese) await runAction("japaneseLearning.clear", {});
-      setLearned(null);
-    },
-  });
+  // The last hour, today, or everything.
+  const clearRange = useRef("hour");
+  const askClear = () => {
+    clearRange.current = "hour";
+    setConfirm({
+      title: l.confirmTitle, message: l.confirmMessage, confirmLabel: d.learned.clear, danger: true,
+      body: <ClearRange onChange={(value) => { clearRange.current = value; }} />,
+      action: async () => {
+        if (clearRange.current === "all") {
+          await runAction("learning.clear", {});
+          if (japanese) await runAction("japaneseLearning.clear", {});
+        } else {
+          await runAction("learning.clearSince", { range: clearRange.current });
+        }
+        setLearned(null);
+      },
+    });
+  };
   const askDelete = (title, message, action) => setConfirm({ title, message, confirmLabel: t.remove, danger: true, action });
   return (
     <>
