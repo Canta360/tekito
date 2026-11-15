@@ -41,7 +41,10 @@ using DataKey = std::array<std::uint8_t, 32>;
 [[nodiscard]] std::optional<std::string> EnableEncryption(const std::filesystem::path& database);
 // Turns it off: the database goes back to plain when it next can.
 [[nodiscard]] bool DisableEncryption(const std::filesystem::path& database);
-// A new recovery code for the key (the old one no longer opens it).
+// A new recovery code with a new key: the database changes to it now, or
+// when no other process has it open (SettleEncryption); the new code opens
+// it all along, and the old one, even with an old copy of user.key, no
+// longer opens it once it has changed.
 [[nodiscard]] std::optional<std::string> RenewRecoveryCode(const std::filesystem::path& database);
 
 // Before opening: makes the database what user.key asks (encrypted or

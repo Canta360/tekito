@@ -37,6 +37,15 @@ struct KeyFile {
     std::array<std::uint8_t, 16> mac{};
     DataKey wrapped{};
     bool hasRecovery{false};
+    // A new recovery code makes a new key: DPAPI's wrapping of the key the
+    // database changes to when no other process has it open, and until then
+    // the key it is encrypted with, locked with that new key (so the new code
+    // opens it all along).
+    Bytes next;
+    std::array<std::uint8_t, 24> previousNonce{};
+    std::array<std::uint8_t, 16> previousMac{};
+    DataKey previous{};
+    bool hasPrevious{false};
 };
 
 std::string Base64(const std::uint8_t* data, std::size_t size) {
@@ -105,6 +114,16 @@ std::optional<KeyFile> ReadKeyFile(const std::filesystem::path& path) {
             fields >> kind >> data;
             if (kind != "dpapi") continue;
             if (auto bytes = Unbase64(data)) file.system = std::move(*bytes);
+        } else if (name == "next") {
+            std::string kind, data;
+            fields >> kind >> data;
+            if (kind != "dpapi") continue;
+            if (auto bytes = Unbase64(data)) file.next = std::move(*bytes);
+        } else if (name == "previous") {
+            std::string kind, nonce, mac, wrapped;
+            fields >> kind >> nonce >> mac >> wrapped;
+            file.hasPrevious = kind == "xchacha20-poly1305" && Fill(file.previousNonce, Unbase64(nonce)) &&
+                               Fill(file.previousMac, Unbase64(mac)) && Fill(file.previous, Unbase64(wrapped));
         } else if (name == "recovery") {
             std::string kind, salt, nonce, mac, wrapped;
             fields >> kind >> file.blocks >> file.passes >> salt >> nonce >> mac >> wrapped;
@@ -124,6 +143,12 @@ bool WriteKeyFile(const std::filesystem::path& path, const KeyFile& file) {
         out << "recovery argon2id " << file.blocks << " " << file.passes << " " << Base64(file.salt.data(), file.salt.size())
             << " " << Base64(file.nonce.data(), file.nonce.size()) << " " << Base64(file.mac.data(), file.mac.size()) << " "
             << Base64(file.wrapped.data(), file.wrapped.size()) << "\n";
+    }
+    if (!file.next.empty()) out << "next dpapi " << Base64(file.next.data(), file.next.size()) << "\n";
+    if (file.hasPrevious) {
+        out << "previous xchacha20-poly1305 " << Base64(file.previousNonce.data(), file.previousNonce.size()) << " "
+            << Base64(file.previousMac.data(), file.previousMac.size()) << " "
+            << Base64(file.previous.data(), file.previous.size()) << "\n";
     }
     // Written beside it, then put in place, so a failure leaves the old one.
     auto temporary = path;
@@ -148,9 +173,9 @@ std::optional<Bytes> SystemWrap(const DataKey& key) {
     return wrapped;
 }
 
-std::optional<DataKey> SystemUnwrap(const KeyFile& file) {
-    if (file.system.empty()) return std::nullopt;
-    DATA_BLOB in{static_cast<DWORD>(file.system.size()), const_cast<BYTE*>(file.system.data())};
+std::optional<DataKey> SystemUnwrapBytes(const Bytes& wrapped) {
+    if (wrapped.empty()) return std::nullopt;
+    DATA_BLOB in{static_cast<DWORD>(wrapped.size()), const_cast<BYTE*>(wrapped.data())};
     DATA_BLOB out{};
     if (!CryptUnprotectData(&in, nullptr, nullptr, nullptr, nullptr, CRYPTPROTECT_UI_FORBIDDEN, &out)) return std::nullopt;
     std::optional<DataKey> key;
@@ -160,6 +185,28 @@ std::optional<DataKey> SystemUnwrap(const KeyFile& file) {
     }
     SecureZeroMemory(out.pbData, out.cbData);
     LocalFree(out.pbData);
+    return key;
+}
+
+std::optional<DataKey> SystemUnwrap(const KeyFile& file) { return SystemUnwrapBytes(file.system); }
+
+// The key the database is encrypted with until it changes to `next`, locked
+// with `next` (KeyFile::previous).
+bool LockPrevious(const DataKey& current, const DataKey& next, KeyFile& file) {
+    if (!RandomBytes(file.previousNonce.data(), file.previousNonce.size())) return false;
+    crypto_aead_lock(file.previous.data(), file.previousMac.data(), next.data(), file.previousNonce.data(), nullptr, 0,
+                     current.data(), current.size());
+    file.hasPrevious = true;
+    return true;
+}
+
+std::optional<DataKey> UnlockPrevious(const KeyFile& file, const DataKey& next) {
+    if (!file.hasPrevious) return std::nullopt;
+    DataKey key{};
+    if (crypto_aead_unlock(key.data(), file.previousMac.data(), next.data(), file.previousNonce.data(), nullptr, 0,
+                           file.previous.data(), file.previous.size()) != 0) {
+        return std::nullopt;
+    }
     return key;
 }
 
@@ -243,6 +290,16 @@ bool KeyConnection(sqlite3* connection, const DataKey& key) {
     return ok && sqlite3_exec(connection, "SELECT count(*) FROM sqlite_master;", nullptr, nullptr, nullptr) == SQLITE_OK;
 }
 
+// Whether `key` opens the database (on a connection of its own, read only).
+bool Opens(const std::filesystem::path& database, const DataKey& key) {
+    sqlite3* connection = nullptr;
+    const bool ok = sqlite3_open_v2(reinterpret_cast<const char*>(database.u8string().c_str()), &connection,
+                                    SQLITE_OPEN_READONLY, nullptr) == SQLITE_OK &&
+                    KeyConnection(connection, key);
+    if (connection) sqlite3_close(connection);
+    return ok;
+}
+
 // No other process has the file open (each process with TEKITO has it).
 bool NobodyElseHasIt(const std::filesystem::path& database) {
     const HANDLE file = CreateFileW(database.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING,
@@ -298,6 +355,9 @@ std::optional<std::string> EnableEncryption(const std::filesystem::path& databas
         file.system = std::move(*system);
     }
     file.encrypt = true;
+    // The database is not encrypted yet: no new key waits for it.
+    file.next.clear();
+    file.hasPrevious = false;
     auto code = WrapWithNewCode(*key, file);
     crypto_wipe(key->data(), key->size());
     if (!code || !WriteKeyFile(path, file)) return std::nullopt;
@@ -319,11 +379,24 @@ std::optional<std::string> RenewRecoveryCode(const std::filesystem::path& databa
     const auto path = UserKeyPath(database);
     auto file = ReadKeyFile(path);
     if (!file) return std::nullopt;
-    auto key = SystemUnwrap(*file);
-    if (!key) return std::nullopt;
-    auto code = WrapWithNewCode(*key, *file);
-    crypto_wipe(key->data(), key->size());
+    auto current = SystemUnwrap(*file);
+    if (!current) return std::nullopt;
+    // A new key with the new code: once the database changes to it
+    // (SettleEncryption, now or when no app has it open), the old code with
+    // an old copy of user.key no longer opens it. Until then the new code
+    // opens the key it is still encrypted with (KeyFile::previous).
+    DataKey next{};
+    std::optional<std::string> code;
+    if (RandomBytes(next.data(), next.size())) {
+        if (auto wrapped = SystemWrap(next)) {
+            file->next = std::move(*wrapped);
+            if (LockPrevious(*current, next, *file)) code = WrapWithNewCode(next, *file);
+        }
+    }
+    crypto_wipe(current->data(), current->size());
+    crypto_wipe(next.data(), next.size());
     if (!code || !WriteKeyFile(path, *file)) return std::nullopt;
+    SettleEncryption(database);
     return code;
 }
 
@@ -331,13 +404,42 @@ bool SettleEncryption(const std::filesystem::path& database) noexcept {
     try {
         std::error_code error;
         if (!std::filesystem::is_regular_file(database, error) || std::filesystem::file_size(database, error) == 0) return true;
-        const auto file = ReadKeyFile(UserKeyPath(database));
+        const auto path = UserKeyPath(database);
+        auto file = ReadKeyFile(path);
         const bool want = file && file->encrypt;
         const bool encrypted = DatabaseEncrypted(database);
-        if (want == encrypted) return true;
-        if (!file || !NobodyElseHasIt(database)) return false;
+        // A new key waits (RenewRecoveryCode) while the database is encrypted.
+        const bool changing = file && !file->next.empty();
+        if (want == encrypted && !(encrypted && changing)) return true;
+        if (!file) return false;
         auto key = SystemUnwrap(*file);
-        if (!key) return false;
+        auto next = SystemUnwrapBytes(file->next);
+        const auto wipe = [&] {
+            if (key) crypto_wipe(key->data(), key->size());
+            if (next) crypto_wipe(next->data(), next->size());
+        };
+        // user.key takes the new key in place of the old one.
+        const auto takeNext = [&] {
+            file->system = std::move(file->next);
+            file->next.clear();
+            file->hasPrevious = false;
+            return WriteKeyFile(path, *file);
+        };
+        // Changed to the new key already, and stopped before user.key said so.
+        if (encrypted && next && !(key && Opens(database, *key)) && Opens(database, *next)) {
+            takeNext();
+            key = next;
+            next.reset();
+            if (want) {
+                wipe();
+                return true;
+            }
+        }
+        if (!key || !NobodyElseHasIt(database)) {
+            wipe();
+            return false;
+        }
+        const DataKey& to = next ? *next : *key;
         sqlite3* connection = nullptr;
         bool done = false;
         if (sqlite3_open16(database.c_str(), &connection) == SQLITE_OK && (!encrypted || KeyConnection(connection, *key))) {
@@ -345,7 +447,7 @@ bool SettleEncryption(const std::filesystem::path& database) noexcept {
             // rewritten (the change is undone whole if it stops).
             sqlite3_exec(connection, "PRAGMA wal_checkpoint(TRUNCATE);", nullptr, nullptr, nullptr);
             if (JournalMode(connection, "PRAGMA journal_mode=DELETE;") == "delete") {
-                auto raw = RawKey(*key);
+                auto raw = RawKey(to);
                 const int rc = want ? sqlite3_rekey(connection, raw.data(), static_cast<int>(raw.size()))
                                     : sqlite3_rekey(connection, nullptr, 0);
                 SecureZeroMemory(raw.data(), raw.size());
@@ -354,7 +456,9 @@ bool SettleEncryption(const std::filesystem::path& database) noexcept {
             }
         }
         if (connection) sqlite3_close(connection);
-        crypto_wipe(key->data(), key->size());
+        // Encrypted with the new key, or plain: the old key is no more.
+        if (done && next) done = takeNext();
+        wipe();
         return done;
     } catch (...) {
         return false;
@@ -381,6 +485,8 @@ bool RescueDatabase(const std::filesystem::path& database, const std::filesystem
     if (!file) return false;
     auto key = CodeUnwrap(*file, recoveryCode);
     if (!key) return false;
+    // Not changed to the code's key yet: the key it is still encrypted with.
+    auto previous = UnlockPrevious(*file, *key);
     // Read from a copy (with its log), never the original.
     std::error_code error;
     wchar_t folder[MAX_PATH]{};
@@ -397,9 +503,15 @@ bool RescueDatabase(const std::filesystem::path& database, const std::filesystem
     std::filesystem::remove(plain, error);
     sqlite3* source = nullptr;
     sqlite3* target = nullptr;
-    bool opened = sqlite3_open16(copy.c_str(), &source) == SQLITE_OK && KeyConnection(source, *key) &&
-                  sqlite3_open16(plain.c_str(), &target) == SQLITE_OK;
+    bool keyed = sqlite3_open16(copy.c_str(), &source) == SQLITE_OK && KeyConnection(source, *key);
+    if (!keyed && previous) {
+        if (source) sqlite3_close(source);
+        source = nullptr;
+        keyed = sqlite3_open16(copy.c_str(), &source) == SQLITE_OK && KeyConnection(source, *previous);
+    }
+    bool opened = keyed && sqlite3_open16(plain.c_str(), &target) == SQLITE_OK;
     crypto_wipe(key->data(), key->size());
+    if (previous) crypto_wipe(previous->data(), previous->size());
     if (opened) {
         // Each table: its schema, then its rows, as many as can be read.
         sqlite3_stmt* tables = nullptr;

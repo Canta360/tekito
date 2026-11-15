@@ -2614,6 +2614,31 @@ void TestUserDataEncryption() {
     }
 
     {
+        // A new recovery code while another connection has the database: a
+        // new key waits; the new code opens it all along, and once nothing
+        // holds it the database changes to the new key, which the old code
+        // with an old copy of user.key does not open.
+        const auto oldKey = folder / L"old-user.key";
+        fs::copy_file(tekito::userdata::UserKeyPath(database), oldKey, fs::copy_options::overwrite_existing, error);
+        std::optional<std::string> renewed;
+        {
+            tekito::userdata::SqliteUserDictionaryRepository holder(database);
+            Require(holder.Open(), "a second process holds it");
+            renewed = tekito::userdata::RenewRecoveryCode(database);
+            Require(renewed && *renewed != *code, "a new recovery code is made");
+            Require(tekito::userdata::RescueDatabase(database, tekito::userdata::UserKeyPath(database), *renewed, plain),
+                    "the new code rescues the database before it changes to the new key");
+        }
+        Require(recalled(L"SECRETWORDTWO"), "the next to open it alone changes it to the new key and reads it");
+        Require(!tekito::userdata::RescueDatabase(database, oldKey, *code, plain),
+                "then the old code with an old copy of user.key opens nothing");
+        Require(tekito::userdata::RescueDatabase(database, tekito::userdata::UserKeyPath(database), *renewed, plain),
+                "and the new code still rescues it");
+        renewed = tekito::userdata::RenewRecoveryCode(database);
+        Require(renewed && recalled(L"SECRETWORDTWO"), "renewed with nothing holding it, it changes key at once");
+    }
+
+    {
         // Turned off while another connection has it: it stays encrypted
         // until nothing does.
         tekito::userdata::SqliteUserDictionaryRepository holder(database);
