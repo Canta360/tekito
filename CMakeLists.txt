@@ -242,7 +242,7 @@ endif()
 # Setup program. The package-release script appends the package to it.
 
 set(TEKITO_SETUP_LIBS
-    user32 ole32 oleaut32 shell32 shlwapi advapi32 bcrypt gdi32 d2d1 dwrite dwmapi windowscodecs mfplay
+    user32 ole32 oleaut32 shell32 shlwapi advapi32 bcrypt userenv gdi32 d2d1 dwrite dwmapi windowscodecs mfplay
     "${CMAKE_CURRENT_SOURCE_DIR}/third_party/webview2/lib/x64/WebView2LoaderStatic.lib"
 )
 

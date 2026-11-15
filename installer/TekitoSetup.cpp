@@ -17,6 +17,7 @@
 #include <shlobj.h>
 #include <bcrypt.h>
 #include <sddl.h>
+#include <userenv.h>
 #include <shlwapi.h>
 #include <wincodec.h>
 #include "WebView2.h"
@@ -462,13 +463,13 @@ bool CopyPayload(const std::filesystem::path& self, std::uint64_t payloadOffset,
 // Windows' Temp folder (where nobody can rename or delete what another made),
 // with a name nobody can guess, made new (never one already there), and
 // changed by administrators and the system only; others can read it (the
-// install's record).
+// user's steps run from it, as the user, and read the install's record).
 std::filesystem::path MakeTempDirectory() {
     wchar_t windows[MAX_PATH]{};
     const UINT length = GetWindowsDirectoryW(windows, MAX_PATH);
     if (length == 0 || length >= MAX_PATH) return {};
     PSECURITY_DESCRIPTOR descriptor = nullptr;
-    if (!ConvertStringSecurityDescriptorToSecurityDescriptorW(L"D:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FR;;;AU)",
+    if (!ConvertStringSecurityDescriptorToSecurityDescriptorW(L"D:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;GRGX;;;AU)",
                                                               SDDL_REVISION_1, &descriptor, nullptr)) {
         return {};
     }
@@ -540,41 +541,20 @@ struct InstallChoices {
     bool keepEnglish{false};
 };
 
-int RunPowerShell(const std::filesystem::path& zipPath, const std::filesystem::path& packageRoot,
-                  const InstallChoices& choices) {
+std::filesystem::path PowerShellPath() {
     wchar_t systemDirectory[MAX_PATH]{};
     const auto length = GetSystemDirectoryW(systemDirectory, MAX_PATH);
-    if (length == 0 || length >= MAX_PATH) return -1;
-    const auto powershell = std::filesystem::path(systemDirectory) / LR"(WindowsPowerShell\v1.0\powershell.exe)";
-    // Unpack, verify the package against its manifest, then install;
-    // install.ps1's own exit codes (Japanese data not downloaded, ...) are
-    // passed on.
-    const auto flag = [](bool value) { return std::wstring(value ? L"$true" : L"$false"); };
-    const auto command = L"-NoProfile -ExecutionPolicy Bypass -Command \"$ErrorActionPreference='Stop'; "
-                         L"Expand-Archive -LiteralPath " + QuotePowerShell(zipPath.wstring()) +
-                         L" -DestinationPath " + QuotePowerShell(packageRoot.wstring()) +
-                         L" -Force; & " + QuotePowerShell((packageRoot / L"verify-package.ps1").wstring()) +
-                         L" -PackageRoot " + QuotePowerShell(packageRoot.wstring()) +
-                         L"; & " + QuotePowerShell((packageRoot / L"install.ps1").wstring()) +
-                         L" -SourceRoot " + QuotePowerShell(packageRoot.wstring()) +
-                         L" -InstallRoot " + QuotePowerShell(choices.installRoot.wstring()) +
-                         L" -StartMenuShortcut:" + flag(choices.startMenuShortcut) +
-                         L" -Japanese:" + flag(choices.japanese) +
-                         L" -KeepEnglishProfile:" + flag(choices.keepEnglish) +
-                         (choices.ai ? L" -AiModel light" : L"") +
-                         L"; exit $(if ($LASTEXITCODE) { $LASTEXITCODE } else { 0 })\"";
-    std::vector<wchar_t> commandLine(command.begin(), command.end());
-    commandLine.push_back(L'\0');
-    STARTUPINFOW startup{};
-    startup.cb = sizeof(startup);
-    startup.dwFlags = STARTF_USESHOWWINDOW;
-    startup.wShowWindow = SW_HIDE;
-    PROCESS_INFORMATION process{};
-    UseAsTemp(packageRoot.parent_path());
-    if (!CreateProcessW(powershell.c_str(), commandLine.data(), nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr,
-                        packageRoot.c_str(), &startup, &process)) {
-        return -1;
-    }
+    if (length == 0 || length >= MAX_PATH) return {};
+    return std::filesystem::path(systemDirectory) / LR"(WindowsPowerShell\v1.0\powershell.exe)";
+}
+
+// Windows PowerShell running `script` (its exit code passed on).
+std::wstring PowerShellCommand(const std::wstring& script) {
+    return L"-NoProfile -ExecutionPolicy Bypass -Command \"$ErrorActionPreference='Stop'; " + script +
+           L"; exit $(if ($LASTEXITCODE) { $LASTEXITCODE } else { 0 })\"";
+}
+
+int WaitForExit(const PROCESS_INFORMATION& process) {
     WaitForSingleObject(process.hProcess, INFINITE);
     DWORD exitCode = 1;
     GetExitCodeProcess(process.hProcess, &exitCode);
@@ -582,6 +562,89 @@ int RunPowerShell(const std::filesystem::path& zipPath, const std::filesystem::p
     CloseHandle(process.hProcess);
     return static_cast<int>(exitCode);
 }
+
+// The administrator's part: PowerShell elevated, as setup is, with setup's
+// own folder for its temporary files and Windows' own modules (UseAsTemp).
+// -1 when it could not start.
+int RunElevated(const std::wstring& script, const std::filesystem::path& folder) {
+    const auto powershell = PowerShellPath();
+    if (powershell.empty()) return -1;
+    std::wstring command = PowerShellCommand(script);
+    std::vector<wchar_t> commandLine(command.begin(), command.end());
+    commandLine.push_back(L'\0');
+    STARTUPINFOW startup{};
+    startup.cb = sizeof(startup);
+    startup.dwFlags = STARTF_USESHOWWINDOW;
+    startup.wShowWindow = SW_HIDE;
+    PROCESS_INFORMATION process{};
+    UseAsTemp(folder);
+    if (!CreateProcessW(powershell.c_str(), commandLine.data(), nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr,
+                        folder.c_str(), &startup, &process)) {
+        return -1;
+    }
+    return WaitForExit(process);
+}
+
+// The signed-in user's own token, the desktop's (Explorer's): what setup does
+// in the user's folders and settings runs with it, never elevated, so nothing
+// there can be turned against the administrator's rights. When another
+// account approved the elevation, it is still the user at the desktop.
+HANDLE DesktopUserToken() {
+    const HWND shell = GetShellWindow();
+    DWORD processId = 0;
+    if (!shell || !GetWindowThreadProcessId(shell, &processId) || processId == 0) return nullptr;
+    const HANDLE process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, processId);
+    if (!process) return nullptr;
+    HANDLE token = nullptr;
+    HANDLE primary = nullptr;
+    if (OpenProcessToken(process, TOKEN_DUPLICATE, &token)) {
+        if (!DuplicateTokenEx(token, TOKEN_QUERY | TOKEN_DUPLICATE | TOKEN_ASSIGN_PRIMARY | TOKEN_ADJUST_DEFAULT |
+                                         TOKEN_ADJUST_SESSIONID,
+                              nullptr, SecurityImpersonation, TokenPrimary, &primary)) {
+            primary = nullptr;
+        }
+        CloseHandle(token);
+    }
+    CloseHandle(process);
+    return primary;
+}
+
+// The user's part: PowerShell as the user at the desktop, with the user's own
+// environment. `userTemp` is set to the user's temporary folder (where its
+// record goes). -2 when the user's token could not be had, -1 when it could
+// not start.
+int RunAsUser(const std::wstring& script, const std::filesystem::path& folder, std::filesystem::path* userTemp = nullptr) {
+    const auto powershell = PowerShellPath();
+    if (powershell.empty()) return -1;
+    const HANDLE token = DesktopUserToken();
+    if (!token) return -2;
+    LPVOID environment = nullptr;
+    if (!CreateEnvironmentBlock(&environment, token, FALSE)) environment = nullptr;
+    if (userTemp && environment) {
+        for (auto* entry = static_cast<const wchar_t*>(environment); *entry; entry += wcslen(entry) + 1) {
+            if (_wcsnicmp(entry, L"TEMP=", 5) == 0) *userTemp = std::filesystem::path(entry + 5);
+        }
+    }
+    std::wstring command = L"\"" + powershell.wstring() + L"\" " + PowerShellCommand(script);
+    std::vector<wchar_t> commandLine(command.begin(), command.end());
+    commandLine.push_back(L'\0');
+    STARTUPINFOW startup{};
+    startup.cb = sizeof(startup);
+    startup.dwFlags = STARTF_USESHOWWINDOW;
+    startup.wShowWindow = SW_HIDE;
+    PROCESS_INFORMATION process{};
+    const BOOL started = CreateProcessWithTokenW(token, 0, powershell.c_str(), commandLine.data(),
+                                                 CREATE_NO_WINDOW | CREATE_UNICODE_ENVIRONMENT, environment,
+                                                 folder.c_str(), &startup, &process);
+    if (environment) DestroyEnvironmentBlock(environment);
+    CloseHandle(token);
+    if (!started) return -1;
+    return WaitForExit(process);
+}
+
+// A step's exit code as setup reports it: 5 PowerShell could not start, 6
+// it could not run as the user.
+int StepCode(int code) { return code == -1 ? 5 : code == -2 ? 6 : code; }
 
 int InstallEmbeddedPackage(const std::filesystem::path& self, const InstallChoices& choices,
                            std::filesystem::path& installLog) {
@@ -603,23 +666,58 @@ int InstallEmbeddedPackage(const std::filesystem::path& self, const InstallChoic
         return 2;
     }
     std::filesystem::create_directory(packageRoot, cleanupError);
-    const auto exitCode = RunPowerShell(zipPath, packageRoot, choices);
-    // A failed install keeps its record, in the same folder.
-    const auto log = tempRoot / L"TEKITO-install.log";
-    if (exitCode != 0 && exitCode != 30 && std::filesystem::is_regular_file(log, cleanupError)) {
+    const auto flag = [](bool value) { return std::wstring(value ? L"$true" : L"$false"); };
+    const std::wstring install = L"& " + QuotePowerShell((packageRoot / L"install.ps1").wstring()) +
+                                 L" -SourceRoot " + QuotePowerShell(packageRoot.wstring()) +
+                                 L" -InstallRoot " + QuotePowerShell(choices.installRoot.wstring()) +
+                                 L" -StartMenuShortcut:" + flag(choices.startMenuShortcut) +
+                                 L" -Japanese:" + flag(choices.japanese) +
+                                 L" -KeepEnglishProfile:" + flag(choices.keepEnglish) +
+                                 (choices.ai ? L" -AiModel light" : L"");
+    std::filesystem::path userTemp;
+    bool userStep = false;
+    // Unpacked and checked against its manifest; the user's Data Packs (as
+    // the user); the program (elevated); the keyboard list, Start menu and
+    // the rest (as the user). install.ps1's own exit codes (Japanese data
+    // not downloaded, AI model not installed) are passed on.
+    int code = StepCode(RunElevated(L"Expand-Archive -LiteralPath " + QuotePowerShell(zipPath.wstring()) +
+                                        L" -DestinationPath " + QuotePowerShell(packageRoot.wstring()) + L" -Force; & " +
+                                        QuotePowerShell((packageRoot / L"verify-package.ps1").wstring()) +
+                                        L" -PackageRoot " + QuotePowerShell(packageRoot.wstring()),
+                                    tempRoot));
+    if (code == 0) {
+        userStep = true;
+        code = StepCode(RunAsUser(install + L" -Part data", packageRoot, &userTemp));
+    }
+    if (code == 0) {
+        userStep = false;
+        code = StepCode(RunElevated(install + L" -Part program", tempRoot));
+    }
+    if (code == 0) {
+        userStep = true;
+        code = StepCode(RunAsUser(install + L" -Part finish", packageRoot, &userTemp));
+    }
+    // A failed install keeps its record: the user's steps in the user's
+    // temporary folder, the program's in setup's own folder.
+    const auto log = (userStep && !userTemp.empty() ? userTemp : tempRoot) / L"TEKITO-install.log";
+    if (code != 0 && code != 30 && std::filesystem::is_regular_file(log, cleanupError)) installLog = log;
+    if (code != 0 && code != 30 && !userStep && std::filesystem::is_regular_file(log, cleanupError)) {
         std::filesystem::remove_all(packageRoot, cleanupError);
         std::filesystem::remove(zipPath, cleanupError);
-        installLog = log;
     } else {
         std::filesystem::remove_all(tempRoot, cleanupError);
     }
-    return exitCode == -1 ? 5 : exitCode;
+    return code;
 }
 
-// Documents\TEKITO words (date): a folder not there yet.
+// Documents\TEKITO words (date): a folder not there yet, in the documents of
+// the user at the desktop.
 std::filesystem::path ExportFolder() {
+    const HANDLE token = DesktopUserToken();
     PWSTR documents = nullptr;
-    if (FAILED(SHGetKnownFolderPath(FOLDERID_Documents, 0, nullptr, &documents))) return {};
+    const HRESULT found = SHGetKnownFolderPath(FOLDERID_Documents, 0, token, &documents);
+    if (token) CloseHandle(token);
+    if (FAILED(found)) return {};
     const std::filesystem::path root(documents);
     CoTaskMemFree(documents);
     SYSTEMTIME now{};
@@ -635,38 +733,24 @@ std::filesystem::path ExportFolder() {
     return {};
 }
 
-// uninstall.ps1's exit code: 0 removed, 3 removed with files left for the
-// next sign-in, 30 the words could not be exported (nothing removed).
+// uninstall.ps1's exit code: 0 removed, 3 removed with files left for
+// later, 30 the words could not be exported (nothing removed). The user's
+// words and data as the user, the program elevated, the rest as the user.
 int RunUninstall(const std::filesystem::path& script, const std::filesystem::path& installRoot,
                  const std::filesystem::path& exportFolder) {
-    wchar_t systemDirectory[MAX_PATH]{};
-    const auto length = GetSystemDirectoryW(systemDirectory, MAX_PATH);
-    if (length == 0 || length >= MAX_PATH) return -1;
-    const auto powershell = std::filesystem::path(systemDirectory) / LR"(WindowsPowerShell\v1.0\powershell.exe)";
-    std::wstring command = L"-NoProfile -ExecutionPolicy Bypass -Command \"$ErrorActionPreference='Stop'; & " +
-                           QuotePowerShell(script.wstring()) + L" -InstallRoot " + QuotePowerShell(installRoot.wstring()) +
-                           L" -RemoveUserData";
-    if (!exportFolder.empty()) command += L" -ExportTo " + QuotePowerShell(exportFolder.wstring());
-    command += L"; exit $(if ($LASTEXITCODE) { $LASTEXITCODE } else { 0 })\"";
-    std::vector<wchar_t> commandLine(command.begin(), command.end());
-    commandLine.push_back(L'\0');
-    STARTUPINFOW startup{};
-    startup.cb = sizeof(startup);
-    startup.dwFlags = STARTF_USESHOWWINDOW;
-    startup.wShowWindow = SW_HIDE;
-    PROCESS_INFORMATION process{};
-    const auto workingDirectory = script.parent_path();
-    UseAsTemp(workingDirectory);
-    if (!CreateProcessW(powershell.c_str(), commandLine.data(), nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr,
-                        workingDirectory.c_str(), &startup, &process)) {
-        return -1;
-    }
-    WaitForSingleObject(process.hProcess, INFINITE);
-    DWORD exitCode = 1;
-    GetExitCodeProcess(process.hProcess, &exitCode);
-    CloseHandle(process.hThread);
-    CloseHandle(process.hProcess);
-    return static_cast<int>(exitCode);
+    const auto folder = script.parent_path();
+    const std::wstring uninstall = L"& " + QuotePowerShell(script.wstring()) + L" -InstallRoot " +
+                                   QuotePowerShell(installRoot.wstring()) + L" -RemoveUserData";
+    const std::wstring exportTo = exportFolder.empty() ? L"" : L" -ExportTo " + QuotePowerShell(exportFolder.wstring());
+    int code = StepCode(RunAsUser(uninstall + exportTo + L" -Part words", folder));
+    if (code != 0) return code;
+    bool left = false;
+    code = StepCode(RunElevated(uninstall + L" -Part program", folder));
+    if (code != 0 && code != 3) return code;
+    left = code == 3;
+    code = StepCode(RunAsUser(uninstall + L" -Part finish", folder));
+    if (code != 0 && code != 3) return code;
+    return left || code == 3 ? 3 : 0;
 }
 
 std::wstring UninstallFailureMessage(int code) {
@@ -675,6 +759,12 @@ std::wstring UninstallFailureMessage(int code) {
                   L"exporting it.",
                   L"ユーザー辞書を書き出せなかったため、何も削除されていません。もう一度お試しいただくか、"
                   L"書き出さずにアンインストールしてください。");
+    }
+    if (code == 6) {
+        return Tr(L"The uninstaller couldn't work as you, the user at the desktop. Sign in to Windows as yourself and "
+                  L"try again.",
+                  L"デスクトップにサインインしている利用者として処理できませんでした。ご自身のアカウントで Windows に"
+                  L"サインインして、もう一度お試しください。");
     }
     if (UseJapanese()) {
         return L"アンインストールがエラー " + std::to_wstring(code) + L" で停止しました。もう一度お試しください。";
@@ -699,8 +789,7 @@ void StartUninstall(Wizard& wizard) {
     const auto folder = wizard.exportFolder;
     try {
         wizard.installThread = std::thread([&wizard, window, script, root, folder] {
-            const int code = RunUninstall(script, root, folder);
-            wizard.installExitCode.store(code == -1 ? 5 : code);
+            wizard.installExitCode.store(RunUninstall(script, root, folder));
             PostMessageW(window, kWizardInstallComplete, 0, 0);
         });
     } catch (...) {
@@ -716,6 +805,7 @@ std::wstring FailureMessage(int code, const std::filesystem::path& log) {
     case 3: return Tr(L"Setup couldn't create a temporary folder. Make sure the drive has free space, then try again.", L"一時フォルダーを作成できませんでした。ドライブの空き容量を確認して、もう一度お試しください。");
     case 4: return Tr(L"Setup couldn't unpack its files. Make sure the drive has free space, then try again.", L"ファイルを展開できませんでした。ドライブの空き容量を確認して、もう一度お試しください。");
     case 5: return Tr(L"Setup couldn't start Windows PowerShell, which it needs to install TEKITO.", L"インストールに必要な Windows PowerShell を起動できませんでした。");
+    case 6: return Tr(L"Setup couldn't work as you, the user at the desktop. Sign in to Windows as yourself and try again.", L"デスクトップにサインインしている利用者として処理できませんでした。ご自身のアカウントで Windows にサインインして、もう一度お試しください。");
     case 20: return Tr(L"Setup couldn't download the Japanese data. Check the internet connection and try again, or install without Japanese.", L"日本語のデータをダウンロードできませんでした。インターネット接続を確認してもう一度お試しいただくか、日本語なしでインストールしてください。");
     case 21: return Tr(L"The downloaded Japanese data was not the file this installer expects. Try again, or download the latest TEKITO.", L"ダウンロードした日本語データが、このインストーラーの想定と一致しません。もう一度お試しいただくか、最新の TEKITO をダウンロードしてください。");
     default:
@@ -1451,8 +1541,8 @@ void Paint(Wizard& wizard) {
                                     : L"";
             if (wizard.installExitCode.load() == 3) {
                 text += (text.empty() ? L"" : L"\n") +
-                        std::wstring(Tr(L"Files still in use are deleted the next time you sign in.",
-                                        L"使用中のファイルは、次回のサインイン時に削除されます。"));
+                        std::wstring(Tr(L"Files still in use are deleted the next time you sign in or restart.",
+                                        L"使用中のファイルは、次回のサインインまたは再起動のときに削除されます。"));
             }
             DrawText(wizard, text, wizard.bodyCentered.Get(), D2D1::RectF(90.0f, 238.0f, kWidth - 90.0f, 290.0f), p.ink2);
             break;

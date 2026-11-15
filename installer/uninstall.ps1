@@ -6,15 +6,24 @@
 # the English words as TEKITO's own file).
 #
 # Apps that type with TEKITO keep its files open until they close: what
-# cannot be deleted now is deleted at the next sign-in.
-# Exit code 0: removed; 3: removed, some files go at the next sign-in;
-# 30: the words could not be exported, and nothing was removed.
+# cannot be deleted now is deleted at the next sign-in (the user's folders)
+# or restart (Program Files).
+# Exit code 0: removed; 3: removed, some files go later; 30: the words could
+# not be exported, and nothing was removed.
+#
+# -Part splits it for the uninstaller, which runs the user's parts as the
+# user and only the program's part as administrator: words (the words saved,
+# the user's data emptied), program (unregistered, Program Files emptied),
+# finish (the keyboard list, Start menu, Installed apps, the user's folders).
+# all (the default) does the three in turn.
 [CmdletBinding()]
 param(
     [string]$InstallRoot = (Join-Path $env:ProgramFiles "TEKITO"),
     [switch]$SkipRegistration,
     [switch]$RemoveUserData,
-    [string]$ExportTo
+    [string]$ExportTo,
+    [ValidateSet("all", "words", "program", "finish")]
+    [string]$Part = "all"
 )
 
 $ErrorActionPreference = "Stop"
@@ -60,40 +69,44 @@ function Remove-InstalledFiles([string]$Root) {
     }
 }
 
+$doWords = $Part -in @("all", "words")
+$doProgram = $Part -in @("all", "program")
+$doFinish = $Part -in @("all", "finish")
+
 $installRoot = [IO.Path]::GetFullPath($InstallRoot).TrimEnd('\')
 $programFiles = [IO.Path]::GetFullPath($env:ProgramFiles).TrimEnd('\') + '\'
 if (-not $SkipRegistration -and -not $installRoot.StartsWith($programFiles, [StringComparison]::OrdinalIgnoreCase)) {
     throw "InstallRoot must be a folder in $env:ProgramFiles."
 }
-# Where versions before 1.0.2 were installed, if its copy is still there.
-$legacyRoot = [IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA "Programs\TEKITO")).TrimEnd('\')
-if ((Test-Path -LiteralPath $installRoot) -and
+if ($doProgram -and (Test-Path -LiteralPath $installRoot) -and
     -not (Test-Path -LiteralPath (Join-Path $installRoot "install-manifest.json")) -and
     @(Get-ChildItem -LiteralPath $installRoot -Filter "Tekito.Tsf*.dll" -File -Recurse -ErrorAction SilentlyContinue).Count -eq 0) {
     throw "$installRoot does not look like a TEKITO installation."
 }
-
-$principal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
-if (-not $SkipRegistration -and -not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-    throw "Run this from an administrator PowerShell to unregister the input method."
+if ($doProgram) {
+    $principal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
+    if (-not $SkipRegistration -and -not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+        throw "Run this from an administrator PowerShell to unregister the input method."
+    }
 }
+$app = Join-Path $installRoot "TEKITO.exe"
+$left = $false
 
-Get-Process -Name TEKITO -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-# The AI helper runs from the data folder and keeps the model open while it
-# runs (up to ten minutes after the last request): stop ours.
-$dataPrefix = (Join-Path $env:LOCALAPPDATA "TEKITO").TrimEnd('\') + '\'
-$aiHelpers = @(Get-Process -Name TekitoAI -ErrorAction SilentlyContinue |
-    Where-Object { $_.Path -and $_.Path.StartsWith($dataPrefix, [StringComparison]::OrdinalIgnoreCase) })
-if ($aiHelpers.Count -gt 0) {
-    $aiHelpers | Stop-Process -Force -ErrorAction SilentlyContinue
-    $aiHelpers | Wait-Process -Timeout 5 -ErrorAction SilentlyContinue
-}
-
-# The user's words first: when they cannot be saved, nothing is removed.
-if ($ExportTo) {
-    $app = Join-Path $installRoot "TEKITO.exe"
+# The user's part, first: the user's words saved (when they cannot be,
+# nothing is removed) and the user's data emptied, by TEKITO.exe as the user.
+if ($doWords) {
+    Get-Process -Name TEKITO -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+    # The AI helper runs from the data folder and keeps the model open while
+    # it runs (up to ten minutes after the last request): stop ours.
+    $dataPrefix = (Join-Path $env:LOCALAPPDATA "TEKITO").TrimEnd('\') + '\'
+    $aiHelpers = @(Get-Process -Name TekitoAI -ErrorAction SilentlyContinue |
+        Where-Object { $_.Path -and $_.Path.StartsWith($dataPrefix, [StringComparison]::OrdinalIgnoreCase) })
+    if ($aiHelpers.Count -gt 0) {
+        $aiHelpers | Stop-Process -Force -ErrorAction SilentlyContinue
+        $aiHelpers | Wait-Process -Timeout 5 -ErrorAction SilentlyContinue
+    }
     $userData = Join-Path $env:LOCALAPPDATA "TEKITO\user.db"
-    if (Test-Path -LiteralPath $userData) {
+    if ($ExportTo -and (Test-Path -LiteralPath $userData)) {
         if (-not (Test-Path -LiteralPath $app)) {
             Write-Host "TEKITO.exe is missing, so the words could not be exported."
             exit 30
@@ -104,68 +117,92 @@ if ($ExportTo) {
             exit 30
         }
     }
-}
-
-# Removing the user's data: apps that still have TEKITO loaded keep its
-# database open, so the file may stay until they close. Its contents go now.
-if ($RemoveUserData) {
-    $app = Join-Path $installRoot "TEKITO.exe"
-    $userData = Join-Path $env:LOCALAPPDATA "TEKITO\user.db"
-    if ((Test-Path -LiteralPath $userData) -and (Test-Path -LiteralPath $app)) {
+    # Apps that still have TEKITO loaded keep its database open, so the file
+    # may stay until they close. Its contents go now.
+    if ($RemoveUserData -and (Test-Path -LiteralPath $userData) -and (Test-Path -LiteralPath $app)) {
         $process = Start-Process $app -ArgumentList @('--erase-user-data') -Wait -PassThru
         if ($process.ExitCode -ne 0) { Write-Warning "The data in $userData could not be erased (TEKITO.exe returned $($process.ExitCode))." }
     }
 }
 
-if (-not $SkipRegistration) {
-    $regsvr32 = Join-Path $env:WINDIR "System32\regsvr32.exe"
-    foreach ($dll in @(Get-ChildItem -LiteralPath $installRoot -Filter "Tekito.Tsf*.dll" -File -Recurse -ErrorAction SilentlyContinue)) {
-        $process = Start-Process $regsvr32 -ArgumentList @('/u', '/s', ('"{0}"' -f $dll.FullName)) -WindowStyle Hidden -Wait -PassThru
-        if ($process.ExitCode -ne 0) { Write-Warning "Unregistering $($dll.Name) returned $($process.ExitCode)." }
-    }
-
-    # TEKITO for English and TEKITO for Japanese.
-    $tips = @("0409:$clsid{8D99240A-5C9C-4ED8-8DE4-85F21DF23763}",
-              "0411:$clsid{2876747C-FA52-4CCC-B308-F406190F8CDE}")
-    $languages = Get-WinUserLanguageList
-    $changed = $false
-    foreach ($language in $languages) {
-        foreach ($tip in $tips) {
-            if ($language.InputMethodTips -contains $tip) {
-                [void]$language.InputMethodTips.Remove($tip)
-                $changed = $true
-            }
+# The administrator's part: unregistered, and Program Files emptied. Nothing
+# here reads or writes the user's own folders. What apps still have open is
+# deleted when Windows restarts.
+if ($doProgram) {
+    Get-Process -Name TEKITO -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+    if (-not $SkipRegistration) {
+        $regsvr32 = Join-Path $env:WINDIR "System32\regsvr32.exe"
+        foreach ($dll in @(Get-ChildItem -LiteralPath $installRoot -Filter "Tekito.Tsf*.dll" -File -Recurse -ErrorAction SilentlyContinue)) {
+            $process = Start-Process $regsvr32 -ArgumentList @('/u', '/s', ('"{0}"' -f $dll.FullName)) -WindowStyle Hidden -Wait -PassThru
+            if ($process.ExitCode -ne 0) { Write-Warning "Unregistering $($dll.Name) returned $($process.ExitCode)." }
         }
     }
-    if ($changed) { Set-WinUserLanguageList $languages -Force }
-    # What Windows kept of the input method for this user.
-    Remove-Item -LiteralPath "HKCU:\Software\Microsoft\CTF\TIP\$clsid" -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-InstalledFiles $installRoot
+    if (Test-Path -LiteralPath $installRoot) {
+        Add-Type -Namespace TekitoUninstall -Name Files -MemberDefinition @'
+[DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+public static extern bool MoveFileEx(string existing, string replacement, int flags);
+'@
+        # MOVEFILE_DELAY_UNTIL_REBOOT: the files first, then the folders, deepest first.
+        $items = @(Get-ChildItem -LiteralPath $installRoot -Recurse -Force -ErrorAction SilentlyContinue |
+            Where-Object { -not ($_.Attributes -band [IO.FileAttributes]::ReparsePoint) })
+        foreach ($item in @($items | Where-Object { -not $_.PSIsContainer }) +
+                          @($items | Where-Object { $_.PSIsContainer } | Sort-Object { $_.FullName.Length } -Descending)) {
+            [void][TekitoUninstall.Files]::MoveFileEx($item.FullName, $null, 4)
+        }
+        [void][TekitoUninstall.Files]::MoveFileEx($installRoot, $null, 4)
+        $left = $true
+    }
 }
 
-$startMenu = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\TEKITO"
-Remove-InstalledFiles $startMenu
-Remove-InstalledFiles $installRoot
-$userDataRoot = Join-Path $env:LOCALAPPDATA "TEKITO"
-if ($RemoveUserData) { Remove-InstalledFiles $userDataRoot }
-Remove-Item -LiteralPath $uninstallKey -Recurse -Force -ErrorAction SilentlyContinue
-# The desktop companion: no longer started with Windows, and where it was left.
-Remove-ItemProperty -LiteralPath "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name "TEKITO Companion" -ErrorAction SilentlyContinue
-Remove-Item -LiteralPath "HKCU:\Software\TEKITO\Companion" -Recurse -Force -ErrorAction SilentlyContinue
-Remove-Item -LiteralPath (Join-Path ([IO.Path]::GetTempPath()) "TEKITO-install.log") -Force -ErrorAction SilentlyContinue
+# The user's part, last: the keyboard list, the Start menu, Installed apps
+# and, when asked, the user's data, as the user.
+if ($doFinish) {
+    if (-not $SkipRegistration) {
+        # TEKITO for English and TEKITO for Japanese.
+        $tips = @("0409:$clsid{8D99240A-5C9C-4ED8-8DE4-85F21DF23763}",
+                  "0411:$clsid{2876747C-FA52-4CCC-B308-F406190F8CDE}")
+        $languages = Get-WinUserLanguageList
+        $changed = $false
+        foreach ($language in $languages) {
+            foreach ($tip in $tips) {
+                if ($language.InputMethodTips -contains $tip) {
+                    [void]$language.InputMethodTips.Remove($tip)
+                    $changed = $true
+                }
+            }
+        }
+        if ($changed) { Set-WinUserLanguageList $languages -Force }
+        # What Windows kept of the input method for this user.
+        Remove-Item -LiteralPath "HKCU:\Software\Microsoft\CTF\TIP\$clsid" -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    Remove-InstalledFiles (Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\TEKITO")
+    $userDataRoot = Join-Path $env:LOCALAPPDATA "TEKITO"
+    if ($RemoveUserData) { Remove-InstalledFiles $userDataRoot }
+    Remove-Item -LiteralPath $uninstallKey -Recurse -Force -ErrorAction SilentlyContinue
+    # The desktop companion: no longer started with Windows, and where it was left.
+    Remove-ItemProperty -LiteralPath "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name "TEKITO Companion" -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath "HKCU:\Software\TEKITO\Companion" -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath (Join-Path ([IO.Path]::GetTempPath()) "TEKITO-install.log") -Force -ErrorAction SilentlyContinue
 
-# Files still open: deleted at the next sign-in.
-$left = @(@($installRoot) + $(if ($RemoveUserData) { @($userDataRoot) } else { @() }) |
-    Where-Object { Test-Path -LiteralPath $_ })
-# The old copy in the user's own folder is deleted by the user, not here.
-if ($legacyRoot -ne $installRoot -and (Test-Path -LiteralPath $legacyRoot)) { $left += $legacyRoot }
-$runOnce = "HKCU:\Software\Microsoft\Windows\CurrentVersion\RunOnce"
-if ($left.Count -gt 0) {
-    $command = 'cmd.exe /d /c ' + (($left | ForEach-Object { 'rd /s /q "{0}"' -f $_ }) -join ' & ')
-    New-Item -Path $runOnce -Force | Out-Null
-    Set-ItemProperty -LiteralPath $runOnce -Name $cleanupValue -Value $command
-    Write-Host "TEKITO was removed. Some files are still in use; they are deleted the next time you sign in."
+    # Still open in the user's folders: deleted at the next sign-in, by the
+    # user. So is the copy versions before 1.0.2 installed there.
+    $inUse = @($(if ($RemoveUserData) { @($userDataRoot) } else { @() }) | Where-Object { Test-Path -LiteralPath $_ })
+    $legacyRoot = [IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA "Programs\TEKITO")).TrimEnd('\')
+    if ($legacyRoot -ne $installRoot -and (Test-Path -LiteralPath $legacyRoot)) { $inUse += $legacyRoot }
+    $runOnce = "HKCU:\Software\Microsoft\Windows\CurrentVersion\RunOnce"
+    if ($inUse.Count -gt 0) {
+        $command = 'cmd.exe /d /c ' + (($inUse | ForEach-Object { 'rd /s /q "{0}"' -f $_ }) -join ' & ')
+        New-Item -Path $runOnce -Force | Out-Null
+        Set-ItemProperty -LiteralPath $runOnce -Name $cleanupValue -Value $command
+        $left = $true
+    } else {
+        Remove-ItemProperty -LiteralPath $runOnce -Name $cleanupValue -ErrorAction SilentlyContinue
+    }
+    Write-Host "TEKITO was removed.$(if ($RemoveUserData) { ' Your dictionary, learning and settings were deleted too.' } else { ' Your dictionary, learning and settings were kept.' })"
+}
+if ($left) {
+    Write-Host "Some files are still in use; they are deleted the next time you sign in or restart."
     exit 3
 }
-Remove-ItemProperty -LiteralPath $runOnce -Name $cleanupValue -ErrorAction SilentlyContinue
-Write-Host "TEKITO was removed.$(if ($RemoveUserData) { ' Your dictionary, learning and settings were deleted too.' } else { ' Your dictionary, learning and settings were kept.' })"
 exit 0
