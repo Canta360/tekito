@@ -18,6 +18,15 @@ struct TypoEvidence {
 // row, or the row above or below).
 [[nodiscard]] bool AreQwertyNeighbors(wchar_t left, wchar_t right) noexcept;
 
+// Whether `typed` reads as `word` typed with slips a hand makes: a key next
+// to the right one (or a vowel for another, as English is misspelled), two
+// keys swapped, a key left out, or one added next to
+// its neighbors or doubled; at most one for a word of up to four letters,
+// two for a longer one. A letter for one far from it on the keyboard
+// (kaggle for gaggle, pixiv for pixie) is no slip: a word the dictionary
+// lacks, typed as meant.
+[[nodiscard]] bool IsPlausibleSlip(std::wstring_view typed, std::wstring_view word) noexcept;
+
 // General typo evidence only. It does not contain misspelling->correction
 // rows and does not decide ranking or automatic application.
 class TypoModel final {

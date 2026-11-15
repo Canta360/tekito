@@ -933,6 +933,14 @@ void TestAddresses(const RomajiTable& table, const MiniPack& pack) {
                 "the next candidate is the last word's");
         end.Clear();
     }
+    // Versions and ordinals stay as typed.
+    for (const wchar_t* keys : {L"v1.3.1-pre.3", L"ver1.2", L"1.0.0-beta", L"2nd", L"21st", L"10th"}) {
+        JapaneseComposer typed(&table);
+        typed.SetConverter(&converter);
+        Type(typed, keys);
+        typed.Convert();
+        RequireText(typed.Commit(), keys, "a version or an ordinal as typed");
+    }
     // A punctuation mark commits the text up to it, converted.
     {
         JapaneseComposer marks(&table);

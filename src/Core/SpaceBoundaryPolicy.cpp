@@ -1,5 +1,7 @@
 #include "Core/SpaceBoundaryPolicy.h"
 
+#include "Core/TypoModel.h"
+
 namespace tekito {
 
 std::optional<std::size_t> SpaceBoundaryPolicy::SelectCorrection(
@@ -39,7 +41,22 @@ bool SpaceBoundaryPolicy::IsAcceptableCorrection(std::wstring_view rawText,
     constexpr std::uint32_t rejectedSourceFlags =
         CandidateSourceCompletion | CandidateSourceEmoji | CandidateSourceProtectedPattern |
         CandidateSourceTekitoOwnedSlang;
-    return (candidate.sourceFlags & rejectedSourceFlags) == 0;
+    if ((candidate.sourceFlags & rejectedSourceFlags) != 0) return false;
+    return IsLikelyMeant(rawText, candidate);
+}
+
+bool IsLikelyMeant(std::wstring_view rawText, const Candidate& candidate) noexcept {
+    // The same word written another way (case, an apostrophe), a common
+    // misspelling put right, the user's own words, words run together or
+    // doubled: as before.
+    if ((candidate.policyFlags & CandidatePolicyNormalize) != 0) return true;
+    constexpr std::uint32_t knownSourceFlags =
+        CandidateSourceWikipediaMisspelling | CandidateSourceQwertyTypoCatalog | CandidateSourceUserDictionary |
+        CandidateSourceRunTogether | CandidateSourceDoubledWord;
+    if ((candidate.sourceFlags & knownSourceFlags) != 0) return true;
+    // Otherwise only slips a hand makes: a word the dictionary lacks
+    // (linpeas, kaggle, fcitx5) stays as typed, the word offered in the list.
+    return IsPlausibleSlip(rawText, candidate.text);
 }
 
 }  // namespace tekito

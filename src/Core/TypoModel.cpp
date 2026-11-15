@@ -5,6 +5,7 @@
 #include <cwctype>
 #include <cstdlib>
 #include <limits>
+#include <string_view>
 
 namespace tekito {
 namespace {
@@ -181,6 +182,48 @@ double TypoModel::WeightedCost(std::wstring_view input, std::wstring_view target
 
 bool AreQwertyNeighbors(wchar_t left, wchar_t right) noexcept {
     return IsQwertyNeighbor(left, right);
+}
+
+bool IsPlausibleSlip(std::wstring_view typed, std::wstring_view word) noexcept {
+    constexpr int kFar = 3;  // a letter for one far from it: no slip
+    constexpr std::size_t kLongest = 40;
+    if (typed.empty() || word.empty() || typed.size() > kLongest || word.size() > kLongest) return false;
+    const auto lower = [](wchar_t c) { return static_cast<wchar_t>(std::towlower(c)); };
+    const std::size_t n = typed.size();
+    const std::size_t m = word.size();
+    // cost[i][j]: the first i typed keys as the first j letters of the word.
+    std::array<std::array<int, kLongest + 1>, kLongest + 1> cost{};
+    for (std::size_t i = 0; i <= n; ++i) {
+        for (std::size_t j = 0; j <= m; ++j) {
+            if (i == 0 && j == 0) continue;
+            int best = std::numeric_limits<int>::max() / 2;
+            if (i > 0 && j > 0) {
+                const wchar_t a = lower(typed[i - 1]);
+                const wchar_t b = lower(word[j - 1]);
+                // A vowel for another is how English is misspelled (definately,
+                // Hallo): as likely as a key next to it.
+                const auto vowel = [](wchar_t c) { return std::wstring_view(L"aeiou").find(c) != std::wstring_view::npos; };
+                const int change = a == b ? 0 : IsQwertyNeighbor(a, b) || (vowel(a) && vowel(b)) ? 1 : kFar;
+                best = std::min(best, cost[i - 1][j - 1] + change);
+            }
+            // A letter left out.
+            if (j > 0) best = std::min(best, cost[i][j - 1] + 1);
+            // A key added: next to a key around it, or the same again.
+            if (i > 0) {
+                const wchar_t extra = lower(typed[i - 1]);
+                const bool near = (i > 1 && (lower(typed[i - 2]) == extra || IsQwertyNeighbor(lower(typed[i - 2]), extra))) ||
+                                  (i < n && (lower(typed[i]) == extra || IsQwertyNeighbor(lower(typed[i]), extra)));
+                best = std::min(best, cost[i - 1][j] + (near ? 1 : 2));
+            }
+            // Two keys swapped.
+            if (i > 1 && j > 1 && lower(typed[i - 1]) == lower(word[j - 2]) && lower(typed[i - 2]) == lower(word[j - 1])) {
+                best = std::min(best, cost[i - 2][j - 2] + 1);
+            }
+            cost[i][j] = best;
+        }
+    }
+    const int allowed = m <= 4 ? 1 : 2;
+    return cost[n][m] <= allowed;
 }
 
 }  // namespace tekito

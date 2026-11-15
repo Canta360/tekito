@@ -1104,6 +1104,17 @@ void TestTypoModelBoundary() {
     const auto neighbor = model.Compare(L"gopd", L"good");
     Require(neighbor.qwertyNeighbor && neighbor.distance == 1,
             "typo model detects QWERTY-neighbor evidence generically");
+
+    // Slips a hand makes, and words the dictionary lacks typed as meant.
+    for (const auto& [typed, word] : {std::pair{L"teh", L"the"}, {L"wiht", L"with"}, {L"gopd", L"good"},
+                                      {L"helllo", L"hello"}, {L"recieve", L"receive"}, {L"tommorow", L"tomorrow"},
+                                      {L"problme", L"problem"}, {L"jsut", L"just"}}) {
+        Require(tekito::IsPlausibleSlip(typed, word), "a slip a hand makes reads as the word");
+    }
+    for (const auto& [typed, word] : {std::pair{L"kaggle", L"gaggle"}, {L"pixiv", L"pixie"}, {L"linpeas", L"linear"},
+                                      {L"nginx", L"nine"}, {L"fcitx5", L"city5"}}) {
+        Require(!tekito::IsPlausibleSlip(typed, word), "a word the dictionary lacks is not taken for another");
+    }
 }
 
 void TestTargetTextCandidateDiagnostics() {

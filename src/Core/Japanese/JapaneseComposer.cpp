@@ -195,10 +195,11 @@ bool IsProtectedSpan(std::wstring_view keys) {
 }
 
 // The same, or one still being typed: name@ and its domain so far
-// (kanta@capitata), a URL after its :// ; and a file name (report.pdf) or
-// a version (v1.0.0). Shown and committed as typed.
+// (kanta@capitata), a URL after its :// ; a file name (report.pdf); a
+// version (v1.0.0, ver1.2, version 2 written together, 1.3.1-pre.3) and an
+// ordinal (1st, 2nd, 3rd, 21st). Shown and committed as typed.
 bool IsAddressTyping(std::wstring_view keys) {
-    static const std::wregex pattern(LR"(^(?:[A-Za-z0-9._%+\-]+@(?:[A-Za-z][A-Za-z0-9.\-]*)?|(?:https?|ftp)://\S*|v[0-9]+(?:\.[0-9]+)*\.?)$)");
+    static const std::wregex pattern(LR"(^(?:[A-Za-z0-9._%+\-]+@(?:[A-Za-z][A-Za-z0-9.\-]*)?|(?:https?|ftp)://\S*|[vV](?:er(?:sion)?)?[0-9]+(?:\.[0-9]+)*\.?(?:-[A-Za-z0-9.]*)?|[0-9]+(?:\.[0-9]+){2,}-[A-Za-z0-9.]*|[0-9]*(?:1st|2nd|3rd|[0-9]th))$)");
     static const std::wregex file(
         LR"(^[A-Za-z0-9_\-]+(?:\.[A-Za-z0-9_\-]+)*\.(?:pdf|docx?|xlsx?|pptx?|txt|csv|md|json|xml|ya?ml|html?|css|js|ts|tsx|jsx|py|cpp|hpp|h|cs|java|go|rs|sh|ps1|bat|exe|dll|msi|zip|7z|gz|png|jpe?g|gif|svg|webp|mp3|mp4|mov|wav|log|ini|toml)$)",
         std::regex::icase);

@@ -1,5 +1,7 @@
 #include "Core/AutoApplyPolicy.h"
 
+#include "Core/SpaceBoundaryPolicy.h"
+
 #include <algorithm>
 
 namespace tekito {
@@ -51,7 +53,7 @@ bool AutoApplyPolicy::IsSafeAutomaticCandidate(std::wstring_view rawText,
         CandidateSourceSingleEdit | CandidateSourceRepeatedKey |
         CandidateSourceTransposition | CandidateSourceMissingCharacter |
         CandidateSourceExtraCharacter;
-    return (candidate.sourceFlags & highConfidenceSourceFlags) != 0;
+    return (candidate.sourceFlags & highConfidenceSourceFlags) != 0 && IsLikelyMeant(rawText, candidate);
 }
 
 }  // namespace tekito
