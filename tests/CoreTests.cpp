@@ -2651,6 +2651,33 @@ void TestUserDataEncryption() {
     fs::remove_all(folder, error);
 }
 
+// The uninstaller erases the database while apps still have it open: what
+// they hold from before is not written back.
+void TestEraseKeepsEarlierWritersOut() {
+    namespace fs = std::filesystem;
+    const fs::path folder = fs::temp_directory_path() / ("tekito-erase-test-" + std::to_string(GetCurrentProcessId()));
+    std::error_code error;
+    fs::remove_all(folder, error);
+    fs::create_directories(folder);
+    const auto database = folder / L"user.db";
+    const tekito::userdata::RecentConversion conversion{0, L"himitsu", L"SECRETWORD", L"Japanese", 1};
+    {
+        tekito::userdata::SqliteUserDictionaryRepository before(database);
+        Require(before.Open() && before.AddRecentConversion(conversion, 30), "an app keeps a conversion");
+        {
+            tekito::userdata::SqliteUserDictionaryRepository uninstaller(database);
+            Require(uninstaller.Open() && uninstaller.EraseAll(), "the uninstaller erases the database");
+        }
+        Require(!before.AddRecentConversion(conversion, 30), "an app that opened it before writes nothing back");
+        Require(!before.SaveSettings(tekito::userdata::UserSettings{}), "not its settings either");
+        tekito::userdata::SqliteUserDictionaryRepository after(database);
+        std::vector<tekito::userdata::RecentConversion> conversions;
+        Require(after.Open() && after.LoadRecentConversions(conversions) && conversions.empty(), "the database stays empty");
+        Require(after.AddRecentConversion(conversion, 30), "one that opens it after the erase writes as usual");
+    }
+    fs::remove_all(folder, error);
+}
+
 int main() {
     TestRunTogether();
     TestFirstSpaceAndLiveCycle();
@@ -2682,6 +2709,7 @@ int main() {
     TestTargetTextCandidateDiagnostics();
     TestDictionaryServiceBoundary();
     TestUserDataEncryption();
+    TestEraseKeepsEarlierWritersOut();
     TestLocalDataPackProviders();
     TestUserDictionaryImportExport();
     TestUserLearningStore();

@@ -41,9 +41,14 @@ public:
 
 private:
     [[nodiscard]] bool EnsureSchema() noexcept;
+    // The mark EraseAll left (0 before any), and whether it changed since
+    // this repository opened the database.
+    [[nodiscard]] std::int64_t EraseMark() const noexcept;
+    [[nodiscard]] bool ErasedSince() const noexcept;
 
     std::filesystem::path databasePath_;
     sqlite3* database_{nullptr};
+    std::int64_t eraseMark_{0};
 };
 
 [[nodiscard]] std::filesystem::path DefaultUserDatabasePath();

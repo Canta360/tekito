@@ -19,6 +19,8 @@ namespace {
 constexpr int kBusyTimeoutMs = 1000;
 
 constexpr const char* kCreateSchema =
+    // A new mark each time EraseAll empties the database (ErasedSince).
+    "CREATE TABLE IF NOT EXISTS erasure (mark INTEGER NOT NULL);"
     "CREATE TABLE IF NOT EXISTS user_dictionary ("
     "id INTEGER PRIMARY KEY NOT NULL,"
     "raw TEXT NOT NULL,"
@@ -133,8 +135,21 @@ bool SqliteUserDictionaryRepository::Open() noexcept {
         Close();
         return false;
     }
+    eraseMark_ = EraseMark();
     return true;
 }
+
+std::int64_t SqliteUserDictionaryRepository::EraseMark() const noexcept {
+    std::int64_t mark = 0;
+    sqlite3_stmt* statement = nullptr;
+    if (database_ && sqlite3_prepare_v2(database_, "SELECT mark FROM erasure LIMIT 1;", -1, &statement, nullptr) == SQLITE_OK) {
+        if (sqlite3_step(statement) == SQLITE_ROW) mark = sqlite3_column_int64(statement, 0);
+        sqlite3_finalize(statement);
+    }
+    return mark;
+}
+
+bool SqliteUserDictionaryRepository::ErasedSince() const noexcept { return EraseMark() != eraseMark_; }
 
 void SqliteUserDictionaryRepository::Close() noexcept {
     if (!database_) return;
@@ -184,6 +199,9 @@ bool SqliteUserDictionaryRepository::Load(UserDictionary& dictionary) const noex
 
 bool SqliteUserDictionaryRepository::Save(const UserDictionary& dictionary) noexcept {
     if (!database_) return false;
+    // Erased (uninstalled) since this was opened: what this process still
+    // holds is not written back.
+    if (ErasedSince()) return false;
     if (sqlite3_exec(database_, "BEGIN IMMEDIATE;", nullptr, nullptr, nullptr) != SQLITE_OK) {
         return false;
     }
@@ -504,6 +522,9 @@ bool SqliteUserDictionaryRepository::LoadSettings(UserSettings& settings) const 
 
 bool SqliteUserDictionaryRepository::SaveSettings(const UserSettings& settings) noexcept {
     if (!database_) return false;
+    // Erased (uninstalled) since this was opened: what this process still
+    // holds is not written back.
+    if (ErasedSince()) return false;
     if (sqlite3_exec(database_, "BEGIN IMMEDIATE;", nullptr, nullptr, nullptr) != SQLITE_OK) {
         return false;
     }
@@ -701,6 +722,9 @@ bool SqliteUserDictionaryRepository::LoadLearning(UserLearningStore& learning) c
 
 bool SqliteUserDictionaryRepository::SaveLearning(const UserLearningStore& learning) noexcept {
     if (!database_) return false;
+    // Erased (uninstalled) since this was opened: what this process still
+    // holds is not written back.
+    if (ErasedSince()) return false;
     if (sqlite3_exec(database_, "BEGIN IMMEDIATE;", nullptr, nullptr, nullptr) != SQLITE_OK) return false;
     bool success = sqlite3_exec(database_,
                                  "DELETE FROM user_learning;"
@@ -793,6 +817,9 @@ bool SqliteUserDictionaryRepository::LoadSocialLearning(
 bool SqliteUserDictionaryRepository::SaveSocialLearning(
     const SocialLearningStore& learning) noexcept {
     if (!database_) return false;
+    // Erased (uninstalled) since this was opened: what this process still
+    // holds is not written back.
+    if (ErasedSince()) return false;
     if (sqlite3_exec(database_, "BEGIN IMMEDIATE;", nullptr, nullptr, nullptr) != SQLITE_OK) return false;
     bool success = sqlite3_exec(database_, "DELETE FROM social_learning;", nullptr, nullptr, nullptr) == SQLITE_OK;
     sqlite3_stmt* statement = nullptr;
@@ -853,6 +880,9 @@ bool SqliteUserDictionaryRepository::LoadJapaneseLearning(
 bool SqliteUserDictionaryRepository::SaveJapaneseLearning(
     const japanese::JapaneseLearningStore& learning) noexcept {
     if (!database_) return false;
+    // Erased (uninstalled) since this was opened: what this process still
+    // holds is not written back.
+    if (ErasedSince()) return false;
     if (sqlite3_exec(database_, "BEGIN IMMEDIATE;", nullptr, nullptr, nullptr) != SQLITE_OK) return false;
     bool success =
         sqlite3_exec(database_, "DELETE FROM japanese_learning;", nullptr, nullptr, nullptr) == SQLITE_OK;
@@ -885,6 +915,9 @@ bool SqliteUserDictionaryRepository::SaveJapaneseLearning(
 
 bool SqliteUserDictionaryRepository::AddRecentConversion(const RecentConversion& conversion, std::size_t keep) noexcept {
     if (!database_) return false;
+    // Erased (uninstalled) since this was opened: what this process still
+    // holds is not written back.
+    if (ErasedSince()) return false;
     sqlite3_stmt* statement = nullptr;
     constexpr const char* insert = "INSERT INTO conversion_history (reading, result, mode, at) VALUES (?, ?, ?, ?);";
     if (sqlite3_prepare_v2(database_, insert, -1, &statement, nullptr) != SQLITE_OK) return false;
@@ -950,7 +983,17 @@ bool SqliteUserDictionaryRepository::EraseAll() noexcept {
         const std::string sql = "DELETE FROM \"" + table + "\";";
         success = sqlite3_exec(database_, sql.c_str(), nullptr, nullptr, nullptr) == SQLITE_OK;
     }
+    // A new mark: processes that opened the database before it was erased
+    // no longer write back what they hold (ErasedSince).
+    std::int64_t mark = 0;
+    sqlite3_randomness(sizeof(mark), &mark);
+    if (mark == 0) mark = 1;
+    if (success) {
+        const std::string sql = "INSERT INTO erasure (mark) VALUES (" + std::to_string(mark) + ");";
+        success = sqlite3_exec(database_, sql.c_str(), nullptr, nullptr, nullptr) == SQLITE_OK;
+    }
     success = sqlite3_exec(database_, success ? "COMMIT;" : "ROLLBACK;", nullptr, nullptr, nullptr) == SQLITE_OK && success;
+    if (success) eraseMark_ = mark;
     (void)sqlite3_exec(database_, "PRAGMA wal_checkpoint(TRUNCATE);", nullptr, nullptr, nullptr);
     return success;
 }
@@ -1000,6 +1043,9 @@ bool SqliteUserDictionaryRepository::LoadJapaneseUserWords(std::vector<japanese:
 
 bool SqliteUserDictionaryRepository::SaveJapaneseUserWords(const std::vector<japanese::UserWord>& words) noexcept {
     if (!database_) return false;
+    // Erased (uninstalled) since this was opened: what this process still
+    // holds is not written back.
+    if (ErasedSince()) return false;
     if (sqlite3_exec(database_, "BEGIN IMMEDIATE;", nullptr, nullptr, nullptr) != SQLITE_OK) return false;
     bool success =
         sqlite3_exec(database_, "DELETE FROM japanese_user_words;", nullptr, nullptr, nullptr) == SQLITE_OK;
