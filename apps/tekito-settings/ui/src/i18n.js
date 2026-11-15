@@ -327,7 +327,7 @@ const en = {
     learning: "Learning",
     learn: { title: "Learn from chosen candidates", description: "Shows candidates you chose higher next time." },
     learned: { title: "What was learned", count: (n) => `${count(n)} items`, clear: "Delete all" },
-    secret: { title: "Secret mode", description: "Nothing you type is learned or kept until you turn it off. It turns off when you sign out or restart." },
+    secret: { title: "Secret mode", description: "Nothing you type is learned or kept, and nothing learned before is suggested, until you turn it off. It turns off when you sign out or restart." },
     private: { title: "Don't learn in private windows", description: "Nothing typed in a browser's private window is learned." },
     encryption: {
       title: "Encrypt your dictionary and learning",
@@ -764,7 +764,7 @@ const ja = {
     learning: "学習",
     learn: { title: "選択した候補の学習", description: "選択した候補が、次回から上位に表示されます" },
     learned: { title: "学習した内容", count: (n) => `${count(n)} 件`, clear: "すべて削除" },
-    secret: { title: "シークレットモード", description: "オフにするまで、入力内容が学習・保存されません。サインアウトや再起動でオフに戻ります" },
+    secret: { title: "シークレットモード", description: "オフにするまで、入力内容が学習・保存されず、これまでの学習も候補に使われません。サインアウトや再起動でオフに戻ります" },
     private: { title: "プライベートウィンドウでは学習しない", description: "ブラウザのシークレットウィンドウでの入力は学習されません" },
     encryption: {
       title: "辞書と学習内容を暗号化",

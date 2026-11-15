@@ -1713,6 +1713,10 @@ HRESULT TextService::HandleKeyInEditSessionCore(ITfContext* context, TfEditCooki
     privateField_ = ContextIsPrivate(context, editCookie) || secret;
     const bool privateField = (userSettings_.noLearningInPrivate && privateField_) || secret;
     japanese_.SetLearning(userSettings_.learningEnabled && !privateField ? &japaneseLearning_ : nullptr);
+    // Secret mode uses nothing learned before either: no word typed earlier
+    // shows among the English candidates while others can see the screen.
+    userLearningProvider_.SetEnabled(userSettings_.learningEnabled && !secret);
+    socialLearningProvider_.SetProfile(userSettings_.socialExpressionRange, secret ? 0 : userSettings_.socialPersonalization);
     if (input.type == KeyInput::Type::ShowModeIndicator) {
         ShowModeBadge(CaretAnchor(context, editCookie));
         return S_OK;
