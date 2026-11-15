@@ -65,7 +65,9 @@ public:
     [[nodiscard]] InputAction OnCancel();
     // With addTerminalPeriod, a line that ends without punctuation gets a
     // period before the newline.
-    [[nodiscard]] InputAction OnEnter(bool addTerminalPeriod = false);
+    // `asShown`: the word as it is shown, no slip put right (UserSettings::
+    // enterCommitsAsShown).
+    [[nodiscard]] InputAction OnEnter(bool addTerminalPeriod = false, bool asShown = false);
 
     void Reset() noexcept;
 

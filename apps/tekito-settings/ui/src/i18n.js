@@ -50,7 +50,7 @@ const en = {
   keyNames: { hankaku: "Hankaku/Zenkaku", henkan: "Henkan", muhenkan: "Muhenkan", hiragana: "Hiragana" },
 
   groups: {
-    switching: "Switching", display: "While typing", apps: "Apps", general: "General", convert: "Conversion", ai: "AI",
+    switching: "Switching", display: "While typing", apps: "Apps", general: "General", convert: "Conversion", ai: "AI", common: "All modes",
     predict: "Predictions", japanese: "Japanese", english: "English", look: "Look", list: "Display", extra: "Extra candidates",
     keyboard: "Keyboard", typing: "Typing",
   },
@@ -284,6 +284,7 @@ const en = {
     casual: { title: "Casual expressions", description: "How many words like gonna and lol are offered.", stops: ["None", "Common", "Standard", "Broad", "All"] },
     doubled: { title: "Fix repeated words", description: "e.g. the the → the" },
     recheck: { title: "Fix the word before too", description: "Fixes a typo in the previous word when the next one is typed (e.g. have to urn → run)." },
+    enterAsShown: { title: "Enter keeps the text as shown", description: "Enter enters the text just as it is shown, without fixing typos or converting it again." },
     spaceless: { title: "Spaces in English typed without them", description: "e.g. seeyouonmonday → See you on Monday" },
     spacelessAlways: { title: "Always add the spaces", description: "Adds them even when the words are less common. Otherwise they are suggested." },
     capitalized: { title: "Fix words typed with a capital", description: "Also fixes words that start with a capital mid-sentence (e.g. Cjicago → Chicago). Off keeps them as typed, as they may be names." },
@@ -486,7 +487,7 @@ const ja = {
   keyNames: { hankaku: "半角/全角", henkan: "変換", muhenkan: "無変換", hiragana: "ひらがな" },
 
   groups: {
-    switching: "切り替え", display: "入力中の表示", apps: "アプリ", general: "全般", convert: "変換", ai: "AI",
+    switching: "切り替え", display: "入力中の表示", apps: "アプリ", general: "全般", convert: "変換", ai: "AI", common: "共通",
     predict: "予測と補完", japanese: "日本語", english: "英語", look: "見た目", list: "表示", extra: "追加の候補",
     keyboard: "キーボード", typing: "入力",
   },
@@ -720,6 +721,7 @@ const ja = {
     casual: { title: "口語表現の候補", description: "gonna、lol などを候補に表示する範囲", stops: ["表示しない", "一般的", "標準", "広め", "すべて"] },
     doubled: { title: "同じ単語の連続を修正", description: "例：the the → the" },
     recheck: { title: "前の単語も修正", description: "次の単語を入力したときに、前の単語の入力ミスが修正されます（例：have to urn → run）" },
+    enterAsShown: { title: "Enter は表示どおりに確定", description: "Enter を押すと、入力ミスの修正や変換の見直しをせず、表示されているとおりに確定されます" },
     spaceless: { title: "空白なしの英文に空白を入れる", description: "例：seeyouonmonday → See you on Monday" },
     spacelessAlways: { title: "いつも空白を入れる", description: "あまり使わない単語でも空白が挿入されます。オフのときは候補に表示されます" },
     capitalized: { title: "大文字で始まる単語も修正", description: "文の途中で大文字から始まる単語の入力ミスも修正されます（例：Cjicago → Chicago）。オフにすると、名前の可能性があるため入力どおりになります" },

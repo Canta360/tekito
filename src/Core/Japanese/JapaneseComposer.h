@@ -225,6 +225,10 @@ public:
     // the reading as meant. Off: convert as typed; slip candidates stay in
     // the list. On by default, as UserSettings::japaneseSlipAutoApply.
     void SetSlipAutoApply(bool on) noexcept { slipAutoApply_ = on; }
+    // Enter commits what is shown (UserSettings::enterCommitsAsShown): live
+    // conversion is not read again, Mix's English is not put right and its
+    // sentence is not judged again.
+    void SetEnterAsShown(bool on) noexcept { enterAsShown_ = on; }
     [[nodiscard]] bool SlipAutoApply() const noexcept { return slipAutoApply_; }
     // The first emoji for a reading shown on the first page of its list
     // (off: with the other symbols, last).
@@ -946,8 +950,10 @@ private:
     std::size_t aiFocus_{0};
     bool sentenceCheck_{true};
     bool chunkCandidates_{true};
-    // Mix: letters Enter commits as they showed (CommitChunk, BuildPhrases).
+    // Mix: letters Enter commits as they showed (CommitChunk, BuildPhrases);
+    // Japanese when what showed was Mix's live conversion (enterAsShown_).
     std::optional<std::wstring> committedAsShown_;
+    bool committedAsShownJapanese_{false};
     bool sentencesByCost_{true};
     std::size_t beamWidth_{0};
     double beamCostPerNat_{1000.0}, beamMargin_{0.0}, beamWholeCost_{0.0};
@@ -1059,6 +1065,7 @@ private:
     std::size_t liveOpenPhrases_{kOpenPhrases};
     // phrases_ is the live conversion shown while typing.
     bool preview_{false};
+    bool enterAsShown_{false};
     // Esc showed the kana: typing brings the live conversion back.
     bool kanaView_{false};
     // The first phrases, and the reading they cover, that stay as they are.

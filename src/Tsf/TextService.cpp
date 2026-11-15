@@ -2144,7 +2144,7 @@ HRESULT TextService::HandleKeyInEditSessionCore(ITfContext* context, TfEditCooki
         if (selectedBefore < state_.Candidates().size()) {
             recordLearningDecision(rawBefore, state_.Candidates(), selectedBefore, explicitSelection);
         }
-        const auto action = state_.OnEnter(userSettings_.periodOnEnter);
+        const auto action = state_.OnEnter(userSettings_.periodOnEnter, userSettings_.enterCommitsAsShown);
         if (action.kind != ActionKind::CommitBeforeNewline &&
             action.kind != ActionKind::EndComposition) return S_FALSE;
         if (!candidateBefore.empty() && candidateBefore != rawBefore) {

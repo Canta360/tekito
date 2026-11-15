@@ -1427,7 +1427,9 @@ void JapaneseComposer::BuildPhrasesFor(bool convert) {
     }
     // Mixed typing: committed as it showed in letters (CommitChunk).
     if (const auto shown = std::exchange(committedAsShown_, std::nullopt); shown && convert) {
-        phrases_.push_back({0, reading.size(), {{*shown, 0, PhraseCandidate::Kind::English, false}}});
+        const bool japanese = std::exchange(committedAsShownJapanese_, false);
+        phrases_.push_back({0, reading.size(),
+                            {{*shown, 0, japanese ? PhraseCandidate::Kind::Dictionary : PhraseCandidate::Kind::English, false}}});
         return;
     }
     // Mixed typing: the chunk may be English, with punctuation typed after
@@ -4478,7 +4480,18 @@ std::wstring JapaneseComposer::Commit() {
     // without Space stays kana, unless live conversion shows it converted;
     // English is taken as Space takes it (CommitChunk); a prediction picked
     // with Tab as it is.
-    if (Typing() && !IsConverted() && !PredictionChosen() && MixLiveText()) Convert();
+    if (Typing() && !IsConverted() && !PredictionChosen()) {
+        if (const auto live = MixLiveText()) {
+            // As shown (enterAsShown_): the live conversion as it shows.
+            if (enterAsShown_) {
+                committedAsShown_ = *live;
+                committedAsShownJapanese_ = true;
+                BuildPhrases(true);
+            } else {
+                Convert();
+            }
+        }
+    }
     std::wstring text;
     if (settled_.empty()) {
         text = CommitChunk();
@@ -5209,14 +5222,18 @@ std::wstring JapaneseComposer::SettledKeys() const {
 std::wstring JapaneseComposer::CommitSentence() {
     // As the chunks were shown when each settled, before Enter judges them again.
     lastShown_ = SettledText();
-    ConvertJapaneseRuns();
-    if (reranker_ && sentenceCheck_) CheckMixedSentence();
+    // As shown (enterAsShown_): the chunks as they were shown, not judged or
+    // converted again.
+    if (!enterAsShown_) {
+        ConvertJapaneseRuns();
+        if (reranker_ && sentenceCheck_) CheckMixedSentence();
+    }
     LowerSentenceStarts();
     if (keepMixed_ > 0) {
         lastMixed_ = MixedSentences(keepMixed_);
         lastMixedKeys_ = SettledKeys();
     }
-    CheckMixedByAi();
+    if (!enterAsShown_) CheckMixedByAi();
     std::wstring text = SettledText();
     const bool firstJapanese = !settled_.front().marksOnly && !settled_.front().isEnglish;
     bool lastEnglish = false;
@@ -5395,7 +5412,8 @@ std::wstring JapaneseComposer::CommitChunk() {
         const bool picked = std::any_of(phrases_.begin(), phrases_.end(), [](const PhraseState& phrase) {
             return phrase.selected != 0 || phrase.form || phrase.address;
         });
-        if (picked) {
+        // As shown (enterAsShown_): only the keys still pending are read too.
+        if (picked || enterAsShown_) {
             UpdateLive();
         } else {
             ResetLive();
@@ -5413,7 +5431,15 @@ std::wstring JapaneseComposer::CommitChunk() {
         while (word > 0 && std::wstring_view(L".,!?").find(keys[word - 1]) != std::wstring_view::npos) --word;
         const auto chunk = JudgeChunk(std::wstring_view(keys).substr(0, word));
         const bool capitals = TypedWithCapitals(std::wstring_view(keys).substr(0, word)).has_value();
-        if ((chunk.english || capitals) && word > 0) BuildPhrases(true);
+        // As shown (enterAsShown_): letters as they are shown, not put right.
+        if (enterAsShown_) {
+            if (const auto letters = LettersShown()) {
+                committedAsShown_ = *letters;
+                BuildPhrases(true);
+            }
+        } else if ((chunk.english || capitals) && word > 0) {
+            BuildPhrases(true);
+        }
         // Not English, yet shown as letters (3abc: the b and c no kana
         // took): committed as it shows.
         if (!IsConverted() && !Live()) {

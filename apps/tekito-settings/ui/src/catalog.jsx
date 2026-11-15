@@ -20,7 +20,7 @@ export const navIcons = {
 export const pageGroups = {
   general: ["switching", "display", "apps", "general"],
   conversion: ["convert", "ai", "predict"],
-  slips: ["japanese", "english"],
+  slips: ["common", "japanese", "english"],
   notation: ["japanese", "english"],
   candidates: ["look", "list", "extra"],
   keys: ["keyboard", "typing"],
@@ -221,6 +221,7 @@ export function catalog(ctx) {
     },
     toggle("doubled", "slips", "english", "repeat", a.doubled, "doubledWordCheck", { modes: ["auto"], detail: true }),
     toggle("recheck", "slips", "english", "undo", a.recheck, "recheckPreviousWord", { modes: ["auto"], detail: true }),
+    toggle("enterAsShown", "slips", "common", "keyboard_return", a.enterAsShown, "enterCommitsAsShown", { detail: true }),
 
     // 表記
     styled({
@@ -430,7 +431,7 @@ export function aiSpecs(ctx) {
     singleVowel: ["mixSingleVowelKana"], prediction: ["japanesePredictionEnabled", "mixPredictionEnabled"],
     completion: ["completionEnabled"], nextWord: ["nextWordPrediction"], phonetic: ["japanesePhoneticSuggestionsEnabled"],
     slipAutoApply: ["japaneseSlipAutoApply"], englishCorrection: ["mixCorrection", "correctionEnabled", "capitalizedCorrection"],
-    doubled: ["doubledWordCheck"], recheck: ["recheckPreviousWord"], spacing: ["japaneseEnglishSpacing"],
+    doubled: ["doubledWordCheck"], recheck: ["recheckPreviousWord"], enterAsShown: ["enterCommitsAsShown"], spacing: ["japaneseEnglishSpacing"],
     kanjiVariants: ["japaneseKanjiVariants"], period: ["periodOnEnter"], doubleSpace: ["doubleSpacePeriod"], smart: ["smartPunctuation"],
     meanings: ["meaningsEnabled", "meaningsInUiLanguage"], candidateWindow: ["candidateWindowEnabled"],
     special: ["dateConversion", "symbolConversion", "calculatorEnabled"], firstPageSymbol: ["japaneseFirstPageSymbol", "mixFirstPageSymbol"],

@@ -58,6 +58,7 @@ inline void ApplyModeSettings(japanese::JapaneseComposer& composer, const UserSe
     composer.SetHalfWidthLetters(settings.japaneseLetterWidth == 1);
     composer.SetSentenceCheck(settings.japaneseSentenceCheck);
     composer.SetSlipAutoApply(settings.japaneseSlipAutoApply);
+    composer.SetEnterAsShown(settings.enterCommitsAsShown);
     composer.SetTypedForms(settings.japaneseTypedForms);
     composer.SetChunkCandidates(settings.japaneseChunkCandidates);
     composer.SetKanjiVariants(settings.japaneseKanjiVariants);

@@ -379,6 +379,8 @@ bool SqliteUserDictionaryRepository::LoadSettings(UserSettings& settings) const 
             loaded.doubledWordCheck = value != 0;
         } else if (std::strcmp(key, "recheck_previous_word") == 0) {
             loaded.recheckPreviousWord = value != 0;
+        } else if (std::strcmp(key, "enter_commits_as_shown") == 0) {
+            loaded.enterCommitsAsShown = value != 0;
         } else if (std::strcmp(key, "capitalized_correction") == 0) {
             loaded.capitalizedCorrection = value != 0;
         } else if (std::strcmp(key, "double_space_period") == 0) {
@@ -582,6 +584,7 @@ bool SqliteUserDictionaryRepository::SaveSettings(const UserSettings& settings) 
     saveValue("next_word_prediction", settings.nextWordPrediction ? 1 : 0);
     saveValue("doubled_word_check", settings.doubledWordCheck ? 1 : 0);
     saveValue("recheck_previous_word", settings.recheckPreviousWord ? 1 : 0);
+    saveValue("enter_commits_as_shown", settings.enterCommitsAsShown ? 1 : 0);
     saveValue("capitalized_correction", settings.capitalizedCorrection ? 1 : 0);
     saveValue("double_space_period", settings.doubleSpacePeriod ? 1 : 0);
     saveValue("smart_punctuation", settings.smartPunctuation ? 1 : 0);

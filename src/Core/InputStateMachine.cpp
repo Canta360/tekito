@@ -262,7 +262,7 @@ InputAction InputStateMachine::OnCancel() {
     return {ActionKind::ReplaceComposition, std::move(text), false};
 }
 
-InputAction InputStateMachine::OnEnter(bool addTerminalPeriod) {
+InputAction InputStateMachine::OnEnter(bool addTerminalPeriod, bool asShown) {
     if (!IsActive()) {
         return {};
     }
@@ -275,8 +275,9 @@ InputAction InputStateMachine::OnEnter(bool addTerminalPeriod) {
 
     const std::optional<std::size_t> explicitSelection =
         state_ == CompositionState::Cycling ? std::optional(selectedIndex_) : std::nullopt;
-    const auto selected = autoApplyPolicy_.SelectForBoundary(rawText_, candidates_,
-                                                              explicitSelection);
+    // As shown: what Space chose, or the word as typed.
+    const auto selected = asShown ? explicitSelection
+                                  : autoApplyPolicy_.SelectForBoundary(rawText_, candidates_, explicitSelection);
     std::wstring text = selected ? candidates_[*selected].text : rawText_;
     if (addTerminalPeriod && NeedsTerminalPeriod(text)) {
         text.push_back(L'.');

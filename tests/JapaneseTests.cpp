@@ -875,6 +875,17 @@ void TestAddresses(const RomajiTable& table, const MiniPack& pack) {
         Require(Type(codes, L"1/2") == L"1\x30FB" L"2", "1/2 is no date: 1・2");
         codes.Clear();
     }
+    // Enter as shown: live conversion commits what it shows.
+    {
+        JapaneseComposer shown(&table);
+        shown.SetConverter(&converter);
+        shown.SetLiveConversion(true);
+        shown.SetEnterAsShown(true);
+        for (const wchar_t* keys : {L"watashinonamaehanakanodesu", L"kyouhaamedesu", L"nihongo"}) {
+            const std::wstring before = Type(shown, keys);
+            RequireText(shown.Commit(), before, "Enter as shown commits the live conversion as it shows");
+        }
+    }
     // Live: an address typed after a conversion (Space) is one of its own.
     JapaneseComposer composer(&table);
     composer.SetConverter(&converter);

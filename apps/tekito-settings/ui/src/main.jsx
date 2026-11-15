@@ -88,6 +88,7 @@ const initialSettings = {
   doubledWordCheck: true,
   englishSpelling: 0,
   recheckPreviousWord: true,
+  enterCommitsAsShown: false,
   capitalizedCorrection: false,
   bracketPairs: false,
   doubleSpacePeriod: false,

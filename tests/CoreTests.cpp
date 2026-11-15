@@ -507,6 +507,18 @@ void TestEnterCandidateNavigation() {
             "candidate-navigation Enter commits without inserting newline");
     Require(action.text == L"candidate1", "candidate-navigation Enter commits selected candidate only");
     Require(!cycling.IsActive(), "cycling Enter closes candidate session");
+
+    // A sure fix Enter puts in, unless Enter is to keep the word as shown.
+    std::vector<tekito::Candidate> fixes(2);
+    fixes[0].text = L"teh";
+    fixes[0].isOriginal = true;
+    fixes[1].text = L"the";
+    fixes[1].policyFlags = tekito::CandidatePolicyNormalize;
+    tekito::InputStateMachine fixing;
+    fixing.BeginOrUpdate(L"teh", fixes);
+    Require(fixing.OnEnter().text == L"the", "Enter puts in a sure fix");
+    fixing.BeginOrUpdate(L"teh", fixes);
+    Require(fixing.OnEnter(false, true).text == L"teh", "Enter as shown keeps the word as typed");
 }
 
 

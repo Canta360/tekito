@@ -73,6 +73,10 @@ struct UserSettings {
     // is typed, and put right when the words around it say it was a slip
     // (have to urn the: run).
     bool recheckPreviousWord{true};
+    // Enter commits the text as it is shown, taken as what the user meant:
+    // no slip put right, nothing read again or judged again (English, Japanese
+    // and Mix). Off by default: Enter puts slips right as Space does.
+    bool enterCommitsAsShown{false};
     // English: a word typed with a capital mid-sentence is put right too
     // (ConversionOptions::capitalizedCorrection); off keeps it as typed.
     bool capitalizedCorrection{false};
