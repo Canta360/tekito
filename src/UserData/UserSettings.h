@@ -110,6 +110,10 @@ struct UserSettings {
     // Alt pressed alone: the left one to English, the right one to
     // Japanese, for keyboards without the Japanese keys. Off by default.
     bool altSwitches{false};
+    // Where each Alt goes: 0 = Japanese, 1 = Mix, 2 = Auto, 3 = Direct,
+    // 4 = nowhere (that Alt stays the application's).
+    int altLeftMode{2};
+    int altRightMode{0};
     // The ja-JP profile's mode (Japanese, Mixed, Convert or Direct), and which of
     // Convert and Direct its switch key goes to from Japanese.
     InputMode lastJapaneseProfileMode{InputMode::Japanese};

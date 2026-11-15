@@ -158,6 +158,8 @@ function initialState() {
       escStepsBack: false,
       showTypedKeys: false,
       altSwitches: false,
+      altLeftMode: 2,
+      altRightMode: 0,
       convertFromEnd: false,
       shiftEnterCommitsToFocus: false,
       commitAtPunctuation: false,

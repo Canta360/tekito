@@ -295,29 +295,25 @@ bool TextService::TranslateModeKey(WPARAM wParam, ModeKey& key) const {
     }
 }
 
+std::optional<InputMode> TextService::AltMode(bool right) const {
+    switch (std::clamp(right ? userSettings_.altRightMode : userSettings_.altLeftMode, 0, 4)) {
+    case 0: return InputMode::Japanese;
+    case 1: return InputMode::Mixed;
+    case 2: return InputMode::Convert;
+    case 3: return InputMode::Direct;
+    default: return std::nullopt;
+    }
+}
+
 TextService::ModeKey TextService::AltModeKey(bool right) const {
     ModeKey key;
     key.mode = mode_;
-    if (!JapaneseTypingAvailable()) {
-        key.mode = right ? InputMode::Convert : InputMode::Direct;
-        return key;
-    }
-    if (!right) {
-        if (TypesJapanese(mode_)) {
-            key.mode = userSettings_.japaneseProfileEnglishMode == InputMode::Direct ? InputMode::Direct
-                                                                                     : InputMode::Convert;
-        }
-        return key;
-    }
-    if (TypesJapanese(mode_)) return key;
-    // The typing mode that comes first in the switch order.
-    key.mode = AvailableMode(InputMode::Japanese);
-    for (const auto& [mode, bit] : userdata::SwitchOrderModes(userSettings_.switchOrder)) {
-        if ((userSettings_.switchModes & bit) != 0 && TypesJapanese(mode) && AvailableMode(mode) == mode) {
-            key.mode = mode;
-            break;
-        }
-    }
+    const auto wanted = AltMode(right);
+    if (!wanted) return key;
+    // The mode chosen for it, or the nearest one there is (Japanese for
+    // Mix when Mix is off; Auto when there is no Japanese).
+    key.mode = AvailableMode(*wanted);
+    if (TypesJapanese(*wanted) && !JapaneseTypingAvailable()) key.mode = InputMode::Convert;
     return key;
 }
 
@@ -364,7 +360,7 @@ bool TextService::OnAltHookKey(WPARAM key, LPARAM flags) {
         if ((flags & (1 << 30)) != 0) return false;
         // Not with Ctrl (AltGr is Ctrl and the right Alt), Shift or Windows.
         const bool others = KeyDown(VK_CONTROL) || KeyDown(VK_SHIFT) || KeyDown(VK_LWIN) || KeyDown(VK_RWIN);
-        if (userSettings_.altSwitches && !others && !ProcessPassesThrough()) {
+        if (userSettings_.altSwitches && AltMode(right) && !others && !ProcessPassesThrough()) {
             altTap_ = right;
             altDownAt_ = GetTickCount64();
         } else {

@@ -426,6 +426,10 @@ bool SqliteUserDictionaryRepository::LoadSettings(UserSettings& settings) const 
             loaded.meaningsInUiLanguage = value != 0;
         } else if (std::strcmp(key, "toggle_key") == 0) {
             loaded.toggleKey = std::clamp(value, 0, 3);
+        } else if (std::strcmp(key, "alt_left_mode") == 0) {
+            loaded.altLeftMode = std::clamp(value, 0, 4);
+        } else if (std::strcmp(key, "alt_right_mode") == 0) {
+            loaded.altRightMode = std::clamp(value, 0, 4);
         } else if (std::strcmp(key, "period_on_enter") == 0) {
             loaded.periodOnEnter = value != 0;
         } else if (std::strcmp(key, "next_word_prediction") == 0) {
@@ -647,6 +651,8 @@ bool SqliteUserDictionaryRepository::SaveSettings(const UserSettings& settings) 
     saveValue("meanings_enabled", settings.meaningsEnabled ? 1 : 0);
     saveValue("meanings_in_ui_language", settings.meaningsInUiLanguage ? 1 : 0);
     saveValue("toggle_key", std::clamp(settings.toggleKey, 0, 3));
+    saveValue("alt_left_mode", std::clamp(settings.altLeftMode, 0, 4));
+    saveValue("alt_right_mode", std::clamp(settings.altRightMode, 0, 4));
     saveValue("period_on_enter", settings.periodOnEnter ? 1 : 0);
     saveValue("next_word_prediction", settings.nextWordPrediction ? 1 : 0);
     saveValue("doubled_word_check", settings.doubledWordCheck ? 1 : 0);

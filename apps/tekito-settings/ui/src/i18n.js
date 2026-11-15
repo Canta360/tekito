@@ -116,7 +116,10 @@ const en = {
 
   general: {
     switchKey: { title: "Switch key", none: "None" },
-    altSwitches: { title: "Switch with the left and right Alt", description: "Left Alt alone for English, right Alt alone for Japanese. For keyboards without Japanese keys." },
+    altSwitches: {
+      title: "Switch with the left and right Alt", description: "Each Alt pressed alone switches to the mode chosen for it. For keyboards without Japanese keys.",
+      left: "Left Alt", right: "Right Alt", japanese: "Japanese", mixed: "Mix", auto: "Auto", direct: "Direct", none: "None",
+    },
     ctrlShift: { title: "Ctrl + Shift switches input methods", description: "Off: Ctrl + Shift no longer switches to another input method by accident (a Windows setting)." },
     defaultIme: {
       title: "Windows' default input method", description: "TEKITO is used first after you sign in and in apps you open.",
@@ -566,7 +569,10 @@ const ja = {
 
   general: {
     switchKey: { title: "切り替えキー", none: "なし" },
-    altSwitches: { title: "左右の Alt で切り替え", description: "左の Alt だけを押すと英語、右の Alt だけを押すと日本語になります（日本語キーのないキーボード向け）" },
+    altSwitches: {
+      title: "左右の Alt で切り替え", description: "Alt だけを押すと、それぞれに選んだモードに切り替わります（日本語キーのないキーボード向け）",
+      left: "左の Alt", right: "右の Alt", japanese: "日本語", mixed: "まぜ打ち", auto: "Auto", direct: "Direct", none: "なし",
+    },
     ctrlShift: { title: "Ctrl + Shift で入力方式を切り替え", description: "オフにすると、Ctrl + Shift で別の入力方式に切り替わらなくなります（Windows の設定）" },
     defaultIme: {
       title: "Windows の既定の入力方式", description: "サインインしたときや新しく開いたアプリで、最初に TEKITO が使われます",

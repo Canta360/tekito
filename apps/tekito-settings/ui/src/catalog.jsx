@@ -116,7 +116,26 @@ export function catalog(ctx) {
         </Row>
       ),
     },
-    toggle("altSwitches", "general", "switching", "switch_left", g.altSwitches, "altSwitches", { detail: true }),
+    toggle("altSwitches", "general", "switching", "switch_left", g.altSwitches, "altSwitches", {
+      detail: true, keys: ["altLeftMode", "altRightMode"],
+      sub: () => s.altSwitches && (() => {
+        // The modes there are, then none.
+        const a = g.altSwitches;
+        const modes = [
+          ...(ctx.japaneseInstalled && on.japanese ? [[0, a.japanese]] : []),
+          ...(ctx.japaneseInstalled && on.mixed ? [[1, a.mixed]] : []),
+          [2, a.auto], [3, a.direct], [4, a.none],
+        ];
+        return (
+          <div className="alt-modes">
+            <label>{a.left}</label>
+            <Segmented label={a.left} value={s.altLeftMode} options={modes} onChange={(value) => set("altLeftMode", value)} />
+            <label>{a.right}</label>
+            <Segmented label={a.right} value={s.altRightMode} options={modes} onChange={(value) => set("altRightMode", value)} />
+          </div>
+        );
+      })(),
+    }),
     {
       id: "ctrlShift", page: "general", group: "switching", keys: [], title: g.ctrlShift.title, about: g.ctrlShift.description, detail: true,
       render: () => (
@@ -463,7 +482,7 @@ export function aiSpecs(ctx) {
     kanjiVariants: ["japaneseKanjiVariants"], period: ["periodOnEnter"], doubleSpace: ["doubleSpacePeriod"], smart: ["smartPunctuation"],
     meanings: ["meaningsEnabled", "meaningsInUiLanguage"], candidateWindow: ["candidateWindowEnabled"],
     special: ["dateConversion", "symbolConversion", "calculatorEnabled"], firstPageSymbol: ["japaneseFirstPageSymbol", "mixFirstPageSymbol"],
-    typedForms: ["japaneseTypedForms"], chunks: ["japaneseChunkCandidates"], kanaInput: ["japaneseKanaInput", "japaneseKanaInputKey"], capsLock: ["japaneseIgnoreCapsLock"], escStepsBack: ["escStepsBack"], showTypedKeys: ["showTypedKeys"], altSwitches: ["altSwitches"], convertFromEnd: ["convertFromEnd"], shiftEnter: ["shiftEnterCommitsToFocus"], punctuationCommit: ["commitAtPunctuation"],
+    typedForms: ["japaneseTypedForms"], chunks: ["japaneseChunkCandidates"], kanaInput: ["japaneseKanaInput", "japaneseKanaInputKey"], capsLock: ["japaneseIgnoreCapsLock"], escStepsBack: ["escStepsBack"], showTypedKeys: ["showTypedKeys"], altSwitches: ["altSwitches", "altLeftMode", "altRightMode"], convertFromEnd: ["convertFromEnd"], shiftEnter: ["shiftEnterCommitsToFocus"], punctuationCommit: ["commitAtPunctuation"],
     numpad: ["japaneseNumpadDirect"], brackets: ["bracketPairs"], spaceless: ["spacelessEnglish", "spacelessEnglishAlways"],
     numbers: ["japaneseRoughNumbersKanji", "numberConversion"],
     learn: ["learningEnabled"], secret: ["secretMode"], private: ["noLearningInPrivate"],

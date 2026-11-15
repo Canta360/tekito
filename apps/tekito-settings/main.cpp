@@ -1464,6 +1464,8 @@ private:
         json += L",\"meaningsInUiLanguage\":";
         json += settings_.meaningsInUiLanguage ? L"true" : L"false";
         json += L",\"toggleKey\":" + std::to_wstring(settings_.toggleKey);
+        json += L",\"altLeftMode\":" + std::to_wstring(settings_.altLeftMode);
+        json += L",\"altRightMode\":" + std::to_wstring(settings_.altRightMode);
         json += L",\"keyboardType\":" + std::to_wstring(settings_.keyboardType);
         json += L",\"periodOnEnter\":";
         json += settings_.periodOnEnter ? L"true" : L"false";
@@ -1824,6 +1826,12 @@ private:
             else if (key == L"uiLanguage") settings_.uiLanguage = std::clamp(integerValue, 0, 2);
             else if (key == L"toggleKey") {
                 settings_.toggleKey = std::clamp(integerValue, 0, 3);
+            }
+            else if (key == L"altLeftMode") {
+                settings_.altLeftMode = std::clamp(integerValue, 0, 4);
+            }
+            else if (key == L"altRightMode") {
+                settings_.altRightMode = std::clamp(integerValue, 0, 4);
             }
             else if (key == L"keyboardType") {
                 settings_.keyboardType = std::clamp(integerValue, 0, 2);

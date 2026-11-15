@@ -184,6 +184,9 @@ private:
     // Alt pressed alone (UserSettings::altSwitches): the left one to
     // English, the right one to Japanese (Mix when it comes first).
     ModeKey AltModeKey(bool right) const;
+    // The mode each Alt is set to go to (UserSettings::altLeftMode,
+    // altRightMode); nothing when it is set to none.
+    std::optional<InputMode> AltMode(bool right) const;
     // TSF does not pass Alt to text services: a keyboard hook on this
     // thread (the application's own) sees it, while altSwitches is on.
     void UpdateAltHook(bool on);

@@ -82,6 +82,9 @@ button.row { cursor: pointer; }
 .radio-label { display: inline-flex; align-items: baseline; }
 .radio-label .radio-name { min-width: 240px; }
 .row-sub-action { padding: 0 18px 10px 44px; }
+.alt-modes { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 8px 16px; padding: 0 18px 12px 52px; }
+.alt-modes label { color: var(--ink-2); font-size: var(--fontSizeBase300); }
+.alt-modes > div { justify-self: start; }
 .row-glyph { font-size: 16px; line-height: 20px; font-weight: 400; }
 /* Doubled classes: Fluent's own styles come after this sheet. */
 .choice.choice { min-width: 160px; }
