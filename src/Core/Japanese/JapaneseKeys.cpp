@@ -228,7 +228,7 @@ KeyOutcome ApplyKey(JapaneseComposer& composer, const KeyCommand& command) {
         composer.Backspace();
         break;
     case Action::Cancel:
-        composer.Cancel();
+        composer.StepBack();
         break;
     case Action::Convert:
         composer.Convert();

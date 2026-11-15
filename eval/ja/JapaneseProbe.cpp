@@ -216,6 +216,7 @@ int main(int argc, char** argv) {
             if (name == "mixSingleVowelKana") { settings.mixSingleVowelKana = value != 0; found = true; }
             if (name == "mixCorrection") { settings.mixCorrection = value != 0; found = true; }
             if (name == "enterCommitsAsShown") { settings.enterCommitsAsShown = value != 0; found = true; }
+            if (name == "escStepsBack") { settings.escStepsBack = value != 0; found = true; }
             if (name == "spacelessEnglish") { settings.spacelessEnglish = value != 0; found = true; }
             if (name == "dateConversion") { settings.dateConversion = value != 0; found = true; }
             if (name == "numberConversion") { settings.numberConversion = value != 0; found = true; }

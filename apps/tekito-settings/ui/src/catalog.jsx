@@ -372,6 +372,7 @@ export function catalog(ctx) {
       render: () => <LinkRow icon="table" title={head(j.romaji.title, ja)} description={j.romaji.description} onClick={ctx.openRomaji} />,
     },
     toggle("brackets", "keys", "typing", "data_object", g.brackets, "bracketPairs"),
+    toggle("escStepsBack", "keys", "typing", "undo", j.escStepsBack, "escStepsBack", { modes: ja, detail: true }),
     {
       id: "keyList", page: "keys", group: "typing", keys: [], title: t.keysRow,
       render: () => <LinkRow icon="keyboard_command_key" title={t.keysRow} onClick={() => ctx.showKeys("all")} />,
@@ -457,7 +458,7 @@ export function aiSpecs(ctx) {
     kanjiVariants: ["japaneseKanjiVariants"], period: ["periodOnEnter"], doubleSpace: ["doubleSpacePeriod"], smart: ["smartPunctuation"],
     meanings: ["meaningsEnabled", "meaningsInUiLanguage"], candidateWindow: ["candidateWindowEnabled"],
     special: ["dateConversion", "symbolConversion", "calculatorEnabled"], firstPageSymbol: ["japaneseFirstPageSymbol", "mixFirstPageSymbol"],
-    typedForms: ["japaneseTypedForms"], chunks: ["japaneseChunkCandidates"], kanaInput: ["japaneseKanaInput", "japaneseKanaInputKey"], capsLock: ["japaneseIgnoreCapsLock"],
+    typedForms: ["japaneseTypedForms"], chunks: ["japaneseChunkCandidates"], kanaInput: ["japaneseKanaInput", "japaneseKanaInputKey"], capsLock: ["japaneseIgnoreCapsLock"], escStepsBack: ["escStepsBack"],
     numpad: ["japaneseNumpadDirect"], brackets: ["bracketPairs"], spaceless: ["spacelessEnglish", "spacelessEnglishAlways"],
     numbers: ["japaneseRoughNumbersKanji", "numberConversion"],
     learn: ["learningEnabled"], secret: ["secretMode"], private: ["noLearningInPrivate"],

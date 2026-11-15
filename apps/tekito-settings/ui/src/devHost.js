@@ -155,6 +155,7 @@ function initialState() {
       englishSpelling: 0,
       recheckPreviousWord: true,
       enterCommitsAsShown: false,
+      escStepsBack: false,
       capitalizedCorrection: false,
       bracketPairs: false,
       doubleSpacePeriod: false,

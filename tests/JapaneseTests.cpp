@@ -886,6 +886,39 @@ void TestAddresses(const RomajiTable& table, const MiniPack& pack) {
             RequireText(shown.Commit(), before, "Enter as shown commits the live conversion as it shows");
         }
     }
+    // Esc steps back: the conversion, the kana, the keys typed, nothing.
+    for (const bool live : {false, true}) {
+        JapaneseComposer back(&table);
+        back.SetConverter(&converter);
+        back.SetLiveConversion(live);
+        back.SetEscStepsBack(true);
+        Type(back, L"watashi");
+        if (!live) back.Convert();
+        Require(back.Preedit() != L"わたし", "converted before Esc");
+        back.StepBack();
+        RequireText(back.Preedit(), L"わたし", "Esc: the kana");
+        back.StepBack();
+        RequireText(back.Preedit(), L"watashi", "Esc again: the keys typed");
+        back.StepBack();
+        Require(!back.IsComposing(), "Esc a third time: nothing");
+        // Backspace after the keys shown goes on as before.
+        Type(back, L"watashi");
+        if (!live) back.Convert();
+        back.StepBack();
+        back.StepBack();
+        back.Backspace();
+        Require(back.IsComposing(), "Backspace does not drop everything");
+    }
+    {
+        JapaneseComposer off(&table);
+        off.SetConverter(&converter);
+        Type(off, L"watashi");
+        off.Convert();
+        off.StepBack();
+        RequireText(off.Preedit(), L"わたし", "off: Esc shows the kana");
+        off.StepBack();
+        Require(!off.IsComposing(), "off: Esc again drops everything");
+    }
     // Live: an address typed after a conversion (Space) is one of its own.
     JapaneseComposer composer(&table);
     composer.SetConverter(&converter);

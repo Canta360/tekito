@@ -465,6 +465,7 @@ void JapaneseComposer::SetLiveConversion(bool on) {
 
 void JapaneseComposer::Insert(wchar_t key) {
     lastCommit_.reset();
+    mixKanaShown_ = false;
     if (aiJudge_ && !chunkJudge_ && !Typing()) aiJudge_->Warm();
     // Mixed typing: a capital is a letter of the chunk like any other; the
     // chunk keeps it for when it is English.
@@ -1258,6 +1259,45 @@ void JapaneseComposer::Cancel() {
             UpdatePredictions();
         }
         return;
+    }
+    ClearChunk();
+}
+
+void JapaneseComposer::StepBack() {
+    const bool keysShown = keysShown_ && IsConverted() && phrases_.size() == 1 &&
+                           phrases_.front().form == KanaForm::HalfWidthAlphanumeric;
+    keysShown_ = false;
+    // What is shown (Mix's live conversion too), for a stage that would look
+    // the same.
+    const auto Shown = [this] {
+        std::wstring text;
+        for (const auto& segment : Segments()) text += segment.text;
+        return text;
+    };
+    if (!escStepsBack_ || keysShown) {
+        Cancel();
+        if (keysShown) ClearChunk();
+        return;
+    }
+    if (IsConverted()) {
+        const auto shown = Shown();
+        Cancel();
+        if (Shown() != shown) return;
+    }
+    // Mix live conversion: the kana, until typing brings it back.
+    if (!mixKanaShown_ && MixLiveText()) {
+        const auto shown = Shown();
+        mixKanaShown_ = true;
+        if (Shown() != shown) return;
+    }
+    // The kana: the keys typed next, half-width as typed.
+    if (Typing()) {
+        const auto shown = Shown();
+        Transliterate(KanaForm::HalfWidthAlphanumeric);
+        if (Shown() != shown) {
+            keysShown_ = true;
+            return;
+        }
     }
     ClearChunk();
 }
@@ -4883,7 +4923,7 @@ std::optional<std::wstring> JapaneseComposer::MixSplitShown(bool convert) const 
 
 std::optional<std::wstring> JapaneseComposer::MixLiveText() const {
     if (!mixLive_ || !chunkJudge_ || !converter_ || !Typing() || IsConverted() || caret_ != units_.size() ||
-        HasAscii() || KanaTyped() || AddressShown()) {
+        mixKanaShown_ || HasAscii() || KanaTyped() || AddressShown()) {
         return std::nullopt;
     }
     // English run into Japanese shows as Space will split it.
@@ -5893,6 +5933,8 @@ void JapaneseComposer::ClearChunk() noexcept {
     asciiMode_ = false;
     capitals_ = 0;
     reconverted_ = false;
+    keysShown_ = false;
+    mixKanaShown_ = false;
     ResetLive();
 }
 

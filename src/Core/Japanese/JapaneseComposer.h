@@ -229,6 +229,10 @@ public:
     // conversion is not read again, Mix's English is not put right and its
     // sentence is not judged again.
     void SetEnterAsShown(bool on) noexcept { enterAsShown_ = on; }
+    // Esc steps back one stage at a time (UserSettings::escStepsBack): the
+    // conversion, then the kana, then the keys typed, then nothing. Off:
+    // Esc goes back to the kana, then drops everything.
+    void SetEscStepsBack(bool on) noexcept { escStepsBack_ = on; }
     [[nodiscard]] bool SlipAutoApply() const noexcept { return slipAutoApply_; }
     // The first emoji for a reading shown on the first page of its list
     // (off: with the other symbols, last).
@@ -398,6 +402,9 @@ public:
     [[nodiscard]] std::size_t CaretOffset() const;
     // Back to the typed kana after a conversion; otherwise drops everything.
     void Cancel();
+    // Esc: Cancel, or with SetEscStepsBack one stage back (a stage that
+    // would look the same is skipped).
+    void StepBack();
     // What was committed last (its last word's part of speech) is where the
     // next conversion starts from, so it reads as the sentence going on.
     // The text service forgets it when the caret is no longer right after
@@ -1066,6 +1073,12 @@ private:
     // phrases_ is the live conversion shown while typing.
     bool preview_{false};
     bool enterAsShown_{false};
+    bool escStepsBack_{false};
+    // StepBack showed the keys typed: Esc again drops everything.
+    bool keysShown_{false};
+    // StepBack showed the kana for Mix's live conversion: typing brings the
+    // conversion back.
+    bool mixKanaShown_{false};
     // Esc showed the kana: typing brings the live conversion back.
     bool kanaView_{false};
     // The first phrases, and the reading they cover, that stay as they are.

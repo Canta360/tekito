@@ -77,6 +77,10 @@ struct UserSettings {
     // no slip put right, nothing read again or judged again (English, Japanese
     // and Mix). Off by default: Enter puts slips right as Space does.
     bool enterCommitsAsShown{false};
+    // Japanese and Mix: Esc steps back one stage at a time (the conversion,
+    // the kana, the keys typed, then nothing). Off by default: Esc goes
+    // back to the kana, then drops everything.
+    bool escStepsBack{false};
     // English: a word typed with a capital mid-sentence is put right too
     // (ConversionOptions::capitalizedCorrection); off keeps it as typed.
     bool capitalizedCorrection{false};
