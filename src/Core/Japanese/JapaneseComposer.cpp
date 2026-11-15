@@ -3227,6 +3227,31 @@ void JapaneseComposer::AddLongerWords(std::size_t i) {
         phrase.candidates.insert(phrase.candidates.begin() + static_cast<std::ptrdiff_t>(at++), std::move(word));
         ++added;
     }
+    // A date said over phrases (らいしゅうの|きんようびに: 来週の金曜日に,
+    // 11/20(金)に) right after the phrase's first, with what follows it in
+    // the last phrase as that phrase writes it.
+    if (!special_ || !specialOptions_.dates) return;
+    const auto now = LocalTime::Now();
+    for (std::size_t j = std::min(phrases_.size() - 1, i + kPhrasesAhead); j > i; --j) {
+        const std::size_t end = phrases_[j].begin + phrases_[j].length;
+        if (end > reading.size() || end <= phrases_[j].begin) continue;
+        const std::wstring lastText = PhraseText(phrases_[j]);
+        for (std::size_t length = end - phrase.begin; length > phrases_[j].begin - phrase.begin; --length) {
+            const std::wstring_view suffix = std::wstring_view(reading).substr(phrase.begin + length, end - phrase.begin - length);
+            if (!lastText.ends_with(suffix)) break;
+            const auto dates = special_->Dates(SpecialConversions::Language::Japanese,
+                                               std::wstring_view(reading).substr(phrase.begin, length), now);
+            if (dates.empty()) continue;
+            std::size_t place = std::min<std::size_t>(1, phrase.candidates.size());
+            for (const auto& date : dates) {
+                PhraseCandidate candidate{date + std::wstring(suffix), 0, PhraseCandidate::Kind::Special, false};
+                candidate.length = end - phrase.begin;
+                phrase.candidates.insert(phrase.candidates.begin() + static_cast<std::ptrdiff_t>(place++), std::move(candidate));
+                if (phrase.selected >= place - 1 && phrase.selected != 0) ++phrase.selected;
+            }
+            return;
+        }
+    }
 }
 
 void JapaneseComposer::AddChunkCandidates(std::size_t i) {
@@ -3560,6 +3585,8 @@ void JapaneseComposer::AddSpecial(std::wstring_view reading, std::vector<PhraseC
             if (number) insert(1, {half, full, kuten}, {});
         } else if (digits == reading.size()) {
             insert(1, special_->Numbers(reading), {});
+            // Eight digits that are a date (20261115): the date first.
+            if (specialOptions_.dates) insert(1, special_->DigitDates(SpecialConversions::Language::Japanese, reading), {});
         } else if (digits > 0 && first.size() > digits && !IsDigit(first[digits]) &&
                    ToHalfWidthAscii(first.substr(0, digits)) == ToHalfWidthAscii(reading.substr(0, digits))) {
             const std::wstring rest = first.substr(digits);

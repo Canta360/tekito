@@ -280,6 +280,32 @@ std::vector<std::wstring> SpecialConversions::Dates(Language language, std::wstr
     if (!rule || rule->empty()) return {};
     // "day+1": the kind, and how many of it from now.
     const std::wstring& text = rule->front();
+    // "weekday:5": the next Friday (today's included); "weekday:5+1" next
+    // week's, the week starting on Monday.
+    if (text.starts_with(L"weekday:") && text.size() >= 9 && text[8] >= L'0' && text[8] <= L'6') {
+        const auto* formats = Find(L"format", language, L"weekday");
+        if (!formats) return {};
+        using namespace std::chrono;
+        const sys_days today{year_month_day{year{now.year}, month{static_cast<unsigned>(now.month)},
+                                            day{static_cast<unsigned>(now.day)}}};
+        const int wanted = text[8] - L'0';  // 0 is Sunday
+        const int todayIndex = static_cast<int>(weekday{today}.c_encoding());
+        sys_days date = today;
+        if (text.size() > 9) {
+            const int weeks = static_cast<int>(std::wcstol(text.c_str() + 9, nullptr, 10));
+            const auto fromMonday = [](int index) { return (index + 6) % 7; };
+            date = today - days{fromMonday(todayIndex)} + days{7 * weeks + fromMonday(wanted)};
+        } else {
+            date = today + days{(wanted - todayIndex + 7) % 7};
+        }
+        const year_month_day ymd{date};
+        std::vector<std::wstring> out;
+        for (const auto& pattern : *formats) {
+            AddUnique(out, Format(language, pattern, static_cast<int>(ymd.year()), static_cast<int>(static_cast<unsigned>(ymd.month())),
+                                  static_cast<int>(static_cast<unsigned>(ymd.day())), now));
+        }
+        return out;
+    }
     const auto sign = text.find_first_of(L"+-");
     const std::wstring kind = text.substr(0, sign);
     const int offset = sign == std::wstring::npos ? 0 : static_cast<int>(std::wcstol(text.c_str() + sign, nullptr, 10));
@@ -304,6 +330,32 @@ std::vector<std::wstring> SpecialConversions::Dates(Language language, std::wstr
     for (const auto& pattern : *formats) {
         AddUnique(out, Format(language, pattern, static_cast<int>(date.year()), static_cast<int>(static_cast<unsigned>(date.month())),
                               static_cast<int>(static_cast<unsigned>(date.day())), now));
+    }
+    return out;
+}
+
+std::vector<std::wstring> SpecialConversions::DigitDates(Language language, std::wstring_view digits) const {
+    if (digits.size() != 8) return {};
+    int value[3]{};
+    for (std::size_t i = 0; i < digits.size(); ++i) {
+        const wchar_t c = digits[i];
+        const int digit = c >= L'0' && c <= L'9' ? c - L'0' : c >= L'\xFF10' && c <= L'\xFF19' ? c - L'\xFF10' : -1;
+        if (digit < 0) return {};
+        int& part = value[i < 4 ? 0 : i < 6 ? 1 : 2];
+        part = part * 10 + digit;
+    }
+    const auto [y, m, d] = value;
+    using namespace std::chrono;
+    if (y < 1900 || y > 2199 || m < 1 || m > 12 || d < 1) return {};
+    if (!year_month_day{year{y}, month{static_cast<unsigned>(m)}, day{static_cast<unsigned>(d)}}.ok()) return {};
+    const auto* formats = Find(L"format", language, L"day");
+    if (!formats) return {};
+    const auto now = LocalTime::Now();
+    std::vector<std::wstring> out;
+    for (const auto& pattern : *formats) {
+        // The day's ways to write it, not its weekday alone (日曜日).
+        if (pattern.find(L"{D") == std::wstring::npos) continue;
+        AddUnique(out, Format(language, pattern, y, m, d, now));
     }
     return out;
 }

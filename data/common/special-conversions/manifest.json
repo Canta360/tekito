@@ -2,14 +2,14 @@
   "pack_id": "special-conversions",
   "display_name": "Special Conversions",
   "schema_version": 1,
-  "version": "2026.10",
+  "version": "2026.11",
   "language": "en-US+ja-JP",
   "type": "special-conversions",
   "format": "rules-tsv-v1",
   "file": "rules.tsv",
-  "entry_count": 19812,
+  "entry_count": 19953,
   "sha256": {
-    "file": "33EEBBC07DFBE75698501EA0711A01F6AFC0A43456718DC89EBA89CA6920743C"
+    "file": "6EF4C7AAF9A4A0B29C5FF2B9DAC26EF61C80EC3A30DE8509D14788EBA372585E"
   },
   "license": "TEKITO-OWNED + BSD-3-Clause (Mozc) + Unicode-3.0 (emoji)",
   "source": "scripts/build-special-conversions.py; Japanese symbols, emoji, emoticons and single kanji from https://github.com/google/mozc/tree/b9c3fcbd6d76b19649ef572324fa9da2559bc18e/src/data",

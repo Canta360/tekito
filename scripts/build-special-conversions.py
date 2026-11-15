@@ -4,6 +4,7 @@ rules.tsv has four fields on each row:  section <TAB> language <TAB> key <TAB> v
 Rows that share a section, language and key keep their order.
 
   word     a date or time word and what it means: day+1 (tomorrow), time,
+           weekday:5 (the next Friday), weekday:5+1 (next week's Friday),
            year-1, month+0 ...
   format   for each kind (day, time, year, month), the ways to write it:
            {Y} {M} {MM} {D} {DD} {Month} {W} (weekday) {E} {EY} (era, its
@@ -49,7 +50,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 PACK = ROOT / "data" / "common" / "special-conversions"
-VERSION = "2026.10"
+VERSION = "2026.11"
 
 WORDS = {
     "ja": [
@@ -65,10 +66,20 @@ WORDS = {
         ("きょねん", "year-1"), ("さくねん", "year-1"), ("おととし", "year-2"),
         ("こんげつ", "month+0"), ("らいげつ", "month+1"), ("さらいげつ", "month+2"),
         ("せんげつ", "month-1"), ("せんせんげつ", "month-2"),
+        # A weekday: the next one from today (today's included), or that of
+        # this week, the next, the one after or the last (weeks from Monday).
+        *[(week + joint + day + tail, f"weekday:{n}{offset}")
+          for week, offset in [("", ""), ("こんしゅう", "+0"), ("らいしゅう", "+1"), ("さらいしゅう", "+2"),
+                               ("せんしゅう", "-1")]
+          for joint in ([""] if not week else ["", "の"])
+          for n, day in enumerate(["にちよう", "げつよう", "かよう", "すいよう", "もくよう", "きんよう", "どよう"])
+          for tail in ["", "び"]],
     ],
     "en": [
         ("today", "day+0"), ("tomorrow", "day+1"), ("yesterday", "day-1"),
         ("now", "time"),
+        *[(day, f"weekday:{n}") for n, day in enumerate(
+            ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"])],
     ],
 }
 
@@ -79,11 +90,13 @@ FORMATS = {
         "time": ["{H}:{NN}", "{H}時{N}分", "{P}{I}時{N}分"],
         "year": ["{Y}年", "{E}{EY}年", "{Y}"],
         "month": ["{M}月", "{Y}年{M}月"],
+        "weekday": ["{M}/{D}({W})", "{M}月{D}日({W})", "{Y}/{MM}/{DD}", "{Y}年{M}月{D}日", "{M}月{D}日"],
     },
     "en": {
         "day": ["{Month} {D}, {Y}", "{M}/{D}/{Y}", "{Y}-{MM}-{DD}", "{W}, {Month} {D}",
                 "{D} {Month} {Y}"],
         "time": ["{I}:{NN} {P}", "{H}:{NN}"],
+        "weekday": ["{W}, {Month} {D}", "{Month} {D}, {Y}", "{M}/{D}/{Y}"],
     },
 }
 

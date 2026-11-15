@@ -2072,6 +2072,21 @@ void TestSpecialConversions(const RomajiTable& table, const MiniPack& pack) {
             "いま in the afternoon");
     Require(Contains(special.Dates(Language::Japanese, L"ことし", {2019, 6, 1, 0, 0}), L"令和元年"),
             "the first year of an era is 元年");
+    // Weekdays: the next one (today's included), or that of a week from Monday.
+    RequireText(special.Dates(Language::Japanese, L"きんよう", morning)[0], L"10/2(金)", "きんよう: the next Friday");
+    RequireText(special.Dates(Language::Japanese, L"かようび", morning)[0], L"9/29(火)", "かようび: today, a Tuesday");
+    RequireText(special.Dates(Language::Japanese, L"らいしゅうのげつよう", morning)[0], L"10/5(月)", "next week's Monday");
+    RequireText(special.Dates(Language::Japanese, L"せんしゅうにちようび", morning)[0], L"9/27(日)",
+                "last week's Sunday, its week from Monday");
+    RequireText(special.Dates(Language::English, L"friday", morning)[0], L"Friday, October 2", "friday");
+    // Eight digits that are a date.
+    const auto digits = special.DigitDates(Language::Japanese, L"20261115");
+    Require(!digits.empty() && digits[0] == L"2026/11/15" && Contains(digits, L"2026年11月15日") &&
+                !Contains(digits, L"日曜日"),
+            "20261115 as a date, not its weekday alone");
+    Require(special.DigitDates(Language::Japanese, L"20261131").empty() &&
+                special.DigitDates(Language::Japanese, L"12345678").empty(),
+            "no date for digits that are none");
 
     const auto numbers = special.Numbers(L"1234");
     Require(Contains(numbers, L"１２３４") && Contains(numbers, L"1,234") && Contains(numbers, L"千二百三十四") &&

@@ -51,6 +51,9 @@ public:
     // formats ("today" -> "September 29, 2026", ...); empty for other words.
     [[nodiscard]] std::vector<std::wstring> Dates(Language language, std::wstring_view word,
                                                   const LocalTime& now) const;
+    // Eight digits that are a date (20261115, half- or full-width; years
+    // 1900-2199) in each of the language's ways to write a day.
+    [[nodiscard]] std::vector<std::wstring> DigitDates(Language language, std::wstring_view digits) const;
     // The symbols for a reading or an ASCII spelling, in the pack's order.
     // Japanese keys are matched in full-width, as they are typed there.
     [[nodiscard]] std::vector<std::wstring> Symbols(Language language, std::wstring_view key) const;
