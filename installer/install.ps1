@@ -42,8 +42,11 @@ $regsvr32 = Join-Path $env:WINDIR "System32\regsvr32.exe"
 $startMenu = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\TEKITO"
 $uninstallKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\TEKITO"
 
+# Start-Process joins the arguments with spaces as they are: a path with a
+# space in it (C:\Program Files) goes in quotes.
 function Invoke-Regsvr32([string[]]$Arguments) {
-    $process = Start-Process $regsvr32 -ArgumentList $Arguments -WindowStyle Hidden -Wait -PassThru
+    $quoted = @($Arguments | ForEach-Object { if ($_ -match '\s') { '"{0}"' -f $_ } else { $_ } })
+    $process = Start-Process $regsvr32 -ArgumentList $quoted -WindowStyle Hidden -Wait -PassThru
     return $process.ExitCode
 }
 

@@ -120,7 +120,7 @@ if ($RemoveUserData) {
 if (-not $SkipRegistration) {
     $regsvr32 = Join-Path $env:WINDIR "System32\regsvr32.exe"
     foreach ($dll in @(Get-ChildItem -LiteralPath $installRoot -Filter "Tekito.Tsf*.dll" -File -Recurse -ErrorAction SilentlyContinue)) {
-        $process = Start-Process $regsvr32 -ArgumentList @('/u', '/s', $dll.FullName) -WindowStyle Hidden -Wait -PassThru
+        $process = Start-Process $regsvr32 -ArgumentList @('/u', '/s', ('"{0}"' -f $dll.FullName)) -WindowStyle Hidden -Wait -PassThru
         if ($process.ExitCode -ne 0) { Write-Warning "Unregistering $($dll.Name) returned $($process.ExitCode)." }
     }
 
