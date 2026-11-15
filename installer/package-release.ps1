@@ -249,18 +249,42 @@ Write-Host "Archive: $ArchivePath"
 # The setup program finds its payload through a trailer at the end of the
 # file: magic, payload length, reserved (see TekitoSetup.cpp).
 $installerPath = Join-Path (Split-Path $ArchivePath -Parent) $installerName
-$output = [IO.File]::Create($installerPath)
+# The payload's SHA-256 goes into the setup program's resources (RCDATA 601),
+# which setup checks the payload against before it unpacks anything.
+Add-Type -Namespace TekitoPackaging -Name Resources -MemberDefinition @'
+[DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+public static extern IntPtr BeginUpdateResource(string fileName, bool deleteExisting);
+[DllImport("kernel32.dll", SetLastError = true)]
+public static extern bool UpdateResource(IntPtr update, IntPtr type, IntPtr name, ushort language, byte[] data, uint size);
+[DllImport("kernel32.dll", SetLastError = true)]
+public static extern bool EndUpdateResource(IntPtr update, bool discard);
+'@
+$hashedStub = Join-Path ([IO.Path]::GetTempPath()) ("tekito-setup-" + [guid]::NewGuid().ToString("N") + ".exe")
+Copy-Item -LiteralPath $setupStub $hashedStub
 try {
-    foreach ($part in @($setupStub, $ArchivePath)) {
-        $stream = [IO.File]::OpenRead($part)
-        try { $stream.CopyTo($output) } finally { $stream.Dispose() }
+    $payloadHex = (Get-FileHash -LiteralPath $ArchivePath -Algorithm SHA256).Hash
+    $payloadHash = [byte[]]@($payloadHex -split '(..)' -ne '' | ForEach-Object { [Convert]::ToByte($_, 16) })
+    $update = [TekitoPackaging.Resources]::BeginUpdateResource($hashedStub, $false)
+    if ($update -eq [IntPtr]::Zero -or
+        -not [TekitoPackaging.Resources]::UpdateResource($update, [IntPtr]10, [IntPtr]601, 0, $payloadHash, 32) -or
+        -not [TekitoPackaging.Resources]::EndUpdateResource($update, $false)) {
+        throw "The payload's SHA-256 could not be written into the setup program."
     }
-    $magic = [Text.Encoding]::ASCII.GetBytes("TEKITO_PAYLOAD_V1")
-    $output.Write($magic, 0, $magic.Length)
-    $output.Write([BitConverter]::GetBytes([UInt64](Get-Item -LiteralPath $ArchivePath).Length), 0, 8)
-    $output.Write([BitConverter]::GetBytes([UInt64]0), 0, 8)
+    $output = [IO.File]::Create($installerPath)
+    try {
+        foreach ($part in @($hashedStub, $ArchivePath)) {
+            $stream = [IO.File]::OpenRead($part)
+            try { $stream.CopyTo($output) } finally { $stream.Dispose() }
+        }
+        $magic = [Text.Encoding]::ASCII.GetBytes("TEKITO_PAYLOAD_V1")
+        $output.Write($magic, 0, $magic.Length)
+        $output.Write([BitConverter]::GetBytes([UInt64](Get-Item -LiteralPath $ArchivePath).Length), 0, 8)
+        $output.Write([BitConverter]::GetBytes([UInt64]0), 0, 8)
+    } finally {
+        $output.Dispose()
+    }
 } finally {
-    $output.Dispose()
+    Remove-Item -LiteralPath $hashedStub -Force -ErrorAction SilentlyContinue
 }
 "$(Get-Sha256 $installerPath)  $installerName" | Set-Content -LiteralPath "$installerPath.sha256" -Encoding ASCII
 & (Join-Path $OutputRoot "verify-package.ps1") -PackageRoot $OutputRoot -RequireSingleExeInstaller

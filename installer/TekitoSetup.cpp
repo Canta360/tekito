@@ -15,6 +15,7 @@
 #include <shellapi.h>
 #include <mfplay.h>
 #include <shlobj.h>
+#include <bcrypt.h>
 #include <sddl.h>
 #include <shlwapi.h>
 #include <wincodec.h>
@@ -57,6 +58,8 @@ constexpr char kPayloadMagic[] = "TEKITO_PAYLOAD_V1";
 constexpr std::size_t kPayloadMagicSize = sizeof(kPayloadMagic) - 1;
 constexpr int kLogoIcon = 101;
 constexpr int kLicenseResource = 401;
+// The payload's SHA-256, written into the program when it is packaged.
+constexpr int kPayloadHashResource = 601;
 constexpr int kWordmarkResource = 501;
 constexpr int kFontResource = 301;  // M PLUS 1, the TEKITO typeface
 constexpr UINT kWizardInstallComplete = WM_APP + 1;
@@ -483,10 +486,50 @@ std::filesystem::path MakeTempDirectory() {
 }
 
 // Scripts run from setup's own folder use it for their temporary files too
-// (downloads, staging, the install's record), not the user's %TEMP%.
+// (downloads, staging, the install's record), not the user's %TEMP%; and
+// PowerShell loads Windows' own modules only, never one from the user's
+// Documents folder (which comes first otherwise).
 void UseAsTemp(const std::filesystem::path& folder) {
     SetEnvironmentVariableW(L"TEMP", folder.c_str());
     SetEnvironmentVariableW(L"TMP", folder.c_str());
+    wchar_t system[MAX_PATH]{};
+    const UINT length = GetSystemDirectoryW(system, MAX_PATH);
+    if (length > 0 && length < MAX_PATH) {
+        const auto modules = std::filesystem::path(system) / LR"(WindowsPowerShell\v1.0\Modules)";
+        SetEnvironmentVariableW(L"PSModulePath", modules.c_str());
+    }
+}
+
+// Whether the payload copied out is the one this program was packaged with:
+// its SHA-256 against the one in the program's resources. The file setup was
+// started from may be changed while it runs; the program in memory cannot.
+bool PayloadMatches(const std::filesystem::path& zip) {
+    const BYTE* expected = nullptr;
+    DWORD size = 0;
+    if (!ResourceBytes(kPayloadHashResource, expected, size) || size != 32) return false;
+    BCRYPT_ALG_HANDLE algorithm = nullptr;
+    if (!BCRYPT_SUCCESS(BCryptOpenAlgorithmProvider(&algorithm, BCRYPT_SHA256_ALGORITHM, nullptr, 0))) return false;
+    bool matches = false;
+    BCRYPT_HASH_HANDLE hash = nullptr;
+    if (BCRYPT_SUCCESS(BCryptCreateHash(algorithm, &hash, nullptr, 0, nullptr, 0, 0))) {
+        std::ifstream input(zip, std::ios::binary);
+        std::vector<char> buffer(1024 * 1024);
+        bool read = static_cast<bool>(input);
+        while (read && input) {
+            input.read(buffer.data(), static_cast<std::streamsize>(buffer.size()));
+            const auto count = input.gcount();
+            if (count > 0 && !BCRYPT_SUCCESS(BCryptHashData(hash, reinterpret_cast<PUCHAR>(buffer.data()),
+                                                            static_cast<ULONG>(count), 0))) {
+                read = false;
+            }
+        }
+        std::array<UCHAR, 32> digest{};
+        matches = read && input.eof() && BCRYPT_SUCCESS(BCryptFinishHash(hash, digest.data(), 32, 0)) &&
+                  std::memcmp(digest.data(), expected, 32) == 0;
+        BCryptDestroyHash(hash);
+    }
+    BCryptCloseAlgorithmProvider(algorithm, 0);
+    return matches;
 }
 
 struct InstallChoices {
@@ -553,6 +596,11 @@ int InstallEmbeddedPackage(const std::filesystem::path& self, const InstallChoic
     if (!CopyPayload(self, payloadOffset, payloadSize, zipPath)) {
         std::filesystem::remove_all(tempRoot, cleanupError);
         return 4;
+    }
+    // Nothing is unpacked or run from a payload that is not this program's.
+    if (!PayloadMatches(zipPath)) {
+        std::filesystem::remove_all(tempRoot, cleanupError);
+        return 2;
     }
     std::filesystem::create_directory(packageRoot, cleanupError);
     const auto exitCode = RunPowerShell(zipPath, packageRoot, choices);
