@@ -15,6 +15,7 @@
 #include <shellapi.h>
 #include <mfplay.h>
 #include <shlobj.h>
+#include <sddl.h>
 #include <shlwapi.h>
 #include <wincodec.h>
 #include "WebView2.h"
@@ -205,6 +206,8 @@ struct PayloadTrailer {
 #pragma pack(pop)
 
 struct Wizard {
+    // Where a failed install's record was kept (TEKITO-install.log).
+    std::filesystem::path installLog;
     HWND window{};
     std::filesystem::path self;
     Screen screen{Screen::Welcome};
@@ -354,24 +357,14 @@ void OpenWebView2DownloadPage() {
                   SW_SHOWNORMAL);
 }
 
+// Program Files: what is registered runs in every app and elevated, so it
+// goes where only administrators can change it (not a folder of one's own).
 std::filesystem::path DefaultInstallRoot() {
-    wchar_t localAppData[MAX_PATH]{};
-    const auto length = GetEnvironmentVariableW(L"LOCALAPPDATA", localAppData, MAX_PATH);
-    if (length == 0 || length >= MAX_PATH) return {};
-    return std::filesystem::path(localAppData) / L"Programs" / L"TEKITO";
-}
-
-std::filesystem::path BrowseForDirectory(HWND owner) {
-    BROWSEINFOW browse{};
-    browse.hwndOwner = owner;
-    browse.ulFlags = BIF_RETURNONLYFSDIRS | BIF_NEWDIALOGSTYLE;
-    browse.lpszTitle = Tr(L"Choose where to install TEKITO", L"TEKITO のインストール先を選択してください");
-    const auto selected = SHBrowseForFolderW(&browse);
-    if (!selected) return {};
-    wchar_t path[MAX_PATH]{};
-    const bool read = SHGetPathFromIDListW(selected, path) != FALSE;
-    CoTaskMemFree(selected);
-    return read ? std::filesystem::path(path) : std::filesystem::path{};
+    PWSTR programFiles = nullptr;
+    if (FAILED(SHGetKnownFolderPath(FOLDERID_ProgramFiles, 0, nullptr, &programFiles))) return {};
+    const std::filesystem::path root = std::filesystem::path(programFiles) / L"TEKITO";
+    CoTaskMemFree(programFiles);
+    return root;
 }
 
 bool ResourceBytes(int id, const BYTE*& bytes, DWORD& size) {
@@ -462,18 +455,38 @@ bool CopyPayload(const std::filesystem::path& self, std::uint64_t payloadOffset,
     return true;
 }
 
+// A folder of setup's own for what it unpacks and runs elevated: in
+// Windows' Temp folder (where nobody can rename or delete what another made),
+// with a name nobody can guess, made new (never one already there), and
+// changed by administrators and the system only; others can read it (the
+// install's record).
 std::filesystem::path MakeTempDirectory() {
-    wchar_t tempPath[MAX_PATH]{};
-    const auto length = GetTempPathW(MAX_PATH, tempPath);
+    wchar_t windows[MAX_PATH]{};
+    const UINT length = GetWindowsDirectoryW(windows, MAX_PATH);
     if (length == 0 || length >= MAX_PATH) return {};
-    for (unsigned int attempt = 0; attempt < 10; ++attempt) {
-        const auto candidate = std::filesystem::path(tempPath) /
-                               (L"TEKITO-Setup-" + std::to_wstring(GetCurrentProcessId()) + L"-" +
-                                std::to_wstring(GetTickCount64()) + L"-" + std::to_wstring(attempt));
-        std::error_code error;
-        if (std::filesystem::create_directory(candidate, error) && !error) return candidate;
+    PSECURITY_DESCRIPTOR descriptor = nullptr;
+    if (!ConvertStringSecurityDescriptorToSecurityDescriptorW(L"D:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FR;;;AU)",
+                                                              SDDL_REVISION_1, &descriptor, nullptr)) {
+        return {};
     }
-    return {};
+    SECURITY_ATTRIBUTES attributes{sizeof(attributes), descriptor, FALSE};
+    std::filesystem::path made;
+    for (unsigned int attempt = 0; attempt < 10 && made.empty(); ++attempt) {
+        GUID guid{};
+        wchar_t name[64]{};
+        if (FAILED(CoCreateGuid(&guid)) || StringFromGUID2(guid, name, static_cast<int>(std::size(name))) == 0) break;
+        const auto candidate = std::filesystem::path(windows) / L"Temp" / (std::wstring(L"TEKITO-Setup-") + name);
+        if (CreateDirectoryW(candidate.c_str(), &attributes)) made = candidate;
+    }
+    LocalFree(descriptor);
+    return made;
+}
+
+// Scripts run from setup's own folder use it for their temporary files too
+// (downloads, staging, the install's record), not the user's %TEMP%.
+void UseAsTemp(const std::filesystem::path& folder) {
+    SetEnvironmentVariableW(L"TEMP", folder.c_str());
+    SetEnvironmentVariableW(L"TMP", folder.c_str());
 }
 
 struct InstallChoices {
@@ -514,6 +527,7 @@ int RunPowerShell(const std::filesystem::path& zipPath, const std::filesystem::p
     startup.dwFlags = STARTF_USESHOWWINDOW;
     startup.wShowWindow = SW_HIDE;
     PROCESS_INFORMATION process{};
+    UseAsTemp(packageRoot.parent_path());
     if (!CreateProcessW(powershell.c_str(), commandLine.data(), nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr,
                         packageRoot.c_str(), &startup, &process)) {
         return -1;
@@ -526,7 +540,8 @@ int RunPowerShell(const std::filesystem::path& zipPath, const std::filesystem::p
     return static_cast<int>(exitCode);
 }
 
-int InstallEmbeddedPackage(const std::filesystem::path& self, const InstallChoices& choices) {
+int InstallEmbeddedPackage(const std::filesystem::path& self, const InstallChoices& choices,
+                           std::filesystem::path& installLog) {
     std::uint64_t payloadOffset = 0;
     std::uint64_t payloadSize = 0;
     if (!ReadPayloadBounds(self, payloadOffset, payloadSize)) return 2;
@@ -541,7 +556,15 @@ int InstallEmbeddedPackage(const std::filesystem::path& self, const InstallChoic
     }
     std::filesystem::create_directory(packageRoot, cleanupError);
     const auto exitCode = RunPowerShell(zipPath, packageRoot, choices);
-    std::filesystem::remove_all(tempRoot, cleanupError);
+    // A failed install keeps its record, in the same folder.
+    const auto log = tempRoot / L"TEKITO-install.log";
+    if (exitCode != 0 && exitCode != 30 && std::filesystem::is_regular_file(log, cleanupError)) {
+        std::filesystem::remove_all(packageRoot, cleanupError);
+        std::filesystem::remove(zipPath, cleanupError);
+        installLog = log;
+    } else {
+        std::filesystem::remove_all(tempRoot, cleanupError);
+    }
     return exitCode == -1 ? 5 : exitCode;
 }
 
@@ -585,6 +608,7 @@ int RunUninstall(const std::filesystem::path& script, const std::filesystem::pat
     startup.wShowWindow = SW_HIDE;
     PROCESS_INFORMATION process{};
     const auto workingDirectory = script.parent_path();
+    UseAsTemp(workingDirectory);
     if (!CreateProcessW(powershell.c_str(), commandLine.data(), nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr,
                         workingDirectory.c_str(), &startup, &process)) {
         return -1;
@@ -638,7 +662,7 @@ void StartUninstall(Wizard& wizard) {
     }
 }
 
-std::wstring FailureMessage(int code) {
+std::wstring FailureMessage(int code, const std::filesystem::path& log) {
     switch (code) {
     case 2: return Tr(L"This setup file is incomplete or damaged. Download TEKITO again and run the new file.", L"このセットアップファイルは不完全か、壊れています。TEKITO をダウンロードし直して、新しいファイルを実行してください。");
     case 3: return Tr(L"Setup couldn't create a temporary folder. Make sure the drive has free space, then try again.", L"一時フォルダーを作成できませんでした。ドライブの空き容量を確認して、もう一度お試しください。");
@@ -649,12 +673,12 @@ std::wstring FailureMessage(int code) {
     default:
         if (UseJapanese()) {
             return L"インストールがエラー " + std::to_wstring(code) +
-                   L" で停止しました。新規インストールの場合、変更は残っていません。もう一度お試しください。"
-                   L"繰り返し起きる場合は、%TEMP%\\TEKITO-install.log に詳しい記録があります。";
+                   L" で停止しました。新規インストールの場合、変更は残っていません。もう一度お試しください。" +
+                   (log.empty() ? std::wstring() : L"繰り返し起きる場合は、" + log.wstring() + L" に詳しい記録があります。");
         }
         return L"The install step stopped with error " + std::to_wstring(code) +
-               L". If this was a new install, nothing was left behind. Try again; if it keeps happening, "
-               L"%TEMP%\\TEKITO-install.log says why.";
+               L". If this was a new install, nothing was left behind. Try again" +
+               (log.empty() ? std::wstring(L".") : L"; if it keeps happening, " + log.wstring() + L" says why.");
     }
 }
 
@@ -677,7 +701,7 @@ void StartInstall(Wizard& wizard) {
                                  wizard.japanese && wizard.ai, wizard.japanese && wizard.keepEnglish};
     try {
         wizard.installThread = std::thread([&wizard, window, self, choices] {
-            wizard.installExitCode.store(InstallEmbeddedPackage(self, choices));
+            wizard.installExitCode.store(InstallEmbeddedPackage(self, choices, wizard.installLog));
             PostMessageW(window, kWizardInstallComplete, 0, 0);
         });
     } catch (...) {
@@ -767,9 +791,6 @@ std::vector<Control> Controls(const Wizard& wizard) {
         controls.push_back({Action::AcceptLicense, Kind::Primary, FooterButton(0), Tr(L"I agree", L"同意する")});
         break;
     case Screen::Options:
-        controls.push_back({Action::Browse, Kind::Secondary, D2D1::RectF(kOptionsCard.right - 118.0f, kOptionsCard.top + 20.0f,
-                                                                        kOptionsCard.right - 18.0f, kOptionsCard.top + 52.0f),
-                            Tr(L"Change", L"変更")});
         controls.push_back({Action::Shortcut, Kind::Toggle, D2D1::RectF(kOptionsCard.right - 66.0f, kOptionsCard.top + 104.0f,
                                                                        kOptionsCard.right - 18.0f, kOptionsCard.top + 132.0f),
                             Tr(L"Start menu shortcut", L"スタートメニューのショートカット"), true, wizard.startMenuShortcut});
@@ -1425,7 +1446,7 @@ void Paint(Wizard& wizard) {
         break;
     case Screen::Failed:
         DrawText(wizard, Tr(L"Setup couldn't finish", L"インストールを完了できませんでした"), wizard.heading.Get(), D2D1::RectF(kMargin, 40.0f, kWidth - kMargin, 72.0f), p.ink);
-        DrawText(wizard, FailureMessage(wizard.installExitCode.load()), wizard.body.Get(),
+        DrawText(wizard, FailureMessage(wizard.installExitCode.load(), wizard.installLog), wizard.body.Get(),
                  D2D1::RectF(kMargin, 84.0f, kWidth - kMargin, 200.0f), p.ink2);
         break;
     }
@@ -1575,11 +1596,6 @@ void Activate(Wizard& wizard, Action action, int index = 0) {
         wizard.agreed = true;
         Go(wizard, Screen::Welcome);
         return;
-    case Action::Browse: {
-        const auto selected = BrowseForDirectory(wizard.window);
-        if (!selected.empty()) wizard.installRoot = selected / L"TEKITO";
-        break;
-    }
     case Action::Shortcut: wizard.startMenuShortcut = !wizard.startMenuShortcut; break;
     case Action::Japanese: wizard.japanese = !wizard.japanese; break;
     case Action::Ai: wizard.ai = !wizard.ai; break;

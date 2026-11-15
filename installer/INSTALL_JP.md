@@ -37,7 +37,7 @@ Set-ExecutionPolicy -Scope Process Bypass -Force
 .\scripts\verify-installed.ps1
 ```
 
-プログラムは `%LOCALAPPDATA%\Programs\TEKITO` に、言語データは `%LOCALAPPDATA%\TEKITO\data` にインストールされます。ユーザー辞書・学習データ・設定は `%LOCALAPPDATA%\TEKITO\user.db` に保存されます。
+プログラムは `%ProgramFiles%\TEKITO` に、言語データは `%LOCALAPPDATA%\TEKITO\data` にインストールされます。ユーザー辞書・学習データ・設定は `%LOCALAPPDATA%\TEKITO\user.db` に保存されます。
 
 ## アンインストール
 

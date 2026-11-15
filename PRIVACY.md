@@ -39,7 +39,7 @@ other private file in your profile.
 
 So that TEKITO also works in the Start menu's search, Settings and Store
 apps, the setup program lets those sandboxed apps read the program folder
-(`%LOCALAPPDATA%\Programs\TEKITO`) and the language data
+(`%ProgramFiles%\TEKITO`) and the language data
 (`%LOCALAPPDATA%\TEKITO\data`). They get read access only, and not to
 `user.db`: your dictionary and what TEKITO has learned stay out of their
 reach, and there TEKITO types with the default settings.

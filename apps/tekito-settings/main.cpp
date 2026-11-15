@@ -37,6 +37,8 @@
 #include <dxgi.h>
 #include <dwmapi.h>
 #include <shellapi.h>
+#include <knownfolders.h>
+#include <shlobj.h>
 #include <urlmon.h>
 #include <wrl.h>
 #include "WebView2.h"
@@ -2742,6 +2744,20 @@ private:
         if (length == 0 || length >= MAX_PATH) return;
         const auto dll =
             std::filesystem::path(modulePath, modulePath + length).parent_path() / L"Tekito.Tsf.dll";
+        // Only a DLL in Program Files, which only administrators can change:
+        // one in a folder the user's own programs can write to is never run
+        // elevated.
+        PWSTR programFiles = nullptr;
+        if (FAILED(SHGetKnownFolderPath(FOLDERID_ProgramFiles, 0, nullptr, &programFiles))) return;
+        std::wstring protectedRoot = programFiles;
+        CoTaskMemFree(programFiles);
+        if (!protectedRoot.empty() && protectedRoot.back() != L'\\') protectedRoot += L'\\';
+        const std::wstring dllPath = dll.wstring();
+        if (dllPath.size() <= protectedRoot.size() ||
+            CompareStringOrdinal(dllPath.c_str(), static_cast<int>(protectedRoot.size()), protectedRoot.c_str(),
+                                 static_cast<int>(protectedRoot.size()), TRUE) != CSTR_EQUAL) {
+            return;
+        }
         wchar_t system[MAX_PATH]{};
         if (!std::filesystem::exists(dll) || GetSystemDirectoryW(system, MAX_PATH) == 0) return;
         const auto regsvr32 = std::filesystem::path(system) / L"regsvr32.exe";

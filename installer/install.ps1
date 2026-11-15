@@ -1,6 +1,7 @@
-# Installs TEKITO from an extracted package for the current user:
-#   %LOCALAPPDATA%\Programs\TEKITO   TEKITO.exe, Tekito.Tsf.dll, settings-ui
-#   %LOCALAPPDATA%\TEKITO\data       Data Packs
+# Installs TEKITO from an extracted package:
+#   %ProgramFiles%\TEKITO            TEKITO.exe, Tekito.Tsf.dll, settings-ui
+#                                    (only administrators can change it)
+#   %LOCALAPPDATA%\TEKITO\data       Data Packs, for the current user
 # registers the input method, adds it to the English keyboard list and makes
 # a Start menu shortcut to Settings. Needs an administrator PowerShell unless
 # -SkipRegistration is given. The user's dictionary, learning and settings in
@@ -17,7 +18,7 @@
 [CmdletBinding()]
 param(
     [string]$SourceRoot = $PSScriptRoot,
-    [string]$InstallRoot = (Join-Path $env:LOCALAPPDATA "Programs\TEKITO"),
+    [string]$InstallRoot = (Join-Path $env:ProgramFiles "TEKITO"),
     [bool]$StartMenuShortcut = $true,
     [bool]$Japanese = $false,
     [string]$JapaneseDataPath,
@@ -46,9 +47,6 @@ function Invoke-Regsvr32([string[]]$Arguments) {
     return $process.ExitCode
 }
 
-# Apps that take text input keep the input method DLL loaded, so it cannot
-# be deleted while they run. It can be renamed, though: move such files out
-# of the way and let the next install or uninstall remove them.
 function Grant-AppContainerRead([string]$Folder) {
     # Store apps, Settings and the Start menu's search run in an app
     # container; the input method loads in them and needs to read the
@@ -60,18 +58,48 @@ function Grant-AppContainerRead([string]$Folder) {
     }
 }
 
+# Only administrators and the system change the program; everyone (apps in
+# an app container too) runs and reads it.
+function Protect-InstallFolder([string]$Folder) {
+    & icacls.exe $Folder /inheritance:r /grant:r "*S-1-5-18:(OI)(CI)F" "*S-1-5-32-544:(OI)(CI)F" `
+        "*S-1-5-32-545:(OI)(CI)RX" "*S-1-15-2-1:(OI)(CI)RX" "*S-1-15-2-2:(OI)(CI)RX" /Q | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "The install folder could not be protected (icacls returned $LASTEXITCODE)." }
+}
+
+# Deletes a folder, never through a link or junction in it (only the link
+# itself goes). Apps that take text input keep the input method DLL loaded,
+# so it cannot be deleted while they run. It can be renamed, though: move
+# such files out of the way and let the next install, uninstall or sign-in
+# remove them.
 function Remove-InstalledFiles([string]$Root) {
     if (-not (Test-Path -LiteralPath $Root)) { return }
-    foreach ($file in @(Get-ChildItem -LiteralPath $Root -File -Recurse -Force)) {
-        try {
-            Remove-Item -LiteralPath $file.FullName -Force -ErrorAction Stop
-        } catch {
-            Rename-Item -LiteralPath $file.FullName ("{0}.old-{1}" -f $file.Name, [guid]::NewGuid().ToString("N"))
+    if ((Get-Item -LiteralPath $Root -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) { return }
+    $folders = New-Object System.Collections.Generic.List[string]
+    $pending = New-Object System.Collections.Stack
+    $pending.Push($Root)
+    while ($pending.Count -gt 0) {
+        $folder = $pending.Pop()
+        $folders.Add($folder)
+        foreach ($item in @(Get-ChildItem -LiteralPath $folder -Force)) {
+            if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) {
+                try { if ($item.PSIsContainer) { [IO.Directory]::Delete($item.FullName) } else { [IO.File]::Delete($item.FullName) } } catch { }
+            } elseif ($item.PSIsContainer) {
+                $pending.Push($item.FullName)
+            } else {
+                try {
+                    Remove-Item -LiteralPath $item.FullName -Force -ErrorAction Stop
+                } catch {
+                    try {
+                        Rename-Item -LiteralPath $item.FullName ("{0}.old-{1}" -f $item.Name, [guid]::NewGuid().ToString("N")) -ErrorAction Stop
+                    } catch { }
+                }
+            }
         }
     }
-    Get-ChildItem -LiteralPath $Root -Directory -Recurse -Force | Sort-Object { $_.FullName.Length } -Descending |
-        Where-Object { @(Get-ChildItem -LiteralPath $_.FullName -Force).Count -eq 0 } |
-        ForEach-Object { Remove-Item -LiteralPath $_.FullName -Force -ErrorAction SilentlyContinue }
+    # The folders left empty, the deepest first.
+    foreach ($folder in @($folders | Sort-Object { $_.Length } -Descending)) {
+        try { [IO.Directory]::Delete($folder) } catch { }
+    }
 }
 
 function Remove-InputMethodTip([string[]]$Tips) {
@@ -152,10 +180,18 @@ foreach ($file in $sourceFiles) {
 }
 
 $installRoot = [IO.Path]::GetFullPath($InstallRoot).TrimEnd('\')
-$userRoot = [IO.Path]::GetFullPath($env:USERPROFILE).TrimEnd('\') + '\'
-if (-not $installRoot.StartsWith($userRoot, [StringComparison]::OrdinalIgnoreCase)) {
-    throw "InstallRoot must be a folder inside your user profile."
+# What is registered runs in every app and elevated: it goes where only
+# administrators can change it. A copy that is not registered may go anywhere.
+$programFiles = [IO.Path]::GetFullPath($env:ProgramFiles).TrimEnd('\') + '\'
+if (-not $SkipRegistration -and -not $installRoot.StartsWith($programFiles, [StringComparison]::OrdinalIgnoreCase)) {
+    throw "InstallRoot must be a folder in $env:ProgramFiles."
 }
+# Versions before 1.0.2 were installed in the user's own folder; that copy
+# is neither run nor loaded here, and is deleted at the next sign-in.
+$legacyRoot = [IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA "Programs\TEKITO")).TrimEnd('\')
+$hadLegacyInstall = -not $SkipRegistration -and $legacyRoot -ne $installRoot -and
+    ((Test-Path -LiteralPath (Join-Path $legacyRoot "install-manifest.json") -PathType Leaf) -or
+     (Test-Path -LiteralPath (Join-Path $legacyRoot "TEKITO.exe") -PathType Leaf))
 # An install that stopped half way leaves the program without its manifest;
 # it is still TEKITO's folder.
 $hadExistingInstall = (Test-Path -LiteralPath (Join-Path $installRoot "install-manifest.json") -PathType Leaf) -or
@@ -222,15 +258,11 @@ try {
     }
 
     Get-Process -Name TEKITO -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-    if (-not $SkipRegistration) {
-        # Older versions kept the DLL in a subfolder; unregister wherever it is.
-        foreach ($oldDll in @(Get-ChildItem -LiteralPath $installRoot -Filter "Tekito.Tsf*.dll" -File -Recurse -ErrorAction SilentlyContinue)) {
-            $code = Invoke-Regsvr32 @('/u', '/s', $oldDll.FullName)
-            if ($code -ne 0) { Write-Warning "Unregistering the previous version returned $code." }
-        }
-    }
+    # The previous version here is only replaced: registering the new DLL
+    # points the input method at it (the old one is never loaded to undo it).
     Remove-InstalledFiles $installRoot
     New-Item -ItemType Directory -Path $installRoot -Force | Out-Null
+    if (-not $SkipRegistration) { Protect-InstallFolder $installRoot }
     Copy-Item -Path (Join-Path $stagingRoot "*") -Destination $installRoot -Recurse -Force
     Grant-AppContainerRead $installRoot
     Grant-AppContainerRead (Join-Path $env:LOCALAPPDATA "TEKITO\data")
@@ -296,7 +328,19 @@ try {
     }
 
     # An uninstall's cleanup left for the next sign-in would delete this.
-    Remove-ItemProperty -LiteralPath "HKCU:\Software\Microsoft\Windows\CurrentVersion\RunOnce" -Name "TEKITO cleanup" -ErrorAction SilentlyContinue
+    $runOnce = "HKCU:\Software\Microsoft\Windows\CurrentVersion\RunOnce"
+    Remove-ItemProperty -LiteralPath $runOnce -Name "TEKITO cleanup" -ErrorAction SilentlyContinue
+    if ($hadLegacyInstall) {
+        # The copy in the user's own folder goes at the next sign-in, deleted
+        # by the user (apps may have its DLL loaded until then).
+        New-Item -Path $runOnce -Force | Out-Null
+        Set-ItemProperty -LiteralPath $runOnce -Name "TEKITO cleanup" -Value ('cmd.exe /d /c rd /s /q "{0}"' -f $legacyRoot)
+    }
+    # The desktop companion starts with Windows from where TEKITO is now.
+    $run = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
+    if ((Get-ItemProperty -LiteralPath $run -Name "TEKITO Companion" -ErrorAction SilentlyContinue)) {
+        Set-ItemProperty -LiteralPath $run -Name "TEKITO Companion" -Value ('"{0}" --companion' -f $installedApp)
+    }
 
     # Installed apps lists TEKITO, and uninstalls it with TekitoUninstall.exe.
     # Not being listed there does not stop the install.
@@ -333,8 +377,8 @@ catch {
         -not (Test-Path -LiteralPath (Join-Path $installRoot "install-manifest.json"))) {
         if ($addedTips.Count -gt 0) { Remove-InputMethodTip $addedTips }
         if ($registeredNewDll) { [void](Invoke-Regsvr32 @('/u', '/s', $installedDll)) }
-        Remove-Item -LiteralPath $startMenu -Recurse -Force -ErrorAction SilentlyContinue
-        Remove-Item -LiteralPath $installRoot -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-InstalledFiles $startMenu
+        Remove-InstalledFiles $installRoot
     }
     throw
 }

@@ -11,7 +11,7 @@
 # 30: the words could not be exported, and nothing was removed.
 [CmdletBinding()]
 param(
-    [string]$InstallRoot = (Join-Path $env:LOCALAPPDATA "Programs\TEKITO"),
+    [string]$InstallRoot = (Join-Path $env:ProgramFiles "TEKITO"),
     [switch]$SkipRegistration,
     [switch]$RemoveUserData,
     [string]$ExportTo
@@ -24,31 +24,49 @@ $clsid = "{6F67E5C8-A873-4B69-8EC3-26DF00F642F1}"
 $uninstallKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\TEKITO"
 $cleanupValue = "TEKITO cleanup"
 
-# Apps that take text input keep the input method DLL loaded, so it cannot
-# be deleted while they run. It can be renamed, though: move such files out
-# of the way and let the next install, uninstall or sign-in remove them.
+# Deletes a folder, never through a link or junction in it (only the link
+# itself goes). Apps that take text input keep the input method DLL loaded,
+# so it cannot be deleted while they run. It can be renamed, though: move
+# such files out of the way and let the next install, uninstall or sign-in
+# remove them.
 function Remove-InstalledFiles([string]$Root) {
     if (-not (Test-Path -LiteralPath $Root)) { return }
-    foreach ($file in @(Get-ChildItem -LiteralPath $Root -File -Recurse -Force)) {
-        try {
-            Remove-Item -LiteralPath $file.FullName -Force -ErrorAction Stop
-        } catch {
-            try {
-                Rename-Item -LiteralPath $file.FullName ("{0}.old-{1}" -f $file.Name, [guid]::NewGuid().ToString("N")) -ErrorAction Stop
-            } catch { }
+    if ((Get-Item -LiteralPath $Root -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) { return }
+    $folders = New-Object System.Collections.Generic.List[string]
+    $pending = New-Object System.Collections.Stack
+    $pending.Push($Root)
+    while ($pending.Count -gt 0) {
+        $folder = $pending.Pop()
+        $folders.Add($folder)
+        foreach ($item in @(Get-ChildItem -LiteralPath $folder -Force)) {
+            if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) {
+                try { if ($item.PSIsContainer) { [IO.Directory]::Delete($item.FullName) } else { [IO.File]::Delete($item.FullName) } } catch { }
+            } elseif ($item.PSIsContainer) {
+                $pending.Push($item.FullName)
+            } else {
+                try {
+                    Remove-Item -LiteralPath $item.FullName -Force -ErrorAction Stop
+                } catch {
+                    try {
+                        Rename-Item -LiteralPath $item.FullName ("{0}.old-{1}" -f $item.Name, [guid]::NewGuid().ToString("N")) -ErrorAction Stop
+                    } catch { }
+                }
+            }
         }
     }
-    Get-ChildItem -LiteralPath $Root -Directory -Recurse -Force | Sort-Object { $_.FullName.Length } -Descending |
-        Where-Object { @(Get-ChildItem -LiteralPath $_.FullName -Force).Count -eq 0 } |
-        ForEach-Object { Remove-Item -LiteralPath $_.FullName -Force -ErrorAction SilentlyContinue }
-    Remove-Item -LiteralPath $Root -Recurse -Force -ErrorAction SilentlyContinue
+    # The folders left empty, the deepest first.
+    foreach ($folder in @($folders | Sort-Object { $_.Length } -Descending)) {
+        try { [IO.Directory]::Delete($folder) } catch { }
+    }
 }
 
 $installRoot = [IO.Path]::GetFullPath($InstallRoot).TrimEnd('\')
-$userRoot = [IO.Path]::GetFullPath($env:USERPROFILE).TrimEnd('\') + '\'
-if (-not $installRoot.StartsWith($userRoot, [StringComparison]::OrdinalIgnoreCase)) {
-    throw "InstallRoot must be a folder inside your user profile."
+$programFiles = [IO.Path]::GetFullPath($env:ProgramFiles).TrimEnd('\') + '\'
+if (-not $SkipRegistration -and -not $installRoot.StartsWith($programFiles, [StringComparison]::OrdinalIgnoreCase)) {
+    throw "InstallRoot must be a folder in $env:ProgramFiles."
 }
+# Where versions before 1.0.2 were installed, if its copy is still there.
+$legacyRoot = [IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA "Programs\TEKITO")).TrimEnd('\')
 if ((Test-Path -LiteralPath $installRoot) -and
     -not (Test-Path -LiteralPath (Join-Path $installRoot "install-manifest.json")) -and
     @(Get-ChildItem -LiteralPath $installRoot -Filter "Tekito.Tsf*.dll" -File -Recurse -ErrorAction SilentlyContinue).Count -eq 0) {
@@ -125,7 +143,7 @@ if (-not $SkipRegistration) {
 }
 
 $startMenu = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\TEKITO"
-if (Test-Path -LiteralPath $startMenu) { Remove-Item -LiteralPath $startMenu -Recurse -Force }
+Remove-InstalledFiles $startMenu
 Remove-InstalledFiles $installRoot
 $userDataRoot = Join-Path $env:LOCALAPPDATA "TEKITO"
 if ($RemoveUserData) { Remove-InstalledFiles $userDataRoot }
@@ -138,6 +156,8 @@ Remove-Item -LiteralPath (Join-Path ([IO.Path]::GetTempPath()) "TEKITO-install.l
 # Files still open: deleted at the next sign-in.
 $left = @(@($installRoot) + $(if ($RemoveUserData) { @($userDataRoot) } else { @() }) |
     Where-Object { Test-Path -LiteralPath $_ })
+# The old copy in the user's own folder is deleted by the user, not here.
+if ($legacyRoot -ne $installRoot -and (Test-Path -LiteralPath $legacyRoot)) { $left += $legacyRoot }
 $runOnce = "HKCU:\Software\Microsoft\Windows\CurrentVersion\RunOnce"
 if ($left.Count -gt 0) {
     $command = 'cmd.exe /d /c ' + (($left | ForEach-Object { 'rd /s /q "{0}"' -f $_ }) -join ' & ')

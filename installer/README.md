@@ -43,7 +43,7 @@ extracted package:
 | Script | What it does |
 | --- | --- |
 | `verify-package.ps1` | Checks every file against the package manifest. |
-| `install.ps1` | Installs to `%LOCALAPPDATA%\Programs\TEKITO`, installs the Data Packs to `%LOCALAPPDATA%\TEKITO\data`, registers the input method and adds a Start menu shortcut. |
+| `install.ps1` | Installs to `%ProgramFiles%\TEKITO` (only administrators can change it), installs the Data Packs to `%LOCALAPPDATA%\TEKITO\data`, registers the input method and adds a Start menu shortcut. |
 | `uninstall.ps1` | Removes the program, both keyboard list entries, the Start menu shortcut and the Installed apps entry. `-RemoveUserData` also deletes the dictionary, learning, settings and Data Packs; `-ExportTo <folder>` first saves the user's words there. Files still in use are deleted at the next sign-in. |
 | `scripts\verify-installed.ps1` | Read-only check of an installation. |
 
