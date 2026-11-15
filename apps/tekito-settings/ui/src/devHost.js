@@ -162,6 +162,7 @@ function initialState() {
       altRightMode: 0,
       convertFromEnd: false,
       japaneseLetterDelay: 0,
+      candidateWindowScale: 100,
       japaneseKanjiDelay: 0,
       japaneseKanjiMarker: true,
       shiftEnterCommitsToFocus: false,

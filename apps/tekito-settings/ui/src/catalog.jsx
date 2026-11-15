@@ -356,6 +356,8 @@ export function catalog(ctx) {
         </div>
       ),
     },
+    choice("windowSize", "candidates", "look", "text_fields", g.windowSize, "candidateWindowScale",
+      [[90, g.windowSize.small], [100, g.windowSize.normal], [120, g.windowSize.large], [145, g.windowSize.larger]], { detail: true }),
     {
       id: "rows", page: "candidates", group: "list", keys: ["candidateRows"], title: g.rows.title,
       render: () => <RowsRow settings={s} setSetting={set} title={g.rows.title} description={g.rows.description} />,

@@ -1427,6 +1427,7 @@ private:
         json += L",\"socialExpressionRange\":" + std::to_wstring(settings_.socialExpressionRange);
         json += L",\"socialPersonalization\":" + std::to_wstring(settings_.socialPersonalization);
         json += L",\"candidateWindowStyle\":" + std::to_wstring(settings_.candidateWindowStyle);
+        json += L",\"candidateWindowScale\":" + std::to_wstring(settings_.candidateWindowScale);
         json += L",\"candidateRows\":" + std::to_wstring(settings_.candidateRows);
         json += L",\"aiSettingsControl\":" + std::to_wstring(settings_.aiSettingsControl);
         json += L",\"japaneseSwitchOrder\":" + std::to_wstring(settings_.japaneseSwitchOrder);
@@ -1723,6 +1724,9 @@ private:
             }
             else if (key == L"candidateWindowStyle") {
                 settings_.candidateWindowStyle = std::clamp(integerValue, 0, 1);
+            }
+            else if (key == L"candidateWindowScale") {
+                settings_.candidateWindowScale = std::clamp(integerValue, 50, 200);
             }
             else if (key == L"candidateRows") {
                 settings_.candidateRows = tekito::userdata::UserSettings::ValidCandidateRows(integerValue);

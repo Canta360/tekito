@@ -359,6 +359,9 @@ int wmain(int argc, wchar_t** argv) {
     if (GetEnvironmentVariableW(L"TEKITO_PREVIEW_STYLE", style, 16) > 0 && wcscmp(style, L"simple") == 0) {
         window.SetStyle(1);
     }
+    // TEKITO_PREVIEW_ZOOM=145: the list's size in percent.
+    wchar_t zoom[8]{};
+    if (GetEnvironmentVariableW(L"TEKITO_PREVIEW_ZOOM", zoom, 8) > 0) window.SetZoom(_wtoi(zoom));
     wchar_t language[8]{};
     const bool japaneseUi = GetEnvironmentVariableW(L"TEKITO_PREVIEW_LANGUAGE", language, 8) > 0 && wcscmp(language, L"ja") == 0;
     if (japaneseUi) window.SetJapanese(true);

@@ -385,6 +385,8 @@ bool SqliteUserDictionaryRepository::LoadSettings(UserSettings& settings) const 
             loaded.socialPersonalization = std::clamp(value, 0, 2);
         } else if (std::strcmp(key, "candidate_window_style") == 0) {
             loaded.candidateWindowStyle = std::clamp(value, 0, 1);
+        } else if (std::strcmp(key, "candidate_window_scale") == 0) {
+            loaded.candidateWindowScale = std::clamp(value, 50, 200);
         } else if (std::strcmp(key, "mode_indicator_enabled") == 0) {
             loaded.modeIndicatorEnabled = value != 0;
         } else if (std::strcmp(key, "mode_underline_colors") == 0) {
@@ -640,6 +642,7 @@ bool SqliteUserDictionaryRepository::SaveSettings(const UserSettings& settings) 
     saveValue("social_expression_range", std::clamp(settings.socialExpressionRange, 0, 4));
     saveValue("social_personalization", std::clamp(settings.socialPersonalization, 0, 2));
     saveValue("candidate_window_style", std::clamp(settings.candidateWindowStyle, 0, 1));
+    saveValue("candidate_window_scale", std::clamp(settings.candidateWindowScale, 50, 200));
     saveValue("candidate_rows", settings.candidateRows);
     saveValue("mode_indicator_enabled", settings.modeIndicatorEnabled ? 1 : 0);
     saveValue("mode_underline_colors", settings.modeUnderlineColors ? 1 : 0);

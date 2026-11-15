@@ -356,6 +356,7 @@ struct Frame {
     std::size_t totalCount{0};
     std::uint64_t generation{0};
     int style{0};  // CandidateWindow::Style
+    int zoom{100};  // CandidateWindow::SetZoom, percent
     bool rainbow{false};  // CandidateWindow::SetRainbow
     std::wstring detailHead;
     std::wstring detailForm;
@@ -488,14 +489,21 @@ Style ReadStyle(bool compositionGlass, bool simple) {
     return style;
 }
 
-int ScaleForWindow(HWND hwnd, int value) {
+// The list's size the user chose, in percent (CandidateWindow::SetZoom),
+// for the frame the UI thread is drawing: it scales as the DPI does.
+thread_local int t_zoomPercent = 100;
+
+UINT ZoomedDpi(HWND hwnd) {
     const UINT dpi = hwnd ? GetDpiForWindow(hwnd) : kBaseDpi;
-    return MulDiv(value, dpi == 0 ? kBaseDpi : dpi, kBaseDpi);
+    return static_cast<UINT>(MulDiv(static_cast<int>(dpi == 0 ? kBaseDpi : dpi), t_zoomPercent, 100));
+}
+
+int ScaleForWindow(HWND hwnd, int value) {
+    return MulDiv(value, static_cast<int>(ZoomedDpi(hwnd)), kBaseDpi);
 }
 
 float ScaleFactor(HWND hwnd) {
-    const UINT dpi = hwnd ? GetDpiForWindow(hwnd) : kBaseDpi;
-    return static_cast<float>(dpi == 0 ? kBaseDpi : dpi) / static_cast<float>(kBaseDpi);
+    return static_cast<float>(ZoomedDpi(hwnd)) / static_cast<float>(kBaseDpi);
 }
 
 RECT WorkAreaNear(const RECT& rect) {
@@ -1372,6 +1380,7 @@ private:
     }
 
     void Present(Frame frame) {
+        t_zoomPercent = frame.zoom;
         if (!EnsureWindows()) return;
         KillTimer(panel_, kBadgeTimer);
         badgeFade_ = 0;
@@ -1609,7 +1618,7 @@ private:
     }
 
     void EnsureTextFormats() {
-        const UINT dpi = GetDpiForWindow(panel_);
+        const UINT dpi = ZoomedDpi(panel_);
         if (formats_.dpi == dpi && formats_.text) return;
         const float scale = static_cast<float>(dpi == 0 ? kBaseDpi : dpi) / static_cast<float>(kBaseDpi);
         IDWriteFactory* f = dwrite_.get();
@@ -2341,6 +2350,7 @@ void CandidateWindow::Show(const RECT& caretRect,
         frame.caret = caretRect;
         frame.generation = ++generation_;
         frame.style = style_;
+    frame.zoom = zoom_;
         frame.caption = caption;
         {
             std::lock_guard<std::mutex> lock(channel_->mutex);
@@ -2385,6 +2395,7 @@ void CandidateWindow::Show(const RECT& caretRect,
     frame.generation = ++generation_;
     frame.firstIndex = pageStart_;
     frame.style = style_;
+    frame.zoom = zoom_;
     frame.rainbow = rainbow_;
     frame.totalCount = candidates_.size();
     frame.rows.reserve(visibleCount_);
@@ -2432,6 +2443,7 @@ void CandidateWindow::ShowModeBadge(const RECT& caretRect, InputMode mode) {
     frame.caret = caretRect;
     frame.generation = ++generation_;
     frame.style = style_;
+    frame.zoom = zoom_;
     frame.rainbow = rainbow_;
     frame.badge = mode == InputMode::Mixed ? kBadgeMixed
                   : TypesJapanese(mode)    ? kBadgeJapanese
@@ -2448,6 +2460,10 @@ void CandidateWindow::ShowModeBadge(const RECT& caretRect, InputMode mode) {
 
 void CandidateWindow::SetStyle(int style) noexcept {
     style_ = style == 1 ? 1 : 0;
+}
+
+void CandidateWindow::SetZoom(int percent) noexcept {
+    zoom_ = std::clamp(percent, 50, 200);
 }
 
 void CandidateWindow::Hide() noexcept {

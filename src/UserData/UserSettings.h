@@ -38,6 +38,9 @@ struct UserSettings {
     // 0 = glass (frosted, with light under the selection), 1 = simple
     // (opaque panel with a flat selection row).
     int candidateWindowStyle{0};
+    // The candidate list's size, in percent of the usual (90, 100, 120, 145
+    // in Settings).
+    int candidateWindowScale{100};
     // Rows in the candidate list: 0 = automatic (English shows 5, then 10
     // once paged; Japanese 9), or a fixed number from kMinCandidateRows to
     // kMaxCandidateRows (Settings offers 5, 7 and 9; the rest by number).

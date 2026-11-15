@@ -116,6 +116,7 @@ const en = {
 
   general: {
     switchKey: { title: "Switch key", none: "None" },
+    windowSize: { title: "Candidate list size", description: "The size of the text and the list.", small: "Small", normal: "Normal", large: "Large", larger: "Larger" },
     altSwitches: {
       title: "Switch with the left and right Alt", description: "Each Alt pressed alone switches to the mode chosen for it. For keyboards without Japanese keys.",
       left: "Left Alt", right: "Right Alt", japanese: "Japanese", mixed: "Mix", auto: "Auto", direct: "Direct", none: "None",
@@ -580,6 +581,7 @@ const ja = {
 
   general: {
     switchKey: { title: "切り替えキー", none: "なし" },
+    windowSize: { title: "候補一覧の大きさ", description: "文字と一覧の大きさ", small: "小さめ", normal: "ふつう", large: "大きめ", larger: "特大" },
     altSwitches: {
       title: "左右の Alt で切り替え", description: "Alt だけを押すと、それぞれに選んだモードに切り替わります（日本語キーのないキーボード向け）",
       left: "左の Alt", right: "右の Alt", japanese: "日本語", mixed: "まぜ打ち", auto: "Auto", direct: "Direct", none: "なし",
