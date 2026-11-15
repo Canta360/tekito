@@ -126,7 +126,7 @@ export function catalog(ctx) {
     },
     // Under the switch key and order; on a keyboard without the Japanese
     // keys shown at once, otherwise under 詳細.
-    toggle("altSwitches", "general", "switching", "swap_horiz", g.altSwitches, "altSwitches", {
+    toggle("altSwitches", "general", "switching", "switch_left", g.altSwitches, "altSwitches", {
       detail: ctx.japaneseKeyboard, keys: ["altLeftMode", "altRightMode"],
       sub: () => s.altSwitches && (() => {
         // The modes there are, then none.
@@ -213,15 +213,15 @@ export function catalog(ctx) {
       ),
     }),
     styledToggle("sentenceCheck", "conversion", "convert", "notes", j.sentenceCheck, "japaneseSentenceCheck", { detail: true }),
-    toggle("convertFromEnd", "conversion", "convert", "text_select_end", j.convertFromEnd, "convertFromEnd", { modes: ja, detail: true }),
-    choice("letterDelay", "conversion", "convert", "abc", j.letterDelay, "japaneseLetterDelay",
+    toggle("convertFromEnd", "conversion", "convert", "last_page", j.convertFromEnd, "convertFromEnd", { modes: ja, detail: true }),
+    choice("letterDelay", "conversion", "convert", "timer", j.letterDelay, "japaneseLetterDelay",
       [[0, j.delays.none], [200, j.delays.short], [500, j.delays.medium], [1000, j.delays.long]], { modes: ja, detail: true }),
     {
-      ...choice("kanjiDelay", "conversion", "convert", "pause", j.kanjiDelay, "japaneseKanjiDelay",
+      ...choice("kanjiDelay", "conversion", "convert", "hourglass_top", j.kanjiDelay, "japaneseKanjiDelay",
         [[0, j.delays.none], [300, j.delays.short], [700, j.delays.medium], [1500, j.delays.long]], { modes: ja, detail: true }),
       keys: ["japaneseKanjiDelay", "japaneseKanjiMarker"],
       render: () => (
-        <Row icon="pause" title={head(j.kanjiDelay.title, ja)} description={j.kanjiDelay.description}
+        <Row icon="hourglass_top" title={head(j.kanjiDelay.title, ja)} description={j.kanjiDelay.description}
           sub={s.japaneseKanjiDelay > 0 || s.japaneseLetterDelay > 0 ? (
             <Check label={j.kanjiDelay.marker} checked={s.japaneseKanjiMarker} onChange={(value) => set("japaneseKanjiMarker", value)} />
           ) : null}>
@@ -381,7 +381,7 @@ export function catalog(ctx) {
     linked("firstPageSymbol", "candidates", "extra", "mood", j.firstPageSymbol, { japanese: "japaneseFirstPageSymbol", mixed: "mixFirstPageSymbol" },
       { detail: true }),
     styledToggle("typedForms", "candidates", "extra", "text_fields", j.typedForms, "japaneseTypedForms", { detail: true }),
-    styledToggle("chunks", "candidates", "extra", "text_fields", j.chunks, "japaneseChunkCandidates", { detail: true }),
+    styledToggle("chunks", "candidates", "extra", "segment", j.chunks, "japaneseChunkCandidates", { detail: true }),
 
     // 辞書と学習 (the page draws its own; these are for All settings, search and AI)
     {
@@ -411,7 +411,7 @@ export function catalog(ctx) {
       sub: () => <Check label={j.kanaInput.key} checked={s.japaneseKanaInputKey} onChange={(value) => set("japaneseKanaInputKey", value)} />,
     }),
     toggle("capsLock", "keys", "keyboard", "keyboard_capslock", j.capsLock, "japaneseIgnoreCapsLock", { modes: ja, detail: true }),
-    toggle("numpad", "keys", "keyboard", "calculate", j.numpad, "japaneseNumpadDirect", { modes: ja, detail: true }),
+    toggle("numpad", "keys", "keyboard", "dialpad", j.numpad, "japaneseNumpadDirect", { modes: ja, detail: true }),
     {
       id: "romaji", page: "keys", group: "typing", keys: [], title: j.romaji.title, modes: ja,
       render: () => <LinkRow icon="table" title={head(j.romaji.title, ja)} description={j.romaji.description} onClick={ctx.openRomaji} />,
