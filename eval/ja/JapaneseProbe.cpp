@@ -217,6 +217,7 @@ int main(int argc, char** argv) {
             if (name == "mixCorrection") { settings.mixCorrection = value != 0; found = true; }
             if (name == "enterCommitsAsShown") { settings.enterCommitsAsShown = value != 0; found = true; }
             if (name == "escStepsBack") { settings.escStepsBack = value != 0; found = true; }
+            if (name == "shiftEnterCommitsToFocus") { settings.shiftEnterCommitsToFocus = value != 0; found = true; }
             if (name == "spacelessEnglish") { settings.spacelessEnglish = value != 0; found = true; }
             if (name == "dateConversion") { settings.dateConversion = value != 0; found = true; }
             if (name == "numberConversion") { settings.numberConversion = value != 0; found = true; }
@@ -265,7 +266,7 @@ int main(int argc, char** argv) {
     // "keys": each line is keys pressed, through the text service's key
     // handling (TranslateKey, ApplyKey) into a document, printed after each
     // key as the document then [the composition]. A capital is Shift and
-    // the letter; {space} {enter} {bs} {esc} {left} {right} {f6}..{f10} are
+    // the letter; {space} {enter} {s-enter} {bs} {esc} {left} {right} {f6}..{f10} are
     // those keys (a plain space too).
     if (std::find_if(argv + 3, argv + argc, [](const char* a) { return std::string(a) == "keys"; }) != argv + argc) {
         using Key = tekito::japanese::KeyPress::Key;
@@ -293,6 +294,10 @@ int main(int argc, char** argv) {
                         {L"{f8}", Key::F8}, {L"{f9}", Key::F9}, {L"{f10}", Key::F10}};
                     for (const auto& [text, key] : named) {
                         if (name == text) press.key = key;
+                    }
+                    if (name == L"{s-enter}") {
+                        press.key = Key::Enter;
+                        press.shift = true;
                     }
                 } else if (keys[i] == L' ') {
                     press.key = Key::Space;

@@ -36,6 +36,7 @@ namespace tekito::userdata {
     japanese::KeyOptions options;
     options.fullWidthSpace = (mixed ? settings.mixSpaceWidth : settings.japaneseSpaceWidth) != 1;
     options.pageSize = JapanesePageSize(settings);
+    options.shiftEnterToFocus = settings.shiftEnterCommitsToFocus;
     return options;
 }
 

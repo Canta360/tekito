@@ -919,6 +919,23 @@ void TestAddresses(const RomajiTable& table, const MiniPack& pack) {
         off.StepBack();
         Require(!off.IsComposing(), "off: Esc again drops everything");
     }
+    // Shift+Enter: up to the focused phrase; the rest stays as converted.
+    for (const bool live : {false, true}) {
+        JapaneseComposer part(&table);
+        part.SetConverter(&converter);
+        part.SetLiveConversion(live);
+        Type(part, L"watashinonamaehanakanodesu");
+        part.Convert();
+        const std::wstring whole = part.Preedit();
+        Require(part.Segments().size() >= 3, "several phrases to commit part of");
+        part.MoveFocus(-100);
+        Require(part.CanCommitToFocus(), "Shift+Enter can commit the first phrase");
+        const std::wstring first = part.CommitToFocus();
+        Require(!first.empty() && whole.starts_with(first), "the first phrase as shown");
+        Require(part.IsConverted(), "the rest stays converted");
+        RequireText(first + part.Preedit(), whole, "the rest as it was shown");
+        RequireText(part.Commit(), whole.substr(first.size()), "Enter commits the rest");
+    }
     // Live: an address typed after a conversion (Space) is one of its own.
     JapaneseComposer composer(&table);
     composer.SetConverter(&converter);

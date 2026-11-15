@@ -5585,6 +5585,82 @@ std::wstring JapaneseComposer::CommitChunk() {
     return text;
 }
 
+bool JapaneseComposer::CanCommitToFocus() const noexcept {
+    if (!IsConverted() || preview_ || !pending_.empty() || !settled_.empty() || WholeChoice()) return false;
+    if (chunkJudge_ && ChoseEnglish()) return false;
+    if (focus_ + 1 >= phrases_.size()) return false;
+    const std::size_t end = phrases_[focus_].begin + phrases_[focus_].length;
+    return end < readingKeys_.size() && readingKeys_[end] != std::wstring::npos;
+}
+
+std::wstring JapaneseComposer::CommitToFocus() {
+    if (!CanCommitToFocus()) return Commit();
+    const std::size_t end = phrases_[focus_].begin + phrases_[focus_].length;
+    const std::size_t keyEnd = readingKeys_[end];
+    // The units the committed keys were typed as; a unit split in two
+    // (a slip undone across it) commits everything.
+    std::size_t units = 0;
+    for (std::size_t keys = 0; keys < keyEnd && units < units_.size(); ++units) keys += units_[units].keys.size();
+    std::size_t typed = 0;
+    for (std::size_t i = 0; i < units; ++i) typed += units_[i].keys.size();
+    if (typed != keyEnd || units == 0 || units >= units_.size()) return Commit();
+
+    std::wstring text;
+    for (std::size_t i = 0; i <= focus_; ++i) {
+        const auto& phrase = phrases_[i];
+        const std::wstring chosen = PhraseText(phrase);
+        text += chosen;
+        if (!learning_) continue;
+        // Dates and sums change; they are not learned.
+        if (!phrase.form && phrase.selected < phrase.candidates.size() &&
+            phrase.candidates[phrase.selected].kind == PhraseCandidate::Kind::Special) {
+            continue;
+        }
+        const std::wstring first = phrase.candidates.empty() ? chosen : phrase.candidates.front().text;
+        learning_->RecordChoice(LearningReading(conversionReading_, phrase.begin, phrase.length), chosen, first);
+    }
+    const auto& last = phrases_[focus_];
+    const std::uint16_t rightId =
+        !last.form && last.selected < last.candidates.size() ? last.candidates[last.selected].rightId : 0;
+
+    // The rest, as it was converted.
+    std::vector<PhraseState> rest(phrases_.begin() + static_cast<std::ptrdiff_t>(focus_) + 1, phrases_.end());
+    for (auto& phrase : rest) phrase.begin -= end;
+    std::vector<std::size_t> restKeys;
+    for (std::size_t i = end; i < readingKeys_.size(); ++i) {
+        restKeys.push_back(readingKeys_[i] == std::wstring::npos ? std::wstring::npos : readingKeys_[i] - keyEnd);
+    }
+    const std::wstring restReading = conversionReading_.substr(end);
+    std::vector<Unit> restUnits(units_.begin() + static_cast<std::ptrdiff_t>(units), units_.end());
+    const bool caseKept = typedCase_.size() >= keyEnd;
+    const std::wstring restCase = caseKept ? typedCase_.substr(keyEnd) : std::wstring{};
+
+    if (chunkJudge_) {
+        // Japanese after English takes its space back, as Enter does.
+        dropSpaceBefore_ = spaceAfterEnglish_;
+        spaceAfterEnglish_ = false;
+        japaneseInSentence_ = true;
+        lastChunkEnglish_ = false;
+    }
+    context_ = ContextAfter(text, rightId);
+    SetSentenceStart(EndsSentence(text));
+    RememberWords(text);
+    const bool ascii = asciiMode_;
+    const int capitals = capitals_;
+    ClearChunk();
+    lastCommit_.reset();
+    units_ = std::move(restUnits);
+    caret_ = units_.size();
+    asciiMode_ = ascii;
+    capitals_ = capitals;
+    if (caseKept) typedCase_ = restCase;
+    conversionReading_ = restReading;
+    readingKeys_ = std::move(restKeys);
+    phrases_ = std::move(rest);
+    focus_ = 0;
+    return text;
+}
+
 bool JapaneseComposer::Reconvert(std::wstring_view text) {
     if (!converter_ || text.empty() || IsComposing()) return false;
     const auto guess = converter_->ReadingOf(text);

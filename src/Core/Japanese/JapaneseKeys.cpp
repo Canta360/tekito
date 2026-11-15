@@ -156,6 +156,7 @@ std::optional<KeyCommand> TranslateKey(const JapaneseComposer& composer, const K
         return Make(Action::CycleKana);
     case Key::Enter:
         if (!composing) return std::nullopt;
+        if (key.shift && options.shiftEnterToFocus && composer.CanCommitToFocus()) return Make(Action::CommitToFocus);
         return Make(Action::Commit);
     case Key::Backspace:
         if (!composing) return std::nullopt;
@@ -280,6 +281,9 @@ KeyOutcome ApplyKey(JapaneseComposer& composer, const KeyCommand& command) {
         break;
     case Action::Commit:
         outcome.committed = composer.IsComposing() ? composer.Commit() : std::wstring{};
+        break;
+    case Action::CommitToFocus:
+        outcome.committed = composer.CommitToFocus();
         break;
     case Action::InsertOutside:
         outcome.outside = std::wstring(1, command.character);

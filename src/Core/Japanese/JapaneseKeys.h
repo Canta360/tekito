@@ -82,6 +82,7 @@ struct KeyCommand {
         ForgetChosen,       // Ctrl+Delete: the chosen prediction or candidate is unlearned
         Reconvert,          // Henkan with nothing typed: the selected text, converted again
         ShowCandidates,     // Tab while typing: converted, with the candidate list open
+        CommitToFocus,      // Shift+Enter: the phrases up to the focused one
     };
     Action action{Action::Commit};
     wchar_t character{0};
@@ -98,6 +99,8 @@ struct KeyOptions {
     bool fullWidthSpace{true};
     // Rows of the candidate list a page shows (1-9 choose from it).
     std::size_t pageSize{9};
+    // Shift+Enter commits up to the focused phrase (CommitToFocus).
+    bool shiftEnterToFocus{false};
 };
 
 // What `key` does now; nothing when it is the application's.

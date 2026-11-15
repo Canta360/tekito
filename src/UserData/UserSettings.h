@@ -81,6 +81,9 @@ struct UserSettings {
     // the kana, the keys typed, then nothing). Off by default: Esc goes
     // back to the kana, then drops everything.
     bool escStepsBack{false};
+    // Japanese and Mix: Shift+Enter commits the phrases up to the one
+    // chosen, the rest staying converted. Off by default: as Enter.
+    bool shiftEnterCommitsToFocus{false};
     // English: a word typed with a capital mid-sentence is put right too
     // (ConversionOptions::capitalizedCorrection); off keeps it as typed.
     bool capitalizedCorrection{false};

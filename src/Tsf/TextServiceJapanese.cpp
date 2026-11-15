@@ -480,8 +480,13 @@ HRESULT TextService::HandleJapaneseKey(ITfContext* context, TfEditCookie editCoo
     if (outcome.committed) {
         // A prediction chosen with a click.
         candidateWindow_.Hide();
-        NoteConversion(readingBefore, *outcome.committed);
-        return WriteJapaneseCommit(context, editCookie, *outcome.committed);
+        // Shift+Enter: the rest stays to convert, in a composition of its own.
+        const bool rest = japanese_.IsComposing();
+        if (!rest) NoteConversion(readingBefore, *outcome.committed);
+        const HRESULT hr = WriteJapaneseCommit(context, editCookie, *outcome.committed);
+        if (FAILED(hr) || !rest) return hr;
+        const HRESULT started = EnsureComposition(context, editCookie);
+        if (FAILED(started)) return started;
     }
     return ShowJapanesePreedit(context, editCookie);
 }

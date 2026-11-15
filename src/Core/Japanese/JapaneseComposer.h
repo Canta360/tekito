@@ -550,6 +550,10 @@ public:
     // The text to commit (pending keys are resolved first, and a chosen
     // prediction replaces what is typed); clears the composition.
     [[nodiscard]] std::wstring Commit();
+    // Shift+Enter (UserSettings::shiftEnterCommitsToFocus): the phrases up to
+    // the focused one are committed, the rest stays converted as it was.
+    [[nodiscard]] bool CanCommitToFocus() const noexcept;
+    [[nodiscard]] std::wstring CommitToFocus();
     // Drops the whole composition, Mix chunks held for Enter included.
     void Clear() noexcept;
     // Ctrl+Backspace right after committing: the text committed last comes
