@@ -391,6 +391,14 @@ const en = {
     licenseMissing: "The license text could not be loaded.",
   },
 
+  settingsCode: {
+    title: "Settings code",
+    description: "Your settings as a code, to take to another PC or share.",
+    copy: "Copy code", read: "Use a code", paste: "Paste a settings code",
+    readTitle: "Use a settings code?", readMessage: "The settings in the code replace yours.",
+    copied: "Settings code copied.", notCopied: "The code could not be copied.",
+    notCode: "This is not a settings code.", applied: (n) => `${n} setting${n === 1 ? "" : "s"} changed.`,
+  },
   learningList: {
     title: "What was learned",
     search: "Search",
@@ -847,6 +855,14 @@ const ja = {
     licenseMissing: "ライセンスの本文を読み込めませんでした。",
   },
 
+  settingsCode: {
+    title: "設定のコード",
+    description: "設定をコードにして、ほかの PC に持ち出したり共有したりできます",
+    copy: "コードをコピー", read: "コードを使う", paste: "設定のコードを貼り付け",
+    readTitle: "設定のコードを使いますか？", readMessage: "コードに含まれる設定で、今の設定が置き換えられます。",
+    copied: "設定のコードをコピーしました。", notCopied: "コードをコピーできませんでした。",
+    notCode: "設定のコードではありません。", applied: (n) => `${n} 個の設定を変更しました。`,
+  },
   learningList: {
     title: "学習した内容",
     search: "検索",

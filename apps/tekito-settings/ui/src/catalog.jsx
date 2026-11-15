@@ -193,6 +193,10 @@ export function catalog(ctx) {
       render: () => <ExcludedApps settings={s} runAction={ctx.runAction} />,
     },
     toggle("companion", "general", "general", "mood", g.companion, "desktopCompanion", { detail: true }),
+    {
+      id: "settingsCode", page: "general", group: "general", keys: [], title: t.settingsCode.title, about: t.settingsCode.description,
+      detail: true, render: () => ctx.settingsCodeRow(),
+    },
     choice("language", "general", "general", "language", g.language, "uiLanguage", [[0, g.language.system], [1, "English"], [2, "日本語"]],
       { detail: true }),
     { ...toggle("rainbow", "general", "general", "palette", g.rainbow, "rainbowAccent", { detail: true }), hidden: "rainbow",
