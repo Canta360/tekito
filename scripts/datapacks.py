@@ -17,6 +17,7 @@ DATA = ROOT / "data"
 # The folder each pack belongs in. A pack missing here is a mistake.
 LANGUAGE = {
     "dictionary-display": "en",
+    "english-forms": "en",
     "emoji": "en",
     "frequency": "en",
     "japanese-phonetic": "en",  # romaji spellings of English words, for English input

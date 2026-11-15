@@ -32,6 +32,7 @@ bool MeaningDictionary::Open(const std::filesystem::path& dataRoot) noexcept {
     english_.Open(FindDataPack(dataRoot, L"dictionary-display") / L"entries.tsv");
     englishInJapanese_.Open(FindDataPack(dataRoot, L"english-meanings-ja") / L"meanings.tsv");
     japaneseInEnglish_.Open(FindDataPack(dataRoot, L"japanese-meanings-en") / L"meanings.tsv");
+    forms_.Open(FindDataPack(dataRoot, L"english-forms") / L"forms.tsv");
     return IsOpen();
 }
 
@@ -40,12 +41,35 @@ std::optional<Meaning> MeaningDictionary::Lookup(std::wstring_view text, std::ws
     if (text.empty()) return std::nullopt;
     try {
         if (IsLatinWord(text)) {
-            if (language == MeaningLanguage::Japanese && text.size() <= kMaxEnglishWord) {
-                std::wstring lower(text);
-                for (wchar_t& c : lower) c = c >= L'A' && c <= L'Z' ? static_cast<wchar_t>(c - L'A' + L'a') : c;
-                if (auto meaning = Japanese(englishInJapanese_, lower, {})) return meaning;
+            if (text.size() > kMaxEnglishWord) return Latin(text, language);
+            std::wstring lower(text);
+            for (wchar_t& c : lower) c = c >= L'A' && c <= L'Z' ? static_cast<wchar_t>(c - L'A' + L'a') : c;
+            const auto forms = FormsOf(lower);
+            if (auto meaning = Latin(text, language)) {
+                // A word of its own that is also an irregular form (gone,
+                // best): its meaning, with the form too. Regular endings are
+                // not looked at here (evening is no form of even).
+                if (forms_.IsOpen()) {
+                    forms_.ForEachRow(ToUtf8(lower), [&](const std::vector<std::string_view>& fields) {
+                        if (fields.size() < 3 || fields[1].empty()) return true;
+                        meaning->base = FromUtf8(fields[1]);
+                        meaning->form = FromUtf8(fields[2]);
+                        return false;
+                    });
+                }
+                return meaning;
             }
-            return English(text);
+            // Another form of a word (went, called, players): that word's
+            // meaning, with the form.
+            for (const auto& [base, form] : forms) {
+                if (auto meaning = Latin(base, language)) {
+                    meaning->headword = std::wstring(text);
+                    meaning->base = base;
+                    meaning->form = form;
+                    return meaning;
+                }
+            }
+            return std::nullopt;
         }
         const std::wstring hiragana = ToHiragana(reading);
         if (language == MeaningLanguage::English) {
@@ -110,6 +134,101 @@ std::optional<Meaning> MeaningDictionary::Japanese(const SortedTsv& source, std:
         }
     }
     return std::nullopt;
+}
+
+std::optional<Meaning> MeaningDictionary::Latin(std::wstring_view word, MeaningLanguage language) const {
+    if (language == MeaningLanguage::Japanese && word.size() <= kMaxEnglishWord) {
+        std::wstring lower(word);
+        for (wchar_t& c : lower) c = c >= L'A' && c <= L'Z' ? static_cast<wchar_t>(c - L'A' + L'a') : c;
+        if (auto meaning = Japanese(englishInJapanese_, lower, {})) return meaning;
+    }
+    return English(word);
+}
+
+std::vector<std::string> MeaningDictionary::PartsOfSpeech(std::wstring_view word) const {
+    // english-forms: the word's row with no base, "parts:noun verb".
+    std::vector<std::string> parts;
+    if (!forms_.IsOpen()) return parts;
+    forms_.ForEachRow(ToUtf8(word), [&](const std::vector<std::string_view>& fields) {
+        if (fields.size() < 3 || !fields[1].empty() || !fields[2].starts_with("parts:")) return true;
+        std::string_view names = fields[2].substr(6);
+        while (!names.empty()) {
+            const std::size_t space = names.find(' ');
+            parts.emplace_back(names.substr(0, space));
+            if (space == std::string_view::npos) break;
+            names.remove_prefix(space + 1);
+        }
+        return false;
+    });
+    return parts;
+}
+
+std::vector<std::pair<std::wstring, std::wstring>> MeaningDictionary::FormsOf(std::wstring_view lower) const {
+    std::vector<std::pair<std::wstring, std::wstring>> forms;
+    if (forms_.IsOpen()) {
+        forms_.ForEachRow(ToUtf8(lower), [&](const std::vector<std::string_view>& fields) {
+            if (fields.size() >= 3 && !fields[1].empty()) forms.emplace_back(FromUtf8(fields[1]), FromUtf8(fields[2]));
+            return true;
+        });
+    }
+    if (!forms.empty() || lower.size() < 4) return forms;
+    const std::wstring word(lower);
+    const auto ends = [&](std::wstring_view end) { return word.size() > end.size() + 1 && word.ends_with(end); };
+    const auto cut = [&](std::size_t n) { return word.substr(0, word.size() - n); };
+    // A doubled last consonant (running, bigger, stopped): one of it.
+    const auto undoubled = [&](std::size_t n) {
+        const std::wstring stem = cut(n);
+        return stem.size() >= 3 && stem.back() == stem[stem.size() - 2] ? stem.substr(0, stem.size() - 1) : std::wstring{};
+    };
+    // The word's parts of speech; one the dictionary does not have is taken
+    // as any (the Japanese meanings name none).
+    const auto is = [&](const std::wstring& base, std::initializer_list<std::string_view> wanted) {
+        const auto parts = PartsOfSpeech(base);
+        if (parts.empty()) return true;
+        return std::any_of(parts.begin(), parts.end(), [&](const std::string& part) {
+            return std::find(wanted.begin(), wanted.end(), part) != wanted.end();
+        });
+    };
+    const auto add = [&](const std::wstring& base, std::wstring_view form) {
+        if (base.size() < 2) return;
+        if (std::any_of(forms.begin(), forms.end(), [&](const auto& f) { return f.first == base; })) return;
+        forms.emplace_back(base, std::wstring(form));
+    };
+    if (ends(L"s") && !ends(L"ss")) {
+        std::vector<std::wstring> bases;
+        if (ends(L"ies")) bases.push_back(cut(3) + L"y");
+        if (ends(L"es")) bases.push_back(cut(2));
+        bases.push_back(cut(1));
+        for (const auto& base : bases) {
+            const bool noun = is(base, {"noun"});
+            const bool verb = is(base, {"verb"});
+            if (!noun && !verb) continue;
+            const auto parts = PartsOfSpeech(base);
+            const bool both = parts.empty() || (std::find(parts.begin(), parts.end(), "noun") != parts.end() &&
+                                                std::find(parts.begin(), parts.end(), "verb") != parts.end());
+            add(base, both ? L"plural+third-person" : noun ? L"plural" : L"third-person");
+        }
+    }
+    if (ends(L"ed")) {
+        for (const auto& base : {ends(L"ied") ? cut(3) + L"y" : std::wstring{}, cut(2), cut(1), undoubled(2)}) {
+            if (!base.empty() && is(base, {"verb"})) add(base, L"past+past-participle");
+        }
+    }
+    if (ends(L"ing")) {
+        for (const auto& base : {cut(3), cut(3) + L"e", undoubled(3)}) {
+            if (!base.empty() && is(base, {"verb"})) add(base, L"present-participle");
+        }
+    }
+    for (const auto& [end, form] : {std::pair{std::wstring_view(L"er"), std::wstring_view(L"comparative")},
+                                    std::pair{std::wstring_view(L"est"), std::wstring_view(L"superlative")}}) {
+        if (!ends(end)) continue;
+        const std::size_t n = end.size();
+        for (const auto& base : {ends(std::wstring(L"i") + std::wstring(end)) ? cut(n + 1) + L"y" : std::wstring{}, cut(n),
+                                 cut(n - 1), undoubled(n)}) {
+            if (!base.empty() && is(base, {"adj", "adv"})) add(base, form);
+        }
+    }
+    return forms;
 }
 
 std::optional<Meaning> MeaningDictionary::English(std::wstring_view word) const {

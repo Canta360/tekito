@@ -793,11 +793,47 @@ japanese::MeaningLanguage TextService::MeaningLanguage() const {
                                                              : japanese::MeaningLanguage::English;
 }
 
+namespace {
+// What form of `base` an English word is, in the language of Settings
+// (english-forms' kinds).
+std::wstring FormLabel(const std::wstring& form, const std::wstring& base, bool japanese) {
+    struct Label {
+        std::wstring_view form;
+        std::wstring_view japanese;
+        std::wstring_view english;
+    };
+    static constexpr Label kLabels[] = {
+        {L"past", L"\u306e\u904e\u53bb\u5f62", L"past tense of "},
+        {L"past-participle", L"\u306e\u904e\u53bb\u5206\u8a5e", L"past participle of "},
+        {L"past+past-participle", L"\u306e\u904e\u53bb\u5f62\u30fb\u904e\u53bb\u5206\u8a5e",
+         L"past tense and past participle of "},
+        {L"present-participle", L"\u306e\u73fe\u5728\u5206\u8a5e\u30fb\u52d5\u540d\u8a5e", L"-ing form of "},
+        {L"third-person", L"\u306e\u4e09\u4eba\u79f0\u5358\u6570\u73fe\u5728\u5f62", L"third person singular of "},
+        {L"plural", L"\u306e\u8907\u6570\u5f62", L"plural of "},
+        {L"plural+third-person", L"\u306e\u8907\u6570\u5f62\u30fb\u4e09\u4eba\u79f0\u5358\u6570\u73fe\u5728\u5f62",
+         L"plural or third person singular of "},
+        {L"comparative", L"\u306e\u6bd4\u8f03\u7d1a", L"comparative of "},
+        {L"superlative", L"\u306e\u6700\u4e0a\u7d1a", L"superlative of "},
+    };
+    const auto* label = std::find_if(std::begin(kLabels), std::end(kLabels), [&](const Label& l) { return l.form == form; });
+    // Any other form: "a form of".
+    if (label == std::end(kLabels)) {
+        return japanese ? base + L" \u306e\u5909\u5316\u5f62" : L"a form of " + base;
+    }
+    return japanese ? base + L" " + std::wstring(label->japanese) : std::wstring(label->english) + base;
+}
+}  // namespace
+
 CandidateDetail TextService::MeaningFor(std::wstring_view text, std::wstring_view reading) const {
     if (!userSettings_.meaningsEnabled || text.empty()) return {};
     const auto meaning = japanese::ProcessMeanings().Lookup(text, reading, MeaningLanguage());
     if (!meaning) return {};
-    return {meaning->headword, meaning->senses};
+    CandidateDetail detail{meaning->headword, meaning->senses};
+    // Another form of an English word (went, called): which, after it.
+    if (!meaning->base.empty()) {
+        detail.form = FormLabel(meaning->form, meaning->base, userdata::UseJapaneseUi(userSettings_.uiLanguage));
+    }
+    return detail;
 }
 
 void TextService::MarkMeanings(std::vector<Candidate>& candidates, std::size_t first, std::size_t count,

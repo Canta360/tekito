@@ -358,6 +358,7 @@ struct Frame {
     int style{0};  // CandidateWindow::Style
     bool rainbow{false};  // CandidateWindow::SetRainbow
     std::wstring detailHead;
+    std::wstring detailForm;
     std::vector<std::wstring> detailSenses;
     // A mode badge instead of rows: 0 none, else the mode.
     int badge{0};
@@ -1574,7 +1575,9 @@ private:
         float textHeight = 0.0f;
         // Later senses give way until the text fits.
         for (std::size_t count = frame.detailSenses.size(); count > 0; --count) {
+            // The headword, then what form of another word it is.
             std::wstring content = frame.detailHead;
+            if (!frame.detailForm.empty()) content += L"\u3000" + frame.detailForm;
             for (std::size_t i = 0; i < count; ++i) {
                 content += L'\n';
                 if (frame.detailSenses.size() > 1 && i < 9) {
@@ -2397,6 +2400,7 @@ void CandidateWindow::Show(const RECT& caretRect,
     }
     if (!detail.senses.empty()) {
         frame.detailHead = detail.headword;
+        frame.detailForm = detail.form;
         frame.detailSenses = detail.senses;
     }
     frame.caption = caption;

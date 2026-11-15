@@ -27,6 +27,9 @@ namespace tekito::tsf {
 struct CandidateDetail {
     std::wstring headword;
     std::vector<std::wstring> senses;
+    // What form of another word the headword is (call の過去形), shown
+    // after it; empty for a word as it is.
+    std::wstring form;
 };
 
 class CandidateWindow final {
