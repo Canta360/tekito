@@ -385,6 +385,8 @@ bool SqliteUserDictionaryRepository::LoadSettings(UserSettings& settings) const 
             loaded.escStepsBack = value != 0;
         } else if (std::strcmp(key, "shift_enter_commits_to_focus") == 0) {
             loaded.shiftEnterCommitsToFocus = value != 0;
+        } else if (std::strcmp(key, "commit_at_punctuation") == 0) {
+            loaded.commitAtPunctuation = value != 0;
         } else if (std::strcmp(key, "capitalized_correction") == 0) {
             loaded.capitalizedCorrection = value != 0;
         } else if (std::strcmp(key, "double_space_period") == 0) {
@@ -591,6 +593,7 @@ bool SqliteUserDictionaryRepository::SaveSettings(const UserSettings& settings) 
     saveValue("enter_commits_as_shown", settings.enterCommitsAsShown ? 1 : 0);
     saveValue("esc_steps_back", settings.escStepsBack ? 1 : 0);
     saveValue("shift_enter_commits_to_focus", settings.shiftEnterCommitsToFocus ? 1 : 0);
+    saveValue("commit_at_punctuation", settings.commitAtPunctuation ? 1 : 0);
     saveValue("capitalized_correction", settings.capitalizedCorrection ? 1 : 0);
     saveValue("double_space_period", settings.doubleSpacePeriod ? 1 : 0);
     saveValue("smart_punctuation", settings.smartPunctuation ? 1 : 0);

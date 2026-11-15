@@ -233,6 +233,12 @@ public:
     // conversion, then the kana, then the keys typed, then nothing. Off:
     // Esc goes back to the kana, then drops everything.
     void SetEscStepsBack(bool on) noexcept { escStepsBack_ = on; }
+    // A punctuation mark typed (、。！？) commits the text up to it,
+    // converted as Space converts it (UserSettings::commitAtPunctuation).
+    void SetCommitAtPunctuation(bool on) noexcept { commitAtPunctuation_ = on; }
+    // The mark just typed ends the text there (SetCommitAtPunctuation):
+    // not after digits or letters (1.5, v1.0) nor in an address.
+    [[nodiscard]] bool EndsAtPunctuation() const;
     [[nodiscard]] bool SlipAutoApply() const noexcept { return slipAutoApply_; }
     // The first emoji for a reading shown on the first page of its list
     // (off: with the other symbols, last).
@@ -1078,6 +1084,7 @@ private:
     bool preview_{false};
     bool enterAsShown_{false};
     bool escStepsBack_{false};
+    bool commitAtPunctuation_{false};
     // StepBack showed the keys typed: Esc again drops everything.
     bool keysShown_{false};
     // StepBack showed the kana for Mix's live conversion: typing brings the

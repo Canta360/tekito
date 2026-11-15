@@ -91,6 +91,7 @@ const initialSettings = {
   enterCommitsAsShown: false,
   escStepsBack: false,
   shiftEnterCommitsToFocus: false,
+  commitAtPunctuation: false,
   capitalizedCorrection: false,
   bracketPairs: false,
   doubleSpacePeriod: false,

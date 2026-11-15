@@ -5585,6 +5585,33 @@ std::wstring JapaneseComposer::CommitChunk() {
     return text;
 }
 
+bool JapaneseComposer::EndsAtPunctuation() const {
+    if (!commitAtPunctuation_ || !Typing() || !pending_.empty() || caret_ != units_.size() || units_.empty()) return false;
+    if (units_.back().ascii || IsAddressTyping(Keys(false))) return false;
+    const std::wstring reading = Reading();
+    if (reading.empty() || std::wstring_view(L"\x3001\x3002\xFF0C\xFF0E\xFF01\xFF1F").find(reading.back()) == std::wstring_view::npos) {
+        return false;
+    }
+    // After a digit or a letter the mark may be a decimal point or part of
+    // a name (1.5, v1.0, tetr.io): it waits.
+    if (reading.size() >= 2) {
+        const wchar_t before = reading[reading.size() - 2];
+        const bool letter = (before >= L'a' && before <= L'z') || (before >= L'A' && before <= L'Z') ||
+                            (before >= L'\xFF21' && before <= L'\xFF3A') || (before >= L'\xFF41' && before <= L'\xFF5A');
+        if (IsDigit(before) || letter) return false;
+    }
+    // Mix: English (hello,) goes on as a sentence; only Japanese ends here.
+    if (chunkJudge_) {
+        std::wstring keys = Keys(false);
+        while (!keys.empty() && std::wstring_view(L".,!?").find(keys.back()) != std::wstring_view::npos) keys.pop_back();
+        if (!keys.empty()) {
+            const auto judged = JudgeChunk(keys);
+            if (judged.english || judged.either || TypedWithCapitals(keys)) return false;
+        }
+    }
+    return true;
+}
+
 bool JapaneseComposer::CanCommitToFocus() const noexcept {
     if (!IsConverted() || preview_ || !pending_.empty() || !settled_.empty() || WholeChoice()) return false;
     if (chunkJudge_ && ChoseEnglish()) return false;

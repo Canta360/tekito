@@ -84,6 +84,9 @@ struct UserSettings {
     // Japanese and Mix: Shift+Enter commits the phrases up to the one
     // chosen, the rest staying converted. Off by default: as Enter.
     bool shiftEnterCommitsToFocus{false};
+    // Japanese and Mix: a punctuation mark (、。！？) commits the text up
+    // to it, converted. Off by default.
+    bool commitAtPunctuation{false};
     // English: a word typed with a capital mid-sentence is put right too
     // (ConversionOptions::capitalizedCorrection); off keeps it as typed.
     bool capitalizedCorrection{false};

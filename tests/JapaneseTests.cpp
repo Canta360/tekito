@@ -919,6 +919,22 @@ void TestAddresses(const RomajiTable& table, const MiniPack& pack) {
         off.StepBack();
         Require(!off.IsComposing(), "off: Esc again drops everything");
     }
+    // A punctuation mark commits the text up to it, converted.
+    {
+        JapaneseComposer marks(&table);
+        marks.SetConverter(&converter);
+        marks.SetCommitAtPunctuation(true);
+        Type(marks, L"watashi.");
+        Require(marks.EndsAtPunctuation(), "。 ends the text");
+        marks.Clear();
+        Type(marks, L"1.");
+        Require(!marks.EndsAtPunctuation(), "not after a digit (1.5)");
+        marks.Clear();
+        marks.SetCommitAtPunctuation(false);
+        Type(marks, L"watashi.");
+        Require(!marks.EndsAtPunctuation(), "off: it waits");
+        marks.Clear();
+    }
     // Shift+Enter: up to the focused phrase; the rest stays as converted.
     for (const bool live : {false, true}) {
         JapaneseComposer part(&table);

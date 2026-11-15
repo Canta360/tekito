@@ -224,6 +224,12 @@ KeyOutcome ApplyKey(JapaneseComposer& composer, const KeyCommand& command) {
         // conversion types on).
         if (composer.CommitsBeforeTyping()) outcome.committed = composer.Commit();
         composer.Insert(command.character);
+        // A punctuation mark commits the text up to it, converted as Space
+        // converts it (live conversion and Mix convert on Enter themselves).
+        if (composer.EndsAtPunctuation()) {
+            if (!composer.IsConverted()) composer.Convert();
+            outcome.committed = outcome.committed.value_or(std::wstring{}) + composer.Commit();
+        }
         break;
     case Action::Backspace:
         composer.Backspace();
