@@ -598,8 +598,9 @@ HANDLE DesktopUserToken() {
     HANDLE token = nullptr;
     HANDLE primary = nullptr;
     if (OpenProcessToken(process, TOKEN_DUPLICATE, &token)) {
-        if (!DuplicateTokenEx(token, TOKEN_QUERY | TOKEN_DUPLICATE | TOKEN_ASSIGN_PRIMARY | TOKEN_ADJUST_DEFAULT |
-                                         TOKEN_ADJUST_SESSIONID,
+        // TOKEN_IMPERSONATE too: SHGetKnownFolderPath reads the user's folders with it.
+        if (!DuplicateTokenEx(token, TOKEN_QUERY | TOKEN_DUPLICATE | TOKEN_IMPERSONATE | TOKEN_ASSIGN_PRIMARY |
+                                         TOKEN_ADJUST_DEFAULT | TOKEN_ADJUST_SESSIONID,
                               nullptr, SecurityImpersonation, TokenPrimary, &primary)) {
             primary = nullptr;
         }
@@ -783,6 +784,13 @@ void StartUninstall(Wizard& wizard) {
     return;  // the preview never uninstalls
 #endif
     wizard.exportFolder = wizard.exportWords ? ExportFolder() : std::filesystem::path{};
+    // The words were to be saved and there is nowhere to: nothing is removed.
+    if (wizard.exportWords && wizard.exportFolder.empty()) {
+        KillTimer(wizard.window, kAnimationTimer);
+        wizard.installExitCode.store(30);
+        wizard.screen = Screen::UninstallFailed;
+        return;
+    }
     const HWND window = wizard.window;
     const auto script = wizard.uninstallScript;
     const auto root = wizard.uninstallRoot;
