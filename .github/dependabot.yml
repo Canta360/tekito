@@ -1,0 +1,19 @@
+# Updates for what TEKITO is built with: the GitHub Actions the checks use
+# (pinned by commit) and the Settings page's npm packages. Security updates
+# come as soon as they are out; the rest once a week, grouped.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+  - package-ecosystem: npm
+    directory: /apps/tekito-settings/ui
+    schedule:
+      interval: weekly
+    groups:
+      settings-page:
+        patterns: ["*"]

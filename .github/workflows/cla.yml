@@ -30,4 +30,4 @@ jobs:
           path-to-signatures: signatures/cla.json
           path-to-document: https://github.com/Canta360/tekito/blob/cla-v1.0/CLA.md
           branch: cla-signatures
-          allowlist: Canta360
+          allowlist: Canta360,dependabot[bot]

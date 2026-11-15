@@ -1,5 +1,6 @@
 # Builds TEKITO, runs the tests and checks the rules (scripts\verify.ps1) on
-# every pull request and push to main, on GitHub's Windows runner, with the
+# every pull request and push to main, on GitHub's Windows runner, in Debug
+# and in Release, with the
 # preset for the Visual Studio it has (2026; 2022 on older images). The data
 # it tests with is what the
 # repository holds; packs built locally (phrase, the Japanese data) are not
@@ -21,6 +22,12 @@ concurrency:
 
 jobs:
   verify:
+    # Debug, and Release as it is shipped: both must pass to merge.
+    strategy:
+      fail-fast: false
+      matrix:
+        configuration: [Debug, Release]
+    name: verify (${{ matrix.configuration }})
     runs-on: windows-2025
     timeout-minutes: 60
     steps:
@@ -44,4 +51,4 @@ jobs:
           $version = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationVersion
           $preset = if ($version -like "17.*") { "windows-x64-vs2022-debug" } else { "windows-x64-debug" }
           Write-Host "Visual Studio ${version}: $preset"
-          scripts\verify.ps1 -Preset $preset
+          scripts\verify.ps1 -Preset $preset -Configuration ${{ matrix.configuration }}
