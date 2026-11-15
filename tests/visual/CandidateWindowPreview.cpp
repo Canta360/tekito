@@ -315,6 +315,7 @@ int wmain(int argc, wchar_t** argv) {
     bool glide = false;
     bool click = false;
     bool meaning = false;
+    bool form = false;
     bool kanji = false;
     bool chunks = false;
     int badge = 0;
@@ -328,6 +329,7 @@ int wmain(int argc, wchar_t** argv) {
         if (wcscmp(argv[i], L"badge-direct") == 0) badge = 2;
         if (wcscmp(argv[i], L"badge-japanese") == 0) badge = 3;
         if (wcscmp(argv[i], L"meaning") == 0) meaning = true;
+        if (wcscmp(argv[i], L"form") == 0) meaning = form = true;
         if (wcscmp(argv[i], L"kanji") == 0) kanji = meaning = true;
         if (wcscmp(argv[i], L"kanji-list") == 0) kanji = true;
         if (wcscmp(argv[i], L"chunks") == 0) chunks = true;
@@ -365,7 +367,14 @@ int wmain(int argc, wchar_t** argv) {
         // Rows with a meaning show the dictionary sign.
         for (std::size_t i = 0; i < candidates.size(); ++i) candidates[i].hasMeaning = i != 0 && i != 3;
     }
-    const auto detail = meaning ? SampleDetail(kanji, japaneseUi) : tekito::tsf::CandidateDetail{};
+    auto detail = meaning ? SampleDetail(kanji, japaneseUi) : tekito::tsf::CandidateDetail{};
+    if (form) {
+        // Another form of a word: went, go's past tense, with go's meaning.
+        detail = {L"went",
+                  {L"参る、行く、動く：場所を変える",
+                   L"行く、去る：去っていく"},
+                  L"go の過去形"};
+    }
     // Caret under "wrold" on the document's third line.
     RECT caret{232, 280, 234, 302};
     LARGE_INTEGER frequency{};

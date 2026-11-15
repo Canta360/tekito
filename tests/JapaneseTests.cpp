@@ -2063,6 +2063,21 @@ void TestMeanings() {
     RequireText(in(L"Meeting", L"", MeaningLanguage::English), first(L"Meeting", L""),
                 "an English word in English is as before");
 
+    // Another form of an English word: that word's meaning, with the form.
+    const auto form = [&](std::wstring_view text, MeaningLanguage language) {
+        const auto meaning = meanings.Lookup(text, L"", language);
+        return meaning ? meaning->headword + L"|" + meaning->base + L"|" + meaning->form + L"|" + meaning->senses.front()
+                       : std::wstring(L"-");
+    };
+    RequireText(form(L"meetings", MeaningLanguage::Japanese), L"meetings|meeting|plural+third-person|会議、ミーティング：公式に準備された集まり",
+                "a plural (meeting is a noun and a verb) in Japanese");
+    RequireText(form(L"ran", MeaningLanguage::Word), L"ran|run|past|a score in baseball", "an irregular past tense");
+    RequireText(form(L"running", MeaningLanguage::Word), L"running|run|present-participle|a score in baseball",
+                "a doubled consonant before -ing");
+    const auto asIs = meanings.Lookup(L"meeting");
+    Require(asIs && asIs->base.empty() && asIs->form.empty(), "a word as it is has no form");
+    Require(!meanings.Lookup(L"xyzzys"), "an unknown word's endings make no word");
+
     tekito::japanese::MeaningDictionary missing;
     Require(!missing.Open(L"Z:/no-such-folder") && !missing.Lookup(L"私"), "missing packs just mean no meanings");
 }

@@ -17,6 +17,13 @@ struct Meaning {
     // is inflected ("会った" -> 会う).
     std::wstring headword;
     std::vector<std::wstring> senses;
+    // An English word met in another form (called, went, players): the word
+    // whose meaning this is, and the form (english-forms' kinds: past,
+    // past-participle, past+past-participle, present-participle,
+    // third-person, plural, plural+third-person, comparative, superlative,
+    // inflection). Empty otherwise.
+    std::wstring base;
+    std::wstring form;
 };
 
 // The language a meaning is written in.
@@ -53,6 +60,15 @@ private:
     [[nodiscard]] std::optional<Meaning> Japanese(const SortedTsv& source, std::wstring_view text,
                                                   std::wstring_view reading) const;
     [[nodiscard]] std::optional<Meaning> English(std::wstring_view word) const;
+    // An English word's meaning in `language` as it is (no other form).
+    [[nodiscard]] std::optional<Meaning> Latin(std::wstring_view word, MeaningLanguage language) const;
+    // The words `lower` may be a form of, with the form: the irregular ones
+    // the english-forms pack lists, then those its endings make (calls,
+    // called, calling, bigger) where the word has that part of speech.
+    [[nodiscard]] std::vector<std::pair<std::wstring, std::wstring>> FormsOf(std::wstring_view lower) const;
+    // The parts of speech english-forms gives `word` (noun, verb, adj,
+    // adv); empty when it does not have it.
+    [[nodiscard]] std::vector<std::string> PartsOfSpeech(std::wstring_view word) const;
 
     SortedTsv slang_;
     SortedTsv wiktionary_;
@@ -60,6 +76,7 @@ private:
     SortedTsv english_;
     SortedTsv englishInJapanese_;
     SortedTsv japaneseInEnglish_;
+    SortedTsv forms_;
 };
 
 }  // namespace tekito::japanese

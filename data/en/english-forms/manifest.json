@@ -1,0 +1,19 @@
+{
+  "pack_id": "english-forms",
+  "display_name": "English Word Forms",
+  "schema_version": 1,
+  "version": "2026.11",
+  "language": "en-US",
+  "type": "english-forms",
+  "file": "forms.tsv",
+  "index_file": "forms.tsv.idx",
+  "entry_count": 83375,
+  "sha256": {
+    "file": "DEBE507E3E22A80F343FA602EDB4EB3FD6F8C18B956E1842D9379F7E9F6BF1AD",
+    "index": "FD281A4336003F10215AD97D824C539D827636BEA904C25357EB1B45F9F584B3"
+  },
+  "license": "WordNet-3.0 + TEKITO-OWNED",
+  "source": "WordNet 3.0 exception lists (https://wordnet.princeton.edu/) and scripts/en/irregular-verbs.tsv",
+  "notice_file": "NOTICE",
+  "source_version": "3.0"
+}

@@ -21,6 +21,7 @@
 #include "Core/ConversionEngine.h"
 #include "Core/EnglishSpelling.h"
 #include "Core/ExternalLexiconProvider.h"
+#include "Core/Japanese/Meanings.h"
 #include "UserData/JapaneseSettings.h"
 #include "UserData/UserSettings.h"
 
@@ -95,6 +96,30 @@ int main(int argc, char** argv) {
             std::cout << line << "\tcount " << show(model.LogCount(a)) << " " << show(model.LogCount(b)) << "\ttopic "
                       << show(model.Topic(a, b)) << "\tpair " << show(model.PairPmi(tekito::japanese::LanguageModel::PairStart(a), b))
                       << "\n";
+        }
+        return 0;
+    }
+    // "meanings" as the second argument (then ja, en or word): each line is
+    // a candidate, printed with the meaning the candidate window shows for
+    // it in that language, and what form of another word it is.
+    if (argc > 3 && std::string(argv[2]) == "meanings") {
+        tekito::japanese::MeaningDictionary meanings;
+        if (!meanings.Open(tekito::ExternalLexiconProvider::DataPackRoot())) return 3;
+        const std::string want = argv[3];
+        const auto language = want == "ja"   ? tekito::japanese::MeaningLanguage::Japanese
+                              : want == "en" ? tekito::japanese::MeaningLanguage::English
+                                             : tekito::japanese::MeaningLanguage::Word;
+        std::ifstream lines(argv[1], std::ios::binary);
+        for (std::string line; std::getline(lines, line);) {
+            if (!line.empty() && line.back() == '\r') line.pop_back();
+            if (line.empty()) continue;
+            const auto meaning = meanings.Lookup(Widen(line), L"", language);
+            if (!meaning) {
+                std::cout << line << "\t-\n";
+                continue;
+            }
+            std::cout << line << "\t" << Narrow(meaning->headword) << "\t" << Narrow(meaning->base) << "\t"
+                      << Narrow(meaning->form) << "\t" << Narrow(meaning->senses.front()) << "\n";
         }
         return 0;
     }
