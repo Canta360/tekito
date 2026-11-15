@@ -276,6 +276,29 @@ tekito::tsf::CandidateDetail SampleDetail(bool kanji) {
 
 }  // namespace
 
+// This process's candidate window: TEKITO installed on the PC has hidden
+// ones of the same class in other applications.
+HWND OwnCandidateWindow() {
+    struct Search {
+        DWORD process;
+        HWND found;
+    } search{GetCurrentProcessId(), nullptr};
+    EnumWindows(
+        [](HWND hwnd, LPARAM lParam) -> BOOL {
+            auto& s = *reinterpret_cast<Search*>(lParam);
+            wchar_t name[64]{};
+            DWORD process = 0;
+            GetWindowThreadProcessId(hwnd, &process);
+            if (process != s.process || !GetClassNameW(hwnd, name, 64) || wcscmp(name, L"TekitoCandidateWindow") != 0) {
+                return TRUE;
+            }
+            s.found = hwnd;
+            return FALSE;
+        },
+        reinterpret_cast<LPARAM>(&search));
+    return search.found;
+}
+
 int wmain(int argc, wchar_t** argv) {
     const wchar_t* outputPath = argc > 1 ? argv[1] : L"candidate_window_preview.bmp";
     bool longList = false;
@@ -285,7 +308,12 @@ int wmain(int argc, wchar_t** argv) {
     bool kanji = false;
     bool chunks = false;
     int badge = 0;
+    // The keys typed shown above the list, or alone.
+    const wchar_t* caption = L"";
+    bool captionOnly = false;
     for (int i = 2; i < argc; ++i) {
+        if (wcscmp(argv[i], L"caption") == 0) caption = L"kyouhaamedesu";
+        if (wcscmp(argv[i], L"caption-only") == 0) caption = L"kyouhaame", captionOnly = true;
         if (wcscmp(argv[i], L"badge-auto") == 0) badge = 1;
         if (wcscmp(argv[i], L"badge-direct") == 0) badge = 2;
         if (wcscmp(argv[i], L"badge-japanese") == 0) badge = 3;
@@ -339,13 +367,15 @@ int wmain(int argc, wchar_t** argv) {
         window.ShowModeBadge(caret, badge == 3 ? tekito::InputMode::Japanese
                                     : badge == 2 ? tekito::InputMode::Direct
                                                  : tekito::InputMode::Convert);
+    } else if (captionOnly) {
+        window.Show(caret, {}, tekito::tsf::CandidateWindow::kNoSelection, 0, 0, {}, caption);
     } else {
-        window.Show(caret, candidates, 1, 0, 5, detail);
+        window.Show(caret, candidates, 1, 0, 5, detail, caption);
     }
     // Time until the UI thread has built its windows and presented the first
     // frame (composition init, device creation and effect compilation).
     for (int spin = 0; spin < 5000; ++spin) {
-        HWND panel = FindWindowW(L"TekitoCandidateWindow", nullptr);
+        HWND panel = OwnCandidateWindow();
         if (panel && IsWindowVisible(panel)) {
             LARGE_INTEGER now{};
             QueryPerformanceCounter(&now);
@@ -369,7 +399,7 @@ int wmain(int argc, wchar_t** argv) {
     };
     pump(badge ? 300 : 1500);
 
-    HWND target = FindWindowW(L"TekitoCandidateWindow", nullptr);
+    HWND target = OwnCandidateWindow();
     if (!target) {
         fwprintf(stderr, L"Candidate window not found\n");
         return 1;

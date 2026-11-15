@@ -5679,6 +5679,14 @@ bool JapaneseComposer::EndsAtPunctuation() const {
     return true;
 }
 
+std::wstring JapaneseComposer::TypedKeys() const {
+    std::wstring keys;
+    for (const auto& chunk : settled_) keys += chunk.typed + L" ";
+    keys += typedCaseKept_ && typedCase_.size() == Keys(true).size() ? typedCase_ : Keys(true);
+    while (!keys.empty() && keys.back() == L' ') keys.pop_back();
+    return keys;
+}
+
 bool JapaneseComposer::CanCommitToFocus() const noexcept {
     if (!IsConverted() || preview_ || !pending_.empty() || !settled_.empty() || WholeChoice()) return false;
     if (chunkJudge_ && ChoseEnglish()) return false;

@@ -233,6 +233,9 @@ public:
     // conversion, then the kana, then the keys typed, then nothing. Off:
     // Esc goes back to the kana, then drops everything.
     void SetEscStepsBack(bool on) noexcept { escStepsBack_ = on; }
+    // The keys typed for what is being composed (Mix: its chunks too, apart),
+    // for showing them small (UserSettings::showTypedKeys).
+    [[nodiscard]] std::wstring TypedKeys() const;
     // Space converts with the last phrase chosen, to put right from the end
     // (UserSettings::convertFromEnd); live conversion always does.
     void SetConvertFromEnd(bool on) noexcept { convertFromEnd_ = on; }

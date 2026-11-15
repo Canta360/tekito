@@ -782,8 +782,16 @@ void TextService::ShowJapaneseCandidates(ITfContext* context, TfEditCookie editC
                    japanese_.IsCandidateListOpen() ? 1 : 0, japanese_.Predictions().size());
         Trace(line);
     }
-    if (list.kind == Kind::None || !userSettings_.candidateWindowEnabled) {
+    // The keys typed, small above the list, or alone (UserSettings::showTypedKeys).
+    const std::wstring caption = userSettings_.showTypedKeys && japanese_.IsComposing() ? japanese_.TypedKeys() : std::wstring{};
+    if (!userSettings_.candidateWindowEnabled || (list.kind == Kind::None && caption.empty())) {
         candidateWindow_.Hide();
+        return;
+    }
+    if (list.kind == Kind::None) {
+        candidateWindow_.SetStyle(userSettings_.candidateWindowStyle);
+        candidateWindow_.Show(JapaneseCandidateAnchor(context, editCookie), {}, CandidateWindow::kNoSelection, 0, 0, {},
+                              caption);
         return;
     }
     std::vector<Candidate> rows;
@@ -813,7 +821,7 @@ void TextService::ShowJapaneseCandidates(ITfContext* context, TfEditCookie editC
     candidateWindow_.SetRainbow(userSettings_.rainbowAccent);
     candidateWindow_.SetJapanese(userdata::UseJapaneseUi(userSettings_.uiLanguage));
     candidateWindow_.Show(anchor, rows, selected ? *selected : CandidateWindow::kNoSelection, list.pageStart,
-                          list.count, detail);
+                          list.count, detail, caption);
 }
 
 HRESULT TextService::CommitJapanese(ITfContext* context, TfEditCookie editCookie) {

@@ -81,6 +81,9 @@ struct UserSettings {
     // the kana, the keys typed, then nothing). Off by default: Esc goes
     // back to the kana, then drops everything.
     bool escStepsBack{false};
+    // Japanese and Mix: the keys typed shown small above the candidates
+    // (alone when there are none) while typing. Off by default.
+    bool showTypedKeys{false};
     // Japanese and Mix: Space converts with the last phrase chosen, to put
     // right from the end. Off by default: the first, as Microsoft IME.
     bool convertFromEnd{false};

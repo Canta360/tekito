@@ -127,6 +127,9 @@ constexpr float kFontCandidate = 15.0f;
 constexpr float kFontNumber = 12.5f;
 constexpr float kFontTag = 9.5f;
 constexpr float kFontDetail = 12.5f;
+// The keys typed, small above the list (UserSettings::showTypedKeys).
+constexpr float kFontCaption = 12.0f;
+constexpr int kCaptionHeight = 20;
 // The dictionary sign on rows with a meaning: the open book ("ReadingMode")
 // of the Windows icon font, which reads as a book even this small.
 constexpr float kFontIcon = 13.0f;
@@ -358,6 +361,8 @@ struct Frame {
     std::vector<std::wstring> detailSenses;
     // A mode badge instead of rows: 0 none, else the mode.
     int badge{0};
+    // The keys typed, small above the rows (alone when there are none).
+    std::wstring caption;
 };
 
 }  // namespace
@@ -553,6 +558,7 @@ struct TextFormats {
     winrt::com_ptr<IDWriteTextFormat> tag;
     winrt::com_ptr<IDWriteTextFormat> detail;
     winrt::com_ptr<IDWriteTextFormat> icon;
+    winrt::com_ptr<IDWriteTextFormat> caption;
 };
 
 struct Layout {
@@ -582,9 +588,11 @@ struct Layout {
     bool indicator{false};
     float indicatorWidth{0.0f};
     float indicatorInset{0.0f};
+    // The caption's line above the rows (0: none).
+    float captionHeight{0.0f};
 
     [[nodiscard]] D2D1_RECT_F RowRect(std::size_t row) const {
-        const float top = padding + static_cast<float>(row) * rowPitch;
+        const float top = padding + captionHeight + static_cast<float>(row) * rowPitch;
         return D2D1::RectF(padding, top, rowRight, top + rowHeight);
     }
 };
@@ -1050,6 +1058,17 @@ void DrawBadge(ID2D1RenderTarget* target, const Layout& layout, int badge, HINST
     target->DrawBitmap(image.get(), D2D1::RectF(x, y, x + side, y + side));
 }
 
+// The keys typed, small and muted, on their own line above the rows.
+void DrawCaption(ID2D1RenderTarget* target, const TextFormats& formats, const Layout& layout, const Frame& frame,
+                 const Style& style) {
+    if (frame.caption.empty() || layout.captionHeight <= 0.0f || !formats.caption) return;
+    auto muted = SolidBrush(target, style.palette.mutedText);
+    const D2D1_RECT_F rect = D2D1::RectF(layout.padding + layout.rowPaddingLeft, layout.padding,
+                                         layout.rowRight - layout.rowPaddingRight, layout.padding + layout.captionHeight);
+    target->DrawText(frame.caption.c_str(), static_cast<UINT32>(frame.caption.size()), formats.caption.get(), rect,
+                     muted.get(), D2D1_DRAW_TEXT_OPTIONS_CLIP);
+}
+
 void DrawDetail(ID2D1RenderTarget* target, const Layout& layout, const Style& style) {
     if (!layout.detailText) return;
     auto line = SolidBrush(target, style.palette.tagFill);
@@ -1339,7 +1358,7 @@ private:
 
     void OnClick(int x, int y) {
         if (!visible_ || layout_.rowPitch <= 0.0f) return;
-        const float fy = static_cast<float>(y) - layout_.padding;
+        const float fy = static_cast<float>(y) - layout_.padding - layout_.captionHeight;
         const float fx = static_cast<float>(x);
         if (fy < 0.0f || fx < layout_.padding || fx > layout_.rowRight) return;
         // Rows are separated by a gap, so the hit test uses the same pitch
@@ -1524,12 +1543,19 @@ private:
             if (row.meaning && formats_.icon) content += l.iconGap + l.iconWidth;
             widest = std::max(widest, content);
         }
+        if (!frame.caption.empty() && formats_.caption) {
+            l.captionHeight = static_cast<float>(ScaleForWindow(panel_, kCaptionHeight));
+            widest = std::max(widest, l.rowPaddingLeft + MeasureTextWidth(dwrite_.get(), formats_.caption.get(), frame.caption) +
+                                          l.rowPaddingRight);
+        }
         const int gutter = l.indicator ? ScaleForWindow(panel_, kIndicatorGutter) : 0;
         l.width = std::clamp(static_cast<int>(std::ceil(widest + 2.0f * l.padding)) + 1 + gutter,
                              ScaleForWindow(panel_, kMinWidth), ScaleForWindow(panel_, kMaxWidth));
         const auto count = static_cast<float>(std::max<std::size_t>(frame.rows.size(), 1));
-        l.height = static_cast<int>(
-            std::lround(2.0f * l.padding + count * l.rowHeight + (count - 1.0f) * (l.rowPitch - l.rowHeight)));
+        l.height = frame.rows.empty()
+                       ? static_cast<int>(std::lround(2.0f * l.padding + l.captionHeight))
+                       : static_cast<int>(std::lround(2.0f * l.padding + l.captionHeight + count * l.rowHeight +
+                                                      (count - 1.0f) * (l.rowPitch - l.rowHeight)));
         l.rowRight = static_cast<float>(l.width) - l.padding - static_cast<float>(gutter);
         l.listWidth = static_cast<float>(l.width);
         l.listHeight = static_cast<float>(l.height);
@@ -1594,6 +1620,8 @@ private:
                                        DWRITE_TEXT_ALIGNMENT_TRAILING, false);
         formats_.tag = CreateFormat(f, brand, kFontTag * scale, DWRITE_FONT_WEIGHT_BOLD,
                                     DWRITE_TEXT_ALIGNMENT_LEADING, false);
+        formats_.caption = CreateFormat(f, brand, kFontCaption * scale, DWRITE_FONT_WEIGHT_NORMAL,
+                                        DWRITE_TEXT_ALIGNMENT_LEADING, true);
         formats_.detail = CreateFormat(f, brand, kFontDetail * scale, DWRITE_FONT_WEIGHT_NORMAL,
                                        DWRITE_TEXT_ALIGNMENT_LEADING, false);
         if (formats_.detail) {
@@ -1949,6 +1977,7 @@ private:
                 DrawBadge(dc, layout_, frame_.badge, channel_->instance);
                 return;
             }
+            DrawCaption(dc, formats_, layout_, frame_, style_);
             DrawRows(dc, dwrite_.get(), formats_, layout_, frame_, style_, Ink::Normal, kNoRow, kNoRow);
             DrawIndicator(dc, layout_, frame_, style_);
             DrawDetail(dc, layout_, style_);
@@ -2116,6 +2145,7 @@ private:
             if (selected < frame_.rows.size()) {
                 DrawSelection(target, layout_.RowRect(selected), layout_.scale, style_);
             }
+            DrawCaption(target, formats_, layout_, frame_, style_);
             DrawRows(target, dwrite_.get(), formats_, layout_, frame_, style_, Ink::Normal, kNoRow, selected);
             if (selected < frame_.rows.size()) {
                 DrawRows(target, dwrite_.get(), formats_, layout_, frame_, style_, Ink::Selected, selected,
@@ -2291,8 +2321,31 @@ void CandidateWindow::Show(const RECT& caretRect,
                            std::size_t selectedIndex,
                            std::size_t pageStart,
                            std::size_t visibleCount,
-                           const CandidateDetail& detail) {
+                           const CandidateDetail& detail,
+                           const std::wstring& caption) {
     if (!channel_) {
+        return;
+    }
+
+    // The keys typed alone, with no candidates to list.
+    if ((candidates.empty() || visibleCount == 0) && !caption.empty()) {
+        candidates_.clear();
+        selectedIndex_ = 0;
+        pageStart_ = 0;
+        visibleCount_ = 0;
+        Frame frame;
+        frame.visible = true;
+        frame.caret = caretRect;
+        frame.generation = ++generation_;
+        frame.style = style_;
+        frame.caption = caption;
+        {
+            std::lock_guard<std::mutex> lock(channel_->mutex);
+            channel_->pending = std::move(frame);
+            channel_->hasPending = true;
+        }
+        PostMessageW(channel_->controlHwnd, kMsgUpdate, 0, 0);
+        shown_ = true;
         return;
     }
 
@@ -2346,6 +2399,7 @@ void CandidateWindow::Show(const RECT& caretRect,
         frame.detailHead = detail.headword;
         frame.detailSenses = detail.senses;
     }
+    frame.caption = caption;
 
     {
         std::lock_guard<std::mutex> lock(channel_->mutex);

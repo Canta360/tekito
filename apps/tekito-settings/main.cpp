@@ -1477,6 +1477,8 @@ private:
         json += settings_.enterCommitsAsShown ? L"true" : L"false";
         json += L",\"escStepsBack\":";
         json += settings_.escStepsBack ? L"true" : L"false";
+        json += L",\"showTypedKeys\":";
+        json += settings_.showTypedKeys ? L"true" : L"false";
         json += L",\"altSwitches\":";
         json += settings_.altSwitches ? L"true" : L"false";
         json += L",\"convertFromEnd\":";
@@ -1728,6 +1730,7 @@ private:
             else if (key == L"recheckPreviousWord") settings_.recheckPreviousWord = value;
             else if (key == L"enterCommitsAsShown") settings_.enterCommitsAsShown = value;
             else if (key == L"escStepsBack") settings_.escStepsBack = value;
+            else if (key == L"showTypedKeys") settings_.showTypedKeys = value;
             else if (key == L"altSwitches") settings_.altSwitches = value;
             else if (key == L"convertFromEnd") settings_.convertFromEnd = value;
             else if (key == L"shiftEnterCommitsToFocus") settings_.shiftEnterCommitsToFocus = value;

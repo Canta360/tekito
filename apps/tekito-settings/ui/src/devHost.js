@@ -156,6 +156,7 @@ function initialState() {
       recheckPreviousWord: true,
       enterCommitsAsShown: false,
       escStepsBack: false,
+      showTypedKeys: false,
       altSwitches: false,
       convertFromEnd: false,
       shiftEnterCommitsToFocus: false,

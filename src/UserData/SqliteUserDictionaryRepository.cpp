@@ -438,6 +438,8 @@ bool SqliteUserDictionaryRepository::LoadSettings(UserSettings& settings) const 
             loaded.enterCommitsAsShown = value != 0;
         } else if (std::strcmp(key, "esc_steps_back") == 0) {
             loaded.escStepsBack = value != 0;
+        } else if (std::strcmp(key, "show_typed_keys") == 0) {
+            loaded.showTypedKeys = value != 0;
         } else if (std::strcmp(key, "alt_switches") == 0) {
             loaded.altSwitches = value != 0;
         } else if (std::strcmp(key, "convert_from_end") == 0) {
@@ -651,6 +653,7 @@ bool SqliteUserDictionaryRepository::SaveSettings(const UserSettings& settings) 
     saveValue("recheck_previous_word", settings.recheckPreviousWord ? 1 : 0);
     saveValue("enter_commits_as_shown", settings.enterCommitsAsShown ? 1 : 0);
     saveValue("esc_steps_back", settings.escStepsBack ? 1 : 0);
+    saveValue("show_typed_keys", settings.showTypedKeys ? 1 : 0);
     saveValue("alt_switches", settings.altSwitches ? 1 : 0);
     saveValue("convert_from_end", settings.convertFromEnd ? 1 : 0);
     saveValue("shift_enter_commits_to_focus", settings.shiftEnterCommitsToFocus ? 1 : 0);

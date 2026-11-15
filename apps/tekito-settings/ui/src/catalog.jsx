@@ -326,6 +326,7 @@ export function catalog(ctx) {
       ),
     }),
     toggle("candidateWindow", "candidates", "list", "list_alt", g.candidateList, "candidateWindowEnabled", { detail: true }),
+    toggle("showTypedKeys", "candidates", "list", "keyboard", j.showTypedKeys, "showTypedKeys", { modes: ja, detail: true }),
     {
       id: "special", page: "candidates", group: "extra", keys: ["dateConversion", "symbolConversion", "calculatorEnabled"], title: t.special.title,
       find: [g.date.title, g.symbols.title, g.calculator.title],
@@ -462,7 +463,7 @@ export function aiSpecs(ctx) {
     kanjiVariants: ["japaneseKanjiVariants"], period: ["periodOnEnter"], doubleSpace: ["doubleSpacePeriod"], smart: ["smartPunctuation"],
     meanings: ["meaningsEnabled", "meaningsInUiLanguage"], candidateWindow: ["candidateWindowEnabled"],
     special: ["dateConversion", "symbolConversion", "calculatorEnabled"], firstPageSymbol: ["japaneseFirstPageSymbol", "mixFirstPageSymbol"],
-    typedForms: ["japaneseTypedForms"], chunks: ["japaneseChunkCandidates"], kanaInput: ["japaneseKanaInput", "japaneseKanaInputKey"], capsLock: ["japaneseIgnoreCapsLock"], escStepsBack: ["escStepsBack"], altSwitches: ["altSwitches"], convertFromEnd: ["convertFromEnd"], shiftEnter: ["shiftEnterCommitsToFocus"], punctuationCommit: ["commitAtPunctuation"],
+    typedForms: ["japaneseTypedForms"], chunks: ["japaneseChunkCandidates"], kanaInput: ["japaneseKanaInput", "japaneseKanaInputKey"], capsLock: ["japaneseIgnoreCapsLock"], escStepsBack: ["escStepsBack"], showTypedKeys: ["showTypedKeys"], altSwitches: ["altSwitches"], convertFromEnd: ["convertFromEnd"], shiftEnter: ["shiftEnterCommitsToFocus"], punctuationCommit: ["commitAtPunctuation"],
     numpad: ["japaneseNumpadDirect"], brackets: ["bracketPairs"], spaceless: ["spacelessEnglish", "spacelessEnglishAlways"],
     numbers: ["japaneseRoughNumbersKanji", "numberConversion"],
     learn: ["learningEnabled"], secret: ["secretMode"], private: ["noLearningInPrivate"],
