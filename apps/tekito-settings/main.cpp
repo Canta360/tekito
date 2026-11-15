@@ -1476,6 +1476,8 @@ private:
         json += settings_.enterCommitsAsShown ? L"true" : L"false";
         json += L",\"escStepsBack\":";
         json += settings_.escStepsBack ? L"true" : L"false";
+        json += L",\"convertFromEnd\":";
+        json += settings_.convertFromEnd ? L"true" : L"false";
         json += L",\"shiftEnterCommitsToFocus\":";
         json += settings_.shiftEnterCommitsToFocus ? L"true" : L"false";
         json += L",\"commitAtPunctuation\":";
@@ -1723,6 +1725,7 @@ private:
             else if (key == L"recheckPreviousWord") settings_.recheckPreviousWord = value;
             else if (key == L"enterCommitsAsShown") settings_.enterCommitsAsShown = value;
             else if (key == L"escStepsBack") settings_.escStepsBack = value;
+            else if (key == L"convertFromEnd") settings_.convertFromEnd = value;
             else if (key == L"shiftEnterCommitsToFocus") settings_.shiftEnterCommitsToFocus = value;
             else if (key == L"commitAtPunctuation") settings_.commitAtPunctuation = value;
             else if (key == L"capitalizedCorrection") settings_.capitalizedCorrection = value;

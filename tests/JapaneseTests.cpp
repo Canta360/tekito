@@ -919,6 +919,20 @@ void TestAddresses(const RomajiTable& table, const MiniPack& pack) {
         off.StepBack();
         Require(!off.IsComposing(), "off: Esc again drops everything");
     }
+    // From the end: Space converts with the last word chosen (not 。).
+    {
+        JapaneseComposer end(&table);
+        end.SetConverter(&converter);
+        end.SetConvertFromEnd(true);
+        Type(end, L"kyouhaamedesu.");
+        end.Convert();
+        const std::wstring first = end.Preedit();
+        end.Convert();
+        const std::wstring second = end.Preedit();
+        Require(second != first && second.starts_with(L"今日は") && second.ends_with(L"。"),
+                "the next candidate is the last word's");
+        end.Clear();
+    }
     // A punctuation mark commits the text up to it, converted.
     {
         JapaneseComposer marks(&table);

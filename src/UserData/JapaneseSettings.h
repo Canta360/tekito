@@ -61,6 +61,7 @@ inline void ApplyModeSettings(japanese::JapaneseComposer& composer, const UserSe
     composer.SetSlipAutoApply(settings.japaneseSlipAutoApply);
     composer.SetEnterAsShown(settings.enterCommitsAsShown);
     composer.SetEscStepsBack(settings.escStepsBack);
+    composer.SetConvertFromEnd(settings.convertFromEnd);
     composer.SetCommitAtPunctuation(settings.commitAtPunctuation);
     composer.SetTypedForms(settings.japaneseTypedForms);
     composer.SetChunkCandidates(settings.japaneseChunkCandidates);

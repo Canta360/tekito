@@ -233,6 +233,9 @@ public:
     // conversion, then the kana, then the keys typed, then nothing. Off:
     // Esc goes back to the kana, then drops everything.
     void SetEscStepsBack(bool on) noexcept { escStepsBack_ = on; }
+    // Space converts with the last phrase chosen, to put right from the end
+    // (UserSettings::convertFromEnd); live conversion always does.
+    void SetConvertFromEnd(bool on) noexcept { convertFromEnd_ = on; }
     // A punctuation mark typed (、。！？) commits the text up to it,
     // converted as Space converts it (UserSettings::commitAtPunctuation).
     void SetCommitAtPunctuation(bool on) noexcept { commitAtPunctuation_ = on; }
@@ -1084,6 +1087,7 @@ private:
     bool preview_{false};
     bool enterAsShown_{false};
     bool escStepsBack_{false};
+    bool convertFromEnd_{false};
     bool commitAtPunctuation_{false};
     // StepBack showed the keys typed: Esc again drops everything.
     bool keysShown_{false};

@@ -217,6 +217,7 @@ int main(int argc, char** argv) {
             if (name == "mixCorrection") { settings.mixCorrection = value != 0; found = true; }
             if (name == "enterCommitsAsShown") { settings.enterCommitsAsShown = value != 0; found = true; }
             if (name == "escStepsBack") { settings.escStepsBack = value != 0; found = true; }
+            if (name == "convertFromEnd") { settings.convertFromEnd = value != 0; found = true; }
             if (name == "shiftEnterCommitsToFocus") { settings.shiftEnterCommitsToFocus = value != 0; found = true; }
             if (name == "commitAtPunctuation") { settings.commitAtPunctuation = value != 0; found = true; }
             if (name == "spacelessEnglish") { settings.spacelessEnglish = value != 0; found = true; }

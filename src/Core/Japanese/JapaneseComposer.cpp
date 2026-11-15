@@ -3818,6 +3818,16 @@ void JapaneseComposer::Convert() {
     }
     if (!IsConverted()) {
         BuildPhrases(true);
+        // From the end: the last word, not the punctuation after it.
+        if (convertFromEnd_ && !phrases_.empty() && !WholeChoice()) {
+            focus_ = phrases_.size() - 1;
+            const auto marksOnly = [](const std::wstring& text) {
+                return !text.empty() && std::all_of(text.begin(), text.end(), [](wchar_t c) {
+                    return std::wstring_view(L"。、．，.,！？!?…‥・").find(c) != std::wstring_view::npos;
+                });
+            };
+            while (focus_ > 0 && marksOnly(PhraseText(phrases_[focus_]))) --focus_;
+        }
         return;
     }
     NextCandidate();

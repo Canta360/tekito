@@ -187,6 +187,7 @@ export function catalog(ctx) {
       ),
     }),
     styledToggle("sentenceCheck", "conversion", "convert", "notes", j.sentenceCheck, "japaneseSentenceCheck", { detail: true }),
+    toggle("convertFromEnd", "conversion", "convert", "last_page", j.convertFromEnd, "convertFromEnd", { modes: ja, detail: true }),
     choice("singleVowel", "conversion", "convert", "text_format", m.singleVowel, "mixSingleVowelKana",
       [[true, m.singleVowel.kana], [false, m.singleVowel.letter]], { modes: ["mixed"], detail: true }),
     {
@@ -460,7 +461,7 @@ export function aiSpecs(ctx) {
     kanjiVariants: ["japaneseKanjiVariants"], period: ["periodOnEnter"], doubleSpace: ["doubleSpacePeriod"], smart: ["smartPunctuation"],
     meanings: ["meaningsEnabled", "meaningsInUiLanguage"], candidateWindow: ["candidateWindowEnabled"],
     special: ["dateConversion", "symbolConversion", "calculatorEnabled"], firstPageSymbol: ["japaneseFirstPageSymbol", "mixFirstPageSymbol"],
-    typedForms: ["japaneseTypedForms"], chunks: ["japaneseChunkCandidates"], kanaInput: ["japaneseKanaInput", "japaneseKanaInputKey"], capsLock: ["japaneseIgnoreCapsLock"], escStepsBack: ["escStepsBack"], shiftEnter: ["shiftEnterCommitsToFocus"], punctuationCommit: ["commitAtPunctuation"],
+    typedForms: ["japaneseTypedForms"], chunks: ["japaneseChunkCandidates"], kanaInput: ["japaneseKanaInput", "japaneseKanaInputKey"], capsLock: ["japaneseIgnoreCapsLock"], escStepsBack: ["escStepsBack"], convertFromEnd: ["convertFromEnd"], shiftEnter: ["shiftEnterCommitsToFocus"], punctuationCommit: ["commitAtPunctuation"],
     numpad: ["japaneseNumpadDirect"], brackets: ["bracketPairs"], spaceless: ["spacelessEnglish", "spacelessEnglishAlways"],
     numbers: ["japaneseRoughNumbersKanji", "numberConversion"],
     learn: ["learningEnabled"], secret: ["secretMode"], private: ["noLearningInPrivate"],
