@@ -1068,7 +1068,8 @@ void TextService::RegisterLangBarItem() {
         [this]() { return runtimeMode_ && runtimeMode_->Secret(); },
         [this](bool on) {
             if (runtimeMode_) runtimeMode_->SetSecret(on);
-        });
+        },
+        [this]() { return privateWindowShown_; });
     if (!item) return;
 
     ComPtr<ModeLangBarItem> ownedItem(item);
@@ -1247,6 +1248,8 @@ HRESULT TextService::OnPopContext(ITfContext* context) {
 HRESULT TextService::OnSetFocus(ITfDocumentMgr* focus, ITfDocumentMgr*) {
     japanese_.ForgetCommit();
     altTap_.reset();
+    // Another field: whether it is private is seen as it is typed in.
+    if (std::exchange(privateWindowShown_, false) && modeLangBarItem_) modeLangBarItem_->NotifyUpdate();
     badgeOnNextKey_ = focus != nullptr;
     typedTail_.clear();
     // Light or dark taskbar: the mode icon follows when focus moves.
@@ -1726,7 +1729,14 @@ HRESULT TextService::HandleKeyInEditSessionCore(ITfContext* context, TfEditCooki
     // anywhere in secret mode (which also keeps nothing, as a private
     // window does whatever the settings say).
     const bool secret = runtimeMode_ && runtimeMode_->Secret();
-    privateField_ = ContextIsPrivate(context, editCookie) || secret;
+    const bool privateWindow = ContextIsPrivate(context, editCookie);
+    privateField_ = privateWindow || secret;
+    // The mode icon shows a private window where nothing is learned.
+    const bool shown = privateWindow && userSettings_.noLearningInPrivate && userSettings_.learningEnabled;
+    if (shown != privateWindowShown_) {
+        privateWindowShown_ = shown;
+        if (modeLangBarItem_) modeLangBarItem_->NotifyUpdate();
+    }
     const bool privateField = (userSettings_.noLearningInPrivate && privateField_) || secret;
     japanese_.SetLearning(userSettings_.learningEnabled && !privateField ? &japaneseLearning_ : nullptr);
     // Secret mode uses nothing learned before either: no word typed earlier

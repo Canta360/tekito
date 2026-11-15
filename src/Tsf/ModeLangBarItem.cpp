@@ -79,7 +79,7 @@ HICON GrayedIcon(HICON source) {
 ModeLangBarItem::ModeLangBarItem(HINSTANCE instance, ModeGetter getMode, ModeSetter setMode,
                                  ModeGetter toggledMode, Query japaneseProfile,
                                  SettingsLauncher launchSettings, Query japaneseUi, Query mixedAvailable,
-                                 Query secret, Switch setSecret)
+                                 Query secret, Switch setSecret, Query privateWindow)
     : instance_(instance),
       getMode_(std::move(getMode)),
       setMode_(std::move(setMode)),
@@ -89,7 +89,8 @@ ModeLangBarItem::ModeLangBarItem(HINSTANCE instance, ModeGetter getMode, ModeSet
       japaneseUi_(std::move(japaneseUi)),
       mixedAvailable_(std::move(mixedAvailable)),
       secret_(std::move(secret)),
-      setSecret_(std::move(setSecret)) {}
+      setSecret_(std::move(setSecret)),
+      privateWindow_(std::move(privateWindow)) {}
 
 const wchar_t* ModeLangBarItem::Text(const wchar_t* english, const wchar_t* japanese) const {
     return japaneseUi_ && japaneseUi_() ? japanese : english;
@@ -151,7 +152,11 @@ HRESULT ModeLangBarItem::GetTooltipString(BSTR* tooltip) {
                         : mode == InputMode::Mixed  ? Text(L"TEKITO Mix", L"TEKITO まぜ打ち")
                         : mode == InputMode::Direct ? Text(L"TEKITO Direct mode", L"TEKITO Direct モード")
                                                     : Text(L"TEKITO Auto mode", L"TEKITO Auto モード");
-    if (Secret()) text += Text(L" (secret)", L"（シークレット）");
+    if (Secret()) {
+        text += Text(L" (secret)", L"（シークレット）");
+    } else if (PrivateWindow()) {
+        text += Text(L" (private window: nothing learned)", L"（プライベートウィンドウ：学習しません）");
+    }
     *tooltip = SysAllocString(text.c_str());
     return *tooltip ? S_OK : E_OUTOFMEMORY;
 }
@@ -304,8 +309,9 @@ HRESULT ModeLangBarItem::GetIcon(HICON* icon) {
     const int size = GetSystemMetrics(SM_CXSMICON);
     *icon = static_cast<HICON>(
         LoadImageW(instance_, MAKEINTRESOURCEW(resourceId), IMAGE_ICON, size, size, LR_DEFAULTCOLOR));
-    // Secret mode: the mode's icon grayed out, as it is on (the tooltip says so).
-    if (*icon && Secret()) {
+    // Secret mode, or a private window where nothing is learned: the mode's
+    // icon grayed out (the tooltip says which).
+    if (*icon && (Secret() || PrivateWindow())) {
         if (HICON grayed = GrayedIcon(*icon)) {
             DestroyIcon(*icon);
             *icon = grayed;

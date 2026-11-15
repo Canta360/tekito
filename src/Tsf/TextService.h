@@ -271,6 +271,8 @@ private:
     // fields.
     void NoteConversion(std::wstring reading, std::wstring text);
     bool privateField_{false};
+    // The mode icon shows typing in a private window, where nothing is learned.
+    bool privateWindowShown_{false};
     void RegisterLangBarItem();
     void UnregisterLangBarItem();
 

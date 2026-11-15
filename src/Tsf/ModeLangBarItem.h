@@ -23,7 +23,8 @@ public:
 
     ModeLangBarItem(HINSTANCE instance, ModeGetter getMode, ModeSetter setMode,
                     ModeGetter toggledMode, Query japaneseProfile, SettingsLauncher launchSettings,
-                    Query japaneseUi, Query mixedAvailable, Query secret, Switch setSecret);
+                    Query japaneseUi, Query mixedAvailable, Query secret, Switch setSecret,
+                    Query privateWindow);
 
     HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void** object) override;
     ULONG STDMETHODCALLTYPE AddRef() override;
@@ -52,6 +53,8 @@ private:
     [[nodiscard]] bool JapaneseProfile() const;
     [[nodiscard]] bool MixedAvailable() const { return mixedAvailable_ && mixedAvailable_(); }
     [[nodiscard]] bool Secret() const { return secret_ && secret_(); }
+    // Typing in a private window, where nothing is learned (as Settings has it).
+    [[nodiscard]] bool PrivateWindow() const { return privateWindow_ && privateWindow_(); }
     [[nodiscard]] const wchar_t* Text(const wchar_t* english, const wchar_t* japanese) const;
     void ShowContextMenu(POINT point);
 
@@ -67,6 +70,7 @@ private:
     Query mixedAvailable_;
     Query secret_;
     Switch setSecret_;
+    Query privateWindow_;
     ITfLangBarItemSink* sink_{nullptr};
 };
 
