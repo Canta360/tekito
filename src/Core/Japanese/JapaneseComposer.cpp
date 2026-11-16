@@ -14,6 +14,7 @@
 #include "Core/EnglishSpelling.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <functional>
 #include <regex>
@@ -466,6 +467,7 @@ void JapaneseComposer::SetLiveConversion(bool on) {
 
 void JapaneseComposer::Insert(wchar_t key) {
     lastCommit_.reset();
+    if (letterDelayMs_ || kanjiDelayMs_) lastKeyAt_ = Now();
     mixKanaShown_ = false;
     if (aiJudge_ && !chunkJudge_ && !Typing()) aiJudge_->Warm();
     // Mixed typing: a capital is a letter of the chunk like any other; the
@@ -1117,8 +1119,65 @@ void JapaneseComposer::FlushAll() {
 }
 
 void JapaneseComposer::Emit(std::wstring keys, std::wstring kana) {
-    units_.insert(units_.begin() + static_cast<std::ptrdiff_t>(caret_), {std::move(keys), std::move(kana)});
+    units_.insert(units_.begin() + static_cast<std::ptrdiff_t>(caret_),
+                  {std::move(keys), std::move(kana), false, letterDelayMs_ ? Now() : 0});
     ++caret_;
+}
+
+std::uint64_t JapaneseComposer::Now() const {
+    if (clock_) return clock_();
+    return static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
+                                          std::chrono::steady_clock::now().time_since_epoch())
+                                          .count());
+}
+
+std::size_t JapaneseComposer::FreshUnits() const {
+    // Only while typing at the end: inside the text, kana as they are.
+    if (letterDelayMs_ == 0 || caret_ != units_.size()) return 0;
+    const std::uint64_t now = Now();
+    std::size_t fresh = 0;
+    for (auto unit = units_.rbegin(); unit != units_.rend(); ++unit) {
+        if (unit->ascii || unit->typedAt == 0 || now - unit->typedAt >= letterDelayMs_ || unit->keys.empty()) break;
+        ++fresh;
+    }
+    return fresh;
+}
+
+bool JapaneseComposer::ConversionWaits() const {
+    const std::uint32_t wait = std::max(letterDelayMs_, kanjiDelayMs_);
+    if (wait == 0 || lastKeyAt_ == 0 || !Typing() || caret_ != units_.size()) return false;
+    return Now() - lastKeyAt_ < wait;
+}
+
+std::wstring JapaneseComposer::DisplayTyping() const {
+    std::wstring text = RenderTyping(true);
+    const std::size_t fresh = FreshUnits();
+    if (fresh == 0) return text;
+    // The last units' kana (before the keys still pending) as their keys.
+    std::size_t kana = 0;
+    std::wstring keys;
+    for (std::size_t i = units_.size() - fresh; i < units_.size(); ++i) {
+        kana += units_[i].kana.size();
+        keys += units_[i].keys;
+    }
+    const std::size_t pending = PendingText().size();
+    if (kana + pending > text.size()) return text;
+    const std::size_t at = text.size() - pending - kana;
+    return text.substr(0, at) + keys + text.substr(text.size() - pending);
+}
+
+std::optional<std::uint32_t> JapaneseComposer::NextDisplayChange() const {
+    const std::uint64_t now = Now();
+    std::optional<std::uint64_t> next;
+    const auto consider = [&](std::uint64_t at) {
+        if (at > now && (!next || at < *next)) next = at;
+    };
+    if (FreshUnits() > 0) {
+        for (std::size_t i = units_.size() - FreshUnits(); i < units_.size(); ++i) consider(units_[i].typedAt + letterDelayMs_);
+    }
+    if (ConversionWaits()) consider(lastKeyAt_ + std::max(letterDelayMs_, kanjiDelayMs_));
+    if (!next) return std::nullopt;
+    return static_cast<std::uint32_t>(*next - now);
 }
 
 std::size_t JapaneseComposer::ReadingOffset(std::size_t units) const {
@@ -1188,8 +1247,9 @@ std::size_t JapaneseComposer::CaretOffset() const {
     }
     if (!segments.empty() && segments.front().settled) settled = segments.front().text.size();
     if (const auto address = AddressShown()) return settled + address->size();
-    if (const auto live = MixLiveText()) return settled + live->size();
+    if (const auto live = MixLiveText()) return settled + (ConversionWaits() ? DisplayTyping().size() : live->size());
     if (const auto letters = LettersShown()) return settled + letters->size();
+    if (FreshUnits() > 0) return settled + DisplayTyping().size();
     return settled + ReadingOffset(caret_) + pending_.size();
 }
 
@@ -4522,10 +4582,50 @@ std::vector<PreeditSegment> JapaneseComposer::Segments() const {
         if (const auto address = AddressShown()) {
             segments.push_back({*address, false, false});
         } else if (const auto live = MixLiveText()) {
-            segments.push_back({*live, true, false});
+            if (ConversionWaits()) {
+                // The conversion waits: the kana, marked when it will change.
+                const std::wstring kana = DisplayTyping();
+                segments.push_back({kana, false, false, false, false, pendingMarker_ && *live != RenderTyping(true)});
+            } else {
+                segments.push_back({*live, true, false});
+            }
         } else if (Typing()) {
             // Not taken as anything yet, even shown as letters.
-            segments.push_back({LettersShown().value_or(RenderTyping(true)), false, false});
+            segments.push_back({LettersShown().value_or(DisplayTyping()), false, false});
+        }
+        return segments;
+    }
+    // Live conversion waiting to show: each phrase as its kana, marked when
+    // it will change, then the keys still pending.
+    if (preview_ && !WholeChoice() && ConversionWaits()) {
+        const bool katakana = TypingForm() == KanaForm::Katakana;
+        for (const auto& phrase : phrases_) {
+            if (phrase.begin + phrase.length > conversionReading_.size()) continue;
+            std::wstring kana = conversionReading_.substr(phrase.begin, phrase.length);
+            if (katakana) kana = ToKatakana(kana);
+            const bool changes = PhraseText(phrase) != kana;
+            segments.push_back({std::move(kana), false, false, false, false, pendingMarker_ && changes});
+        }
+        if (!pending_.empty()) segments.push_back({PendingText(), false, false});
+        // The units still shown as their keys, at the end.
+        if (const std::size_t fresh = FreshUnits(); fresh > 0) {
+            std::size_t kana = 0;
+            std::wstring keys;
+            for (std::size_t i = units_.size() - fresh; i < units_.size(); ++i) {
+                kana += units_[i].kana.size();
+                keys += units_[i].keys;
+            }
+            const bool pendingLast = !pending_.empty();
+            std::wstring tailPending = pendingLast ? segments.back().text : std::wstring{};
+            if (pendingLast) segments.pop_back();
+            while (kana > 0 && !segments.empty()) {
+                auto& last = segments.back().text;
+                const std::size_t take = std::min(kana, last.size());
+                last.resize(last.size() - take);
+                kana -= take;
+                if (last.empty()) segments.pop_back();
+            }
+            segments.push_back({keys + tailPending, false, false});
         }
         return segments;
     }

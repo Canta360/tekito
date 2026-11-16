@@ -616,6 +616,38 @@ constexpr UINT kRefinePauseMs = 200;
 thread_local TextService* refineOwner = nullptr;
 }  // namespace
 
+namespace {
+// The text service whose redisplay timer runs on this thread.
+thread_local TextService* redisplayOwner = nullptr;
+}  // namespace
+
+void TextService::ScheduleJapaneseRedisplay() {
+    const auto next = japanese_.IsComposing() ? japanese_.NextDisplayChange() : std::nullopt;
+    if (!next) {
+        if (redisplayTimer_) KillTimer(nullptr, redisplayTimer_);
+        redisplayTimer_ = 0;
+        return;
+    }
+    redisplayOwner = this;
+    redisplayTimer_ = SetTimer(nullptr, redisplayTimer_, std::max<UINT>(*next, USER_TIMER_MINIMUM), &TextService::OnJapaneseRedisplayTimer);
+}
+
+void CALLBACK TextService::OnJapaneseRedisplayTimer(HWND, UINT, UINT_PTR id, DWORD) {
+    KillTimer(nullptr, id);
+    TextService* self = redisplayOwner;
+    if (!self || id != self->redisplayTimer_) return;
+    self->redisplayTimer_ = 0;
+    if (!self->compositionContext_) return;
+    KeyInput input{};
+    input.type = KeyInput::Type::JapaneseRedisplay;
+    auto* session = new (std::nothrow) KeyEditSession(self, self->compositionContext_, input);
+    if (!session) return;
+    HRESULT sessionResult = E_FAIL;
+    (void)self->compositionContext_->RequestEditSession(self->clientId_, session, TF_ES_ASYNCDONTCARE | TF_ES_READWRITE,
+                                                         &sessionResult);
+    session->Release();
+}
+
 void TextService::ScheduleJapaneseRefine() {
     refineOwner = this;
     // SetTimer with the same id restarts the wait.
@@ -697,6 +729,7 @@ HRESULT TextService::ShowJapanesePreedit(ITfContext* context, TfEditCookie editC
     hr = ReplaceJapaneseComposition(context, editCookie);
     if (FAILED(hr)) return hr;
     ShowJapaneseCandidates(context, editCookie);
+    ScheduleJapaneseRedisplay();
     return S_OK;
 }
 
@@ -727,7 +760,8 @@ HRESULT TextService::ReplaceJapaneseComposition(ITfContext* context, TfEditCooki
             // The held sentence: marked, or (mixSettledMarker off) underlined
             // in light grey.
             const bool marked = segment.settled && userSettings_.mixSettledMarker;
-            auto underline = marked              ? JapaneseUnderline::Settled
+            auto underline = segment.pending     ? JapaneseUnderline::Pending
+                             : marked              ? JapaneseUnderline::Settled
                              : segment.settled  ? JapaneseUnderline::Held
                              : !segment.converted ? (mix ? JapaneseUnderline::MixInput : JapaneseUnderline::Input)
                              : segment.focused  ? (mix ? JapaneseUnderline::MixFocused : JapaneseUnderline::Focused)
@@ -875,6 +909,7 @@ void TextService::ShowJapaneseCandidates(ITfContext* context, TfEditCookie editC
     }
     if (list.kind == Kind::None) {
         candidateWindow_.SetStyle(userSettings_.candidateWindowStyle);
+        candidateWindow_.SetZoom(userSettings_.candidateWindowScale);
         candidateWindow_.Show(JapaneseCandidateAnchor(context, editCookie), {}, CandidateWindow::kNoSelection, 0, 0, {},
                               caption);
         return;
@@ -903,6 +938,7 @@ void TextService::ShowJapaneseCandidates(ITfContext* context, TfEditCookie editC
                                                        : JapaneseCandidateAnchor(context, editCookie);
     candidateAnchor_ = anchor;
     candidateWindow_.SetStyle(userSettings_.candidateWindowStyle);
+    candidateWindow_.SetZoom(userSettings_.candidateWindowScale);
     candidateWindow_.SetRainbow(userSettings_.rainbowAccent);
     candidateWindow_.SetJapanese(userdata::UseJapaneseUi(userSettings_.uiLanguage));
     candidateWindow_.Show(anchor, rows, selected ? *selected : CandidateWindow::kNoSelection, list.pageStart,

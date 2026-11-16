@@ -95,6 +95,10 @@ const initialSettings = {
   altLeftMode: 2,
   altRightMode: 0,
   convertFromEnd: false,
+  japaneseLetterDelay: 0,
+  candidateWindowScale: 100,
+  japaneseKanjiDelay: 0,
+  japaneseKanjiMarker: true,
   shiftEnterCommitsToFocus: false,
   commitAtPunctuation: false,
   capitalizedCorrection: false,
@@ -405,6 +409,7 @@ function App() {
     japaneseInstalling: Boolean(runtime.japaneseInstalling), japaneseDataBytes: runtime.japaneseDataBytes || 0,
     japaneseAddable: runtime.japaneseAddable !== false, japaneseDataError: runtime.japaneseDataError || "",
     encryption,
+    settingsCodeRow: () => <SettingsCodeRow settings={settings} setSetting={setSetting} setConfirm={setConfirm} showNotice={showNotice} />,
   };
   const pageProps = { settings, setSetting, runAction, setConfirm, showKeys: setKeys, open };
 
@@ -617,6 +622,97 @@ function RomajiTable({ romaji, runAction, setConfirm, back }) {
 
 // ---------------------------------------------------------------------------
 // 辞書と学習
+
+// Settings as a code to take to another PC or give someone: the ones changed
+// from the defaults, as JSON in base64url after a name and a version. Not
+// secret mode (for now only), the AI model (it may not be downloaded there)
+// or the apps TEKITO is off in (their names are this PC's).
+const settingsCodePrefix = "TEKITO-SETTINGS-1.";
+const settingsCodeLeftOut = new Set(["secretMode", "japaneseSentenceModel", "excludedApps"]);
+
+export function makeSettingsCode(settings) {
+  const changed = {};
+  for (const [key, initial] of Object.entries(initialSettings)) {
+    if (settingsCodeLeftOut.has(key) || !(key in settings)) continue;
+    const value = settings[key];
+    if (typeof value !== typeof initial || Array.isArray(value) || value === initial) continue;
+    changed[key] = value;
+  }
+  const bytes = new TextEncoder().encode(JSON.stringify(changed));
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return settingsCodePrefix + btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+// The settings a code holds that this version knows, with values of the
+// right kind; null when it is no settings code.
+export function readSettingsCode(code) {
+  const text = String(code || "").trim();
+  if (!text.startsWith(settingsCodePrefix)) return null;
+  try {
+    const body = text.slice(settingsCodePrefix.length).replace(/-/g, "+").replace(/_/g, "/");
+    const binary = atob(body + "=".repeat((4 - (body.length % 4)) % 4));
+    const parsed = JSON.parse(new TextDecoder().decode(Uint8Array.from(binary, (c) => c.charCodeAt(0))));
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+    const known = {};
+    for (const [key, value] of Object.entries(parsed)) {
+      if (settingsCodeLeftOut.has(key) || !(key in initialSettings)) continue;
+      if (typeof value !== typeof initialSettings[key] || Array.isArray(value)) continue;
+      known[key] = value;
+    }
+    return known;
+  } catch {
+    return null;
+  }
+}
+
+function CodeBox({ onChange }) {
+  const c = useText().settingsCode;
+  const [code, setCode] = useState("");
+  return (
+    <TextBox aria-label={c.paste} placeholder={c.paste} value={code}
+      onChange={(event) => { setCode(event.target.value); onChange(event.target.value); }} />
+  );
+}
+
+function SettingsCodeRow({ settings, setSetting, setConfirm, showNotice }) {
+  const c = useText().settingsCode;
+  const pasted = useRef("");
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(makeSettingsCode(settings));
+      showNotice(c.copied);
+    } catch {
+      showNotice(c.notCopied, "negative");
+    }
+  };
+  const read = () => {
+    pasted.current = "";
+    setConfirm({
+      title: c.readTitle, message: c.readMessage, confirmLabel: c.read,
+      body: <CodeBox onChange={(value) => { pasted.current = value; }} />,
+      action: async () => {
+        const known = readSettingsCode(pasted.current);
+        if (!known) {
+          showNotice(c.notCode, "negative");
+          return;
+        }
+        let applied = 0;
+        for (const [key, value] of Object.entries(known)) {
+          if (settings[key] === value) continue;
+          if (await setSetting(key, value)) applied += 1;
+        }
+        showNotice(c.applied(applied));
+      },
+    });
+  };
+  return (
+    <Row icon="content_copy" title={c.title} description={c.description}>
+      <Button onClick={read}>{c.read}</Button>
+      <Button onClick={copy}>{c.copy}</Button>
+    </Row>
+  );
+}
 
 function ClearRange({ onChange }) {
   const l = useText().learningList;

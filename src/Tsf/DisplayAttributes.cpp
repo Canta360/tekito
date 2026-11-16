@@ -61,6 +61,7 @@ const GUID& JapaneseUnderlineGuid(JapaneseUnderline underline) noexcept {
     case JapaneseUnderline::MixEnglishFocused: return GUID_TekitoDisplayAttributeMixEnglishFocused;
     case JapaneseUnderline::SettledEnglish: return GUID_TekitoDisplayAttributeSettledEnglish;
     case JapaneseUnderline::Held: return GUID_TekitoDisplayAttributeHeld;
+    case JapaneseUnderline::Pending: return GUID_TekitoDisplayAttributePending;
     case JapaneseUnderline::Input: break;
     }
     return GUID_TekitoDisplayAttributeInput;
@@ -108,6 +109,18 @@ ITfDisplayAttributeInfo* CreateJapaneseUnderline(JapaneseUnderline underline) {
         attribute.crBk.cr = RGB(252, 212, 160);
         attribute.bAttr = TF_ATTR_CONVERTED;
         description = L"TEKITO Mix sentence held until Enter";
+        break;
+    case JapaneseUnderline::Pending:
+        // Kana that will become kanji once the conversion shows (display
+        // delay): a light grey marker with dark text, read on light and dark
+        // pages, under the dotted line of what is typed.
+        attribute.lsStyle = TF_LS_DOT;
+        attribute.crText.type = TF_CT_COLORREF;
+        attribute.crText.cr = RGB(32, 32, 32);
+        attribute.crBk.type = TF_CT_COLORREF;
+        attribute.crBk.cr = RGB(222, 222, 222);
+        attribute.bAttr = TF_ATTR_INPUT;
+        description = L"TEKITO kana to become kanji";
         break;
     case JapaneseUnderline::Held:
         // Without the marker: a light grey line, quieter than the orange of

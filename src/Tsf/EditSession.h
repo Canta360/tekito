@@ -47,6 +47,9 @@ struct KeyInput {
         // Not a key: the AI's answer to the conversion shown came
         // (JapaneseComposer::TakeAiAnswer).
         JapaneseAiAnswer,
+        // Not a key: what is shown changes by itself now (keys turning into
+        // kana, live conversion showing: JapaneseComposer::NextDisplayChange).
+        JapaneseRedisplay,
         // Not a key: show the mode by the caret (the user switched modes).
         ShowModeIndicator,
         // English: `character` finishes a symbol's spelling or a sum before

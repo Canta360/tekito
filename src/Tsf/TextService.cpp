@@ -1762,6 +1762,10 @@ HRESULT TextService::HandleKeyInEditSessionCore(ITfContext* context, TfEditCooki
         if (context != compositionContext_ || !composition_ || !japanese_.RefineLive()) return S_OK;
         return ShowJapanesePreedit(context, editCookie);
     }
+    if (input.type == KeyInput::Type::JapaneseRedisplay) {
+        if (context != compositionContext_ || !composition_ || !japanese_.IsComposing()) return S_OK;
+        return ShowJapanesePreedit(context, editCookie);
+    }
     if (input.type == KeyInput::Type::JapaneseAiAnswer) {
         if (context != compositionContext_ || !composition_ || !japanese_.TakeAiAnswer()) return S_OK;
         return ShowJapanesePreedit(context, editCookie);
@@ -2487,6 +2491,7 @@ void TextService::ShowCandidates(ITfContext* context, TfEditCookie editCookie) {
     const RECT anchor = GetCandidateAnchor(context, editCookie);
     candidateAnchor_ = anchor;
     candidateWindow_.SetStyle(userSettings_.candidateWindowStyle);
+    candidateWindow_.SetZoom(userSettings_.candidateWindowScale);
     candidateWindow_.SetRainbow(userSettings_.rainbowAccent);
     candidateWindow_.SetJapanese(userdata::UseJapaneseUi(userSettings_.uiLanguage));
     candidateWindow_.Show(anchor, EnglishRows(), state_.SelectedIndex(), state_.PageStart(), state_.VisibleCount(),
@@ -2552,6 +2557,7 @@ void TextService::ShowModeIndicator(ITfContext* context) {
 
 void TextService::ShowModeBadge(const RECT& caret) {
     candidateWindow_.SetStyle(userSettings_.candidateWindowStyle);
+    candidateWindow_.SetZoom(userSettings_.candidateWindowScale);
     candidateWindow_.SetRainbow(userSettings_.rainbowAccent);
     candidateWindow_.ShowModeBadge(caret, mode_);
 }

@@ -224,6 +224,10 @@ private:
     HRESULT ShowJapanesePreedit(ITfContext* context, TfEditCookie editCookie);
     // Live conversion: once typing pauses, what is shown is converted again
     // as Enter would convert it.
+    // Shows the text again when it changes by itself (display delays).
+    void ScheduleJapaneseRedisplay();
+    static void CALLBACK OnJapaneseRedisplayTimer(HWND, UINT, UINT_PTR id, DWORD);
+    UINT_PTR redisplayTimer_{0};
     void ScheduleJapaneseRefine();
     void CancelJapaneseRefine();
     static void CALLBACK OnJapaneseRefineTimer(HWND, UINT, UINT_PTR id, DWORD);

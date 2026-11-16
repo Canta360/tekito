@@ -59,6 +59,10 @@ public:
     // 0 = glass, 1 = simple (see UserSettings::candidateWindowStyle). Takes
     // effect from the next Show.
     void SetStyle(int style) noexcept;
+    // The list's size, in percent of the usual (UserSettings::
+    // candidateWindowScale): text, rows and margins alike. Takes effect from
+    // the next Show.
+    void SetZoom(int percent) noexcept;
     // The accent's colour going round the rainbow while the list is shown
     // (UserSettings::rainbowAccent). Takes effect from the next Show.
     void SetRainbow(bool on) noexcept { rainbow_ = on; }
@@ -101,6 +105,7 @@ private:
     bool shown_{false};
     bool japanese_{false};
     int style_{0};
+    int zoom_{100};
     bool rainbow_{false};
 };
 

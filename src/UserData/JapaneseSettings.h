@@ -62,6 +62,9 @@ inline void ApplyModeSettings(japanese::JapaneseComposer& composer, const UserSe
     composer.SetEnterAsShown(settings.enterCommitsAsShown);
     composer.SetEscStepsBack(settings.escStepsBack);
     composer.SetConvertFromEnd(settings.convertFromEnd);
+    composer.SetDisplayDelays(static_cast<std::uint32_t>(std::clamp(settings.japaneseLetterDelay, 0, 2000)),
+                              static_cast<std::uint32_t>(std::clamp(settings.japaneseKanjiDelay, 0, 3000)),
+                              settings.japaneseKanjiMarker);
     composer.SetCommitAtPunctuation(settings.commitAtPunctuation);
     composer.SetTypedForms(settings.japaneseTypedForms);
     composer.SetChunkCandidates(settings.japaneseChunkCandidates);

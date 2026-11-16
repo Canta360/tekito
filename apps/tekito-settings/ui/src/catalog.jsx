@@ -193,6 +193,10 @@ export function catalog(ctx) {
       render: () => <ExcludedApps settings={s} runAction={ctx.runAction} />,
     },
     toggle("companion", "general", "general", "mood", g.companion, "desktopCompanion", { detail: true }),
+    {
+      id: "settingsCode", page: "general", group: "general", keys: [], title: t.settingsCode.title, about: t.settingsCode.description,
+      detail: true, render: () => ctx.settingsCodeRow(),
+    },
     choice("language", "general", "general", "language", g.language, "uiLanguage", [[0, g.language.system], [1, "English"], [2, "日本語"]],
       { detail: true }),
     { ...toggle("rainbow", "general", "general", "palette", g.rainbow, "rainbowAccent", { detail: true }), hidden: "rainbow",
@@ -210,6 +214,23 @@ export function catalog(ctx) {
     }),
     styledToggle("sentenceCheck", "conversion", "convert", "notes", j.sentenceCheck, "japaneseSentenceCheck", { detail: true }),
     toggle("convertFromEnd", "conversion", "convert", "last_page", j.convertFromEnd, "convertFromEnd", { modes: ja, detail: true }),
+    choice("letterDelay", "conversion", "convert", "timer", j.letterDelay, "japaneseLetterDelay",
+      [[0, j.delays.none], [200, j.delays.short], [500, j.delays.medium], [1000, j.delays.long]], { modes: ja, detail: true }),
+    {
+      ...choice("kanjiDelay", "conversion", "convert", "hourglass_top", j.kanjiDelay, "japaneseKanjiDelay",
+        [[0, j.delays.none], [300, j.delays.short], [700, j.delays.medium], [1500, j.delays.long]], { modes: ja, detail: true }),
+      keys: ["japaneseKanjiDelay", "japaneseKanjiMarker"],
+      render: () => (
+        <Row icon="hourglass_top" title={head(j.kanjiDelay.title, ja)} description={j.kanjiDelay.description}
+          sub={s.japaneseKanjiDelay > 0 || s.japaneseLetterDelay > 0 ? (
+            <Check label={j.kanjiDelay.marker} checked={s.japaneseKanjiMarker} onChange={(value) => set("japaneseKanjiMarker", value)} />
+          ) : null}>
+          <Segmented label={j.kanjiDelay.title} value={s.japaneseKanjiDelay}
+            options={[[0, j.delays.none], [300, j.delays.short], [700, j.delays.medium], [1500, j.delays.long]]}
+            onChange={(value) => set("japaneseKanjiDelay", value)} />
+        </Row>
+      ),
+    },
     choice("singleVowel", "conversion", "convert", "text_format", m.singleVowel, "mixSingleVowelKana",
       [[true, m.singleVowel.kana], [false, m.singleVowel.letter]], { modes: ["mixed"], detail: true }),
     {
@@ -335,6 +356,8 @@ export function catalog(ctx) {
         </div>
       ),
     },
+    choice("windowSize", "candidates", "look", "text_fields", g.windowSize, "candidateWindowScale",
+      [[90, g.windowSize.small], [100, g.windowSize.normal], [120, g.windowSize.large], [145, g.windowSize.larger]], { detail: true }),
     {
       id: "rows", page: "candidates", group: "list", keys: ["candidateRows"], title: g.rows.title,
       render: () => <RowsRow settings={s} setSetting={set} title={g.rows.title} description={g.rows.description} />,
@@ -484,7 +507,7 @@ export function aiSpecs(ctx) {
     kanjiVariants: ["japaneseKanjiVariants"], period: ["periodOnEnter"], doubleSpace: ["doubleSpacePeriod"], smart: ["smartPunctuation"],
     meanings: ["meaningsEnabled", "meaningsInUiLanguage"], candidateWindow: ["candidateWindowEnabled"],
     special: ["dateConversion", "symbolConversion", "calculatorEnabled"], firstPageSymbol: ["japaneseFirstPageSymbol", "mixFirstPageSymbol"],
-    typedForms: ["japaneseTypedForms"], chunks: ["japaneseChunkCandidates"], kanaInput: ["japaneseKanaInput", "japaneseKanaInputKey"], capsLock: ["japaneseIgnoreCapsLock"], escStepsBack: ["escStepsBack"], showTypedKeys: ["showTypedKeys"], altSwitches: ["altSwitches", "altLeftMode", "altRightMode"], convertFromEnd: ["convertFromEnd"], shiftEnter: ["shiftEnterCommitsToFocus"], punctuationCommit: ["commitAtPunctuation"],
+    typedForms: ["japaneseTypedForms"], chunks: ["japaneseChunkCandidates"], kanaInput: ["japaneseKanaInput", "japaneseKanaInputKey"], capsLock: ["japaneseIgnoreCapsLock"], escStepsBack: ["escStepsBack"], showTypedKeys: ["showTypedKeys"], altSwitches: ["altSwitches", "altLeftMode", "altRightMode"], convertFromEnd: ["convertFromEnd"], letterDelay: ["japaneseLetterDelay"], kanjiDelay: ["japaneseKanjiDelay", "japaneseKanjiMarker"], shiftEnter: ["shiftEnterCommitsToFocus"], punctuationCommit: ["commitAtPunctuation"],
     numpad: ["japaneseNumpadDirect"], brackets: ["bracketPairs"], spaceless: ["spacelessEnglish", "spacelessEnglishAlways"],
     numbers: ["japaneseRoughNumbersKanji", "numberConversion"],
     learn: ["learningEnabled"], secret: ["secretMode"], private: ["noLearningInPrivate"],

@@ -116,6 +116,7 @@ const en = {
 
   general: {
     switchKey: { title: "Switch key", none: "None" },
+    windowSize: { title: "Candidate list size", description: "The size of the text and the list.", small: "Small", normal: "Normal", large: "Large", larger: "Larger" },
     altSwitches: {
       title: "Switch with the left and right Alt", description: "Each Alt pressed alone switches to the mode chosen for it. For keyboards without Japanese keys.",
       left: "Left Alt", right: "Right Alt", japanese: "Japanese", mixed: "Mix", auto: "Auto", direct: "Direct", none: "None",
@@ -216,6 +217,9 @@ const en = {
     capsLock: { title: "Type kana while Caps Lock is on" },
     punctuationCommit: { title: "Enter the text at 、 and 。", description: "Typing 、。！？ converts the text up to it and enters it." },
     shiftEnter: { title: "Shift + Enter enters up to the chosen part", description: "After converting, the parts up to the one chosen are entered; the rest stays to convert." },
+    letterDelay: { title: "Time before kana", description: "The keys typed show as letters for a moment, then turn into kana." },
+    kanjiDelay: { title: "Time before kanji", description: "Live conversion shows its kanji once typing stops for this long.", marker: "Mark in light grey what will become kanji" },
+    delays: { none: "None", short: "Short", medium: "Medium", long: "Long" },
     convertFromEnd: { title: "Fix from the last part", description: "After converting, the last part is chosen first." },
     showTypedKeys: { title: "Show the keys typed", description: "The romaji typed is shown small above the candidates." },
     escStepsBack: { title: "Esc goes back one step", description: "Each Esc goes back a step: kanji, kana, the keys typed, then nothing." },
@@ -388,6 +392,14 @@ const en = {
     licenseMissing: "The license text could not be loaded.",
   },
 
+  settingsCode: {
+    title: "Settings code",
+    description: "Your settings as a code, to take to another PC or share.",
+    copy: "Copy code", read: "Use a code", paste: "Paste a settings code",
+    readTitle: "Use a settings code?", readMessage: "The settings in the code replace yours.",
+    copied: "Settings code copied.", notCopied: "The code could not be copied.",
+    notCode: "This is not a settings code.", applied: (n) => `${n} setting${n === 1 ? "" : "s"} changed.`,
+  },
   learningList: {
     title: "What was learned",
     search: "Search",
@@ -569,6 +581,7 @@ const ja = {
 
   general: {
     switchKey: { title: "切り替えキー", none: "なし" },
+    windowSize: { title: "候補一覧の大きさ", description: "文字と一覧の大きさ", small: "小さめ", normal: "ふつう", large: "大きめ", larger: "特大" },
     altSwitches: {
       title: "左右の Alt で切り替え", description: "Alt だけを押すと、それぞれに選んだモードに切り替わります（日本語キーのないキーボード向け）",
       left: "左の Alt", right: "右の Alt", japanese: "日本語", mixed: "まぜ打ち", auto: "Auto", direct: "Direct", none: "なし",
@@ -669,6 +682,9 @@ const ja = {
     capsLock: { title: "Caps Lock がオンでもかなを入力" },
     punctuationCommit: { title: "句読点で確定", description: "、。！？ を入力すると、そこまでが変換されて確定されます" },
     shiftEnter: { title: "Shift + Enter で選んでいる文節まで確定", description: "変換中に、選んでいる文節までが確定され、残りは変換したまま続けられます" },
+    letterDelay: { title: "かなになるまでの時間", description: "打ったキーが少しの間英字で表示されてから、かなになります" },
+    kanjiDelay: { title: "漢字になるまでの時間", description: "ライブ変換で、打つのを止めてからこの時間が経つと漢字で表示されます", marker: "漢字になる部分を薄いグレーで示す" },
+    delays: { none: "なし", short: "短め", medium: "ふつう", long: "長め" },
     convertFromEnd: { title: "後ろの文節から直す", description: "変換したとき、最後の文節が選ばれた状態になります" },
     showTypedKeys: { title: "打ったキーを表示", description: "打ったローマ字が、候補の上に小さく表示されます" },
     escStepsBack: { title: "Esc で一段ずつ戻す", description: "Esc を押すたびに、漢字、かな、打ったローマ字の順に戻り、最後に消されます" },
@@ -841,6 +857,14 @@ const ja = {
     licenseMissing: "ライセンスの本文を読み込めませんでした。",
   },
 
+  settingsCode: {
+    title: "設定のコード",
+    description: "設定をコードにして、ほかの PC に持ち出したり共有したりできます",
+    copy: "コードをコピー", read: "コードを使う", paste: "設定のコードを貼り付け",
+    readTitle: "設定のコードを使いますか？", readMessage: "コードに含まれる設定で、今の設定が置き換えられます。",
+    copied: "設定のコードをコピーしました。", notCopied: "コードをコピーできませんでした。",
+    notCode: "設定のコードではありません。", applied: (n) => `${n} 個の設定を変更しました。`,
+  },
   learningList: {
     title: "学習した内容",
     search: "検索",

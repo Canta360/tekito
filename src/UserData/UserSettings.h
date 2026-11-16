@@ -38,6 +38,9 @@ struct UserSettings {
     // 0 = glass (frosted, with light under the selection), 1 = simple
     // (opaque panel with a flat selection row).
     int candidateWindowStyle{0};
+    // The candidate list's size, in percent of the usual (90, 100, 120, 145
+    // in Settings).
+    int candidateWindowScale{100};
     // Rows in the candidate list: 0 = automatic (English shows 5, then 10
     // once paged; Japanese 9), or a fixed number from kMinCandidateRows to
     // kMaxCandidateRows (Settings offers 5, 7 and 9; the rest by number).
@@ -87,6 +90,13 @@ struct UserSettings {
     // Japanese and Mix: Space converts with the last phrase chosen, to put
     // right from the end. Off by default: the first, as Microsoft IME.
     bool convertFromEnd{false};
+    // Japanese and Mix: how long keys show before they turn into kana, and
+    // live conversion waits before it shows (milliseconds, 0: at once),
+    // counted from the last key; while it waits, the kana that will become
+    // kanji are marked in light grey (japaneseKanjiMarker).
+    int japaneseLetterDelay{0};
+    int japaneseKanjiDelay{0};
+    bool japaneseKanjiMarker{true};
     // Japanese and Mix: Shift+Enter commits the phrases up to the one
     // chosen, the rest staying converted. Off by default: as Enter.
     bool shiftEnterCommitsToFocus{false};
